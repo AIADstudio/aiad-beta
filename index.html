@@ -4999,7 +4999,20 @@
                             </div>
                             <div class="settings-field">
                                 <label class="settings-label">Location (optional)</label>
-                                <input type="text" class="settings-input" id="settingsLocation" value="Lagos, Nigeria" placeholder="City, Country">
+                                <input type="text" class="settings-input" id="settingsLocation" value="" placeholder="City, Country">
+                            </div>
+                            <div class="settings-field">
+                                <label class="settings-label">Primary Genre</label>
+                                <input type="text" class="settings-input" id="settingsPrimaryGenre" value="" placeholder="e.g., R&B, Hip-Hop, Electronic">
+                            </div>
+                            <div class="settings-field">
+                                <label class="settings-label">Career Stage</label>
+                                <select class="settings-input" id="settingsCareerStage" style="appearance:none;background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\");background-repeat:no-repeat;background-position:right 12px center;background-size:20px;padding-right:40px;">
+                                    <option value="">Select stage</option>
+                                    <option value="starter">Starter — Building momentum</option>
+                                    <option value="pro">Pro — Growing & monetizing</option>
+                                    <option value="established">Established — Scaling up</option>
+                                </select>
                             </div>
                             <div class="settings-toggle-row">
                                 <div class="settings-toggle-info">
@@ -11408,13 +11421,17 @@
             }
 
             AppState.artistProfile.artistName = document.getElementById('artistName').value.trim();
+            AppState.artistProfile.primaryGenre = document.getElementById('primaryGenre').value.trim();
             localStorage.setItem('aiad_artist_profile', JSON.stringify(AppState.artistProfile));
 
-            // Also write to artist_profiles so settings loads correctly
+            // Write page-1 fields to artist_profiles immediately
             if (AppState.currentUser && AppState.artistProfile.artistName) {
                 await db.from('artist_profiles').upsert({
                     user_id: AppState.currentUser.id,
                     artist_name: AppState.artistProfile.artistName,
+                    primary_genre: AppState.artistProfile.primaryGenre || null,
+                    career_stage: AppState.artistProfile.artistLevel || null,
+                    username: username || null,
                     updated_at: new Date().toISOString()
                 }, { onConflict: 'user_id' });
             }
@@ -11432,13 +11449,25 @@
             validateGoalsPage();
         }
 
-        function handleGoalsContinue() {
-            // Save goals + new progressive profiling fields
+        async function handleGoalsContinue() {
+            // Save goals + progressive profiling fields to AppState
             AppState.artistProfile.primaryPlatform = AppState.artistContext.primaryPlatform || '';
             AppState.artistProfile.followerCount = AppState.artistContext.followerCount || '';
             localStorage.setItem('aiad_artist_goals', JSON.stringify(AppState.artistGoals));
             localStorage.setItem('aiad_artist_profile', JSON.stringify(AppState.artistProfile));
             localStorage.setItem('aiad_artist_context', JSON.stringify(AppState.artistContext));
+
+            // Persist page-2 fields to Supabase
+            if (AppState.currentUser) {
+                await db.from('artist_profiles').upsert({
+                    user_id: AppState.currentUser.id,
+                    primary_platform: AppState.artistProfile.primaryPlatform || null,
+                    follower_count: AppState.artistProfile.followerCount || null,
+                    goals: AppState.artistGoals.length ? AppState.artistGoals : null,
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'user_id' });
+            }
+
             navigateTo('subscription-tier');
         }
 
@@ -12882,6 +12911,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     short_bio: document.getElementById('settingsShortBio')?.value?.trim(),
                     full_bio: document.getElementById('settingsFullBio')?.value?.trim(),
                     location: document.getElementById('settingsLocation')?.value?.trim(),
+                    primary_genre: document.getElementById('settingsPrimaryGenre')?.value?.trim() || AppState.artistProfile?.primaryGenre || null,
+                    career_stage: document.getElementById('settingsCareerStage')?.value || AppState.artistProfile?.artistLevel || null,
                     updated_at: new Date().toISOString()
                 };
 
@@ -12966,6 +12997,15 @@ Only capture real, meaningful decisions — not questions or general discussion.
 
                 if (data.artist_name) AppState.artistProfile.artistName = data.artist_name;
                 if (data.location) AppState.artistProfile.location = data.location;
+                if (data.primary_genre) AppState.artistProfile.primaryGenre = data.primary_genre;
+                if (data.career_stage) AppState.artistProfile.artistLevel = data.career_stage;
+                if (data.primary_platform) AppState.artistProfile.primaryPlatform = data.primary_platform;
+                if (data.follower_count) AppState.artistProfile.followerCount = data.follower_count;
+                if (data.goals) { try { AppState.artistGoals = Array.isArray(data.goals) ? data.goals : JSON.parse(data.goals); } catch(e){} }
+
+                // Populate settings fields for new columns
+                if (document.getElementById('settingsPrimaryGenre')) document.getElementById('settingsPrimaryGenre').value = data.primary_genre || '';
+                if (document.getElementById('settingsCareerStage')) document.getElementById('settingsCareerStage').value = data.career_stage || '';
 
                 const nameEl = document.querySelector('.dash-artist-name');
                 if (nameEl && data.artist_name) nameEl.textContent = data.artist_name;
