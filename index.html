@@ -4814,13 +4814,23 @@ html, body {
                     </div>
 
                     <!-- ──────────────────────────────────────────
-                         AIAD STAGE AGENTS — 8 stages + contract review
+                         AIAD STAGE AGENTS — 8 stages (+ contract review as a cross-stage sub-agent)
                          Backed by `stage-agent` edge function (server-side skill content).
                          ────────────────────────────────────────── -->
                     <div class="specialized-agents-section">
                         <h3 class="specialized-agents-title">AIAD Stage Agents</h3>
-                        <p style="font-size:0.85rem;color:var(--text-muted);margin:0 0 18px 0;">Each agent runs a dedicated skill — A&R, development, recording, rights, touring, brand, finance, strategy, and contract review.</p>
+                        <p style="font-size:0.85rem;color:var(--text-muted);margin:0 0 18px 0;">Eight stages of the artist journey. Each agent runs a dedicated skill server-side.</p>
                         <div class="specialized-agents-grid" id="aiadStageGrid"></div>
+
+                        <div style="margin-top:18px;display:flex;justify-content:center;">
+                            <button onclick="window.openStageAgent('contract_review')" style="background:linear-gradient(135deg,rgba(167,139,250,0.18),rgba(124,58,237,0.12));border:1px solid rgba(167,139,250,0.35);border-radius:12px;padding:14px 22px;color:var(--text-primary);font-family:var(--font-body);font-size:0.88rem;cursor:pointer;display:flex;align-items:center;gap:10px;">
+                                <span style="font-size:1.1rem;">📜</span>
+                                <div style="text-align:left;">
+                                    <div style="font-weight:600;">Review a Contract</div>
+                                    <div style="font-size:0.74rem;color:var(--text-muted);">Cross-stage sub-agent — paste or describe any agreement</div>
+                                </div>
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Stage agent chat modal -->
@@ -4842,39 +4852,9 @@ html, body {
                         </div>
                     </div>
 
-                    <div class="specialized-agents-section">
-                        <h3 class="specialized-agents-title">Specialized Agents</h3>
-                        <div class="specialized-agents-grid">
-                            <div class="specialized-agent-card" onclick="openSpecializedAgent('strategy')">
-                                <div class="specialized-agent-icon strategy">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
-                                </div>
-                                <div class="specialized-agent-name">Strategy</div>
-                                <div class="specialized-agent-desc">Long-term positioning, deal evaluation, career direction</div>
-                            </div>
-                            <div class="specialized-agent-card" onclick="openSpecializedAgent('release')">
-                                <div class="specialized-agent-icon release">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
-                                </div>
-                                <div class="specialized-agent-name">Release</div>
-                                <div class="specialized-agent-desc">Timing, sequencing, distribution strategy</div>
-                            </div>
-                            <div class="specialized-agent-card" onclick="openSpecializedAgent('monetization')">
-                                <div class="specialized-agent-icon monetization">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
-                                </div>
-                                <div class="specialized-agent-name">Monetization</div>
-                                <div class="specialized-agent-desc">Revenue streams, pricing, sustainability</div>
-                            </div>
-                            <div class="specialized-agent-card" onclick="openSpecializedAgent('branding')">
-                                <div class="specialized-agent-icon branding">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>
-                                </div>
-                                <div class="specialized-agent-name">Branding</div>
-                                <div class="specialized-agent-desc">Identity, positioning, visual direction</div>
-                            </div>
-                        </div>
-                    </div>
+                    <!-- Old "Specialized Agents" (Strategy / Release / Monetization / Branding) removed —
+                         those concepts now live as full skills inside the Stage Agents grid above. -->
+
 
                     <div class="decision-memory-section">
                         <div class="decision-memory-header">
@@ -21948,8 +21928,9 @@ function toggleAgeRange(btn) {
             { key: 'brand_sync',       emoji: '🤝', name: 'Brand & Sync',     desc: 'Partnerships, sync placements' },
             { key: 'finances',         emoji: '💰', name: 'Finances',         desc: 'P&L, cash flow, runway' },
             { key: 'strategy_team',    emoji: '🧭', name: 'Strategy & Team',  desc: 'Career arc, team build, ops' },
-            { key: 'contract_review',  emoji: '📜', name: 'Contract Review',  desc: 'Read any contract — recording, mgmt, sync, more' },
         ];
+        // contract_review is a cross-stage sub-agent — accessible via the standalone button below the grid.
+        const CONTRACT_REVIEW = { key: 'contract_review', emoji: '📜', name: 'Contract Review', desc: 'Cross-stage — recording, mgmt, sync, publishing, more' };
 
         let activeStage = null;
 
@@ -22009,7 +21990,9 @@ function toggleAgeRange(btn) {
         }
 
         window.openStageAgent = function (key) {
-            const stage = STAGES.find((s) => s.key === key);
+            const stage = key === 'contract_review'
+                ? CONTRACT_REVIEW
+                : STAGES.find((s) => s.key === key);
             if (!stage) return;
             activeStage = stage;
             document.getElementById('stageAgentEmoji').textContent = stage.emoji;
