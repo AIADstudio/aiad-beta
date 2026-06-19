@@ -21745,8 +21745,17 @@ function toggleAgeRange(btn) {
         const SUPABASE_URL = 'https://uapiytquwuhtewqieegx.supabase.co';
         const ANON = (window.SUPABASE_ANON_KEY || '');
 
+        // Read the Supabase session straight from localStorage (where supabase-js stores it).
+        function getSession() {
+            try {
+                const tok = JSON.parse(localStorage.getItem('sb-uapiytquwuhtewqieegx-auth-token'));
+                if (tok?.access_token && tok?.user) return tok;
+            } catch (e) {}
+            return null;
+        }
+
         async function callEdge(fn, body) {
-            const session = (await window.db?.auth?.getSession())?.data?.session;
+            const session = getSession();
             const headers = {
                 'Content-Type':  'application/json',
                 'Authorization': `Bearer ${session?.access_token || ANON}`,
@@ -21761,7 +21770,7 @@ function toggleAgeRange(btn) {
 
         window.startCheckout = async function (plan) {
             try {
-                const sess = (await window.db?.auth?.getSession())?.data?.session;
+                const sess = getSession();
                 if (!sess?.user) { (window.showToast || alert)('Please sign in first'); return; }
                 const { url } = await callEdge('stripe-checkout', {
                     plan,
@@ -21777,7 +21786,7 @@ function toggleAgeRange(btn) {
 
         window.openBillingPortal = async function () {
             try {
-                const sess = (await window.db?.auth?.getSession())?.data?.session;
+                const sess = getSession();
                 if (!sess?.user) { (window.showToast || alert)('Please sign in first'); return; }
                 const { url } = await callEdge('stripe-portal', { user_id: sess.user.id });
                 window.location.href = url;
