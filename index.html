@@ -4813,6 +4813,35 @@ html, body {
                         </div>
                     </div>
 
+                    <!-- ──────────────────────────────────────────
+                         AIAD STAGE AGENTS — 8 stages + contract review
+                         Backed by `stage-agent` edge function (server-side skill content).
+                         ────────────────────────────────────────── -->
+                    <div class="specialized-agents-section">
+                        <h3 class="specialized-agents-title">AIAD Stage Agents</h3>
+                        <p style="font-size:0.85rem;color:var(--text-muted);margin:0 0 18px 0;">Each agent runs a dedicated skill — A&R, development, recording, rights, touring, brand, finance, strategy, and contract review.</p>
+                        <div class="specialized-agents-grid" id="aiadStageGrid"></div>
+                    </div>
+
+                    <!-- Stage agent chat modal -->
+                    <div id="stageAgentModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.78);backdrop-filter:blur(6px);z-index:9999;align-items:center;justify-content:center;padding:24px;">
+                        <div style="background:var(--bg-card);border:1px solid var(--border-default);border-radius:16px;max-width:760px;width:100%;max-height:88dvh;display:flex;flex-direction:column;overflow:hidden;">
+                            <div style="display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--border-default);">
+                                <div id="stageAgentEmoji" style="font-size:1.4rem;">🎯</div>
+                                <div style="flex:1;min-width:0;">
+                                    <div id="stageAgentName" style="font-size:1rem;font-weight:700;color:var(--text-primary);">Discover</div>
+                                    <div id="stageAgentDesc" style="font-size:0.78rem;color:var(--text-muted);">A&R and talent evaluation</div>
+                                </div>
+                                <button onclick="closeStageAgent()" style="background:none;border:none;color:var(--text-muted);font-size:1.4rem;cursor:pointer;line-height:1;padding:4px 10px;">×</button>
+                            </div>
+                            <div id="stageAgentThread" style="flex:1;overflow-y:auto;padding:18px 20px;display:flex;flex-direction:column;gap:14px;"></div>
+                            <div style="border-top:1px solid var(--border-default);padding:14px 16px;display:flex;gap:10px;align-items:flex-end;">
+                                <textarea id="stageAgentInput" rows="2" placeholder="Ask this agent anything..." style="flex:1;background:var(--bg-secondary);border:1px solid var(--border-default);border-radius:10px;color:var(--text-primary);font-family:var(--font-body);font-size:0.88rem;padding:10px 12px;resize:none;outline:none;" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendStageAgentMessage();}"></textarea>
+                                <button onclick="sendStageAgentMessage()" id="stageAgentSendBtn" style="background:linear-gradient(135deg,var(--magenta),var(--magenta-dark));border:none;color:#fff;border-radius:10px;padding:10px 18px;font-weight:600;cursor:pointer;font-family:var(--font-body);font-size:0.85rem;">Ask</button>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="specialized-agents-section">
                         <h3 class="specialized-agents-title">Specialized Agents</h3>
                         <div class="specialized-agents-grid">
@@ -21900,6 +21929,189 @@ function toggleAgeRange(btn) {
                 (window.showToast || alert)('Checkout canceled. No charge made.');
             }
         });
+    })();
+    </script>
+
+    <!-- ───────────────────────────────────────────────
+         AIAD Stage Agents — wires the 9 skill cards to
+         the `stage-agent` edge function.
+         ─────────────────────────────────────────────── -->
+    <script>
+    (function () {
+        const SUPABASE_URL = 'https://uapiytquwuhtewqieegx.supabase.co';
+        const STAGES = [
+            { key: 'discover',         emoji: '🔍', name: 'Discover',         desc: 'A&R and talent evaluation' },
+            { key: 'develop',          emoji: '🎨', name: 'Develop',          desc: 'Artist development and creative direction' },
+            { key: 'record_release',   emoji: '🎙️', name: 'Record & Release', desc: 'Recording budgets, metadata, rollout' },
+            { key: 'rights_royalties', emoji: '⚖️', name: 'Rights & Royalties', desc: 'Publishing, splits, royalties' },
+            { key: 'touring_live',     emoji: '🎤', name: 'Touring & Live',   desc: 'Routing, deal terms, settlement' },
+            { key: 'brand_sync',       emoji: '🤝', name: 'Brand & Sync',     desc: 'Partnerships, sync placements' },
+            { key: 'finances',         emoji: '💰', name: 'Finances',         desc: 'P&L, cash flow, runway' },
+            { key: 'strategy_team',    emoji: '🧭', name: 'Strategy & Team',  desc: 'Career arc, team build, ops' },
+            { key: 'contract_review',  emoji: '📜', name: 'Contract Review',  desc: 'Read any contract — recording, mgmt, sync, more' },
+        ];
+
+        let activeStage = null;
+
+        function getSession() {
+            try {
+                const tok = JSON.parse(localStorage.getItem('sb-uapiytquwuhtewqieegx-auth-token'));
+                if (tok?.access_token && tok?.user) return tok;
+            } catch (e) {}
+            return null;
+        }
+
+        function renderStageCards() {
+            const grid = document.getElementById('aiadStageGrid');
+            if (!grid || grid.dataset.rendered) return;
+            grid.dataset.rendered = '1';
+            grid.innerHTML = STAGES.map((s) => `
+                <div class="specialized-agent-card" onclick="window.openStageAgent('${s.key}')" style="cursor:pointer;">
+                    <div class="specialized-agent-icon" style="background:linear-gradient(135deg,rgba(255,0,255,0.18),rgba(0,212,255,0.12));font-size:1.4rem;display:flex;align-items:center;justify-content:center;">${s.emoji}</div>
+                    <div class="specialized-agent-name">${s.name}</div>
+                    <div class="specialized-agent-desc">${s.desc}</div>
+                </div>
+            `).join('');
+        }
+
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+        }
+
+        // Tiny markdown-ish renderer: ## headings, **bold**, lists, line breaks.
+        function renderMarkdown(text) {
+            let html = escapeHtml(text);
+            html = html.replace(/^### (.+)$/gm, '<h4 style="font-size:0.9rem;font-weight:700;margin:14px 0 6px 0;color:var(--text-primary);">$1</h4>');
+            html = html.replace(/^## (.+)$/gm, '<h3 style="font-size:0.98rem;font-weight:700;margin:16px 0 8px 0;color:var(--text-primary);">$1</h3>');
+            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.06);padding:1px 6px;border-radius:4px;font-size:0.85em;">$1</code>');
+            // Pipe tables (very simple — convert into HTML)
+            html = html.replace(/(\|[^\n]+\|\n)+/g, (block) => {
+                const lines = block.trim().split('\n').filter((l) => l.trim().startsWith('|'));
+                if (lines.length < 2) return block;
+                const rows = lines.filter((l, i) => !/^\|[\s\-:|]+\|$/.test(l));
+                const cells = rows.map((l) => l.replace(/^\||\|$/g, '').split('|').map((c) => c.trim()));
+                const head = cells[0];
+                const body = cells.slice(1);
+                let t = '<table style="border-collapse:collapse;width:100%;margin:10px 0;font-size:0.82rem;"><thead><tr>';
+                head.forEach((h) => t += `<th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--border-default);color:var(--text-secondary);font-weight:600;">${h}</th>`);
+                t += '</tr></thead><tbody>';
+                body.forEach((r) => {
+                    t += '<tr>';
+                    r.forEach((c) => t += `<td style="padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.04);color:var(--text-secondary);">${c}</td>`);
+                    t += '</tr>';
+                });
+                t += '</tbody></table>';
+                return t;
+            });
+            html = html.split(/\n{2,}/).map((p) => /^<(h\d|table)/.test(p) ? p : '<p style="margin:8px 0;line-height:1.55;">' + p.replace(/\n/g, '<br>') + '</p>').join('');
+            return html;
+        }
+
+        window.openStageAgent = function (key) {
+            const stage = STAGES.find((s) => s.key === key);
+            if (!stage) return;
+            activeStage = stage;
+            document.getElementById('stageAgentEmoji').textContent = stage.emoji;
+            document.getElementById('stageAgentName').textContent = stage.name;
+            document.getElementById('stageAgentDesc').textContent = stage.desc;
+            const thread = document.getElementById('stageAgentThread');
+            thread.innerHTML = `<div style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:20px 8px;">Ask the ${stage.name} agent anything — server-side skill, structured output.</div>`;
+            document.getElementById('stageAgentInput').value = '';
+            const modal = document.getElementById('stageAgentModal');
+            modal.style.display = 'flex';
+            setTimeout(() => document.getElementById('stageAgentInput').focus(), 50);
+        };
+
+        window.closeStageAgent = function () {
+            document.getElementById('stageAgentModal').style.display = 'none';
+            activeStage = null;
+        };
+
+        window.sendStageAgentMessage = async function () {
+            if (!activeStage) return;
+            const input = document.getElementById('stageAgentInput');
+            const message = input.value.trim();
+            if (!message) return;
+
+            const sess = getSession();
+            if (!sess) { (window.showToast || alert)('Please sign in first'); return; }
+
+            const thread = document.getElementById('stageAgentThread');
+            // Clear placeholder if first message
+            if (thread.querySelector('div[style*="text-align:center"]')) thread.innerHTML = '';
+
+            // User bubble
+            const userBubble = document.createElement('div');
+            userBubble.style.cssText = 'align-self:flex-end;max-width:85%;background:rgba(0,212,255,0.10);border:1px solid rgba(0,212,255,0.25);border-radius:12px 12px 2px 12px;padding:10px 14px;color:var(--text-primary);font-size:0.88rem;line-height:1.5;';
+            userBubble.textContent = message;
+            thread.appendChild(userBubble);
+
+            // Loading bubble
+            const loading = document.createElement('div');
+            loading.style.cssText = 'align-self:flex-start;color:var(--text-muted);font-size:0.82rem;font-style:italic;';
+            loading.textContent = activeStage.name + ' is thinking…';
+            thread.appendChild(loading);
+            thread.scrollTop = thread.scrollHeight;
+
+            input.value = '';
+            const sendBtn = document.getElementById('stageAgentSendBtn');
+            sendBtn.disabled = true;
+            sendBtn.textContent = '…';
+
+            try {
+                const res = await fetch(`${SUPABASE_URL}/functions/v1/stage-agent`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${sess.access_token}`,
+                    },
+                    body: JSON.stringify({
+                        stage: activeStage.key,
+                        user_id: sess.user.id,
+                        message,
+                    }),
+                });
+                const data = await res.json();
+                loading.remove();
+
+                if (!res.ok) throw new Error(data.error || `stage-agent ${res.status}`);
+
+                const agentBubble = document.createElement('div');
+                agentBubble.style.cssText = 'align-self:flex-start;max-width:96%;background:rgba(255,0,255,0.06);border:1px solid rgba(255,0,255,0.18);border-radius:12px 12px 12px 2px;padding:14px 16px;color:var(--text-secondary);font-size:0.88rem;line-height:1.55;';
+                agentBubble.innerHTML = renderMarkdown(data.response || '');
+                thread.appendChild(agentBubble);
+                thread.scrollTop = thread.scrollHeight;
+            } catch (err) {
+                console.error('[stage-agent]', err);
+                loading.remove();
+                const errBubble = document.createElement('div');
+                errBubble.style.cssText = 'align-self:flex-start;color:#ef4444;font-size:0.82rem;';
+                errBubble.textContent = 'Error: ' + (err.message || err);
+                thread.appendChild(errBubble);
+            } finally {
+                sendBtn.disabled = false;
+                sendBtn.textContent = 'Ask';
+            }
+        };
+
+        // Render cards when the artist Agents view becomes visible.
+        function tryRender() {
+            const view = document.getElementById('artistAgentsView');
+            if (!view) return;
+            renderStageCards();
+        }
+        document.addEventListener('DOMContentLoaded', tryRender);
+        // Also render after a brief delay in case the dashboard isn't mounted yet.
+        setTimeout(tryRender, 1500);
+        // Re-render whenever artist Agents view becomes active.
+        const _origShowArtist = window.showArtistView;
+        if (typeof _origShowArtist === 'function') {
+            window.showArtistView = function (view) {
+                _origShowArtist(view);
+                if (view === 'agent') setTimeout(renderStageCards, 50);
+            };
+        }
     })();
     </script>
 </body>
