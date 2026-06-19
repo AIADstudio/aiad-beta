@@ -15560,31 +15560,111 @@ Only capture real, meaningful decisions — not questions or general discussion.
             const { data, error } = await db.auth.signUp({
                 email,
                 password,
-                options: { data: { full_name: name, username, role } }
+                options: {
+                    data: { full_name: name, username, role },
+                    emailRedirectTo: 'https://aiad.studio/?verified=1',
+                },
             });
+
+            btn.querySelector('span').textContent = 'Create Account';
+            btn.disabled = false;
 
             if (error) {
                 showToast('Error: ' + error.message);
-                btn.disabled = false;
-                btn.querySelector('span').textContent = 'Create Account';
                 return;
             }
 
-            if (data.user) {
-                await db.from('profiles').upsert({
-                    id: data.user.id,
-                    email,
-                    full_name: name,
-                    username,
-                    role,
-                }, { onConflict: 'id' });
-                AppState.currentUser = data.user;
-            }
+            // Stash the intended profile so we can create the row AFTER email is verified.
+            // (Until verified, RLS blocks the insert and there's no session.)
+            try {
+                localStorage.setItem('aiad_pending_profile', JSON.stringify({
+                    email, full_name: name, username, role,
+                }));
+            } catch (e) {}
 
-            btn.querySelector('span').textContent = 'Create Account';
-            showToast('Welcome to AIAD, ' + name + '!');
-            navigateTo('industry-selection');
+            // Email confirmation is ON — Supabase returns a user object but NO session.
+            // Show the verification screen instead of dropping the user into onboarding.
+            if (data?.user && !data?.session) {
+                showVerifyEmailScreen(email);
+            } else if (data?.session) {
+                // Email confirmation is OFF (edge case) — proceed straight in.
+                if (data.user) {
+                    await db.from('profiles').upsert({
+                        id: data.user.id,
+                        email, full_name: name, username, role,
+                    }, { onConflict: 'id' });
+                    AppState.currentUser = data.user;
+                }
+                showToast('Welcome to AIAD, ' + name + '!');
+                navigateTo('industry-selection');
+            }
         }
+
+        // Full-screen "check your email" message shown after signup.
+        function showVerifyEmailScreen(email) {
+            let overlay = document.getElementById('aiadVerifyEmailOverlay');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.id = 'aiadVerifyEmailOverlay';
+                overlay.style.cssText = 'position:fixed;inset:0;background:var(--bg-primary, #0a0a0f);z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px;';
+                overlay.innerHTML = `
+                    <div style="max-width:440px;width:100%;text-align:center;color:var(--text-primary, #fff);font-family:var(--font-body, system-ui);">
+                        <div style="font-size:3rem;line-height:1;margin-bottom:18px;">✉️</div>
+                        <h2 style="font-size:1.4rem;font-weight:700;margin:0 0 12px 0;">Check your email</h2>
+                        <p style="font-size:0.95rem;color:var(--text-secondary, #9ca3af);line-height:1.55;margin:0 0 24px 0;">
+                            We sent a verification link to <strong id="aiadVerifyEmailAddr" style="color:var(--text-primary, #fff);"></strong>.
+                            Click it to activate your AIAD account.
+                        </p>
+                        <p style="font-size:0.82rem;color:var(--text-muted, #6b7280);margin:0 0 28px 0;">
+                            Didn't get the email? Check your spam folder, or
+                            <a href="#" id="aiadVerifyResend" style="color:var(--teal, #00d4ff);">resend it</a>.
+                        </p>
+                        <button id="aiadVerifyBackBtn" style="background:transparent;border:1px solid var(--border-default, rgba(255,255,255,0.12));color:var(--text-secondary, #9ca3af);padding:10px 22px;border-radius:10px;cursor:pointer;font-family:inherit;font-size:0.85rem;">
+                            Back to sign in
+                        </button>
+                    </div>`;
+                document.body.appendChild(overlay);
+
+                document.getElementById('aiadVerifyBackBtn').onclick = () => {
+                    overlay.remove();
+                    location.replace(location.origin + location.pathname);
+                };
+                document.getElementById('aiadVerifyResend').onclick = async (e) => {
+                    e.preventDefault();
+                    try {
+                        await db.auth.resend({ type: 'signup', email, options: { emailRedirectTo: 'https://aiad.studio/?verified=1' } });
+                        showToast('Verification email resent');
+                    } catch (err) {
+                        showToast('Resend failed: ' + (err.message || err));
+                    }
+                };
+            }
+            document.getElementById('aiadVerifyEmailAddr').textContent = email;
+        }
+
+        // When user lands back from the email verification link (?verified=1), create their profile row.
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const p = new URLSearchParams(location.search);
+                if (p.get('verified') !== '1') return;
+                const sess = (await db.auth.getSession())?.data?.session;
+                if (!sess?.user) return;
+                const pending = JSON.parse(localStorage.getItem('aiad_pending_profile') || 'null');
+                if (pending) {
+                    await db.from('profiles').upsert({
+                        id: sess.user.id,
+                        email: pending.email,
+                        full_name: pending.full_name,
+                        username: pending.username,
+                        role: pending.role,
+                    }, { onConflict: 'id' });
+                    localStorage.removeItem('aiad_pending_profile');
+                }
+                AppState.currentUser = sess.user;
+                showToast('Email verified — welcome to AIAD');
+                navigateTo('industry-selection');
+            } catch (e) { console.warn('[aiad] post-verify hook', e); }
+        });
 
         let selectedMerchProduct = 'T-Shirt';
         const mockupMap = {
@@ -17143,26 +17223,20 @@ Only capture real, meaningful decisions — not questions or general discussion.
             const { data, error } = await db.auth.signInWithPassword({ email, password });
 
             if (error) {
-
-                if (error.message.includes('Invalid login credentials')) {
-                    const { data: signUpData, error: signUpError } = await db.auth.signUp({ email, password });
-                    if (signUpError) {
-                        showToast('Error: ' + signUpError.message);
-                        btn.disabled = false;
-                        btn.querySelector('span').textContent = 'Sign In';
-                        return;
-                    }
-                    AppState.currentUser = signUpData.user;
-                    showToast('Account created! Welcome to AIAD.');
-                } else {
-                    showToast('Error: ' + error.message);
+                // User hasn't clicked the verification link yet.
+                if (/email not confirmed/i.test(error.message)) {
+                    showToast('Please verify your email first');
                     btn.disabled = false;
                     btn.querySelector('span').textContent = 'Sign In';
+                    showVerifyEmailScreen(email);
                     return;
                 }
-            } else {
-                AppState.currentUser = data.user;
+                showToast('Error: ' + error.message);
+                btn.disabled = false;
+                btn.querySelector('span').textContent = 'Sign In';
+                return;
             }
+            AppState.currentUser = data.user;
 
             btn.querySelector('span').textContent = 'Sign In';
             btn.disabled = false;
