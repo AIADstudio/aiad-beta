@@ -4823,8 +4823,10 @@ html, body {
                         <div class="specialized-agents-grid" id="aiadStageGrid"></div>
 
                         <div style="margin-top:18px;display:flex;justify-content:center;">
-                            <button onclick="window.openStageAgent('contract_review')" style="background:linear-gradient(135deg,rgba(167,139,250,0.18),rgba(124,58,237,0.12));border:1px solid rgba(167,139,250,0.35);border-radius:12px;padding:14px 22px;color:var(--text-primary);font-family:var(--font-body);font-size:0.88rem;cursor:pointer;display:flex;align-items:center;gap:10px;">
-                                <span style="font-size:1.1rem;">📜</span>
+                            <button onclick="window.openStageAgent('contract_review')" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.10);border-radius:12px;padding:14px 22px;color:var(--text-primary);font-family:var(--font-body);font-size:0.88rem;cursor:pointer;display:flex;align-items:center;gap:14px;">
+                                <span style="width:22px;height:22px;display:inline-flex;color:#fff;">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="14 3 14 9 20 9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
+                                </span>
                                 <div style="text-align:left;">
                                     <div style="font-weight:600;">Review a Contract</div>
                                     <div style="font-size:0.74rem;color:var(--text-muted);">Cross-stage sub-agent — paste or describe any agreement</div>
@@ -4837,7 +4839,7 @@ html, body {
                     <div id="stageAgentModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.78);backdrop-filter:blur(6px);z-index:9999;align-items:center;justify-content:center;padding:24px;">
                         <div style="background:var(--bg-card);border:1px solid var(--border-default);border-radius:16px;max-width:760px;width:100%;max-height:88dvh;display:flex;flex-direction:column;overflow:hidden;">
                             <div style="display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--border-default);">
-                                <div id="stageAgentEmoji" style="font-size:1.4rem;">🎯</div>
+                                <div id="stageAgentEmoji" style="width:24px;height:24px;color:#fff;display:inline-flex;"></div>
                                 <div style="flex:1;min-width:0;">
                                     <div id="stageAgentName" style="font-size:1rem;font-weight:700;color:var(--text-primary);">Discover</div>
                                     <div id="stageAgentDesc" style="font-size:0.78rem;color:var(--text-muted);">A&R and talent evaluation</div>
@@ -21919,18 +21921,30 @@ function toggleAgeRange(btn) {
     <script>
     (function () {
         const SUPABASE_URL = 'https://uapiytquwuhtewqieegx.supabase.co';
+        // Feather-style line icons (24x24, stroke=currentColor, fill=none)
+        const ICONS = {
+            search:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+            sparkles:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>',
+            mic:       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3M8 21h8"/></svg>',
+            scales:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M5 21h14M6 7l-3 7c0 2 1.5 3 3 3s3-1 3-3l-3-7zM18 7l-3 7c0 2 1.5 3 3 3s3-1 3-3l-3-7zM5 7l7-2 7 2"/></svg>',
+            calendar:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/></svg>',
+            link:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>',
+            trending:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></svg>',
+            compass:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16 8 13 13 8 16 11 11 16 8"/></svg>',
+            document:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="14 3 14 9 20 9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>',
+        };
         const STAGES = [
-            { key: 'discover',         emoji: '🔍', name: 'Discover',         desc: 'A&R and talent evaluation' },
-            { key: 'develop',          emoji: '🎨', name: 'Develop',          desc: 'Artist development and creative direction' },
-            { key: 'record_release',   emoji: '🎙️', name: 'Record & Release', desc: 'Recording budgets, metadata, rollout' },
-            { key: 'rights_royalties', emoji: '⚖️', name: 'Rights & Royalties', desc: 'Publishing, splits, royalties' },
-            { key: 'touring_live',     emoji: '🎤', name: 'Touring & Live',   desc: 'Routing, deal terms, settlement' },
-            { key: 'brand_sync',       emoji: '🤝', name: 'Brand & Sync',     desc: 'Partnerships, sync placements' },
-            { key: 'finances',         emoji: '💰', name: 'Finances',         desc: 'P&L, cash flow, runway' },
-            { key: 'strategy_team',    emoji: '🧭', name: 'Strategy & Team',  desc: 'Career arc, team build, ops' },
+            { key: 'discover',         icon: ICONS.search,   name: 'Discover',         desc: 'A&R and talent evaluation' },
+            { key: 'develop',          icon: ICONS.sparkles, name: 'Develop',          desc: 'Artist development and creative direction' },
+            { key: 'record_release',   icon: ICONS.mic,      name: 'Record & Release', desc: 'Recording budgets, metadata, rollout' },
+            { key: 'rights_royalties', icon: ICONS.scales,   name: 'Rights & Royalties', desc: 'Publishing, splits, royalties' },
+            { key: 'touring_live',     icon: ICONS.calendar, name: 'Touring & Live',   desc: 'Routing, deal terms, settlement' },
+            { key: 'brand_sync',       icon: ICONS.link,     name: 'Brand & Sync',     desc: 'Partnerships, sync placements' },
+            { key: 'finances',         icon: ICONS.trending, name: 'Finances',         desc: 'P&L, cash flow, runway' },
+            { key: 'strategy_team',    icon: ICONS.compass,  name: 'Strategy & Team',  desc: 'Career arc, team build, ops' },
         ];
         // contract_review is a cross-stage sub-agent — accessible via the standalone button below the grid.
-        const CONTRACT_REVIEW = { key: 'contract_review', emoji: '📜', name: 'Contract Review', desc: 'Cross-stage — recording, mgmt, sync, publishing, more' };
+        const CONTRACT_REVIEW = { key: 'contract_review', icon: ICONS.document, name: 'Contract Review', desc: 'Cross-stage — recording, mgmt, sync, publishing, more' };
 
         let activeStage = null;
 
@@ -21948,7 +21962,9 @@ function toggleAgeRange(btn) {
             grid.dataset.rendered = '1';
             grid.innerHTML = STAGES.map((s) => `
                 <div class="specialized-agent-card" onclick="window.openStageAgent('${s.key}')" style="cursor:pointer;">
-                    <div class="specialized-agent-icon" style="background:linear-gradient(135deg,rgba(255,0,255,0.18),rgba(0,212,255,0.12));font-size:1.4rem;display:flex;align-items:center;justify-content:center;">${s.emoji}</div>
+                    <div class="specialized-agent-icon" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;color:#fff;">
+                        <span style="width:22px;height:22px;display:inline-flex;">${s.icon}</span>
+                    </div>
                     <div class="specialized-agent-name">${s.name}</div>
                     <div class="specialized-agent-desc">${s.desc}</div>
                 </div>
@@ -21995,7 +22011,9 @@ function toggleAgeRange(btn) {
                 : STAGES.find((s) => s.key === key);
             if (!stage) return;
             activeStage = stage;
-            document.getElementById('stageAgentEmoji').textContent = stage.emoji;
+            const iconEl = document.getElementById('stageAgentEmoji');
+            iconEl.innerHTML = stage.icon;
+            iconEl.style.cssText = 'width:24px;height:24px;color:#fff;display:inline-flex;';
             document.getElementById('stageAgentName').textContent = stage.name;
             document.getElementById('stageAgentDesc').textContent = stage.desc;
             const thread = document.getElementById('stageAgentThread');
