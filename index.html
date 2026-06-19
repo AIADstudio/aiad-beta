@@ -1622,7 +1622,7 @@ html, body {
                     <div class="collab-plan-header">
                         <div class="collab-plan-badge">Collaborator</div>
                         <div class="collab-plan-price">
-                            <span class="collab-plan-amount">$9</span>
+                            <span class="collab-plan-amount">$19</span>
                             <span class="collab-plan-period">/month</span>
                         </div>
                     </div>
@@ -12793,7 +12793,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
 
         function handleLicenseTrack(trackId, title, price) {
-            showToast(`Licensing "${title}" — Stripe integration coming soon`);
+            // Track licensing — separate from subscription flow. Stub for now.
+            showToast(`Licensing "${title}" — license-purchase flow not wired yet`);
         }
 
         function filterSyncCatalog() {
@@ -20840,7 +20841,7 @@ function fanOpenSupportModal(artistId, artistName) {
                 style="width:100%;padding:13px;border-radius:12px;border:none;background:var(--teal);color:var(--bg-primary);font-size:0.92rem;font-weight:700;cursor:pointer;font-family:var(--font-body);opacity:0.5;">
                 Choose a tier to continue
             </button>
-            <p style="font-size:0.72rem;color:var(--text-muted);text-align:center;margin-top:10px;">Stripe payments coming soon. Selection saved.</p>
+            <p style="font-size:0.72rem;color:var(--text-muted);text-align:center;margin-top:10px;">Fan-to-artist patronage uses Stripe Connect (separate from AIAD subscriptions). Selection saved.</p>
         </div>`;
     document.body.appendChild(modal);
     document.getElementById('fanSupportModalClose').onclick = () => modal.remove();
@@ -21730,6 +21731,72 @@ function toggleAgeRange(btn) {
                 navigator.serviceWorker.register('/sw.js').catch(() => {});
             });
         }
+    </script>
+
+    <!-- ───────────────────────────────────────────────
+         Stripe billing helpers — wired to edge functions.
+         Call from anywhere:
+           startCheckout('artist_pro')        // subscription
+           startCheckout('brief_credits_5')   // one-time credit pack
+           openBillingPortal()                // manage / cancel
+         ─────────────────────────────────────────────── -->
+    <script>
+    (function () {
+        const SUPABASE_URL = 'https://uapiytquwuhtewqieegx.supabase.co';
+        const ANON = (window.SUPABASE_ANON_KEY || '');
+
+        async function callEdge(fn, body) {
+            const session = (await window.db?.auth?.getSession())?.data?.session;
+            const headers = {
+                'Content-Type':  'application/json',
+                'Authorization': `Bearer ${session?.access_token || ANON}`,
+            };
+            const res = await fetch(`${SUPABASE_URL}/functions/v1/${fn}`, {
+                method: 'POST', headers, body: JSON.stringify(body),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || `${fn} failed (${res.status})`);
+            return data;
+        }
+
+        window.startCheckout = async function (plan) {
+            try {
+                const sess = (await window.db?.auth?.getSession())?.data?.session;
+                if (!sess?.user) { (window.showToast || alert)('Please sign in first'); return; }
+                const { url } = await callEdge('stripe-checkout', {
+                    plan,
+                    user_id: sess.user.id,
+                    email:   sess.user.email,
+                });
+                window.location.href = url;
+            } catch (err) {
+                console.error('[startCheckout]', err);
+                (window.showToast || alert)('Could not start checkout: ' + err.message);
+            }
+        };
+
+        window.openBillingPortal = async function () {
+            try {
+                const sess = (await window.db?.auth?.getSession())?.data?.session;
+                if (!sess?.user) { (window.showToast || alert)('Please sign in first'); return; }
+                const { url } = await callEdge('stripe-portal', { user_id: sess.user.id });
+                window.location.href = url;
+            } catch (err) {
+                console.error('[openBillingPortal]', err);
+                (window.showToast || alert)('Could not open billing portal: ' + err.message);
+            }
+        };
+
+        // Surface checkout result to the user when Stripe redirects back.
+        document.addEventListener('DOMContentLoaded', () => {
+            const p = new URLSearchParams(location.search);
+            if (p.get('billing') === 'success') {
+                (window.showToast || alert)('Payment successful — your plan is active.');
+            } else if (p.get('billing') === 'canceled') {
+                (window.showToast || alert)('Checkout canceled. No charge made.');
+            }
+        });
+    })();
     </script>
 </body>
 </html>
