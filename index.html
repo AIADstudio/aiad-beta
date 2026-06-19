@@ -21727,8 +21727,29 @@ function toggleAgeRange(btn) {
             el.classList.add('active');
         }
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js').catch(() => {});
+            window.addEventListener('load', async () => {
+                try {
+                    const reg = await navigator.serviceWorker.register('/sw.js');
+                    // Force update check on each page load so deploys reach users immediately.
+                    reg.update().catch(() => {});
+                    // When a new SW is installed and waiting, tell it to take over.
+                    reg.addEventListener('updatefound', () => {
+                        const nw = reg.installing;
+                        if (!nw) return;
+                        nw.addEventListener('statechange', () => {
+                            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+                                nw.postMessage('SKIP_WAITING');
+                            }
+                        });
+                    });
+                    // Reload once when the active SW changes so the page picks up new code.
+                    let reloaded = false;
+                    navigator.serviceWorker.addEventListener('controllerchange', () => {
+                        if (reloaded) return;
+                        reloaded = true;
+                        location.reload();
+                    });
+                } catch (e) { /* swallow */ }
             });
         }
     </script>
