@@ -403,6 +403,25 @@ html, body {
     .view-header { flex-direction: column !important; align-items: flex-start !important; }
     .context-items { grid-template-columns: repeat(2, 1fr) !important; }
     .dash-sidebar-footer { padding-bottom: 24px !important; }
+
+    /* 12. Post composer toolbar — wrap so Post button never gets clipped */
+    .new-composer-toolbar {
+        flex-wrap: wrap !important;
+        row-gap: 8px !important;
+    }
+    .new-composer-toolbar .nc-spacer { display: none !important; }
+    .new-composer-toolbar .nc-vis-select {
+        flex: 1 1 140px !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+    }
+    .new-composer-toolbar .nc-post-btn {
+        flex: 0 0 auto !important;
+        margin-left: auto !important;
+    }
+    .new-composer-toolbar .nc-tool-btn {
+        flex: 0 0 auto !important;
+    }
 }
 /* Hide labels when collapsed, show on hover */
 .dash-sidebar-left .dash-logo-text,
