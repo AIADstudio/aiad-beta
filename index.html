@@ -21934,17 +21934,73 @@ function toggleAgeRange(btn) {
             document:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="14 3 14 9 20 9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>',
         };
         const STAGES = [
-            { key: 'discover',         icon: ICONS.search,   name: 'Discover',         desc: 'A&R and talent evaluation' },
-            { key: 'develop',          icon: ICONS.sparkles, name: 'Develop',          desc: 'Artist development and creative direction' },
-            { key: 'record_release',   icon: ICONS.mic,      name: 'Record & Release', desc: 'Recording budgets, metadata, rollout' },
-            { key: 'rights_royalties', icon: ICONS.scales,   name: 'Rights & Royalties', desc: 'Publishing, splits, royalties' },
-            { key: 'touring_live',     icon: ICONS.calendar, name: 'Touring & Live',   desc: 'Routing, deal terms, settlement' },
-            { key: 'brand_sync',       icon: ICONS.link,     name: 'Brand & Sync',     desc: 'Partnerships, sync placements' },
-            { key: 'finances',         icon: ICONS.trending, name: 'Finances',         desc: 'P&L, cash flow, runway' },
-            { key: 'strategy_team',    icon: ICONS.compass,  name: 'Strategy & Team',  desc: 'Career arc, team build, ops' },
+            { key: 'discover',         icon: ICONS.search,   name: 'Discover',         desc: 'A&R and talent evaluation',
+              suggestions: [
+                  "I'm an independent artist — score my own readiness honestly",
+                  "What's my market lane and who are my closest comps?",
+                  "Which traction signals actually matter at my level?",
+                  "Am I ready to release publicly, or should I keep developing?",
+              ] },
+            { key: 'develop',          icon: ICONS.sparkles, name: 'Develop',          desc: 'Artist development and creative direction',
+              suggestions: [
+                  "Help me write a one-page brand brief — I'm starting from scratch",
+                  "I have 5 demos. Which one should I lead with?",
+                  "Find me affordable producers in my genre (budget under $500/track)",
+                  "Plan a sustainable content cadence I can actually hold solo",
+              ] },
+            { key: 'record_release',   icon: ICONS.mic,      name: 'Record & Release', desc: 'Recording budgets, metadata, rollout',
+              suggestions: [
+                  "Build my first single rollout — release in 6 weeks, no team",
+                  "What metadata and credits do I need before I upload to DSPs?",
+                  "Walk me through pitching Spotify editorial as an indie",
+                  "Am I release-ready? Run the full checklist",
+              ] },
+            { key: 'rights_royalties', icon: ICONS.scales,   name: 'Rights & Royalties', desc: 'Publishing, splits, royalties',
+              suggestions: [
+                  "Publishing 101 — what do I actually own and how do I get paid?",
+                  "I co-wrote with a friend on guitar. How do we split fairly?",
+                  "Should I sign up for a PRO? Which one and how?",
+                  "What rights am I giving up if I sign a distro or label deal?",
+              ] },
+            { key: 'touring_live',     icon: ICONS.calendar, name: 'Touring & Live',   desc: 'Routing, deal terms, settlement',
+              suggestions: [
+                  "I've never played live. How do I book my first show?",
+                  "Price tickets for a 50-capacity room — what's realistic?",
+                  "Build a one-city show budget so I don't lose money",
+                  "How do I land a support slot for a touring artist?",
+              ] },
+            { key: 'brand_sync',       icon: ICONS.link,     name: 'Brand & Sync',     desc: 'Partnerships, sync placements',
+              suggestions: [
+                  "How do indie artists actually get songs placed in TV/film?",
+                  "What's a realistic sync placement payout at my level?",
+                  "Brand partnerships when I'm small — what's worth pursuing?",
+                  "Where do I list my catalog so sync supervisors can find it?",
+              ] },
+            { key: 'finances',         icon: ICONS.trending, name: 'Finances',         desc: 'P&L, cash flow, runway',
+              suggestions: [
+                  "I have $500/month for music. Where should it go?",
+                  "How much should I set aside for taxes as an independent artist?",
+                  "Spotify pays me ~$30/mo. When does that meaningfully grow?",
+                  "Build me a 12-month runway plan — what can I sustain?",
+              ] },
+            { key: 'strategy_team',    icon: ICONS.compass,  name: 'Strategy & Team',  desc: 'Career arc, team build, ops',
+              suggestions: [
+                  "Do I need a manager yet? How do I know when it's time?",
+                  "Map out my next 12 months — one realistic goal at a time",
+                  "What should I do myself vs. hire/outsource at my level?",
+                  "I'm overwhelmed. Help me pick the ONE thing to focus on this quarter",
+              ] },
         ];
         // contract_review is a cross-stage sub-agent — accessible via the standalone button below the grid.
-        const CONTRACT_REVIEW = { key: 'contract_review', icon: ICONS.document, name: 'Contract Review', desc: 'Cross-stage — recording, mgmt, sync, publishing, more' };
+        const CONTRACT_REVIEW = {
+            key: 'contract_review', icon: ICONS.document, name: 'Contract Review', desc: 'Cross-stage — recording, mgmt, sync, publishing, more',
+            suggestions: [
+                "I'll paste a contract — flag the red flags in plain English",
+                "What should I look for in a distribution deal at my level?",
+                "Is 50/50 publishing fair for an indie? Walk me through it",
+                "Explain this contract clause-by-clause like I'm new to this",
+            ],
+        };
 
         let activeStage = null;
 
@@ -22017,7 +22073,21 @@ function toggleAgeRange(btn) {
             document.getElementById('stageAgentName').textContent = stage.name;
             document.getElementById('stageAgentDesc').textContent = stage.desc;
             const thread = document.getElementById('stageAgentThread');
-            thread.innerHTML = `<div style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:20px 8px;">Ask the ${stage.name} agent anything — server-side skill, structured output.</div>`;
+            const sugs = (stage.suggestions || []).map((s, i) =>
+                `<button type="button" data-sug="${escapeHtml(s)}" style="text-align:left;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.10);border-radius:10px;padding:11px 14px;color:var(--text-secondary);font-family:var(--font-body);font-size:0.84rem;line-height:1.4;cursor:pointer;transition:border-color 0.15s, background 0.15s;width:100%;" onmouseover="this.style.borderColor='rgba(255,0,255,0.35)';this.style.background='rgba(255,0,255,0.05)';" onmouseout="this.style.borderColor='rgba(255,255,255,0.10)';this.style.background='rgba(255,255,255,0.03)';">${escapeHtml(s)}</button>`
+            ).join('');
+            thread.innerHTML = `
+                <div style="color:var(--text-muted);font-size:0.78rem;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Try asking</div>
+                <div style="display:grid;grid-template-columns:1fr;gap:8px;">${sugs}</div>
+            `;
+            // Wire suggestion clicks to prefill input.
+            thread.querySelectorAll('button[data-sug]').forEach((b) => {
+                b.addEventListener('click', () => {
+                    const input = document.getElementById('stageAgentInput');
+                    input.value = b.dataset.sug;
+                    input.focus();
+                });
+            });
             document.getElementById('stageAgentInput').value = '';
             const modal = document.getElementById('stageAgentModal');
             modal.style.display = 'flex';
@@ -22039,8 +22109,8 @@ function toggleAgeRange(btn) {
             if (!sess) { (window.showToast || alert)('Please sign in first'); return; }
 
             const thread = document.getElementById('stageAgentThread');
-            // Clear placeholder if first message
-            if (thread.querySelector('div[style*="text-align:center"]')) thread.innerHTML = '';
+            // Clear initial suggestions block once user actually sends.
+            if (thread.querySelector('button[data-sug]')) thread.innerHTML = '';
 
             // User bubble
             const userBubble = document.createElement('div');
