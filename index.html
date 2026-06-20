@@ -3351,6 +3351,7 @@ html, body {
                     <div class="dash-nav-item" onclick="showArtistView('schedule')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span> Schedule</span></div>
                     <div class="dash-nav-item" onclick="showArtistView('revenue')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg><span> Revenue</span></div>
                     <div class="dash-nav-item" onclick="showArtistView('analytics')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span> Analytics</span></div>
+                    <div class="dash-nav-item" id="navMyStats" onclick="showArtistView('mystats')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span> My Stats</span></div>
                     <div class="dash-nav-item" onclick="showArtistView('milestones')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span> Milestones</span></div>
                     <div class="dash-nav-item" onclick="showArtistView('inbox')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><span> Inbox </div>
                     <div class="dash-nav-item dash-nav-dropdown" onclick="toggleCreativeStudio()">
@@ -4767,6 +4768,47 @@ html, body {
                             </div>
                         </div>
                     </div>
+                </div>
+
+                <!-- ── MY STATS — first-class destination for platform handles + self-reported numbers ── -->
+                <div class="dash-view" id="artistMyStatsView">
+                    <div class="agents-page-header">
+                        <h1 class="agents-page-title">My Stats</h1>
+                        <p class="agents-page-subtitle">AIAD grounds every recommendation in your real numbers. Connect platforms or self-report — both work.</p>
+                    </div>
+
+                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:20px 22px;margin-bottom:16px;">
+                        <h3 style="margin:0 0 4px 0;font-size:1rem;font-weight:600;">Public-API connect</h3>
+                        <p style="font-size:0.82rem;color:var(--text-muted);margin:0 0 14px 0;">Spotify (when Premium owner OR Extended Quota) + YouTube — no sign-in required.</p>
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;">
+                            <input id="myStatsSpotifyId" placeholder="Spotify artist URL or ID" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
+                            <input id="myStatsYoutubeHandle" placeholder="YouTube @handle or UC… channel ID" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
+                        </div>
+                        <div id="myStatsApiStatus" style="margin-top:10px;font-size:0.76rem;color:var(--text-muted);"></div>
+                    </div>
+
+                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:20px 22px;margin-bottom:16px;">
+                        <h3 style="margin:0 0 4px 0;font-size:1rem;font-weight:600;">Self-report numbers</h3>
+                        <p style="font-size:0.82rem;color:var(--text-muted);margin:0 0 14px 0;">Use these any time API data is blocked, missing, or you just know more than the API does (e.g., monthly listeners for Spotify, which the public API doesn't expose).</p>
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;">
+                            <input id="srMonthlyListeners"   type="number" placeholder="Spotify monthly listeners" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
+                            <input id="srSpotifyFollowers"   type="number" placeholder="Spotify followers" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
+                            <input id="srTotalStreams"       type="number" placeholder="Total streams (all-time)" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
+                            <input id="srInstagramFollowers" type="number" placeholder="Instagram followers" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
+                            <input id="srTiktokFollowers"    type="number" placeholder="TikTok followers" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
+                            <input id="srPrimaryGenre"       placeholder="Primary genre (e.g., R&amp;B, indie pop)" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
+                            <input id="srLatestReleaseName"  placeholder="Latest release title" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
+                            <input id="srLatestReleaseDate"  type="date" placeholder="Latest release date" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
+                            <input id="srLocation"           placeholder="City / market (e.g., Brooklyn NY)" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
+                        </div>
+                    </div>
+
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+                        <button onclick="window.saveAndFetchStats()" style="background:linear-gradient(135deg,var(--magenta),var(--magenta-dark));border:none;color:#fff;border-radius:10px;padding:11px 22px;font-weight:600;cursor:pointer;font-size:0.88rem;">Save &amp; fetch</button>
+                        <button onclick="window.saveStatsOnly()" style="background:transparent;border:1px solid var(--border-default);color:var(--text-secondary);border-radius:10px;padding:11px 18px;font-size:0.85rem;cursor:pointer;">Save self-report only</button>
+                        <button onclick="document.getElementById('myStatsRaw').style.display = document.getElementById('myStatsRaw').style.display === 'none' ? 'block' : 'none';" style="background:transparent;border:1px solid var(--border-default);color:var(--text-secondary);border-radius:10px;padding:11px 16px;font-size:0.82rem;cursor:pointer;">Show raw data</button>
+                    </div>
+                    <pre id="myStatsRaw" style="display:none;background:rgba(0,0,0,0.4);border:1px solid var(--border-default);border-radius:10px;padding:12px;font-size:0.74rem;color:var(--text-secondary);overflow-x:auto;white-space:pre-wrap;max-height:340px;overflow-y:auto;"></pre>
                 </div>
 
                 <div class="dash-view" id="artistAgentsView">
@@ -13198,7 +13240,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
 
         function showArtistView(view) {
 
-            const allViews = ['artistPostsView', 'artistSupportersView', 'artistProjectsView', 'artistRevenueView', 'artistScheduleView', 'artistCollaboratorsView', 'artistMusicView', 'artistSongwritingView', 'artistMixMediaView', 'artistMerchView', 'artistSyncLibraryView', 'artistMilestonesView', 'artistAnalyticsView', 'artistAgentsView', 'artistInboxView', 'artistSettingsView'];
+            const allViews = ['artistPostsView', 'artistSupportersView', 'artistProjectsView', 'artistRevenueView', 'artistScheduleView', 'artistCollaboratorsView', 'artistMusicView', 'artistSongwritingView', 'artistMixMediaView', 'artistMerchView', 'artistSyncLibraryView', 'artistMilestonesView', 'artistAnalyticsView', 'artistMyStatsView', 'artistAgentsView', 'artistInboxView', 'artistSettingsView'];
             allViews.forEach(v => {
                 const el = document.getElementById(v);
                 if (el) el.classList.remove('active');
@@ -13227,6 +13269,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 'merch': 'artistMerchView',
                 'synclibrary': 'artistSyncLibraryView',
                 'analytics': 'artistAnalyticsView',
+                'mystats': 'artistMyStatsView',
                 'milestones': 'artistMilestonesView',
                 'inbox': 'artistInboxView',
                 'settings': 'artistSettingsView'
@@ -13300,12 +13343,16 @@ Only capture real, meaningful decisions — not questions or general discussion.
             } else if (view === 'analytics') {
                 viewEl.classList.add('active');
                 navItems[7].classList.add('active');
+            } else if (view === 'mystats') {
+                viewEl.classList.add('active');
+                if (navItems[8]) navItems[8].classList.add('active');
+                setTimeout(() => { if (typeof loadMyStats === 'function') loadMyStats(); }, 60);
             } else if (view === 'milestones') {
                 viewEl.classList.add('active');
-                navItems[8].classList.add('active');
+                if (navItems[9]) navItems[9].classList.add('active');
             } else if (view === 'inbox') {
                 viewEl.classList.add('active');
-                navItems[9].classList.add('active');
+                if (navItems[10]) navItems[10].classList.add('active');
             } else if (view === 'settings') {
                 viewEl.classList.add('active');
                 // Auto-populate settings from AppState first (instant)
@@ -22324,6 +22371,254 @@ function toggleAgeRange(btn) {
                 if (view === 'agent') setTimeout(renderStageCards, 50);
             };
         }
+    })();
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // My Stats view + first-run onboarding modal
+    // ─────────────────────────────────────────────────────────────────────────
+    (function () {
+        function getSess() {
+            try {
+                const raw = localStorage.getItem('sb-uapiytquwuhtewqieegx-auth-token');
+                return raw ? JSON.parse(raw) : null;
+            } catch { return null; }
+        }
+        function getAnonKey() {
+            // Grab the anon JWT from any script tag in the page (Supabase client embeds it).
+            const all = [...document.querySelectorAll('script')].map(s => s.innerHTML).join('');
+            const m = all.match(/eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+/);
+            return m ? m[0] : null;
+        }
+        function normalizeSpotifyId(input) {
+            if (!input) return '';
+            const t = input.trim();
+            const u = t.match(/artist\/([A-Za-z0-9]+)/); if (u) return u[1];
+            const r = t.match(/spotify:artist:([A-Za-z0-9]+)/); if (r) return r[1];
+            return t;
+        }
+        function num(id) {
+            const v = document.getElementById(id)?.value;
+            if (v === undefined || v === '' || v === null) return undefined;
+            const n = Number(v);
+            return Number.isFinite(n) ? n : undefined;
+        }
+        function str(id) {
+            const v = document.getElementById(id)?.value;
+            return v ? v.trim() : undefined;
+        }
+        function buildSelfReported() {
+            const obj = {
+                monthly_listeners:    num('srMonthlyListeners')   ?? num('obMonthlyListeners'),
+                spotify_followers:    num('srSpotifyFollowers')   ?? num('obSpotifyFollowers'),
+                total_streams:        num('srTotalStreams'),
+                instagram_followers:  num('srInstagramFollowers') ?? num('obInstagramFollowers'),
+                tiktok_followers:     num('srTiktokFollowers')    ?? num('obTiktokFollowers'),
+                primary_genre:        str('srPrimaryGenre')       ?? str('obPrimaryGenre'),
+                latest_release_name:  str('srLatestReleaseName'),
+                latest_release_date:  str('srLatestReleaseDate'),
+                location:             str('srLocation')           ?? str('obLocation'),
+            };
+            // Drop undefined keys.
+            Object.keys(obj).forEach(k => obj[k] === undefined && delete obj[k]);
+            return obj;
+        }
+        function buildHandles(scope) {
+            const prefix = scope === 'onboarding' ? 'ob' : 'myStats';
+            return {
+                spotify_id:     normalizeSpotifyId(document.getElementById(prefix + 'SpotifyId')?.value || ''),
+                youtube_handle: (document.getElementById(prefix + 'YoutubeHandle')?.value || '').trim(),
+            };
+        }
+
+        async function callFetchStats(action, scope) {
+            const sess = getSess();
+            if (!sess) { (window.showToast || alert)('Please sign in first'); return null; }
+            const handles = buildHandles(scope);
+            const self_reported = buildSelfReported();
+            const body = {
+                user_id: sess.user.id,
+                action,
+                spotify_id:     handles.spotify_id || undefined,
+                youtube_handle: handles.youtube_handle || undefined,
+                self_reported:  Object.keys(self_reported).length ? self_reported : undefined,
+            };
+            const SUPABASE_URL_LOCAL = (typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL) || 'https://uapiytquwuhtewqieegx.supabase.co';
+            const res = await fetch(`${SUPABASE_URL_LOCAL}/functions/v1/fetch-artist-stats`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sess.access_token },
+                body: JSON.stringify(body),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || `fetch-artist-stats ${res.status}`);
+            return data;
+        }
+
+        window.saveAndFetchStats = async function () {
+            try {
+                const data = await callFetchStats('fetch', 'mystats');
+                if (!data) return;
+                renderMyStatsStatus(data);
+                (window.showToast || alert)('Stats saved & refreshed');
+                localStorage.setItem('aiad_stats_collected', '1');
+            } catch (e) { (window.showToast || alert)('Failed: ' + e.message); }
+        };
+        window.saveStatsOnly = async function () {
+            try {
+                const data = await callFetchStats('save_handles', 'mystats');
+                if (!data) return;
+                (window.showToast || alert)('Saved.');
+                localStorage.setItem('aiad_stats_collected', '1');
+            } catch (e) { (window.showToast || alert)('Failed: ' + e.message); }
+        };
+
+        function renderMyStatsStatus(data) {
+            const el = document.getElementById('myStatsApiStatus');
+            const raw = document.getElementById('myStatsRaw');
+            if (!el) return;
+            const parts = [];
+            if (data.spotify_stats?.followers !== undefined) parts.push(`Spotify API: ${data.spotify_stats.followers.toLocaleString()} followers · pop ${data.spotify_stats.popularity ?? '?'}`);
+            if (data.youtube_stats?.subscribers !== undefined) parts.push(`YouTube: ${data.youtube_stats.subscribers.toLocaleString()} subs`);
+            if (data.self_reported?.monthly_listeners) parts.push(`Self-reported: ${data.self_reported.monthly_listeners.toLocaleString()} monthly listeners`);
+            const errs = data.errors ? Object.entries(data.errors).map(([k, v]) => `${k}: ${v}`).join(' · ') : '';
+            el.innerHTML = (parts.length ? `<span style="color:var(--teal-light);">●</span> ${parts.join(' · ')}` : '<span style="opacity:0.6;">No data yet</span>')
+                + (errs ? `<br><span style="color:#f59e0b;">${errs}</span>` : '');
+            if (raw) raw.textContent = JSON.stringify(data, null, 2);
+        }
+
+        async function loadMyStats() {
+            const sess = getSess();
+            const anon = getAnonKey();
+            if (!sess || !anon) return;
+            try {
+                const SUPABASE_URL_LOCAL = (typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL) || 'https://uapiytquwuhtewqieegx.supabase.co';
+                const res = await fetch(`${SUPABASE_URL_LOCAL}/rest/v1/artist_stats?select=*&user_id=eq.${sess.user.id}`, {
+                    headers: { 'Authorization': 'Bearer ' + sess.access_token, 'apikey': anon },
+                });
+                const rows = await res.json();
+                const row = Array.isArray(rows) ? rows[0] : null;
+                if (!row) return;
+                const setVal = (id, v) => { const el = document.getElementById(id); if (el && v !== undefined && v !== null && v !== '') el.value = v; };
+                setVal('myStatsSpotifyId',     row.spotify_id);
+                setVal('myStatsYoutubeHandle', row.youtube_handle);
+                const sr = row.spotify_stats?.self_reported || {};
+                setVal('srMonthlyListeners',   sr.monthly_listeners);
+                setVal('srSpotifyFollowers',   sr.spotify_followers);
+                setVal('srTotalStreams',      sr.total_streams);
+                setVal('srInstagramFollowers', sr.instagram_followers);
+                setVal('srTiktokFollowers',   sr.tiktok_followers);
+                setVal('srPrimaryGenre',      sr.primary_genre);
+                setVal('srLatestReleaseName', sr.latest_release_name);
+                setVal('srLatestReleaseDate', sr.latest_release_date);
+                setVal('srLocation',          sr.location);
+                renderMyStatsStatus({ spotify_stats: row.spotify_stats, youtube_stats: row.youtube_stats, self_reported: sr });
+                if (sr.monthly_listeners || row.spotify_id || row.youtube_handle) {
+                    localStorage.setItem('aiad_stats_collected', '1');
+                }
+            } catch (e) { /* silent */ }
+        }
+        window.loadMyStats = loadMyStats;
+
+        // ── First-run onboarding modal ───────────────────────────────────────
+        function buildOnboardingModal() {
+            if (document.getElementById('aiadOnboardingOverlay')) return;
+            const html = `
+            <div id="aiadOnboardingOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.82);backdrop-filter:blur(8px);z-index:99999;align-items:center;justify-content:center;padding:20px;">
+              <div style="background:var(--bg-card,#0f0f14);border:1px solid rgba(255,255,255,0.10);border-radius:18px;max-width:640px;width:100%;max-height:92vh;overflow-y:auto;padding:28px 28px 22px;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+                  <span style="width:8px;height:8px;border-radius:50%;background:linear-gradient(135deg,var(--magenta,#d946ef),var(--teal,#06b6d4));display:inline-block;"></span>
+                  <span style="font-size:0.72rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted,#94a3b8);">AIAD setup · step 1 of 1</span>
+                </div>
+                <h2 style="margin:4px 0 8px 0;font-size:1.5rem;font-weight:700;color:#fff;">Tell AIAD your numbers</h2>
+                <p style="font-size:0.92rem;color:var(--text-secondary,#cbd5e1);margin:0 0 18px 0;line-height:1.45;">
+                  Every recommendation AIAD makes — from release strategy to pricing — is grounded in your actual stats. Drop in what you have. You can always update later in <strong>My Stats</strong>.
+                </p>
+
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:14px 16px;margin-bottom:14px;">
+                  <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:8px;font-weight:600;">Public-API connect (optional)</div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                    <input id="obSpotifyId" placeholder="Spotify artist URL/ID" style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
+                    <input id="obYoutubeHandle" placeholder="YouTube @handle" style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
+                  </div>
+                </div>
+
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:14px 16px;margin-bottom:14px;">
+                  <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:8px;font-weight:600;">Your numbers</div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                    <input id="obMonthlyListeners"   type="number" placeholder="Spotify monthly listeners" style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
+                    <input id="obSpotifyFollowers"   type="number" placeholder="Spotify followers" style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
+                    <input id="obInstagramFollowers" type="number" placeholder="Instagram followers" style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
+                    <input id="obTiktokFollowers"    type="number" placeholder="TikTok followers" style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
+                    <input id="obPrimaryGenre"       placeholder="Primary genre" style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
+                    <input id="obLocation"           placeholder="City / market" style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
+                  </div>
+                </div>
+
+                <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap;">
+                  <button onclick="window.aiadOnboardingSkip()" style="background:transparent;border:1px solid rgba(255,255,255,0.15);color:var(--text-muted);border-radius:10px;padding:10px 16px;font-size:0.85rem;cursor:pointer;">Skip for now</button>
+                  <button onclick="window.aiadOnboardingSubmit()" id="aiadOnboardingSubmitBtn" style="background:linear-gradient(135deg,var(--magenta,#d946ef),var(--magenta-dark,#a21caf));border:none;color:#fff;border-radius:10px;padding:10px 22px;font-weight:600;cursor:pointer;font-size:0.88rem;">Save &amp; continue</button>
+                </div>
+                <p style="font-size:0.7rem;color:var(--text-hint,#64748b);margin:14px 0 0 0;text-align:center;">All fields optional. AIAD adapts to whatever data you give it.</p>
+              </div>
+            </div>`;
+            const wrap = document.createElement('div');
+            wrap.innerHTML = html;
+            document.body.appendChild(wrap.firstElementChild);
+        }
+
+        window.aiadOnboardingSkip = function () {
+            localStorage.setItem('aiad_stats_skipped_at', String(Date.now()));
+            const o = document.getElementById('aiadOnboardingOverlay');
+            if (o) o.style.display = 'none';
+        };
+        window.aiadOnboardingSubmit = async function () {
+            const btn = document.getElementById('aiadOnboardingSubmitBtn');
+            if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+            try {
+                await callFetchStats('fetch', 'onboarding');
+                localStorage.setItem('aiad_stats_collected', '1');
+                const o = document.getElementById('aiadOnboardingOverlay');
+                if (o) o.style.display = 'none';
+                (window.showToast || (() => {}))('Saved — AIAD will use this in every response');
+            } catch (e) {
+                (window.showToast || alert)('Failed: ' + e.message);
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = 'Save & continue'; }
+            }
+        };
+
+        async function maybeShowOnboarding() {
+            const sess = getSess();
+            const anon = getAnonKey();
+            if (!sess || !anon) return;
+            if (localStorage.getItem('aiad_stats_collected') === '1') return;
+            // Check DB — they may have filled it on another device.
+            try {
+                const SUPABASE_URL_LOCAL = (typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL) || 'https://uapiytquwuhtewqieegx.supabase.co';
+                const res = await fetch(`${SUPABASE_URL_LOCAL}/rest/v1/artist_stats?select=spotify_id,youtube_handle,spotify_stats&user_id=eq.${sess.user.id}`, {
+                    headers: { 'Authorization': 'Bearer ' + sess.access_token, 'apikey': anon },
+                });
+                const rows = await res.json();
+                const row = Array.isArray(rows) ? rows[0] : null;
+                const hasData = row && (row.spotify_id || row.youtube_handle || row.spotify_stats?.self_reported?.monthly_listeners);
+                if (hasData) {
+                    localStorage.setItem('aiad_stats_collected', '1');
+                    return;
+                }
+            } catch { /* fall through and prompt */ }
+
+            // Respect a recent skip (don't nag every session — wait 24h before showing again).
+            const skipped = Number(localStorage.getItem('aiad_stats_skipped_at') || 0);
+            if (skipped && (Date.now() - skipped < 24 * 60 * 60 * 1000)) return;
+
+            buildOnboardingModal();
+            const overlay = document.getElementById('aiadOnboardingOverlay');
+            if (overlay) overlay.style.display = 'flex';
+        }
+
+        // Trigger on initial dashboard load (~2s after DOMContentLoaded gives auth time to settle).
+        document.addEventListener('DOMContentLoaded', () => { setTimeout(maybeShowOnboarding, 2200); });
+        // Also re-check after any sign-in (URL hash often changes).
+        window.addEventListener('hashchange', () => setTimeout(maybeShowOnboarding, 600));
     })();
     </script>
 </body>
