@@ -3099,7 +3099,8 @@ html, body {
         </button>
         <div class="dashboard">
             <aside class="dash-sidebar-left">
-                <div class="dash-logo">
+                <div class="dash-logo" style="display:flex;align-items:center;gap:8px;">
+                    <svg viewBox="0 0 100 100" fill="none" style="width:28px;height:28px;flex-shrink:0;"><circle cx="50" cy="50" r="44" stroke="#ffffff" stroke-width="3" fill="none" opacity="0.95"/><circle cx="50" cy="50" r="34" fill="#ffffff"/><rect x="18" y="41" width="64" height="18" rx="9" fill="#0a0a0f"/><circle cx="36" cy="50" r="3.2" fill="#ffffff"/><circle cx="64" cy="50" r="3.2" fill="#ffffff"/></svg>
                     <span class="dash-logo-text">AIAD</span>
                 </div>
                 <div class="dash-subtitle">Stream Studio</div>
@@ -4833,6 +4834,29 @@ html, body {
                     </div>
 
                     <!-- ──────────────────────────────────────────
+                         CONNECT PLATFORMS — public data, no per-user OAuth
+                         Server pulls Spotify (app-only Client Creds), YouTube (API key), Last.fm.
+                         ────────────────────────────────────────── -->
+                    <div class="specialized-agents-section" id="aiadConnectPanel" style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:18px 20px;margin-bottom:20px;">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+                            <div>
+                                <h3 class="specialized-agents-title" style="margin:0 0 4px 0;">Connect Your Platforms</h3>
+                                <p style="font-size:0.82rem;color:var(--text-muted);margin:0;">Public data only — no sign-in to Spotify/YouTube/Last.fm required. AIAD uses this to ground answers in your real stats.</p>
+                            </div>
+                            <div id="aiadStatsStatus" style="font-size:0.74rem;color:var(--text-muted);"></div>
+                        </div>
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:14px;">
+                            <input id="aiadSpotifyId" placeholder="Spotify artist ID or URL" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-family:var(--font-body);font-size:0.85rem;outline:none;">
+                            <input id="aiadYoutubeHandle" placeholder="YouTube @handle or channel ID" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-family:var(--font-body);font-size:0.85rem;outline:none;">
+                        </div>
+                        <div style="display:flex;gap:10px;margin-top:12px;">
+                            <button id="aiadFetchStatsBtn" onclick="window.fetchArtistStats()" style="background:linear-gradient(135deg,var(--magenta),var(--magenta-dark));border:none;color:#fff;border-radius:10px;padding:10px 18px;font-weight:600;cursor:pointer;font-family:var(--font-body);font-size:0.85rem;">Fetch stats</button>
+                            <button onclick="document.getElementById('aiadStatsSummary').style.display = document.getElementById('aiadStatsSummary').style.display === 'none' ? 'block' : 'none';" style="background:transparent;border:1px solid var(--border-default);color:var(--text-secondary);border-radius:10px;padding:10px 16px;font-family:var(--font-body);font-size:0.82rem;cursor:pointer;">Show data</button>
+                        </div>
+                        <pre id="aiadStatsSummary" style="display:none;background:rgba(0,0,0,0.4);border:1px solid var(--border-default);border-radius:10px;padding:12px;margin-top:12px;font-size:0.74rem;color:var(--text-secondary);overflow-x:auto;white-space:pre-wrap;max-height:300px;overflow-y:auto;"></pre>
+                    </div>
+
+                    <!-- ──────────────────────────────────────────
                          AIAD STAGE AGENTS — 8 stages (+ contract review as a cross-stage sub-agent)
                          Backed by `stage-agent` edge function (server-side skill content).
                          ────────────────────────────────────────── -->
@@ -5656,7 +5680,8 @@ html, body {
         </button>
         <div class="dashboard">
             <aside class="dash-sidebar-left">
-                <div class="dash-logo">
+                <div class="dash-logo" style="display:flex;align-items:center;gap:8px;">
+                    <svg viewBox="0 0 100 100" fill="none" style="width:28px;height:28px;flex-shrink:0;"><circle cx="50" cy="50" r="44" stroke="#ffffff" stroke-width="3" fill="none" opacity="0.95"/><circle cx="50" cy="50" r="34" fill="#ffffff"/><rect x="18" y="41" width="64" height="18" rx="9" fill="#0a0a0f"/><circle cx="36" cy="50" r="3.2" fill="#ffffff"/><circle cx="64" cy="50" r="3.2" fill="#ffffff"/></svg>
                     <span class="dash-logo-text">AIAD</span>
                 </div>
                 <div class="dash-subtitle">Atelier</div>
@@ -19695,7 +19720,14 @@ Only capture real, meaningful decisions — not questions or general discussion.
         <div class="dashboard" style="background:#0a0a0f;">
 
             <nav class="dash-nav" style="border-right:1px solid rgba(255,255,255,0.06);">
-                <div class="dash-nav-logo">
+                <div class="dash-nav-logo" style="display:flex;align-items:center;gap:8px;">
+                    <svg viewBox="0 0 100 100" fill="none" style="width:28px;height:28px;flex-shrink:0;">
+                        <circle cx="50" cy="50" r="44" stroke="#ffffff" stroke-width="3" fill="none" opacity="0.95"/>
+                        <circle cx="50" cy="50" r="34" fill="#ffffff"/>
+                        <rect x="18" y="41" width="64" height="18" rx="9" fill="#0a0a0f"/>
+                        <circle cx="36" cy="50" r="3.2" fill="#ffffff"/>
+                        <circle cx="64" cy="50" r="3.2" fill="#ffffff"/>
+                    </svg>
                     <span style="font-size:1.1rem;font-weight:700;letter-spacing:0.05em;color:var(--text-primary);">AIAD</span>
                     <span style="font-size:0.65rem;color:#a78bfa;margin-left:6px;background:rgba(167,139,250,0.1);padding:2px 8px;border-radius:4px;border:1px solid rgba(167,139,250,0.2);">Supervisor</span>
                 </div>
@@ -22190,7 +22222,97 @@ function toggleAgeRange(btn) {
             const view = document.getElementById('artistAgentsView');
             if (!view) return;
             renderStageCards();
+            loadStatsIntoForm();
         }
+
+        // ── Connect Platforms: load saved handles + cached stats into the form on mount ──
+        async function loadStatsIntoForm() {
+            const sess = getSession();
+            if (!sess) return;
+            try {
+                const scripts = [...document.querySelectorAll('script')].map(s => s.innerHTML).join('');
+                const m = scripts.match(/eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+/);
+                const anon = m && m[0];
+                if (!anon) return;
+                const res = await fetch(`${SUPABASE_URL}/rest/v1/artist_stats?select=*&user_id=eq.${sess.user.id}`, {
+                    headers: { 'Authorization': 'Bearer ' + sess.access_token, 'apikey': anon },
+                });
+                const rows = await res.json();
+                const row = Array.isArray(rows) ? rows[0] : null;
+                if (!row) return;
+                if (row.spotify_id)     document.getElementById('aiadSpotifyId').value     = row.spotify_id;
+                if (row.youtube_handle) document.getElementById('aiadYoutubeHandle').value = row.youtube_handle;
+                if (row.lastfm_user)    document.getElementById('aiadLastfmUser').value    = row.lastfm_user;
+                updateStatsStatus(row);
+            } catch (e) { /* silent */ }
+        }
+
+        function updateStatsStatus(row) {
+            const el = document.getElementById('aiadStatsStatus');
+            if (!el) return;
+            if (!row) { el.textContent = ''; return; }
+            const parts = [];
+            if (row.spotify_stats?.followers !== undefined) parts.push(`Spotify: ${row.spotify_stats.followers.toLocaleString()} followers`);
+            if (row.youtube_stats?.subscribers !== undefined) parts.push(`YouTube: ${row.youtube_stats.subscribers.toLocaleString()} subs`);
+            if (row.lastfm_stats?.playcount !== undefined) parts.push(`Last.fm: ${row.lastfm_stats.playcount.toLocaleString()} plays`);
+            const when = row.last_fetched_at ? new Date(row.last_fetched_at).toLocaleString() : 'never';
+            el.innerHTML = parts.length
+                ? `<span style="color:var(--teal-light);">●</span> ${parts.join(' · ')}<br><span style="opacity:0.6;">Last fetched: ${when}</span>`
+                : `<span style="opacity:0.6;">No data yet</span>`;
+            const sum = document.getElementById('aiadStatsSummary');
+            if (sum) sum.textContent = JSON.stringify({
+                spotify: row.spotify_stats, youtube: row.youtube_stats, lastfm: row.lastfm_stats,
+            }, null, 2);
+        }
+
+        // Extract a Spotify artist ID from either a bare ID, a /artist/... URL, or a spotify: URI.
+        function normalizeSpotifyId(input) {
+            if (!input) return '';
+            const trimmed = input.trim();
+            const urlMatch = trimmed.match(/artist\/([A-Za-z0-9]+)/);
+            if (urlMatch) return urlMatch[1];
+            const uriMatch = trimmed.match(/spotify:artist:([A-Za-z0-9]+)/);
+            if (uriMatch) return uriMatch[1];
+            return trimmed;
+        }
+
+        window.fetchArtistStats = async function () {
+            const sess = getSession();
+            if (!sess) { (window.showToast || alert)('Please sign in first'); return; }
+            const btn = document.getElementById('aiadFetchStatsBtn');
+            const status = document.getElementById('aiadStatsStatus');
+            btn.disabled = true; btn.textContent = 'Fetching…';
+            try {
+                const body = {
+                    user_id:        sess.user.id,
+                    action:         'fetch',
+                    spotify_id:     normalizeSpotifyId(document.getElementById('aiadSpotifyId').value),
+                    youtube_handle: document.getElementById('aiadYoutubeHandle').value.trim(),
+                };
+                const res = await fetch(`${SUPABASE_URL}/functions/v1/fetch-artist-stats`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sess.access_token },
+                    body: JSON.stringify(body),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `fetch-artist-stats ${res.status}`);
+                updateStatsStatus({
+                    spotify_stats: data.spotify_stats,
+                    youtube_stats: data.youtube_stats,
+                    lastfm_stats:  data.lastfm_stats,
+                    last_fetched_at: data.fetched_at,
+                });
+                if (data.errors) {
+                    status.innerHTML += `<br><span style="color:#f59e0b;">Some sources failed: ${Object.entries(data.errors).map(([k,v]) => `${k} (${v})`).join('; ')}</span>`;
+                }
+                (window.showToast || alert)('Stats fetched');
+            } catch (err) {
+                console.error('[fetchArtistStats]', err);
+                (window.showToast || alert)('Failed: ' + err.message);
+            } finally {
+                btn.disabled = false; btn.textContent = 'Fetch stats';
+            }
+        };
         document.addEventListener('DOMContentLoaded', tryRender);
         // Also render after a brief delay in case the dashboard isn't mounted yet.
         setTimeout(tryRender, 1500);
