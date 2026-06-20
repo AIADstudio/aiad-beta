@@ -100,9 +100,42 @@ serve(async (req) => {
         if (!skill) throw new Error(`Unknown stage: ${stage}. Valid: ${Object.keys(SKILLS).join(", ")}`);
         if (!message) throw new Error("message required");
 
+        // Pull the artist's cached stats (if any) so the agent can ground answers in real data.
+        let artistContext = "";
+        if (user_id) {
+            try {
+                const supa = createClient(SUPABASE_URL, SERVICE_KEY);
+                const { data: stats } = await supa.from("artist_stats")
+                    .select("spotify_stats,youtube_stats,lastfm_stats,last_fetched_at")
+                    .eq("user_id", user_id).maybeSingle();
+                if (stats && (stats.spotify_stats || stats.youtube_stats || stats.lastfm_stats)) {
+                    const compact: Record<string, unknown> = {};
+                    const sp = stats.spotify_stats || {};
+                    if (sp.name) compact.spotify = {
+                        name: sp.name, followers: sp.followers, popularity: sp.popularity,
+                        genres: sp.genres,
+                        top_tracks: (sp.top_tracks ?? []).slice(0, 5).map((t: any) => `${t.name} (pop ${t.popularity})`),
+                        related: (sp.related_artists ?? []).slice(0, 5).map((a: any) => a.name),
+                    };
+                    const yt = stats.youtube_stats || {};
+                    if (yt.name) compact.youtube = {
+                        name: yt.name, subscribers: yt.subscribers,
+                        total_views: yt.total_views, video_count: yt.video_count,
+                        recent_videos: (yt.recent_videos ?? []).slice(0, 3).map((v: any) => `${v.title} — ${v.views} views`),
+                    };
+                    const lf = stats.lastfm_stats || {};
+                    if (lf.name) compact.lastfm = { name: lf.name, playcount: lf.playcount, country: lf.country };
+                    if (Object.keys(compact).length) {
+                        artistContext = `[Artist data — last fetched ${stats.last_fetched_at ?? "unknown"}]\n${JSON.stringify(compact, null, 2)}`;
+                    }
+                }
+            } catch (e) { console.warn("[stage-agent] stats lookup", e); }
+        }
+
+        const mergedContext = [artistContext, context].filter(Boolean).join("\n\n");
         const system = `${ROUTING_RULES}\n\n--- ACTIVE SKILL: ${STAGE_NAMES[stage]} ---\n\n${skill}`;
 
-        const { text, usage } = await callClaude(system, message, context ?? "");
+        const { text, usage } = await callClaude(system, message, mergedContext);
 
         // Best-effort: log usage to a metrics table if you create one later.
         if (user_id) {
