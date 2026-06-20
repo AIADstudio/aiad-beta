@@ -22453,6 +22453,10 @@ function toggleAgeRange(btn) {
             return data;
         }
 
+        function hideBanner() {
+            const b = document.getElementById('aiadStatsBanner');
+            if (b) b.style.display = 'none';
+        }
         window.saveAndFetchStats = async function () {
             try {
                 const data = await callFetchStats('fetch', 'mystats');
@@ -22460,6 +22464,7 @@ function toggleAgeRange(btn) {
                 renderMyStatsStatus(data);
                 (window.showToast || alert)('Stats saved & refreshed');
                 localStorage.setItem('aiad_stats_collected', '1');
+                hideBanner();
             } catch (e) { (window.showToast || alert)('Failed: ' + e.message); }
         };
         window.saveStatsOnly = async function () {
@@ -22468,6 +22473,7 @@ function toggleAgeRange(btn) {
                 if (!data) return;
                 (window.showToast || alert)('Saved.');
                 localStorage.setItem('aiad_stats_collected', '1');
+                hideBanner();
             } catch (e) { (window.showToast || alert)('Failed: ' + e.message); }
         };
 
@@ -22569,6 +22575,8 @@ function toggleAgeRange(btn) {
             localStorage.setItem('aiad_stats_skipped_at', String(Date.now()));
             const o = document.getElementById('aiadOnboardingOverlay');
             if (o) o.style.display = 'none';
+            // Now show the persistent banner so they don't forget.
+            setTimeout(maybeShowBanner, 200);
         };
         window.aiadOnboardingSubmit = async function () {
             const btn = document.getElementById('aiadOnboardingSubmitBtn');
@@ -22578,6 +22586,8 @@ function toggleAgeRange(btn) {
                 localStorage.setItem('aiad_stats_collected', '1');
                 const o = document.getElementById('aiadOnboardingOverlay');
                 if (o) o.style.display = 'none';
+                const b = document.getElementById('aiadStatsBanner');
+                if (b) b.style.display = 'none';
                 (window.showToast || (() => {}))('Saved — AIAD will use this in every response');
             } catch (e) {
                 (window.showToast || alert)('Failed: ' + e.message);
@@ -22585,6 +22595,50 @@ function toggleAgeRange(btn) {
                 if (btn) { btn.disabled = false; btn.textContent = 'Save & continue'; }
             }
         };
+
+        // ── Persistent banner for users who skipped onboarding ──────────────
+        function buildStatsBanner() {
+            if (document.getElementById('aiadStatsBanner')) return;
+            const html = `
+            <div id="aiadStatsBanner" style="display:none;position:sticky;top:0;z-index:500;background:linear-gradient(90deg,rgba(217,70,239,0.18),rgba(6,182,212,0.18));border-bottom:1px solid rgba(255,255,255,0.08);padding:10px 18px;font-size:0.84rem;color:#fff;display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:space-between;">
+              <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;flex-shrink:0;color:#d946ef;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <span>AIAD needs your stats to give grounded advice. Add them in <strong>My Stats</strong> — takes 30 seconds.</span>
+              </div>
+              <div style="display:flex;gap:8px;flex-shrink:0;">
+                <button onclick="window.aiadOpenStatsFromBanner()" style="background:linear-gradient(135deg,#d946ef,#a21caf);border:none;color:#fff;border-radius:8px;padding:7px 14px;font-weight:600;cursor:pointer;font-size:0.82rem;">Add now</button>
+                <button onclick="window.aiadDismissBanner()" style="background:transparent;border:1px solid rgba(255,255,255,0.18);color:rgba(255,255,255,0.7);border-radius:8px;padding:7px 12px;font-size:0.78rem;cursor:pointer;">Later</button>
+              </div>
+            </div>`;
+            // Insert at top of artist dashboard.
+            const dash = document.getElementById('artistDashboard');
+            if (!dash) return;
+            const wrap = document.createElement('div');
+            wrap.innerHTML = html;
+            const banner = wrap.firstElementChild;
+            dash.insertBefore(banner, dash.firstChild);
+        }
+
+        window.aiadOpenStatsFromBanner = function () {
+            if (typeof window.showArtistView === 'function') window.showArtistView('mystats');
+            const b = document.getElementById('aiadStatsBanner'); if (b) b.style.display = 'none';
+        };
+        window.aiadDismissBanner = function () {
+            // Hide for 3 days — long enough to not nag, short enough to keep AIAD honest.
+            localStorage.setItem('aiad_banner_dismissed_at', String(Date.now()));
+            const b = document.getElementById('aiadStatsBanner'); if (b) b.style.display = 'none';
+        };
+
+        async function maybeShowBanner() {
+            const sess = getSess();
+            if (!sess) return;
+            if (localStorage.getItem('aiad_stats_collected') === '1') return;
+            const dismissed = Number(localStorage.getItem('aiad_banner_dismissed_at') || 0);
+            if (dismissed && (Date.now() - dismissed < 3 * 24 * 60 * 60 * 1000)) return;
+            buildStatsBanner();
+            const b = document.getElementById('aiadStatsBanner');
+            if (b) b.style.display = 'flex';
+        }
 
         async function maybeShowOnboarding() {
             const sess = getSess();
@@ -22616,9 +22670,16 @@ function toggleAgeRange(btn) {
         }
 
         // Trigger on initial dashboard load (~2s after DOMContentLoaded gives auth time to settle).
-        document.addEventListener('DOMContentLoaded', () => { setTimeout(maybeShowOnboarding, 2200); });
+        // If onboarding is suppressed (skipped recently / already collected), still show the banner if relevant.
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(maybeShowOnboarding, 2200);
+            setTimeout(maybeShowBanner, 2400);
+        });
         // Also re-check after any sign-in (URL hash often changes).
-        window.addEventListener('hashchange', () => setTimeout(maybeShowOnboarding, 600));
+        window.addEventListener('hashchange', () => {
+            setTimeout(maybeShowOnboarding, 600);
+            setTimeout(maybeShowBanner, 800);
+        });
     })();
     </script>
 </body>
