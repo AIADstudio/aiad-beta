@@ -8,48 +8,30 @@
 <link rel="icon" type="image/png" href="/icon-192.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <style>
-  :root {
-    --bg: #0a0a0f; --bg-card: rgba(255,255,255,0.02); --border: rgba(255,255,255,0.08);
-    --text: #e5e7eb; --text-muted: #94a3b8; --text-hint: #64748b;
-    --magenta: #d946ef; --teal: #06b6d4; --link: #06b6d4;
-    --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Inter, system-ui, sans-serif;
-    --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, sans-serif;
-  }
-  *,*::before,*::after { box-sizing: border-box; }
-  html,body { margin:0; padding:0; }
-  body {
-    background: var(--bg); color: var(--text); font-family: var(--font-body);
-    line-height: 1.65; font-size: 15.5px; min-height:100vh;
-  }
-  .topbar {
-    position: sticky; top:0; z-index:10; background: rgba(10,10,15,0.85); backdrop-filter: blur(10px);
-    border-bottom: 1px solid var(--border); padding: 14px 22px;
-    display:flex; align-items:center; justify-content:space-between;
-  }
-  .brand { display:flex; align-items:center; gap:10px; color:#fff; text-decoration:none; font-weight:700; letter-spacing:0.05em; font-family: var(--font-display); }
-  .brand img { width:30px; height:30px; }
-  .topbar a.back { color: var(--text-muted); text-decoration:none; font-size: 0.88rem; }
-  .topbar a.back:hover { color: var(--text); }
-  main { max-width: 820px; margin: 0 auto; padding: 40px 24px 80px; }
-  h1 { font-family: var(--font-display); font-size: 2rem; font-weight: 700; color:#fff; letter-spacing:-0.01em; margin: 0 0 8px 0; }
-  h1 + p { color: var(--text-muted); font-size: 0.92rem; margin: 0 0 32px 0; }
-  h2 { font-family: var(--font-display); font-size: 1.45rem; font-weight: 700; color:#fff; margin: 38px 0 14px 0; padding-top: 14px; border-top: 1px solid var(--border); }
-  h3 { font-size: 1.05rem; font-weight: 600; color:#fff; margin: 26px 0 10px 0; }
-  h4 { font-size: 0.95rem; font-weight: 600; color: var(--text); margin: 20px 0 8px 0; }
-  p { margin: 0 0 14px 0; color: var(--text); }
-  a { color: var(--link); text-decoration: underline; text-underline-offset: 2px; }
-  a:hover { color:#fff; }
-  ul,ol { padding-left: 24px; margin: 8px 0 16px 0; }
-  li { margin-bottom: 6px; }
-  strong, b { color:#fff; font-weight: 600; }
-  em, i { color: var(--text); }
-  blockquote { border-left: 3px solid var(--border); padding: 4px 0 4px 18px; margin: 12px 0 16px 12px; color: var(--text-muted); }
-  table { border-collapse: collapse; width:100%; margin: 14px 0; font-size: 0.92rem; }
-  th, td { border: 1px solid var(--border); padding: 10px 12px; vertical-align: top; text-align: left; }
-  th { background: rgba(255,255,255,0.04); color:#fff; font-weight: 600; }
-  footer { border-top: 1px solid var(--border); margin-top: 60px; padding: 24px 22px; text-align: center; color: var(--text-hint); font-size: 0.82rem; }
-  footer a { color: var(--text-muted); margin: 0 10px; text-decoration: none; }
-  footer a:hover { color: #fff; }
+  :root { --bg:#0a0a0f; --bg-card:rgba(255,255,255,0.02); --border:rgba(255,255,255,0.08); --text:#e5e7eb; --text-muted:#94a3b8; --text-hint:#64748b; --magenta:#d946ef; --teal:#06b6d4; --link:#06b6d4; --font-body:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Inter,system-ui,sans-serif; --font-display:-apple-system,BlinkMacSystemFont,"SF Pro Display",Inter,sans-serif; }
+  *,*::before,*::after{ box-sizing:border-box; } html,body{ margin:0;padding:0; }
+  body{ background:var(--bg);color:var(--text);font-family:var(--font-body);line-height:1.65;font-size:15.5px;min-height:100vh; }
+  .topbar{ position:sticky;top:0;z-index:10;background:rgba(10,10,15,0.85);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);padding:14px 22px;display:flex;align-items:center;justify-content:space-between; }
+  .brand{ display:flex;align-items:center;gap:10px;color:#fff;text-decoration:none;font-weight:700;letter-spacing:0.05em;font-family:var(--font-display); }
+  .brand img{ width:30px;height:30px; }
+  .topbar a.back{ color:var(--text-muted);text-decoration:none;font-size:0.88rem; }
+  .topbar a.back:hover{ color:var(--text); }
+  main{ max-width:820px;margin:0 auto;padding:40px 24px 80px; }
+  h1{ font-family:var(--font-display);font-size:2rem;font-weight:700;color:#fff;letter-spacing:-0.01em;margin:0 0 8px 0; }
+  h1 + p{ color:var(--text-muted);font-size:0.92rem;margin:0 0 32px 0; }
+  h2{ font-family:var(--font-display);font-size:1.45rem;font-weight:700;color:#fff;margin:38px 0 14px 0;padding-top:14px;border-top:1px solid var(--border); }
+  h3{ font-size:1.05rem;font-weight:600;color:#fff;margin:26px 0 10px 0; }
+  h4{ font-size:0.95rem;font-weight:600;color:var(--text);margin:20px 0 8px 0; }
+  p{ margin:0 0 14px 0;color:var(--text); }
+  a{ color:var(--link);text-decoration:underline;text-underline-offset:2px; } a:hover{ color:#fff; }
+  ul,ol{ padding-left:24px;margin:8px 0 16px 0; } li{ margin-bottom:6px; }
+  strong,b{ color:#fff;font-weight:600; } em,i{ color:var(--text); }
+  blockquote{ border-left:3px solid var(--border);padding:4px 0 4px 18px;margin:12px 0 16px 12px;color:var(--text-muted); }
+  table{ border-collapse:collapse;width:100%;margin:14px 0;font-size:0.92rem; }
+  th,td{ border:1px solid var(--border);padding:10px 12px;vertical-align:top;text-align:left; }
+  th{ background:rgba(255,255,255,0.04);color:#fff;font-weight:600; }
+  footer{ border-top:1px solid var(--border);margin-top:60px;padding:24px 22px;text-align:center;color:var(--text-hint);font-size:0.82rem; }
+  footer a{ color:var(--text-muted);margin:0 10px;text-decoration:none; } footer a:hover{ color:#fff; }
 </style>
 </head>
 <body>
@@ -97,12 +79,11 @@
 </blockquote>
 <p><strong>Please contact Company's Designated Agent at the following address:</strong></p>
 <p>AIAD Studio Inc.</p>
-<p>Hardy Indiigo Muanza, Founder</p>
+<p>Hardy Muanza, Founder</p>
 <p>Attn: DMCA Designated Agent</p>
 <p>3500 South DuPont Highway</p>
 <p>Dover, Delaware 19901</p>
 <p>Email: founder@aiad.studio</p>
-
 </main>
 <footer>
   AIAD Studio Inc. · 3500 South DuPont Highway, Dover, DE 19901<br>
