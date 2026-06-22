@@ -19317,6 +19317,44 @@ Only capture real, meaningful decisions — not questions or general discussion.
 .fan-genre-chip{padding:8px 16px;background:var(--bg-card);border:1px solid var(--border-default);border-radius:20px;color:var(--text-secondary);font-size:0.85rem;cursor:pointer;font-family:var(--font-body);transition:all 0.15s;font-weight:500;}
 .fan-genre-chip:hover{background:var(--bg-secondary);color:var(--text-primary);}
 .fan-genre-chip.active{background:var(--teal);border-color:var(--teal);color:var(--bg-primary);}
+
+/* ───────────────────────────────────────────────────────────
+   MOBILE SAFETY NET — defensive overrides for narrow viewports.
+   Catches common breakage without needing per-view fixes.
+   ─────────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+    /* Stop horizontal scroll on body when any child overflows. */
+    html, body { overflow-x: hidden !important; max-width: 100vw; }
+    /* Prevent any block from forcing horizontal scroll. */
+    .dash-main, .dashboard, .studio-layout, .dash-view, main { max-width: 100vw; overflow-x: hidden; }
+    /* Stack any two-column studio layouts. */
+    .studio-layout { display: block !important; grid-template-columns: 1fr !important; }
+    .studio-agent-col { position: static !important; margin-top: 16px; width: 100% !important; }
+    /* Stats rows wrap or stack. */
+    .dash-stats-row { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+    .live-stats-bar { font-size: 0.74rem; padding: 6px 10px; }
+    /* Tables scroll horizontally instead of breaking layout. */
+    table { display: block; max-width: 100%; overflow-x: auto; }
+    /* All inputs/buttons get a touch-friendly minimum. */
+    input, select, textarea, button { font-size: 16px !important; /* prevents iOS zoom */ }
+    /* Generic grids collapse to one or two columns. */
+    .specialized-agents-grid { grid-template-columns: 1fr !important; }
+    /* Card grids that used auto-fit narrower minmax need to allow single column. */
+    .cards-container--industry { grid-template-columns: 1fr 1fr !important; }
+    /* Hide horizontal nav scrollers that overflow. */
+    .nav-scroll-container, .live-stats-ticker { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    /* Mobile-friendly modal padding. */
+    [style*="position:fixed"][style*="inset:0"] { padding: 12px !important; }
+    /* Page headers compact. */
+    .view-title, .agents-page-title, .inbox-page-title, .milestones-page-title { font-size: 1.5rem !important; }
+    .view-subtitle, .agents-page-subtitle { font-size: 0.85rem !important; }
+    /* Right-rail sticky agent panel stops sticking on mobile (otherwise covers content). */
+    .studio-agent-col { position: static !important; top: auto !important; }
+    /* Default sidebar footer not cramped. */
+    .dash-sidebar-footer { padding: 12px !important; }
+    /* Long URLs / IDs wrap rather than overflow. */
+    pre, code { white-space: pre-wrap !important; word-break: break-word; }
+}
 </style>
 
     <script>
