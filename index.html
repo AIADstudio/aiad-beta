@@ -22573,8 +22573,21 @@ function toggleAgeRange(btn) {
         function buildOnboardingModal() {
             if (document.getElementById('aiadOnboardingOverlay')) return;
             const html = `
+            <style id="aiadOnboardingStyles">
+              #aiadOnboardingOverlay * { box-sizing: border-box; }
+              #aiadOnboardingOverlay input { width: 100%; min-width: 0; }
+              #aiadOnboardingOverlay .ob-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
+              @media (max-width: 520px) {
+                #aiadOnboardingOverlay { padding: 12px !important; }
+                #aiadOnboardingOverlay .ob-card { padding: 14px !important; }
+                #aiadOnboardingOverlay .ob-grid { grid-template-columns: 1fr !important; }
+                #aiadOnboardingOverlay h2 { font-size: 1.25rem !important; }
+                #aiadOnboardingOverlay button { width: 100%; }
+                #aiadOnboardingOverlay .ob-actions { flex-direction: column-reverse !important; }
+              }
+            </style>
             <div id="aiadOnboardingOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.82);backdrop-filter:blur(8px);z-index:99999;align-items:center;justify-content:center;padding:20px;">
-              <div style="background:var(--bg-card,#0f0f14);border:1px solid rgba(255,255,255,0.10);border-radius:18px;max-width:640px;width:100%;max-height:92vh;overflow-y:auto;padding:28px 28px 22px;">
+              <div class="ob-card" style="background:var(--bg-card,#0f0f14);border:1px solid rgba(255,255,255,0.10);border-radius:18px;max-width:640px;width:100%;max-height:92vh;overflow-y:auto;padding:28px 28px 22px;">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
                   <span style="width:8px;height:8px;border-radius:50%;background:linear-gradient(135deg,var(--magenta,#d946ef),var(--teal,#06b6d4));display:inline-block;"></span>
                   <span style="font-size:0.72rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted,#94a3b8);">AIAD setup · step 1 of 1</span>
@@ -22586,7 +22599,7 @@ function toggleAgeRange(btn) {
 
                 <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:14px 16px;margin-bottom:14px;">
                   <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:8px;font-weight:600;">Public-API connect (optional)</div>
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                  <div class="ob-grid">
                     <input id="obSpotifyId" placeholder="Spotify artist URL/ID" style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
                     <input id="obYoutubeHandle" placeholder="YouTube @handle" style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
                   </div>
@@ -22594,7 +22607,7 @@ function toggleAgeRange(btn) {
 
                 <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:14px 16px;margin-bottom:14px;">
                   <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:8px;font-weight:600;">Your numbers</div>
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                  <div class="ob-grid">
                     <input id="obMonthlyListeners"   type="number" placeholder="Spotify monthly listeners" style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
                     <input id="obSpotifyFollowers"   type="number" placeholder="Spotify followers" style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
                     <input id="obInstagramFollowers" type="number" placeholder="Instagram followers" style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
@@ -22604,7 +22617,7 @@ function toggleAgeRange(btn) {
                   </div>
                 </div>
 
-                <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap;">
+                <div class="ob-actions" style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap;">
                   <button onclick="window.aiadOnboardingSkip()" style="background:transparent;border:1px solid rgba(255,255,255,0.15);color:var(--text-muted);border-radius:10px;padding:10px 16px;font-size:0.85rem;cursor:pointer;">Skip for now</button>
                   <button onclick="window.aiadOnboardingSubmit()" id="aiadOnboardingSubmitBtn" style="background:linear-gradient(135deg,var(--magenta,#d946ef),var(--magenta-dark,#a21caf));border:none;color:#fff;border-radius:10px;padding:10px 22px;font-weight:600;cursor:pointer;font-size:0.88rem;">Save &amp; continue</button>
                 </div>
@@ -22678,6 +22691,9 @@ function toggleAgeRange(btn) {
             const sess = getSess();
             if (!sess) return;
             if (localStorage.getItem('aiad_stats_collected') === '1') return;
+            // Artist-only: fans/collaborators/supervisors don't need analytics.
+            const cachedRole = localStorage.getItem('aiad_user_role');
+            if (cachedRole && cachedRole !== 'artist') return;
             const dismissed = Number(localStorage.getItem('aiad_banner_dismissed_at') || 0);
             if (dismissed && (Date.now() - dismissed < 3 * 24 * 60 * 60 * 1000)) return;
             buildStatsBanner();
@@ -22690,6 +22706,23 @@ function toggleAgeRange(btn) {
             const anon = getAnonKey();
             if (!sess || !anon) return;
             if (localStorage.getItem('aiad_stats_collected') === '1') return;
+
+            // Only show for artists — fans/collaborators/supervisors don't need analytics onboarding.
+            const cachedRole = localStorage.getItem('aiad_user_role');
+            if (cachedRole && cachedRole !== 'artist') return;
+            // If role isn't cached yet, check the profile row directly.
+            if (!cachedRole) {
+                try {
+                    const SUPABASE_URL_LOCAL = (typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL) || 'https://uapiytquwuhtewqieegx.supabase.co';
+                    const r = await fetch(`${SUPABASE_URL_LOCAL}/rest/v1/profiles?select=role&id=eq.${sess.user.id}`, {
+                        headers: { 'Authorization': 'Bearer ' + sess.access_token, 'apikey': anon },
+                    });
+                    const rows = await r.json();
+                    const role = Array.isArray(rows) && rows[0]?.role;
+                    if (role && role !== 'artist') return;
+                } catch { /* if we can't determine role, fall through (safer to prompt than miss) */ }
+            }
+
             // Check DB — they may have filled it on another device.
             try {
                 const SUPABASE_URL_LOCAL = (typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL) || 'https://uapiytquwuhtewqieegx.supabase.co';
