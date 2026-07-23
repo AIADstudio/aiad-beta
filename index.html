@@ -17373,6 +17373,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
 
         window.addEventListener('DOMContentLoaded', async () => {
             const { data: { session } } = await db.auth.getSession();
+            window.__aiadBootUid = session?.user?.id || null;
             if (session) {
                 AppState.currentUser = session.user;
                 await restoreUserSession();
@@ -17455,10 +17456,38 @@ Only capture real, meaningful decisions — not questions or general discussion.
             }
         }
 
+        // ── Cross-user isolation guard ──
+        // Wipe all per-user cached state so one account's data never bleeds into
+        // another's on a shared device / browser.
+        function clearUserScopedCache() {
+            try {
+                Object.keys(localStorage).forEach(k => { if (k.indexOf('aiad_') === 0) localStorage.removeItem(k); });
+            } catch (e) {}
+            try {
+                AppState.artistProfile = { artistName: '', primaryGenre: '', artistLevel: '' };
+                AppState.userIndustry = null; AppState.userRole = null;
+                AppState.pendingAvatar = ''; AppState._cachedArtistAvatars = {};
+            } catch (e) {}
+        }
+        window.aiadClearUserCache = clearUserScopedCache;
+
         db.auth.onAuthStateChange(async (event, session) => {
             if (event === 'SIGNED_IN' && session) {
+                const newUid = session.user.id;
+                const boot = window.__aiadBootUid;
+                // A DIFFERENT account just took over an already-booted session:
+                // hard-reset so the previous user's data/DOM can't leak through.
+                if (typeof boot !== 'undefined' && boot !== null && boot !== newUid) {
+                    clearUserScopedCache();
+                    window.__aiadBootUid = newUid;
+                    location.replace(location.origin + location.pathname);
+                    return;
+                }
+                window.__aiadBootUid = newUid;
                 AppState.currentUser = session.user;
             } else if (event === 'SIGNED_OUT') {
+                clearUserScopedCache();
+                window.__aiadBootUid = null;
                 AppState.currentUser = null;
             }
         });
