@@ -23095,25 +23095,25 @@ function toggleAgeRange(btn) {
             const vset = new Set((vids||[]).map(x => x.id));
             (arts||[]).forEach(a => { if (a.artist_name && vset.has(a.user_id)) _verifiedNames.add(a.artist_name.trim().toLowerCase()); });
         }
-        // Name elements are short, name-ish nodes. We only badge leaf elements whose
-        // exact trimmed text equals a verified name — full names don't collide with UI labels.
-        const NAME_SEL = '[class*="name" i], [class*="title" i], [data-aiad-name], .discover-artist-card *, h1, h2, h3, h4';
+        // We badge leaf elements whose exact trimmed text equals a verified name.
+        // Matching on full names (e.g. "Hardy Indiigo") avoids collisions with UI labels,
+        // so we can scan all leaf nodes inside content areas regardless of class.
         function decorateBadges(root) {
             if (!_verifiedNames || !_verifiedNames.size) return;
-            const scope = root || document;
-            scope.querySelectorAll(NAME_SEL).forEach(el => {
-                if (el.__badged) return;
-                // Skip elements inside nav/sidebar to avoid badging menu labels.
-                if (el.closest('nav, .dash-nav, .dash-sidebar-left, .dash-mobile-nav, [id$="Nav"]')) return;
-                const explicit = el.getAttribute && el.getAttribute('data-aiad-name');
-                const txt = (explicit || el.textContent || '').trim().toLowerCase();
-                if (txt.length < 3 || txt.length > 60) return;
-                // Only leaf-ish elements (avoid wrapping containers with children besides text).
-                if (!explicit && el.children.length > 0) return;
-                if (_verifiedNames.has(txt)) {
-                    el.insertAdjacentHTML('beforeend', BADGE);
-                    el.__badged = true;
-                }
+            const scopes = (root ? [root] : [...document.querySelectorAll('main, .dash-main, .studio-layout, [id*="Discover" i], [id*="Collaborators" i], [id*="Supporters" i], [id*="Profile" i]')]);
+            const seen = new Set();
+            scopes.forEach(scope => {
+                if (seen.has(scope)) return; seen.add(scope);
+                scope.querySelectorAll('div, span, a, h1, h2, h3, h4, p, strong, b').forEach(el => {
+                    if (el.__badged || el.childElementCount > 0) return;
+                    if (el.closest('nav, .dash-nav, .dash-sidebar-left, .dash-mobile-nav, [id$="Nav"]')) return;
+                    const txt = (el.textContent || '').trim().toLowerCase();
+                    if (txt.length < 3 || txt.length > 60) return;
+                    if (_verifiedNames.has(txt)) {
+                        el.insertAdjacentHTML('beforeend', BADGE);
+                        el.__badged = true;
+                    }
+                });
             });
         }
         window.aiadDecorateBadges = decorateBadges;
