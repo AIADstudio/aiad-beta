@@ -600,8 +600,14 @@ html, body {
                         <div class="field-group">
                             <input type="password" class="input" id="signInPassword" placeholder="Password" oninput="validateSignIn()">
                         </div>
-                        <div class="forgot-password">
-                            <a onclick="handleForgotPassword()">Forgot password?</a>
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:2px 0 4px;">
+                            <label for="rememberMe" style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:0.85rem;color:var(--text-secondary,#94a3b8);user-select:none;">
+                                <input type="checkbox" id="rememberMe" checked onchange="try{localStorage.setItem('aiad_remember', this.checked?'1':'0')}catch(e){}" style="width:16px;height:16px;accent-color:#06b6d4;cursor:pointer;">
+                                Remember me
+                            </label>
+                            <div class="forgot-password" style="margin:0;">
+                                <a onclick="handleForgotPassword()">Forgot password?</a>
+                            </div>
                         </div>
                         <button class="btn-primary btn-fan" id="signInBtn" disabled onclick="handleSignIn()" style="max-width: 100%;">
                             <span>Sign In</span>
@@ -15808,9 +15814,11 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 if (typeof jumpToDashboard === 'function') jumpToDashboard('collab'); else navigateTo('collaborator-complete');
             } else if (role === 'fan') {
                 if (typeof jumpToDashboard === 'function') jumpToDashboard('fan'); else navigateTo('industry-selection');
-            } else if (industry && typeof jumpToDashboard === 'function' && INDUSTRY_DASH[industry]) {
+            } else if (industry && INDUSTRY_DASH[industry]) {
                 localStorage.setItem('aiad_user_industry', industry);
-                jumpToDashboard(INDUSTRY_DASH[industry]);
+                // New artists → tailored AI questionnaire → pricing → dashboard.
+                if (window.aiadStartOnboarding) window.aiadStartOnboarding({ dash: INDUSTRY_DASH[industry] });
+                else if (typeof jumpToDashboard === 'function') jumpToDashboard(INDUSTRY_DASH[industry]);
             } else {
                 navigateTo('industry-selection');
             }
@@ -17369,7 +17377,24 @@ Only capture real, meaningful decisions — not questions or general discussion.
 
         const SUPABASE_URL = 'https://uapiytquwuhtewqieegx.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhcGl5dHF1d3VodGV3cWllZWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NzcwMTksImV4cCI6MjA4OTI1MzAxOX0.BLs2RdStghm0_cF8t70cBTX1GWcowGRwID7TAG8Mg38';
-        const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        // "Remember me" storage adapter: when checked (default) the session lives in
+        // localStorage and survives browser restarts; when unchecked it lives in
+        // sessionStorage and clears when the browser/tab closes.
+        const aiadAuthStorage = {
+            getItem: (k) => { try { return localStorage.getItem(k) ?? sessionStorage.getItem(k); } catch (e) { return null; } },
+            setItem: (k, v) => {
+                let remember = true;
+                try { remember = localStorage.getItem('aiad_remember') !== '0'; } catch (e) {}
+                try {
+                    if (remember) { localStorage.setItem(k, v); sessionStorage.removeItem(k); }
+                    else { sessionStorage.setItem(k, v); localStorage.removeItem(k); }
+                } catch (e) {}
+            },
+            removeItem: (k) => { try { localStorage.removeItem(k); sessionStorage.removeItem(k); } catch (e) {} },
+        };
+        const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storage: aiadAuthStorage },
+        });
 
         window.addEventListener('DOMContentLoaded', async () => {
             const { data: { session } } = await db.auth.getSession();
@@ -17414,6 +17439,11 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     const lastDashboard = localStorage.getItem('aiad_last_dashboard');
 
                     setTimeout(() => {
+                        // New artist who hasn't finished the tailored questionnaire → show it (on top).
+                        if (AppState.userRole === 'artist' && profile && profile.onboarded === false && window.aiadStartOnboarding) {
+                            const IDASH = { music:'artist', fashion:'fashion', streaming:'streamer', visual_arts:'visualarts', writing_publishing:'writing', film_media:'film', games:'games', multi:'multi' };
+                            window.aiadStartOnboarding({ dash: IDASH[profile.industry] || 'artist' });
+                        }
                         if (lastDashboard) {
                             jumpToDashboard(lastDashboard);
                         } else if (AppState.userRole === 'artist') {
@@ -17496,6 +17526,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
             const email = document.getElementById('signInEmail').value.trim();
             const password = document.getElementById('signInPassword').value;
             const btn = document.getElementById('signInBtn');
+            // Honor "Remember me" before auth so the token is stored in the right place.
+            try { const rm = document.getElementById('rememberMe'); localStorage.setItem('aiad_remember', (rm && !rm.checked) ? '0' : '1'); } catch (e) {}
             btn.disabled = true;
             btn.querySelector('span').textContent = 'Signing in...';
 
@@ -23604,6 +23636,99 @@ function toggleAgeRange(btn) {
             const res = await rpc('submit_support_ticket', { p_subject: subject || '(no subject)', p_message: msg, p_category: 'general' });
             if (res && !res.message) { document.getElementById('aiadHelpDone').style.display = 'block'; btn.style.display = 'none'; }
             else { btn.disabled = false; btn.textContent = 'Send message'; (window.showToast||alert)('Could not send — try again'); }
+        };
+
+        // ══════════════════════════════════════════════════════════════
+        //  TAILORED AI ONBOARDING  (new artists → questionnaire → pricing)
+        //  Captures rich career context so the analytics/agents can tailor
+        //  guidance. Gates the dashboard until complete.
+        // ══════════════════════════════════════════════════════════════
+        const OB_FIELD = (id, label, ph, type) => `
+            <label style="display:block;margin-bottom:10px;">
+                <span style="display:block;font-size:0.78rem;color:#94a3b8;margin-bottom:4px;">${label}</span>
+                ${type==='area'
+                    ? `<textarea id="${id}" rows="2" placeholder="${ph}" style="width:100%;box-sizing:border-box;background:#12141d;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:9px 11px;color:#fff;font-size:0.85rem;resize:vertical;"></textarea>`
+                    : `<input id="${id}" placeholder="${ph}" style="width:100%;box-sizing:border-box;background:#12141d;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:9px 11px;color:#fff;font-size:0.85rem;">`}
+            </label>`;
+        const OB_SELECT = (id, label, opts) => `
+            <label style="display:block;margin-bottom:10px;">
+                <span style="display:block;font-size:0.78rem;color:#94a3b8;margin-bottom:4px;">${label}</span>
+                <select id="${id}" style="width:100%;box-sizing:border-box;background:#12141d;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:9px 11px;color:#fff;font-size:0.85rem;">
+                    ${opts.map(o=>`<option value="${o}">${o}</option>`).join('')}
+                </select>
+            </label>`;
+
+        window.aiadStartOnboarding = function (opts) {
+            opts = opts || {};
+            const dash = opts.dash || 'artist';
+            let ov = document.getElementById('aiadOnboardOverlay');
+            if (ov) ov.remove();
+            ov = document.createElement('div');
+            ov.id = 'aiadOnboardOverlay';
+            ov.style.cssText = 'position:fixed;inset:0;background:#07090f;z-index:100002;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;overflow-y:auto;';
+            ov.innerHTML = `
+                <div style="max-width:560px;width:100%;">
+                    <div style="text-align:center;margin-bottom:18px;">
+                        <div style="font-size:1.5rem;font-weight:800;background:linear-gradient(135deg,#06b6d4,#a855f7);-webkit-background-clip:text;background-clip:text;color:transparent;">Let's tailor your AI</div>
+                        <p style="color:#94a3b8;font-size:0.86rem;margin:6px 0 0;">A few questions so your analytics and career agents are built around <em>you</em>. The more you share, the sharper the guidance.</p>
+                    </div>
+                    <div id="aiadObStep1" style="background:#0d0f17;border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:20px;">
+                        <div style="font-size:0.72rem;color:#38bdf8;font-weight:700;letter-spacing:.05em;margin-bottom:12px;">THE BASICS</div>
+                        ${OB_FIELD('ob_artist_name','Artist / stage name','e.g. Rueben')}
+                        ${OB_FIELD('ob_primary_genre','Primary genre','e.g. R&B, Hip-Hop, Afrobeats')}
+                        ${OB_FIELD('ob_substyle','Your sound in a few words','e.g. moody alt-R&B with trap drums')}
+                        ${OB_SELECT('ob_career_stage','Where are you in your career?',['Just starting','Emerging','Developing','Established','Professional'])}
+                        ${OB_FIELD('ob_city','Home city / main market','e.g. Atlanta, GA')}
+                        ${OB_FIELD('ob_years','Years making music','e.g. 3')}
+                        <div style="font-size:0.72rem;color:#38bdf8;font-weight:700;letter-spacing:.05em;margin:16px 0 6px;">YOUR LINKS</div>
+                        <p style="font-size:0.75rem;color:#64748b;margin:0 0 12px;">Just paste your profiles — AIAD pulls your stats automatically, no screenshots or manual numbers needed.</p>
+                        ${OB_FIELD('ob_spotify','Spotify artist link','https://open.spotify.com/artist/...')}
+                        ${OB_FIELD('ob_youtube','YouTube channel','https://youtube.com/@...')}
+                        ${OB_FIELD('ob_instagram','Instagram','@handle')}
+                        ${OB_FIELD('ob_tiktok','TikTok','@handle')}
+                        ${OB_FIELD('ob_monthly_listeners','Spotify monthly listeners (optional)','only if you want to set a baseline')}
+                        ${OB_FIELD('ob_following','Total following (optional)','rough is fine')}
+                        <div style="font-size:0.72rem;color:#38bdf8;font-weight:700;letter-spacing:.05em;margin:16px 0 12px;">GOALS & CONTEXT</div>
+                        ${OB_FIELD('ob_goal','Your #1 goal for the next 12 months','e.g. hit 50k monthly listeners and book a tour','area')}
+                        ${OB_FIELD('ob_challenge','Biggest challenge right now','e.g. growing past my current audience','area')}
+                        ${OB_FIELD('ob_audience','Who is your core audience?','e.g. 18-24, US + UK, alt-R&B fans')}
+                        ${OB_FIELD('ob_success','What does success look like in 3 years?','e.g. full-time artist, sync placements, headline shows','area')}
+                        ${OB_SELECT('ob_cadence','How often do you release?',['Not yet releasing','A few times a year','Monthly','Every couple weeks'])}
+                        ${OB_SELECT('ob_team','Your team right now',['Solo (just me)','I have a manager','Signed to a label','Full team'])}
+                        <button onclick="aiadSubmitOnboarding(this,'${dash}')" style="width:100%;margin-top:14px;background:linear-gradient(135deg,#06b6d4,#3b82f6);color:#fff;border:none;border-radius:10px;padding:12px;font-size:0.92rem;font-weight:700;cursor:pointer;">Continue →</button>
+                        <p style="text-align:center;font-size:0.72rem;color:#64748b;margin:10px 0 0;">Takes ~2 minutes. You can refine any of this later in your profile.</p>
+                    </div>
+                    <div id="aiadObStep2" style="display:none;background:#0d0f17;border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:20px;">
+                        <div style="text-align:center;margin-bottom:8px;"><div style="font-size:1.15rem;font-weight:700;color:#fff;">Choose your plan</div><p style="color:#94a3b8;font-size:0.82rem;margin:4px 0 0;">Start free and upgrade anytime — or unlock the full AI toolkit now.</p></div>
+                        <div id="aiadPricingMount"></div>
+                        <button onclick="aiadFinishOnboarding('${dash}')" style="width:100%;margin-top:12px;background:transparent;color:#94a3b8;border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:11px;font-size:0.88rem;font-weight:600;cursor:pointer;">Start on Free →</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(ov);
+        };
+        window.aiadSubmitOnboarding = async function (btn, dash) {
+            const g = (id) => (document.getElementById(id)?.value || '').trim();
+            const data = {
+                artist_name: g('ob_artist_name'), primary_genre: g('ob_primary_genre'), sound: g('ob_substyle'),
+                career_stage: g('ob_career_stage'), city: g('ob_city'), years_active: g('ob_years'),
+                monthly_listeners: g('ob_monthly_listeners'), total_following: g('ob_following'),
+                links: { spotify: g('ob_spotify'), youtube: g('ob_youtube'), instagram: g('ob_instagram'), tiktok: g('ob_tiktok') },
+                goal_12mo: g('ob_goal'), biggest_challenge: g('ob_challenge'), audience: g('ob_audience'),
+                success_3yr: g('ob_success'), release_cadence: g('ob_cadence'), team: g('ob_team'),
+                submitted_at: new Date().toISOString(),
+            };
+            btn.disabled = true; btn.textContent = 'Saving…';
+            try { await rpc('save_artist_onboarding', { p_data: data }); } catch (e) {}
+            // Also persist artist_profiles name/genre for the dashboard header.
+            try { const s = sess(); if (s && data.artist_name) await rest('artist_profiles?on_conflict=user_id', { method:'POST', headers:{ 'Prefer':'resolution=merge-duplicates' }, body: JSON.stringify({ user_id: s.user.id, artist_name: data.artist_name, primary_genre: data.primary_genre || null, career_stage: data.career_stage || null }) }); } catch (e) {}
+            document.getElementById('aiadObStep1').style.display = 'none';
+            document.getElementById('aiadObStep2').style.display = 'block';
+            window.scrollTo(0, 0);
+            try { if (window.aiadRenderPricing) window.aiadRenderPricing(); } catch (e) {}
+        };
+        window.aiadFinishOnboarding = function (dash) {
+            const ov = document.getElementById('aiadOnboardOverlay'); if (ov) ov.remove();
+            try { if (window.jumpToDashboard) window.jumpToDashboard(dash || 'artist'); else location.replace(location.origin + location.pathname); } catch (e) { location.replace(location.origin + location.pathname); }
         };
 
         // Wire into settings view + boot.
