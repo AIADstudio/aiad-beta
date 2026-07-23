@@ -15787,12 +15787,12 @@ Only capture real, meaningful decisions — not questions or general discussion.
                         <h2 style="font-size:1.4rem;font-weight:700;margin:0 0 12px 0;">Check your email</h2>
                         <p style="font-size:0.95rem;color:var(--text-secondary, #9ca3af);line-height:1.55;margin:0 0 22px 0;">
                             We sent a message to <strong id="aiadVerifyEmailAddr" style="color:var(--text-primary, #fff);"></strong>.
-                            Enter the 6-digit code below, or tap the link in the email.
+                            Enter the code below, or tap the link in the email.
                         </p>
 
                         <div style="display:flex;gap:8px;justify-content:center;margin:0 0 12px 0;">
-                            <input id="aiadVerifyCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000"
-                                style="width:180px;text-align:center;letter-spacing:0.35em;font-size:1.35rem;font-weight:700;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;background:var(--bg-secondary, rgba(255,255,255,0.04));border:1px solid var(--border-default, rgba(255,255,255,0.14));color:#fff;border-radius:12px;padding:12px 14px;outline:none;">
+                            <input id="aiadVerifyCode" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="00000000"
+                                style="width:230px;text-align:center;letter-spacing:0.3em;font-size:1.35rem;font-weight:700;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;background:var(--bg-secondary, rgba(255,255,255,0.04));border:1px solid var(--border-default, rgba(255,255,255,0.14));color:#fff;border-radius:12px;padding:12px 14px;outline:none;">
                         </div>
                         <button id="aiadVerifyCodeBtn"
                             style="width:100%;max-width:280px;background:linear-gradient(135deg,var(--magenta,#d946ef),var(--magenta-dark,#a21caf));border:none;color:#fff;padding:12px 22px;border-radius:10px;cursor:pointer;font-family:inherit;font-size:0.95rem;font-weight:600;margin:0 auto 20px;display:block;">
@@ -15812,9 +15812,9 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 const codeInput = document.getElementById('aiadVerifyCode');
                 const codeBtn   = document.getElementById('aiadVerifyCodeBtn');
 
-                // Only allow digits.
+                // Only allow digits (Supabase OTP is 8 digits on this project).
                 codeInput.addEventListener('input', () => {
-                    codeInput.value = codeInput.value.replace(/\D/g, '').slice(0, 6);
+                    codeInput.value = codeInput.value.replace(/\D/g, '').slice(0, 8);
                 });
                 codeInput.addEventListener('keydown', (e) => {
                     if (e.key === 'Enter') { e.preventDefault(); codeBtn.click(); }
@@ -15822,7 +15822,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
 
                 codeBtn.onclick = async () => {
                     const token = (codeInput.value || '').trim();
-                    if (token.length !== 6) { showToast('Enter the 6-digit code'); return; }
+                    if (token.length < 6) { showToast('Enter the code from your email'); return; }
                     codeBtn.disabled = true;
                     const orig = codeBtn.textContent;
                     codeBtn.textContent = 'Verifying…';
