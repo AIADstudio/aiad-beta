@@ -15751,30 +15751,96 @@ Only capture real, meaningful decisions — not questions or general discussion.
             }
         }
 
+        // Shared: create the profile row + drop the verified user into onboarding.
+        // Used by BOTH the email-link path (?verified=1) and the 6-digit code path.
+        async function finalizeVerifiedSignup(user) {
+            if (!user) return;
+            try {
+                const pending = JSON.parse(localStorage.getItem('aiad_pending_profile') || 'null');
+                if (pending) {
+                    await db.from('profiles').upsert({
+                        id: user.id,
+                        email: pending.email,
+                        full_name: pending.full_name,
+                        username: pending.username,
+                        role: pending.role,
+                    }, { onConflict: 'id' });
+                    localStorage.removeItem('aiad_pending_profile');
+                }
+            } catch (e) { console.warn('[aiad] finalizeVerifiedSignup', e); }
+            AppState.currentUser = user;
+            showToast('Email verified — welcome to AIAD');
+            navigateTo('industry-selection');
+        }
+
         // Full-screen "check your email" message shown after signup.
+        // Offers TWO ways to verify: click the emailed link, OR enter the 6-digit code.
         function showVerifyEmailScreen(email) {
             let overlay = document.getElementById('aiadVerifyEmailOverlay');
             if (!overlay) {
                 overlay = document.createElement('div');
                 overlay.id = 'aiadVerifyEmailOverlay';
-                overlay.style.cssText = 'position:fixed;inset:0;background:var(--bg-primary, #0a0a0f);z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px;';
+                overlay.style.cssText = 'position:fixed;inset:0;background:var(--bg-primary, #0a0a0f);z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px;overflow-y:auto;';
                 overlay.innerHTML = `
                     <div style="max-width:440px;width:100%;text-align:center;color:var(--text-primary, #fff);font-family:var(--font-body, system-ui);">
                         <div style="font-size:3rem;line-height:1;margin-bottom:18px;">✉️</div>
                         <h2 style="font-size:1.4rem;font-weight:700;margin:0 0 12px 0;">Check your email</h2>
-                        <p style="font-size:0.95rem;color:var(--text-secondary, #9ca3af);line-height:1.55;margin:0 0 24px 0;">
-                            We sent a verification link to <strong id="aiadVerifyEmailAddr" style="color:var(--text-primary, #fff);"></strong>.
-                            Click it to activate your AIAD account.
+                        <p style="font-size:0.95rem;color:var(--text-secondary, #9ca3af);line-height:1.55;margin:0 0 22px 0;">
+                            We sent a message to <strong id="aiadVerifyEmailAddr" style="color:var(--text-primary, #fff);"></strong>.
+                            Enter the 6-digit code below, or tap the link in the email.
                         </p>
-                        <p style="font-size:0.82rem;color:var(--text-muted, #6b7280);margin:0 0 28px 0;">
-                            Didn't get the email? Check your spam folder, or
-                            <a href="#" id="aiadVerifyResend" style="color:var(--teal, #00d4ff);">resend it</a>.
+
+                        <div style="display:flex;gap:8px;justify-content:center;margin:0 0 12px 0;">
+                            <input id="aiadVerifyCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000"
+                                style="width:180px;text-align:center;letter-spacing:0.35em;font-size:1.35rem;font-weight:700;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;background:var(--bg-secondary, rgba(255,255,255,0.04));border:1px solid var(--border-default, rgba(255,255,255,0.14));color:#fff;border-radius:12px;padding:12px 14px;outline:none;">
+                        </div>
+                        <button id="aiadVerifyCodeBtn"
+                            style="width:100%;max-width:280px;background:linear-gradient(135deg,var(--magenta,#d946ef),var(--magenta-dark,#a21caf));border:none;color:#fff;padding:12px 22px;border-radius:10px;cursor:pointer;font-family:inherit;font-size:0.95rem;font-weight:600;margin:0 auto 20px;display:block;">
+                            Verify &amp; continue
+                        </button>
+
+                        <p style="font-size:0.82rem;color:var(--text-muted, #6b7280);margin:0 0 24px 0;">
+                            Didn't get it? Check spam, or
+                            <a href="#" id="aiadVerifyResend" style="color:var(--teal, #00d4ff);">resend</a>.
                         </p>
                         <button id="aiadVerifyBackBtn" style="background:transparent;border:1px solid var(--border-default, rgba(255,255,255,0.12));color:var(--text-secondary, #9ca3af);padding:10px 22px;border-radius:10px;cursor:pointer;font-family:inherit;font-size:0.85rem;">
                             Back to sign in
                         </button>
                     </div>`;
                 document.body.appendChild(overlay);
+
+                const codeInput = document.getElementById('aiadVerifyCode');
+                const codeBtn   = document.getElementById('aiadVerifyCodeBtn');
+
+                // Only allow digits.
+                codeInput.addEventListener('input', () => {
+                    codeInput.value = codeInput.value.replace(/\D/g, '').slice(0, 6);
+                });
+                codeInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); codeBtn.click(); }
+                });
+
+                codeBtn.onclick = async () => {
+                    const token = (codeInput.value || '').trim();
+                    if (token.length !== 6) { showToast('Enter the 6-digit code'); return; }
+                    codeBtn.disabled = true;
+                    const orig = codeBtn.textContent;
+                    codeBtn.textContent = 'Verifying…';
+                    try {
+                        const { data, error } = await db.auth.verifyOtp({
+                            email: overlay.dataset.email,
+                            token,
+                            type: 'signup',
+                        });
+                        if (error) throw error;
+                        overlay.remove();
+                        await finalizeVerifiedSignup(data?.user || (await db.auth.getUser())?.data?.user);
+                    } catch (err) {
+                        showToast('Code invalid or expired: ' + (err.message || err));
+                        codeBtn.disabled = false;
+                        codeBtn.textContent = orig;
+                    }
+                };
 
                 document.getElementById('aiadVerifyBackBtn').onclick = () => {
                     overlay.remove();
@@ -15783,14 +15849,17 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 document.getElementById('aiadVerifyResend').onclick = async (e) => {
                     e.preventDefault();
                     try {
-                        await db.auth.resend({ type: 'signup', email, options: { emailRedirectTo: 'https://aiad.studio/?verified=1' } });
+                        await db.auth.resend({ type: 'signup', email: overlay.dataset.email, options: { emailRedirectTo: 'https://aiad.studio/?verified=1' } });
                         showToast('Verification email resent');
                     } catch (err) {
                         showToast('Resend failed: ' + (err.message || err));
                     }
                 };
             }
-            document.getElementById('aiadVerifyEmailAddr').textContent = email;
+            overlay.dataset.email = email;
+            const addr = document.getElementById('aiadVerifyEmailAddr');
+            if (addr) addr.textContent = email;
+            setTimeout(() => document.getElementById('aiadVerifyCode')?.focus(), 100);
         }
 
         // When user lands back from the email verification link (?verified=1), create their profile row.
@@ -15800,20 +15869,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 if (p.get('verified') !== '1') return;
                 const sess = (await db.auth.getSession())?.data?.session;
                 if (!sess?.user) return;
-                const pending = JSON.parse(localStorage.getItem('aiad_pending_profile') || 'null');
-                if (pending) {
-                    await db.from('profiles').upsert({
-                        id: sess.user.id,
-                        email: pending.email,
-                        full_name: pending.full_name,
-                        username: pending.username,
-                        role: pending.role,
-                    }, { onConflict: 'id' });
-                    localStorage.removeItem('aiad_pending_profile');
-                }
-                AppState.currentUser = sess.user;
-                showToast('Email verified — welcome to AIAD');
-                navigateTo('industry-selection');
+                await finalizeVerifiedSignup(sess.user);
             } catch (e) { console.warn('[aiad] post-verify hook', e); }
         });
 
