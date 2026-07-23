@@ -23082,19 +23082,38 @@ function toggleAgeRange(btn) {
         const BADGE = '<span class="aiad-verified" title="Verified by AIAD"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>';
         window.aiadVerifiedBadge = (v) => v ? BADGE : '';
 
-        // Decorate discover cards: match rendered names against verified profiles.
+        // Decorate rendered names against verified profiles (works across every
+        // discover/profile template without needing per-template data attributes).
         let _verifiedNames = null;
         async function loadVerifiedNames() {
-            const rows = await rest('profiles?select=full_name,username&verified=eq.true');
             _verifiedNames = new Set();
+            const rows = await rest('profiles?select=full_name,username&verified=eq.true');
             (rows||[]).forEach(r => { if (r.full_name) _verifiedNames.add(r.full_name.trim().toLowerCase()); if (r.username) _verifiedNames.add(r.username.trim().toLowerCase()); });
-            // Also artist_profiles.artist_name for verified users would need a join; skip for now.
+            // Verified artists' public artist_name too (join via user id).
+            const arts = await rest('artist_profiles?select=artist_name,user_id');
+            const vids = await rest('profiles?select=id&verified=eq.true');
+            const vset = new Set((vids||[]).map(x => x.id));
+            (arts||[]).forEach(a => { if (a.artist_name && vset.has(a.user_id)) _verifiedNames.add(a.artist_name.trim().toLowerCase()); });
         }
+        // Name elements are short, name-ish nodes. We only badge leaf elements whose
+        // exact trimmed text equals a verified name — full names don't collide with UI labels.
+        const NAME_SEL = '[class*="name" i], [class*="title" i], [data-aiad-name], .discover-artist-card *, h1, h2, h3, h4';
         function decorateBadges(root) {
             if (!_verifiedNames || !_verifiedNames.size) return;
-            (root||document).querySelectorAll('[data-aiad-name]:not([data-badged])').forEach(el => {
-                const nm = (el.getAttribute('data-aiad-name')||'').trim().toLowerCase();
-                if (_verifiedNames.has(nm)) { el.insertAdjacentHTML('beforeend', BADGE); el.setAttribute('data-badged','1'); }
+            const scope = root || document;
+            scope.querySelectorAll(NAME_SEL).forEach(el => {
+                if (el.__badged) return;
+                // Skip elements inside nav/sidebar to avoid badging menu labels.
+                if (el.closest('nav, .dash-nav, .dash-sidebar-left, .dash-mobile-nav, [id$="Nav"]')) return;
+                const explicit = el.getAttribute && el.getAttribute('data-aiad-name');
+                const txt = (explicit || el.textContent || '').trim().toLowerCase();
+                if (txt.length < 3 || txt.length > 60) return;
+                // Only leaf-ish elements (avoid wrapping containers with children besides text).
+                if (!explicit && el.children.length > 0) return;
+                if (_verifiedNames.has(txt)) {
+                    el.insertAdjacentHTML('beforeend', BADGE);
+                    el.__badged = true;
+                }
             });
         }
         window.aiadDecorateBadges = decorateBadges;
