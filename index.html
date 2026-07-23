@@ -15793,7 +15793,20 @@ Only capture real, meaningful decisions — not questions or general discussion.
             AppState.currentUser = user;
             AppState.userRole = role;
             try { localStorage.setItem('aiad_user_role', role); } catch (e) {}
-            showToast('Email verified — welcome to AIAD');
+
+            // Founding collaborator: first 100 collaborators are free-forever + verified (pending approval).
+            if (role === 'collaborator') {
+                try {
+                    const { data: spot } = await db.rpc('claim_founding_spot', { p_user: user.id, p_role: 'collaborator' });
+                    if (typeof spot === 'number' && spot > 0) {
+                        showToast(`🎉 You're Founding Collaborator #${spot} — free for life!`, 4000);
+                    } else {
+                        showToast('Email verified — welcome to AIAD');
+                    }
+                } catch (e) { showToast('Email verified — welcome to AIAD'); }
+            } else {
+                showToast('Email verified — welcome to AIAD');
+            }
             // Route by role. Collaborators/fans → their dashboard. Artists who already
             // picked an industry (guided flow) → that dashboard; otherwise → industry picker.
             const INDUSTRY_DASH = { music: 'artist', fashion: 'fashion', streaming: 'streamer', visual_arts: 'visualarts', writing_publishing: 'writing', film_media: 'film', games: 'games', multi: 'multi' };
