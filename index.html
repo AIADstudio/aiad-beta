@@ -23249,6 +23249,35 @@ function toggleAgeRange(btn) {
             } catch (e) { return { error: String(e) }; }
         }
 
+        // Execution actions (email/refund routed through admin-actions edge fn).
+        async function callAction(payload) {
+            const s = sess(); if (!s) return { error: 'no session' };
+            try {
+                const r = await fetch(`${SUPA}/functions/v1/admin-actions`, {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload || {}),
+                });
+                if (r.status === 404) return { error: 'Email sending isn’t enabled yet — approve the admin-actions deploy and add your RESEND_API_KEY.' };
+                return await r.json();
+            } catch (e) { return { error: String(e) }; }
+        }
+
+        // Apply founder-published SEO meta live (no redeploy needed).
+        async function applyLiveMeta() {
+            try {
+                const cfg = await rpc('get_site_config', {});
+                if (!cfg || typeof cfg !== 'object') return;
+                if (cfg.seo_title) document.title = cfg.seo_title;
+                if (cfg.seo_description) {
+                    let m = document.querySelector('meta[name="description"]');
+                    if (!m) { m = document.createElement('meta'); m.setAttribute('name', 'description'); document.head.appendChild(m); }
+                    m.setAttribute('content', cfg.seo_description);
+                }
+            } catch (e) {}
+        }
+        window.aiadApplyLiveMeta = applyLiveMeta;
+
         // Minimal, safe markdown → HTML (headings, bold, lists, breaks).
         function mdToHtml(md) {
             if (!md) return '';
@@ -23370,7 +23399,29 @@ function toggleAgeRange(btn) {
             if (agent === 'seo') payload.context = { title: document.title, description: (document.querySelector('meta[name=description]')||{}).content || '' };
             const res = await callAgent(payload);
             out.innerHTML = res.summary ? mdToHtml(res.summary) : `<span style="color:#f87171;">${res.error||'No response'}</span>`;
+            if (agent === 'seo' && res.summary) {
+                const tM = res.summary.match(/TITLE:\s*(.+)/i); const dM = res.summary.match(/DESCRIPTION:\s*(.+)/i);
+                const t = tM ? tM[1].replace(/[<>"]/g,'').trim().slice(0,70) : (document.title||'');
+                const d = dM ? dM[1].replace(/[<>"]/g,'').trim().slice(0,160) : '';
+                out.insertAdjacentHTML('beforeend', `
+                    <div style="margin-top:14px;background:#0b1220;border:1px solid rgba(56,189,248,0.25);border-radius:12px;padding:14px;">
+                        <div style="color:#38bdf8;font-size:0.74rem;font-weight:600;margin-bottom:8px;">✦ ONE-CLICK PUBLISH — updates live homepage meta instantly</div>
+                        <input id="aiadSeoTitle" value="${t.replace(/"/g,'&quot;')}" maxlength="70" placeholder="Homepage title" style="width:100%;box-sizing:border-box;background:#12141d;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:8px 10px;color:#fff;font-size:0.82rem;margin-bottom:8px;">
+                        <textarea id="aiadSeoDesc" maxlength="160" rows="2" placeholder="Meta description" style="width:100%;box-sizing:border-box;background:#12141d;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:8px 10px;color:#fff;font-size:0.82rem;margin-bottom:8px;resize:vertical;">${d}</textarea>
+                        <button onclick="publishSeo(this)" style="background:linear-gradient(135deg,#06b6d4,#3b82f6);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:0.8rem;font-weight:600;cursor:pointer;">🚀 Publish live</button>
+                        <span id="aiadSeoDone" style="color:#22c55e;font-size:0.78rem;margin-left:10px;"></span>
+                    </div>`);
+            }
             btn.disabled = false; btn.textContent = '⚡ Run agent';
+        };
+        window.publishSeo = async (b) => {
+            const p_title = document.getElementById('aiadSeoTitle').value.trim();
+            const p_description = document.getElementById('aiadSeoDesc').value.trim();
+            b.disabled = true; b.textContent = 'Publishing…';
+            const res = await rpc('admin_publish_seo', { p_title, p_description });
+            if (res && res.message) { document.getElementById('aiadSeoDone').textContent = '✗ ' + res.message; }
+            else { document.getElementById('aiadSeoDone').textContent = '✓ Live on aiad.studio'; applyLiveMeta(); }
+            b.disabled = false; b.textContent = '🚀 Publish live';
         };
 
         async function renderAdminSupport() {
@@ -23393,6 +23444,7 @@ function toggleAgeRange(btn) {
                     ${t.ai_draft ? `<div style="background:#0b1220;border:1px solid rgba(56,189,248,0.25);border-radius:10px;padding:10px;margin-top:8px;"><div style="color:#38bdf8;font-size:0.7rem;font-weight:600;margin-bottom:4px;">✦ AI DRAFT REPLY${t.ai_sentiment?' · '+t.ai_sentiment:''}${t.ai_category?' · '+t.ai_category:''}</div><div style="color:#e2e8f0;font-size:0.83rem;white-space:pre-wrap;">${(t.ai_draft||'').replace(/</g,'&lt;')}</div></div>` : ''}
                     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
                         <button onclick="draftTicketReply('${t.id}',this)" style="background:linear-gradient(135deg,#06b6d4,#3b82f6);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:0.76rem;font-weight:600;cursor:pointer;">${t.ai_draft?'Regenerate draft':'✦ AI draft reply'}</button>
+                        ${t.ai_draft&&t.email?`<button onclick="sendTicketReply('${t.id}',this)" style="background:#0e2a16;color:#4ade80;border:1px solid rgba(34,197,94,0.4);border-radius:8px;padding:6px 12px;font-size:0.76rem;font-weight:600;cursor:pointer;">✉️ Send reply</button>`:''}
                         ${t.ai_draft?`<button onclick="copyDraft(this,'${t.id}')" data-draft="${encodeURIComponent(t.ai_draft||'')}" style="background:#1a1d28;color:#cbd5e1;border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:6px 12px;font-size:0.76rem;cursor:pointer;">Copy</button>`:''}
                         ${t.status!=='resolved'?`<button onclick="resolveTicket('${t.id}',this)" style="background:#1a1d28;color:#22c55e;border:1px solid rgba(34,197,94,0.3);border-radius:8px;padding:6px 12px;font-size:0.76rem;cursor:pointer;">Mark resolved</button>`:''}
                     </div>
@@ -23413,6 +23465,12 @@ function toggleAgeRange(btn) {
             renderAdminSupport();
         };
         window.copyDraft = (btn, id) => { try { navigator.clipboard.writeText(decodeURIComponent(btn.getAttribute('data-draft'))); btn.textContent = 'Copied ✓'; } catch (e) {} };
+        window.sendTicketReply = async (id, btn) => {
+            btn.disabled = true; btn.textContent = 'Sending…';
+            const res = await callAction({ action: 'send_reply', ticket_id: id });
+            if (res && res.ok) { btn.textContent = 'Sent ✓'; btn.style.background = '#166534'; setTimeout(renderAdminSupport, 800); }
+            else { btn.disabled = false; btn.textContent = '✉️ Send reply'; (window.showToast||alert)(res && res.error ? res.error : 'Send failed'); }
+        };
         window.resolveTicket = async (id, btn) => {
             btn.disabled = true; btn.textContent = 'Saving…';
             await rpc('admin_resolve_ticket', { p_id: id, p_status: 'resolved' });
@@ -23528,7 +23586,7 @@ function toggleAgeRange(btn) {
             }
         }
         document.addEventListener('DOMContentLoaded', () => {
-            setTimeout(() => { hookSettings(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); loadVerifiedNames().then(() => decorateBadges()); }, 1500);
+            setTimeout(() => { hookSettings(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); applyLiveMeta(); loadVerifiedNames().then(() => decorateBadges()); }, 1500);
         });
         // Re-decorate + (re)mount buttons as auth state / views change.
         setInterval(() => { if (_verifiedNames) decorateBadges(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); }, 2500);
