@@ -5496,13 +5496,7 @@ html, body {
                                 <div class="settings-usage-item"><div class="settings-usage-label">Decision memories</div><div class="settings-usage-value">24 / Unlimited</div></div>
                             </div>
                             <h3 style="font-size: 0.9375rem; font-weight: 500; margin-bottom: var(--space-md); color: var(--text-secondary);">Available Plans</h3>
-                            <div class="settings-plans-grid">
-                                <div class="settings-plan-card"><div class="settings-plan-card-name">Observer</div><div class="settings-plan-card-price">Free</div><button class="settings-plan-card-btn">View</button></div>
-                                <div class="settings-plan-card"><div class="settings-plan-card-name">Starter</div><div class="settings-plan-card-price">$9/mo</div><button class="settings-plan-card-btn">View</button></div>
-                                <div class="settings-plan-card current"><div class="settings-plan-card-name">Pro</div><div class="settings-plan-card-price">$19/mo</div><button class="settings-plan-card-btn">Current</button></div>
-                                <div class="settings-plan-card"><div class="settings-plan-card-name">Established</div><div class="settings-plan-card-price">$39/mo</div><button class="settings-plan-card-btn">Upgrade</button></div>
-                                <div class="settings-plan-card"><div class="settings-plan-card-name">Elite</div><div class="settings-plan-card-price">$99/mo</div><button class="settings-plan-card-btn">Upgrade</button></div>
-                            </div>
+                            <div id="aiadPricingMount"></div>
                             <details style="margin-top: var(--space-lg);"><summary style="cursor: pointer; font-size: 0.9375rem; color: var(--text-secondary);">Billing History</summary>
                                 <table class="settings-billing-table" style="margin-top: var(--space-md);"><thead><tr><th>Date</th><th>Description</th><th>Amount</th><th></th></tr></thead><tbody>
                                     <tr><td>Jan 21, 2026</td><td>Pro Plan - Monthly</td><td>$19.00</td><td><a href="#" class="settings-billing-link">Download</a></td></tr>
@@ -22220,7 +22214,7 @@ function toggleAgeRange(btn) {
             return data;
         }
 
-        window.startCheckout = async function (plan) {
+        window.startCheckout = async function (plan, interval) {
             try {
                 const sess = getSession();
                 if (!sess?.user) { (window.showToast || alert)('Please sign in first'); return; }
@@ -22228,6 +22222,7 @@ function toggleAgeRange(btn) {
                     plan,
                     user_id: sess.user.id,
                     email:   sess.user.email,
+                    interval: interval || window.__aiadBillingInterval || 'month',
                 });
                 window.location.href = url;
             } catch (err) {
@@ -23041,6 +23036,199 @@ function toggleAgeRange(btn) {
             setTimeout(maybeShowOnboarding, 600);
             setTimeout(maybeShowBanner, 800);
         });
+    })();
+    </script>
+
+    <!-- ───────────────────────────────────────────────────────────────────
+         AIAD: pricing (monthly/annual + founding banner), verified badges,
+         and the founder verification console. Self-contained.
+         ─────────────────────────────────────────────────────────────────── -->
+    <style>
+        .aiad-verified { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; margin-left:5px; vertical-align:middle; border-radius:50%; background:linear-gradient(135deg,#06b6d4,#3b82f6); color:#fff; flex-shrink:0; }
+        .aiad-verified svg { width:10px; height:10px; }
+        .aiad-price-toggle { display:inline-flex; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.10); border-radius:999px; padding:3px; margin-bottom:16px; }
+        .aiad-price-toggle button { border:none; background:transparent; color:var(--text-muted,#94a3b8); padding:7px 16px; border-radius:999px; cursor:pointer; font-size:0.82rem; font-weight:600; font-family:inherit; }
+        .aiad-price-toggle button.active { background:linear-gradient(135deg,#d946ef,#a21caf); color:#fff; }
+        .aiad-plan-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
+        .aiad-plan { background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:16px 14px; text-align:center; }
+        .aiad-plan.current { border-color:rgba(6,182,212,0.5); }
+        .aiad-plan-name { font-size:0.8rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-muted,#94a3b8); }
+        .aiad-plan-price { font-size:1.3rem; font-weight:700; color:#fff; margin:6px 0 2px; }
+        .aiad-plan-sub { font-size:0.7rem; color:var(--text-hint,#64748b); min-height:14px; }
+        .aiad-plan-btn { margin-top:12px; width:100%; border:none; border-radius:9px; padding:9px; font-weight:600; font-size:0.82rem; cursor:pointer; font-family:inherit; background:linear-gradient(135deg,#d946ef,#a21caf); color:#fff; }
+        .aiad-plan-btn.ghost { background:transparent; border:1px solid rgba(255,255,255,0.14); color:var(--text-secondary,#cbd5e1); }
+        .aiad-plan-btn:disabled { opacity:0.5; cursor:default; }
+        .aiad-founding-banner { background:linear-gradient(90deg,rgba(217,70,239,0.14),rgba(6,182,212,0.14)); border:1px solid rgba(255,255,255,0.10); border-radius:12px; padding:12px 16px; margin-bottom:14px; font-size:0.85rem; color:#fff; }
+        @media (max-width:600px){ .aiad-plan-grid{ grid-template-columns:1fr 1fr; } }
+    </style>
+    <script>
+    (function () {
+        window.__aiadBillingInterval = 'month';
+        const SUPA = 'https://uapiytquwuhtewqieegx.supabase.co';
+        function sess() { try { return JSON.parse(localStorage.getItem('sb-uapiytquwuhtewqieegx-auth-token')); } catch (e) { return null; } }
+        function anon() { const a=[...document.querySelectorAll('script')].map(s=>s.innerHTML).join(''); const m=a.match(/eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+/); return m?m[0]:''; }
+        async function rest(path, opts) {
+            const s = sess(); if (!s) return null;
+            const r = await fetch(`${SUPA}/rest/v1/${path}`, { ...(opts||{}), headers: { 'Authorization':'Bearer '+s.access_token, 'apikey':anon(), 'Content-Type':'application/json', ...(opts&&opts.headers||{}) } });
+            try { return await r.json(); } catch (e) { return null; }
+        }
+        async function rpc(fn, args) {
+            const s = sess(); if (!s) return null;
+            const r = await fetch(`${SUPA}/rest/v1/rpc/${fn}`, { method:'POST', headers:{'Authorization':'Bearer '+s.access_token,'apikey':anon(),'Content-Type':'application/json'}, body: JSON.stringify(args||{}) });
+            try { return await r.json(); } catch (e) { return null; }
+        }
+
+        // ── Verified badge helper (usable anywhere) ──
+        const BADGE = '<span class="aiad-verified" title="Verified by AIAD"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>';
+        window.aiadVerifiedBadge = (v) => v ? BADGE : '';
+
+        // Decorate discover cards: match rendered names against verified profiles.
+        let _verifiedNames = null;
+        async function loadVerifiedNames() {
+            const rows = await rest('profiles?select=full_name,username&verified=eq.true');
+            _verifiedNames = new Set();
+            (rows||[]).forEach(r => { if (r.full_name) _verifiedNames.add(r.full_name.trim().toLowerCase()); if (r.username) _verifiedNames.add(r.username.trim().toLowerCase()); });
+            // Also artist_profiles.artist_name for verified users would need a join; skip for now.
+        }
+        function decorateBadges(root) {
+            if (!_verifiedNames || !_verifiedNames.size) return;
+            (root||document).querySelectorAll('[data-aiad-name]:not([data-badged])').forEach(el => {
+                const nm = (el.getAttribute('data-aiad-name')||'').trim().toLowerCase();
+                if (_verifiedNames.has(nm)) { el.insertAdjacentHTML('beforeend', BADGE); el.setAttribute('data-badged','1'); }
+            });
+        }
+        window.aiadDecorateBadges = decorateBadges;
+
+        // ── Pricing renderer (monthly/annual + founding banner) ──
+        const TIERS = [
+            { key:null,              name:'Free',    m:0,   credits:'20 credits/mo' },
+            { key:'artist_starter',  name:'Starter', m:30,  credits:'100 credits/mo' },
+            { key:'artist_pro',      name:'Pro',     m:80,  credits:'500 credits/mo' },
+            { key:'artist_premier',  name:'Premier', m:150, credits:'Unlimited credits' },
+        ];
+        async function renderPricing() {
+            const mount = document.getElementById('aiadPricingMount');
+            if (!mount) return;
+            const s = sess();
+            let currentPlan = 'free', founding = false;
+            if (s) {
+                const rows = await rest(`profiles?select=plan,founding_member&id=eq.${s.user.id}`);
+                const row = Array.isArray(rows) ? rows[0] : null;
+                currentPlan = row?.plan || 'free';
+                founding = !!row?.founding_member;
+            }
+            // Founding spots left (artists).
+            let spotsLeft = null;
+            try { const c = await rpc('founding_member_count', { p_role:'artist' }); if (typeof c === 'number') spotsLeft = Math.max(0, 100 - c); } catch (e) {}
+
+            const iv = window.__aiadBillingInterval;
+            const banner = founding
+                ? `<div class="aiad-founding-banner">🎉 You're a <strong>Founding Member</strong> — 30% off for life is locked in.</div>`
+                : (spotsLeft !== null && spotsLeft > 0
+                    ? `<div class="aiad-founding-banner">🔥 <strong>Founding offer:</strong> first 100 subscribers get <strong>30% off for life</strong>. ${spotsLeft} spots left.</div>`
+                    : '');
+
+            const cards = TIERS.map(t => {
+                const isCurrent = (t.key || 'free') === currentPlan;
+                let priceHtml, sub;
+                if (t.m === 0) { priceHtml = 'Free'; sub = t.credits; }
+                else if (iv === 'year') {
+                    const yr = t.m * 10;
+                    const disc = founding ? Math.round(yr * 0.7) : yr;
+                    priceHtml = `$${disc}<span style="font-size:0.7rem;color:var(--text-hint);">/yr</span>`;
+                    sub = `${t.credits} · 2 months free${founding?' · founding 30% off':''}`;
+                } else {
+                    const disc = founding ? Math.round(t.m * 0.7) : t.m;
+                    priceHtml = `$${disc}<span style="font-size:0.7rem;color:var(--text-hint);">/mo</span>`;
+                    sub = founding ? `${t.credits} · founding 30% off` : t.credits;
+                }
+                let btn;
+                if (isCurrent) btn = `<button class="aiad-plan-btn ghost" disabled>Current</button>`;
+                else if (t.m === 0) btn = `<button class="aiad-plan-btn ghost" disabled>—</button>`;
+                else btn = `<button class="aiad-plan-btn" onclick="window.startCheckout('${t.key}','${iv}')">${currentPlan==='free'?'Choose':'Switch'}</button>`;
+                return `<div class="aiad-plan ${isCurrent?'current':''}"><div class="aiad-plan-name">${t.name}</div><div class="aiad-plan-price">${priceHtml}</div><div class="aiad-plan-sub">${sub}</div>${btn}</div>`;
+            }).join('');
+
+            mount.innerHTML = `
+                ${banner}
+                <div class="aiad-price-toggle">
+                    <button class="${iv==='month'?'active':''}" onclick="window.__setInterval('month')">Monthly</button>
+                    <button class="${iv==='year'?'active':''}" onclick="window.__setInterval('year')">Annual <span style="opacity:.8;">(2 mo free)</span></button>
+                </div>
+                <div class="aiad-plan-grid">${cards}</div>
+                <p style="font-size:0.72rem;color:var(--text-hint);margin-top:10px;">Manage or cancel anytime from <a href="#" onclick="window.openBillingPortal();return false;" style="color:var(--teal,#06b6d4);">the billing portal</a>.</p>`;
+        }
+        window.__setInterval = (iv) => { window.__aiadBillingInterval = iv; renderPricing(); };
+        window.aiadRenderPricing = renderPricing;
+
+        // ── Founder verification console (only for founder@aiad.studio) ──
+        async function buildFounderConsole() {
+            const s = sess();
+            if (!s || (s.user?.email !== 'founder@aiad.studio')) return;
+            if (document.getElementById('aiadFounderBtn')) return;
+            const btn = document.createElement('button');
+            btn.id = 'aiadFounderBtn';
+            btn.textContent = '✓ Verify Requests';
+            btn.style.cssText = 'position:fixed;bottom:18px;right:18px;z-index:99998;background:linear-gradient(135deg,#06b6d4,#3b82f6);color:#fff;border:none;border-radius:999px;padding:10px 16px;font-weight:600;font-size:0.82rem;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.4);';
+            btn.onclick = openFounderConsole;
+            document.body.appendChild(btn);
+        }
+        async function openFounderConsole() {
+            let ov = document.getElementById('aiadFounderOverlay');
+            if (!ov) {
+                ov = document.createElement('div');
+                ov.id = 'aiadFounderOverlay';
+                ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);backdrop-filter:blur(6px);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+                ov.innerHTML = `<div style="background:#0f0f14;border:1px solid rgba(255,255,255,0.1);border-radius:16px;max-width:520px;width:100%;max-height:82vh;overflow-y:auto;padding:22px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><h2 style="margin:0;font-size:1.2rem;color:#fff;">Verify Requests</h2><button onclick="document.getElementById('aiadFounderOverlay').style.display='none'" style="background:none;border:none;color:#94a3b8;font-size:1.4rem;cursor:pointer;">×</button></div>
+                    <p id="aiadFounderCounts" style="font-size:0.8rem;color:#94a3b8;margin:0 0 14px;"></p>
+                    <div id="aiadFounderList"></div>
+                </div>`;
+                document.body.appendChild(ov);
+            }
+            ov.style.display = 'flex';
+            const list = document.getElementById('aiadFounderList');
+            list.innerHTML = '<div style="color:#94a3b8;font-size:0.85rem;">Loading…</div>';
+            const [pending, artistN, collabN] = await Promise.all([
+                rpc('pending_verifications', {}),
+                rpc('founding_member_count', { p_role:'artist' }),
+                rpc('founding_member_count', { p_role:'collaborator' }),
+            ]);
+            document.getElementById('aiadFounderCounts').textContent =
+                `Founding artists: ${artistN||0}/100 · Founding collaborators: ${collabN||0}/100`;
+            if (!Array.isArray(pending) || !pending.length) {
+                list.innerHTML = '<div style="color:#94a3b8;font-size:0.85rem;">No pending verification requests.</div>';
+                return;
+            }
+            list.innerHTML = pending.map(p => `
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06);">
+                    <div style="min-width:0;">
+                        <div style="color:#fff;font-size:0.9rem;">${(p.full_name||'—')} ${p.founding_number?`<span style='color:#64748b;font-size:0.72rem;'>#${p.founding_number}</span>`:''}</div>
+                        <div style="color:#94a3b8;font-size:0.72rem;">${p.email} · ${p.role}</div>
+                    </div>
+                    <button onclick="window.__approve('${p.user_id}', this)" style="background:linear-gradient(135deg,#06b6d4,#3b82f6);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-weight:600;font-size:0.78rem;cursor:pointer;">Approve</button>
+                </div>`).join('');
+        }
+        window.__approve = async (uid, el) => {
+            el.disabled = true; el.textContent = 'Approving…';
+            const res = await rpc('approve_verified', { p_target: uid, p_approve: true });
+            if (res === true || res === 'true') { el.textContent = 'Verified ✓'; el.style.background = '#22c55e'; }
+            else { el.disabled = false; el.textContent = 'Approve'; (window.showToast||alert)('Approve failed'); }
+        };
+
+        // Wire into settings view + boot.
+        function hookSettings() {
+            const orig = window.showArtistView;
+            if (typeof orig === 'function' && !orig.__pricingHooked) {
+                window.showArtistView = function (v) { orig(v); if (v === 'settings') setTimeout(renderPricing, 60); };
+                window.showArtistView.__pricingHooked = true;
+            }
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => { hookSettings(); buildFounderConsole(); loadVerifiedNames().then(() => decorateBadges()); }, 1500);
+        });
+        // Re-decorate periodically as discover results render.
+        setInterval(() => { if (_verifiedNames) decorateBadges(); }, 2500);
     })();
     </script>
 </body>
