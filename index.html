@@ -22340,6 +22340,75 @@ function toggleAgeRange(btn) {
             activeStage = null;
         };
 
+        // ── AI credits: resolve the Supabase client + REST helpers ──────────────
+        function _client() {
+            try { if (typeof db !== 'undefined' && db?.rpc) return db; } catch (e) {}
+            return (window.db && window.db.rpc) ? window.db : null;
+        }
+        function _anonKey() {
+            const all = [...document.querySelectorAll('script')].map(s => s.innerHTML).join('');
+            const m = all.match(/eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+/);
+            return m ? m[0] : null;
+        }
+
+        // Atomically consume one AI credit. Returns remaining (>=0), 999999 for unlimited, -1 if out, or null on error.
+        async function spendAiCredit(sess) {
+            const c = _client();
+            try {
+                if (c) {
+                    const { data, error } = await c.rpc('spend_ai_credit', { p_user: sess.user.id });
+                    if (!error && typeof data === 'number') return data;
+                }
+                // REST fallback
+                const anon = _anonKey();
+                const SU = (typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL) || 'https://uapiytquwuhtewqieegx.supabase.co';
+                const res = await fetch(`${SU}/rest/v1/rpc/spend_ai_credit`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sess.access_token, 'apikey': anon || '' },
+                    body: JSON.stringify({ p_user: sess.user.id }),
+                });
+                const val = await res.json();
+                return (typeof val === 'number') ? val : null;
+            } catch (e) { console.warn('[credits] spend', e); return null; }
+        }
+
+        function updateCreditsDisplay(remaining) {
+            const val = document.getElementById('creditsValue');
+            const bar = document.getElementById('creditsBarFill');
+            if (remaining === 999999 || remaining === 'unlimited') {
+                if (val) val.textContent = 'Unlimited';
+                if (bar) bar.style.width = '100%';
+                return;
+            }
+            const max = window.__aiCreditMax || null;
+            if (val) val.textContent = max ? `${remaining} / ${max}` : String(remaining);
+            if (bar && max) bar.style.width = Math.max(0, Math.min(100, (remaining / max) * 100)) + '%';
+        }
+
+        // Load current balance + allowance and paint the indicator.
+        async function loadAiCredits() {
+            const sess = getSession();
+            if (!sess) return;
+            try {
+                const anon = _anonKey();
+                const SU = (typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL) || 'https://uapiytquwuhtewqieegx.supabase.co';
+                const res = await fetch(`${SU}/rest/v1/ai_credits?select=balance,allowance&user_id=eq.${sess.user.id}`, {
+                    headers: { 'Authorization': 'Bearer ' + sess.access_token, 'apikey': anon || '' },
+                });
+                const rows = await res.json();
+                const row = Array.isArray(rows) ? rows[0] : null;
+                if (row) {
+                    window.__aiCreditMax = row.allowance >= 999999 ? null : row.allowance;
+                    updateCreditsDisplay(row.allowance >= 999999 ? 999999 : row.balance);
+                } else {
+                    // No row yet → free tier defaults.
+                    window.__aiCreditMax = 20;
+                    updateCreditsDisplay(20);
+                }
+            } catch (e) { /* silent */ }
+        }
+        window.loadAiCredits = loadAiCredits;
+
         window.sendStageAgentMessage = async function () {
             if (!activeStage) return;
             const input = document.getElementById('stageAgentInput');
@@ -22348,6 +22417,16 @@ function toggleAgeRange(btn) {
 
             const sess = getSession();
             if (!sess) { (window.showToast || alert)('Please sign in first'); return; }
+
+            // ── Spend one AI credit (atomic, per-tier). -1 = out for the month. ──
+            const remaining = await spendAiCredit(sess);
+            if (remaining === -1) {
+                (window.showToast || alert)("You're out of AIAD Agent credits for this month. Upgrade for more.");
+                if (typeof showArtistView === 'function') { /* leave them on the view */ }
+                updateCreditsDisplay(0);
+                return;
+            }
+            if (remaining !== null) updateCreditsDisplay(remaining);
 
             const thread = document.getElementById('stageAgentThread');
             // Clear initial suggestions block once user actually sends.
@@ -22413,6 +22492,7 @@ function toggleAgeRange(btn) {
             if (!view) return;
             renderStageCards();
             loadStatsIntoForm();
+            loadAiCredits();
         }
 
         // ── Connect Platforms: load saved handles + cached stats into the form on mount ──
