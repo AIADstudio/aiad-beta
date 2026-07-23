@@ -11611,7 +11611,10 @@ html, body {
             const { data, error } = await db.auth.signUp({
                 email,
                 password,
-                options: { data: { full_name: fullName, username, role: 'artist' } }
+                options: {
+                    data: { full_name: fullName, username, role: 'artist' },
+                    emailRedirectTo: 'https://aiad.studio/?verified=1',
+                },
             });
 
             if (error) {
@@ -11631,6 +11634,20 @@ html, body {
                     btn.querySelector('span').textContent = 'Continue';
                     return;
                 }
+            } else if (data?.user && !data?.session) {
+                // Email confirmation ON → no session yet. Stash profile + artist context, show verify screen.
+                AppState.artistProfile.artistName = document.getElementById('artistName').value.trim();
+                AppState.artistProfile.primaryGenre = document.getElementById('primaryGenre').value.trim();
+                localStorage.setItem('aiad_artist_profile', JSON.stringify(AppState.artistProfile));
+                try {
+                    localStorage.setItem('aiad_pending_profile', JSON.stringify({
+                        email, full_name: fullName, username, role: 'artist',
+                        industry: AppState.userIndustry || 'music',
+                    }));
+                } catch (e) {}
+                btn.disabled = false; btn.querySelector('span').textContent = 'Continue';
+                showVerifyEmailScreen(email);
+                return;
             } else {
                 AppState.currentUser = data.user;
             }
@@ -15751,26 +15768,45 @@ Only capture real, meaningful decisions — not questions or general discussion.
             }
         }
 
-        // Shared: create the profile row + drop the verified user into onboarding.
-        // Used by BOTH the email-link path (?verified=1) and the 6-digit code path.
+        // Shared: create the profile row + route the verified user by role.
+        // Used by the email-link path (?verified=1), the code path, AND collaborators.
         async function finalizeVerifiedSignup(user) {
             if (!user) return;
+            let role = 'artist';
+            let industry = null;
             try {
                 const pending = JSON.parse(localStorage.getItem('aiad_pending_profile') || 'null');
                 if (pending) {
-                    await db.from('profiles').upsert({
-                        id: user.id,
-                        email: pending.email,
-                        full_name: pending.full_name,
-                        username: pending.username,
-                        role: pending.role,
-                    }, { onConflict: 'id' });
+                    role = pending.role || 'artist';
+                    industry = pending.industry || null;
+                    // Write every field we have; extra keys (location, avatar_url, industry) are ignored if columns absent.
+                    const row = { id: user.id, email: pending.email || user.email, role };
+                    if (pending.full_name)  row.full_name = pending.full_name;
+                    if (pending.username)   row.username  = pending.username;
+                    if (pending.industry)   row.industry  = pending.industry;
+                    if (pending.location)   row.location  = pending.location;
+                    if (pending.avatar_url) row.avatar_url = pending.avatar_url;
+                    await db.from('profiles').upsert(row, { onConflict: 'id' });
                     localStorage.removeItem('aiad_pending_profile');
                 }
             } catch (e) { console.warn('[aiad] finalizeVerifiedSignup', e); }
             AppState.currentUser = user;
+            AppState.userRole = role;
+            try { localStorage.setItem('aiad_user_role', role); } catch (e) {}
             showToast('Email verified — welcome to AIAD');
-            navigateTo('industry-selection');
+            // Route by role. Collaborators/fans → their dashboard. Artists who already
+            // picked an industry (guided flow) → that dashboard; otherwise → industry picker.
+            const INDUSTRY_DASH = { music: 'artist', fashion: 'fashion', streaming: 'streamer', visual_arts: 'visualarts', writing_publishing: 'writing', film_media: 'film', games: 'games', multi: 'multi' };
+            if (role === 'collaborator') {
+                if (typeof jumpToDashboard === 'function') jumpToDashboard('collab'); else navigateTo('collaborator-complete');
+            } else if (role === 'fan') {
+                if (typeof jumpToDashboard === 'function') jumpToDashboard('fan'); else navigateTo('industry-selection');
+            } else if (industry && typeof jumpToDashboard === 'function' && INDUSTRY_DASH[industry]) {
+                localStorage.setItem('aiad_user_industry', industry);
+                jumpToDashboard(INDUSTRY_DASH[industry]);
+            } else {
+                navigateTo('industry-selection');
+            }
         }
 
         // Full-screen "check your email" message shown after signup.
@@ -18117,40 +18153,76 @@ Only capture real, meaningful decisions — not questions or general discussion.
             try {
                 const { data: authData, error } = await db.auth.signUp({
                     email, password,
-                    options: { data: { full_name: displayName, role: 'collaborator' } }
+                    options: {
+                        data: { full_name: displayName, role: 'collaborator' },
+                        emailRedirectTo: 'https://aiad.studio/?verified=1',
+                    },
                 });
 
                 if (error) {
                     if (error.message.includes('already registered') || error.message.includes('already exists')) {
-                        const { data: signInData, error: signInErr } = await db.auth.signInWithPassword({ email, password });
+                        // Existing account — try to sign in and continue the flow.
+                        const { error: signInErr } = await db.auth.signInWithPassword({ email, password });
                         if (signInErr) {
-                            showToast('Error: ' + signInErr.message);
+                            showToast('That email is already registered. ' + signInErr.message);
                             btn.disabled = false; btn.querySelector('span').textContent = 'Continue'; return;
                         }
-                    } else {
-                        showToast('Error: ' + error.message);
-                        btn.disabled = false; btn.querySelector('span').textContent = 'Continue'; return;
+                        const u = (await db.auth.getUser()).data?.user;
+                        if (u) {
+                            AppState.currentUser = u;
+                            await db.from('profiles').upsert({
+                                id: u.id, full_name: displayName,
+                                username: displayName.toLowerCase().replace(/\s+/g, '_'),
+                                role: 'collaborator', industry: AppState.userIndustry || 'music',
+                                location: AppState.collaborator.profile.location || '',
+                                avatar_url: AppState.collaborator.profile.avatarUrl || '',
+                            }, { onConflict: 'id' });
+                        }
+                        btn.disabled = false; btn.querySelector('span').textContent = 'Continue';
+                        navigateTo('collaborator-intent');
+                        return;
                     }
+                    showToast('Error: ' + error.message);
+                    btn.disabled = false; btn.querySelector('span').textContent = 'Continue'; return;
                 }
 
-                const user = (await db.auth.getUser()).data?.user;
+                localStorage.setItem('aiad_collab_email', email);
+
+                // Email confirmation is ON → no session yet. Stash the profile for after verification.
+                if (authData?.user && !authData?.session) {
+                    try {
+                        localStorage.setItem('aiad_pending_profile', JSON.stringify({
+                            email,
+                            full_name: displayName,
+                            username: displayName.toLowerCase().replace(/\s+/g, '_'),
+                            role: 'collaborator',
+                            industry: AppState.userIndustry || 'music',
+                            location: AppState.collaborator.profile.location || '',
+                            avatar_url: AppState.collaborator.profile.avatarUrl || '',
+                        }));
+                    } catch (e) {}
+                    btn.disabled = false; btn.querySelector('span').textContent = 'Continue';
+                    showVerifyEmailScreen(email);   // reuse the code/link verify screen; on verify → collab dashboard
+                    return;
+                }
+
+                // Edge case: confirmation OFF → session exists, create profile and continue the flow.
+                const user = authData?.user || (await db.auth.getUser()).data?.user;
                 if (user) {
                     AppState.currentUser = user;
                     await db.from('profiles').upsert({
-                        id: user.id,
-                        full_name: displayName,
-                        username: displayName.toLowerCase().replace(/\\s+/g, '_'),
-                        role: 'collaborator',
-                        industry: AppState.userIndustry || 'music',
+                        id: user.id, full_name: displayName,
+                        username: displayName.toLowerCase().replace(/\s+/g, '_'),
+                        role: 'collaborator', industry: AppState.userIndustry || 'music',
                         location: AppState.collaborator.profile.location || '',
-                        avatar_url: AppState.collaborator.profile.avatarUrl || ''
+                        avatar_url: AppState.collaborator.profile.avatarUrl || '',
                     }, { onConflict: 'id' });
-
-                    localStorage.setItem('aiad_collab_email', email);
                 }
             } catch(e) {
                 console.warn('[AIAD] Collab signup error:', e);
-                showToast('Account creation failed — continuing in demo mode');
+                showToast('Account creation failed: ' + (e.message || e));
+                btn.disabled = false; btn.querySelector('span').textContent = 'Continue';
+                return;
             }
 
             btn.querySelector('span').textContent = 'Continue';
@@ -20711,7 +20783,10 @@ document.addEventListener('keydown', function(e) {
             let userData = null;
             const { data, error } = await db.auth.signUp({
                 email, password,
-                options: { data: { full_name: name, role: 'fan' } }
+                options: {
+                    data: { full_name: name, role: 'fan' },
+                    emailRedirectTo: 'https://aiad.studio/?verified=1',
+                },
             });
             if (error) {
                 if (error.message.includes('already registered') || error.message.includes('already exists')) {
@@ -20725,6 +20800,23 @@ document.addEventListener('keydown', function(e) {
                     showToast('Error: ' + error.message);
                     btn.disabled = false; btn.querySelector('span').textContent = 'Continue'; return;
                 }
+            } else if (data?.user && !data?.session) {
+                // Email confirmation ON → verify first, then land in the fan dashboard.
+                AppState.fanAccount = { name, email, location, ageRange };
+                localStorage.setItem('aiad_fan_name', name);
+                localStorage.setItem('aiad_fan_email', email);
+                if (location) localStorage.setItem('aiad_fan_location', location);
+                if (ageRange) localStorage.setItem('aiad_fan_age', ageRange);
+                try {
+                    localStorage.setItem('aiad_pending_profile', JSON.stringify({
+                        email, full_name: name,
+                        username: name.toLowerCase().replace(/\s+/g, '_'),
+                        role: 'fan', industry: 'music', location,
+                    }));
+                } catch (e) {}
+                btn.disabled = false; btn.querySelector('span').textContent = 'Continue';
+                showVerifyEmailScreen(email);
+                return;
             } else {
                 userData = data.user;
             }
