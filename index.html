@@ -16651,7 +16651,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 const res = await fetch('https://uapiytquwuhtewqieegx.supabase.co/functions/v1/music-production', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-                    body: JSON.stringify({ prompt, style, title, instrumental: musicIsInstrumental, lyrics, referenceUrl })
+                    body: JSON.stringify({ prompt, style, title, instrumental: musicIsInstrumental, lyrics, referenceUrl, model: (document.getElementById('musicModelSelect') || {}).value || 'minimax' })
                 });
                 const data = await res.json();
                 if (!data.workId) {
@@ -23369,6 +23369,48 @@ function toggleAgeRange(btn) {
         }
         window.aiadEnsureArtistStats = ensureArtistStats;
 
+        // ── Creative Studio: give artists AI-model options (validated engines) ──
+        const STUDIO_MODELS = {
+            text:  [['sonnet','Claude Sonnet · balanced (default)'],['opus','Claude Opus · most creative'],['haiku','Claude Haiku · fastest']],
+            image: [['nano','Nano Banana · fast (default)'],['nano-pro','Nano Banana Pro · high detail'],['flux','Flux · artistic']],
+            music: [['minimax','MiniMax · full songs + vocals (default)'],['stable-audio','Stable Audio · instrumental / soundscapes']],
+        };
+        function makeStudioPicker(id, kind) {
+            const wrap = document.createElement('div');
+            wrap.className = 'aiad-model-pick';
+            wrap.style.cssText = 'margin:10px 0;';
+            wrap.innerHTML = `<label style="display:block;font-size:0.72rem;color:var(--text-hint,#94a3b8);margin-bottom:4px;">⚙ AI model</label>
+                <select id="${id}" style="width:100%;box-sizing:border-box;background:#12141d;border:1px solid rgba(255,255,255,0.14);border-radius:8px;padding:8px 10px;color:#fff;font-size:0.82rem;cursor:pointer;">
+                    ${STUDIO_MODELS[kind].map(o => `<option value="${o[0]}">${o[1]}</option>`).join('')}
+                </select>`;
+            return wrap;
+        }
+        function injectStudioModelPickers() {
+            [['songwritingInput','songModelSelect','text'],
+             ['merchAIPrompt','merchModelSelect','text'],
+             ['mixmediaInput','mixModelSelect','image'],
+             ['musicStyle','musicModelSelect','music']].forEach(([anchorId, selId, kind]) => {
+                if (document.getElementById(selId)) return;
+                const anchor = document.getElementById(anchorId);
+                if (!anchor) return;
+                anchor.insertAdjacentElement('afterend', makeStudioPicker(selId, kind));
+            });
+        }
+        function wrapCreativeStudio() {
+            if (window.__csWrapped || typeof window.callCreativeStudio !== 'function') return;
+            const orig = window.callCreativeStudio;
+            window.callCreativeStudio = function (tool, prompt, extra) {
+                extra = extra || {};
+                if (extra.model == null) {
+                    const map = { songwriting: 'songModelSelect', merch: 'merchModelSelect', mixmedia: 'mixModelSelect' };
+                    const el = map[tool] && document.getElementById(map[tool]);
+                    if (el && el.value) extra.model = el.value;
+                }
+                return orig(tool, prompt, extra);
+            };
+            window.__csWrapped = true;
+        }
+
         // Minimal, safe markdown → HTML (headings, bold, lists, breaks).
         function mdToHtml(md) {
             if (!md) return '';
@@ -23799,10 +23841,10 @@ function toggleAgeRange(btn) {
             }
         }
         document.addEventListener('DOMContentLoaded', () => {
-            setTimeout(() => { hookSettings(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); applyLiveMeta(); ensureArtistStats(); loadVerifiedNames().then(() => decorateBadges()); }, 1500);
+            setTimeout(() => { hookSettings(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); applyLiveMeta(); ensureArtistStats(); injectStudioModelPickers(); wrapCreativeStudio(); loadVerifiedNames().then(() => decorateBadges()); }, 1500);
         });
-        // Re-decorate + (re)mount buttons as auth state / views change.
-        setInterval(() => { if (_verifiedNames) decorateBadges(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); }, 2500);
+        // Re-decorate + (re)mount buttons/pickers as auth state / views change.
+        setInterval(() => { if (_verifiedNames) decorateBadges(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); injectStudioModelPickers(); wrapCreativeStudio(); }, 2500);
     })();
     </script>
 </body>
