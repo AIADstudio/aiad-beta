@@ -14383,6 +14383,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     body: JSON.stringify({
                         message,
                         conversationHistory: artistAgentHistory.slice(0, -1),
+                        user_id: (AppState.currentUser && AppState.currentUser.id) || null,
                         artistName: AppState.artistProfile.artistName,
                         genre: AppState.artistProfile.primaryGenre,
                         location: AppState.artistProfile.location,
@@ -23339,6 +23340,35 @@ function toggleAgeRange(btn) {
         }
         window.aiadApplyLiveMeta = applyLiveMeta;
 
+        // Safety net: if an artist has social links from onboarding but no fetched
+        // stats yet, auto-scan on load (covers any missed onboarding-time fetch).
+        async function ensureArtistStats() {
+            const s = sess(); if (!s) return;
+            try {
+                const prof = await rest(`profiles?select=role&id=eq.${s.user.id}`);
+                if (!Array.isArray(prof) || (prof[0] && prof[0].role) !== 'artist') return;
+                const st = await rest(`artist_stats?select=youtube_stats,spotify_stats&user_id=eq.${s.user.id}`);
+                const row = Array.isArray(st) ? st[0] : null;
+                const hasYT = row && row.youtube_stats;
+                const hasSP = row && row.spotify_stats && JSON.stringify(row.spotify_stats) !== '{}';
+                if (hasYT || hasSP) return;
+                const ob = await rest(`artist_onboarding?select=data&user_id=eq.${s.user.id}`);
+                const links = Array.isArray(ob) && ob[0] && ob[0].data && ob[0].data.links;
+                if (!links) return;
+                const spId = (links.spotify || '').match(/artist\/([A-Za-z0-9]+)/);
+                const ytRaw = links.youtube || '';
+                const ytAt = ytRaw.match(/@([A-Za-z0-9_.\-]+)/); const ytCh = ytRaw.match(/channel\/([A-Za-z0-9_\-]+)/);
+                const yh = ytAt ? '@' + ytAt[1] : (ytCh ? ytCh[1] : '');
+                if (!spId && !yh) return;
+                fetch(`${SUPA}/functions/v1/fetch-artist-stats`, {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: s.user.id, action: 'fetch', spotify_id: spId ? spId[1] : undefined, youtube_handle: yh || undefined }),
+                }).catch(() => {});
+            } catch (e) {}
+        }
+        window.aiadEnsureArtistStats = ensureArtistStats;
+
         // Minimal, safe markdown → HTML (headings, bold, lists, breaks).
         function mdToHtml(md) {
             if (!md) return '';
@@ -23719,6 +23749,35 @@ function toggleAgeRange(btn) {
             };
             btn.disabled = true; btn.textContent = 'Saving…';
             try { await rpc('save_artist_onboarding', { p_data: data }); } catch (e) {}
+            // Auto-fetch public stats from the links (no manual numbers). YouTube works now;
+            // Spotify populates once SPOTIFY_CLIENT_ID/SECRET are set. Fire-and-forget.
+            try {
+                const s = sess();
+                if (s) {
+                    const spId = (data.links.spotify || '').match(/artist\/([A-Za-z0-9]+)/);
+                    const ytRaw = data.links.youtube || '';
+                    const ytAt = ytRaw.match(/@([A-Za-z0-9_.\-]+)/); const ytCh = ytRaw.match(/channel\/([A-Za-z0-9_\-]+)/);
+                    const youtube_handle = ytAt ? '@' + ytAt[1] : (ytCh ? ytCh[1] : '');
+                    const clean = (h) => (h || '').replace(/^.*@/, '').replace(/^https?:\/\/[^/]+\//, '').replace(/\/+$/, '').trim();
+                    fetch(`${SUPA}/functions/v1/fetch-artist-stats`, {
+                        method: 'POST',
+                        headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon(), 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            user_id: s.user.id, action: 'fetch',
+                            spotify_id: spId ? spId[1] : undefined,
+                            youtube_handle: youtube_handle || undefined,
+                            instagram_handle: clean(data.links.instagram) || undefined,
+                            tiktok_handle: clean(data.links.tiktok) || undefined,
+                            self_reported: {
+                                monthly_listeners: data.monthly_listeners || undefined,
+                                spotify_followers: data.total_following || undefined,
+                                primary_genre: data.primary_genre || undefined,
+                                location: data.city || undefined,
+                            },
+                        }),
+                    }).catch(() => {});
+                }
+            } catch (e) {}
             // Also persist artist_profiles name/genre for the dashboard header.
             try { const s = sess(); if (s && data.artist_name) await rest('artist_profiles?on_conflict=user_id', { method:'POST', headers:{ 'Prefer':'resolution=merge-duplicates' }, body: JSON.stringify({ user_id: s.user.id, artist_name: data.artist_name, primary_genre: data.primary_genre || null, career_stage: data.career_stage || null }) }); } catch (e) {}
             document.getElementById('aiadObStep1').style.display = 'none';
@@ -23740,7 +23799,7 @@ function toggleAgeRange(btn) {
             }
         }
         document.addEventListener('DOMContentLoaded', () => {
-            setTimeout(() => { hookSettings(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); applyLiveMeta(); loadVerifiedNames().then(() => decorateBadges()); }, 1500);
+            setTimeout(() => { hookSettings(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); applyLiveMeta(); ensureArtistStats(); loadVerifiedNames().then(() => decorateBadges()); }, 1500);
         });
         // Re-decorate + (re)mount buttons as auth state / views change.
         setInterval(() => { if (_verifiedNames) decorateBadges(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); }, 2500);
