@@ -16651,9 +16651,17 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 const res = await fetch('https://uapiytquwuhtewqieegx.supabase.co/functions/v1/music-production', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-                    body: JSON.stringify({ prompt, style, title, instrumental: musicIsInstrumental, lyrics, referenceUrl, model: (document.getElementById('musicModelSelect') || {}).value || 'minimax' })
+                    body: JSON.stringify({ prompt, style, title, instrumental: musicIsInstrumental, lyrics, referenceUrl, model: (document.getElementById('musicModelSelect') || {}).value || 'minimax', user_id: (function(){try{return JSON.parse(localStorage.getItem('sb-uapiytquwuhtewqieegx-auth-token')).user.id;}catch(e){return null;}})() })
                 });
                 const data = await res.json();
+                if (data && data.outOfCredits) {
+                    showToast("You're out of AI credits. Top up to keep creating.");
+                    if (window.openTopupModal) window.openTopupModal();
+                    document.getElementById('musicLoadingState').style.display = 'none';
+                    btn.disabled = false; btnText.textContent = 'Create';
+                    return;
+                }
+                if (data && data.remaining != null && window.loadAiCredits) { try { window.loadAiCredits(); } catch (e) {} }
                 if (!data.workId) {
                     showToast(data.error || 'Failed to start generation');
                     document.getElementById('musicLoadingState').style.display = 'none';
@@ -16959,6 +16967,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
 
         async function callCreativeStudio(tool, prompt, extra = {}) {
+            let _uid = null; try { _uid = JSON.parse(localStorage.getItem('sb-uapiytquwuhtewqieegx-auth-token')).user.id; } catch (e) {}
             const response = await fetch('https://uapiytquwuhtewqieegx.supabase.co/functions/v1/creative-studio', {
                 method: 'POST',
                 headers: {
@@ -16970,15 +16979,24 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     prompt,
                     artistName: '',
                     genre: AppState.artistProfile?.primaryGenre || '',
+                    user_id: _uid,
                     ...extra
                 })
             });
+            const data = await response.json().catch(() => ({}));
+            // Out of credits -> nudge a top-up instead of a hard error.
+            if (data && data.outOfCredits) {
+                (window.showToast || alert)("You're out of AI credits. Top up to keep creating.");
+                if (window.openTopupModal) window.openTopupModal();
+                throw new Error('out of credits');
+            }
             if (!response.ok) {
-                const txt = await response.text();
-                console.error('[AIAD] creative-studio error:', response.status, txt);
+                console.error('[AIAD] creative-studio error:', response.status, data);
                 throw new Error('Generation failed: ' + response.status);
             }
-            return await response.json();
+            // Refresh the credit display from the authoritative server balance.
+            if (data && data.remaining != null && window.loadAiCredits) { try { window.loadAiCredits(); } catch (e) {} }
+            return data;
         }
 
         // ── Studio History (localStorage) ────────────────────────────────────
