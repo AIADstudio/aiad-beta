@@ -14707,24 +14707,25 @@ Only capture real, meaningful decisions — not questions or general discussion.
             postCard.style.opacity = '0';
             postCard.style.transform = 'translateY(-8px)';
             setTimeout(() => postCard.remove(), 260);
-            if (postId && AppState.currentUser) {
-                await db.from('artist_posts').delete()
-                    .eq('id', postId)
-                    .eq('user_id', AppState.currentUser.id);
+            if (postId) {
+                // RLS enforces ownership (auth.uid() = user_id); delete by id so this
+                // works even when AppState.currentUser hasn't been populated.
+                const { error } = await db.from('artist_posts').delete().eq('id', postId);
+                if (error) { showToast('Could not delete post'); return; }
             }
             showToast('Post deleted');
+            if (typeof loadArtistPosts === 'function') setTimeout(loadArtistPosts, 300);
         }
 
         async function archivePost(postCard, postId) {
             postCard.style.transition = 'opacity 0.25s';
             postCard.style.opacity = '0';
             setTimeout(() => postCard.remove(), 260);
-            if (postId && AppState.currentUser) {
-                await db.from('artist_posts').update({ archived: true })
-                    .eq('id', postId)
-                    .eq('user_id', AppState.currentUser.id);
+            if (postId) {
+                await db.from('artist_posts').update({ archived: true }).eq('id', postId);
             }
             showToast('Post archived — hidden from feed');
+            if (typeof loadArtistPosts === 'function') setTimeout(loadArtistPosts, 300);
         }
 
         function _openPostDetailMenu(postId, btn) {
@@ -14743,16 +14744,16 @@ Only capture real, meaningful decisions — not questions or general discussion.
             };
             menu.appendChild(mkItem('Archive Post', 'var(--text-secondary)', () => {
                 _closeArtistPost();
-                if (postId && AppState.currentUser) {
-                    db.from('artist_posts').update({ archived: true }).eq('id', postId).eq('user_id', AppState.currentUser.id);
+                if (postId) {
+                    db.from('artist_posts').update({ archived: true }).eq('id', postId);
                 }
                 showToast('Post archived');
                 setTimeout(loadArtistPosts, 300);
             }));
             menu.appendChild(mkItem('Delete Post', '#ef4444', () => {
                 _closeArtistPost();
-                if (postId && AppState.currentUser) {
-                    db.from('artist_posts').delete().eq('id', postId).eq('user_id', AppState.currentUser.id);
+                if (postId) {
+                    db.from('artist_posts').delete().eq('id', postId);
                 }
                 showToast('Post deleted');
                 setTimeout(loadArtistPosts, 300);
