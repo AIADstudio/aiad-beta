@@ -162,6 +162,53 @@
       };
 
       load();
+
+      // ── Admin Agent chat ─────────────────────────────────────────────
+      const AGENT_HISTORY = [];
+      function agentUI(){
+        const btn = document.createElement('button');
+        btn.id='agentFab';
+        btn.textContent='✦ Admin Agent';
+        btn.style.cssText='position:fixed;right:20px;bottom:20px;z-index:9998;background:linear-gradient(135deg,#00D4FF,#0077B6);color:#001018;font-weight:700;border:none;border-radius:999px;padding:12px 20px;font-size:14px;cursor:pointer;box-shadow:0 8px 30px rgba(0,180,216,0.35)';
+        btn.onclick=()=>{ const p=document.getElementById('agentPanel'); p.style.display = p.style.display==='flex'?'none':'flex'; document.getElementById('agentInput').focus(); };
+        document.body.appendChild(btn);
+
+        const panel=document.createElement('div');
+        panel.id='agentPanel';
+        panel.style.cssText='display:none;position:fixed;right:20px;bottom:74px;z-index:9999;width:min(440px,92vw);height:min(560px,72vh);background:#0f0f0f;border:1px solid var(--bd);border-radius:18px;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.6)';
+        panel.innerHTML=
+          '<div style="padding:14px 16px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center"><strong>Admin Agent</strong><span style="cursor:pointer;opacity:.6" onclick="document.getElementById(\'agentPanel\').style.display=\'none\'">✕</span></div>'+
+          '<div id="agentThread" style="flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:10px;font-size:13.5px;line-height:1.5"></div>'+
+          '<div style="padding:12px;border-top:1px solid var(--bd);display:flex;gap:8px"><input id="agentInput" placeholder="Ask or tell the agent… (e.g. verify @therealpartyg)" style="flex:1;background:rgba(255,255,255,0.05);border:1px solid var(--bd);border-radius:999px;padding:10px 14px;color:#fff;font-size:13px" onkeydown="if(event.key===\'Enter\')window.agentSend()"><button onclick="window.agentSend()" style="background:linear-gradient(135deg,#00D4FF,#0077B6);color:#001018;font-weight:600;border:none;border-radius:999px;padding:0 16px;cursor:pointer">Send</button></div>';
+        document.body.appendChild(panel);
+        bubble('assistant','Hi — I run the back office. Ask me anything ("how many signups this week", "who\'s on a paid plan", "revenue"), or tell me to act ("verify @therealpartyg", "give @hardyindiigo 200 credits", "set @user to artist_pro").');
+      }
+      function bubble(role,text){
+        const t=document.getElementById('agentThread'); if(!t) return;
+        const d=document.createElement('div');
+        d.style.cssText = role==='user'
+          ? 'align-self:flex-end;max-width:85%;background:rgba(0,212,255,0.12);border:1px solid rgba(0,212,255,0.25);border-radius:12px 12px 2px 12px;padding:9px 12px'
+          : 'align-self:flex-start;max-width:90%;background:#161616;border:1px solid var(--bd);border-radius:12px 12px 12px 2px;padding:9px 12px;white-space:pre-wrap';
+        d.textContent=text; t.appendChild(d); t.scrollTop=t.scrollHeight; return d;
+      }
+      window.agentSend=async function(){
+        const inp=document.getElementById('agentInput'); const msg=(inp.value||'').trim(); if(!msg) return;
+        inp.value=''; bubble('user',msg);
+        const loading=bubble('assistant','…');
+        const t=token();
+        if(!t){ loading.textContent='Sign in as the founder first.'; return; }
+        try{
+          const r=await fetch(API+'/functions/v1/admin-assistant',{method:'POST',headers:{apikey:ANON,Authorization:'Bearer '+t,'Content-Type':'application/json'},body:JSON.stringify({message:msg,history:AGENT_HISTORY})});
+          const d=await r.json();
+          const ans = d.answer || d.error || 'Something went wrong.';
+          loading.textContent=ans;
+          AGENT_HISTORY.push({role:'user',content:msg},{role:'assistant',content:ans});
+          if(d.actions && d.actions.length){ // a write happened → refresh dashboard
+            setTimeout(load, 600);
+          }
+        }catch(e){ loading.textContent='Error: '+e.message; }
+      };
+      agentUI();
     </script>
 </body>
 </html>
