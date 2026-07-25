@@ -207,8 +207,10 @@
           <div class="brand">Powered by <a href="/">AIAD</a></div>
         `;
 
+        // Grid is view-only for the public: clicking a post routes to sign-in,
+        // it does NOT open the media. Full view/interaction requires an account.
         root.querySelectorAll('.post[data-idx]').forEach(el => {
-          el.addEventListener('click', () => openLightbox(POSTS[+el.dataset.idx]));
+          el.addEventListener('click', () => { window.location.href = '/'; });
         });
       }
 
