@@ -23898,5 +23898,101 @@ function toggleAgeRange(btn) {
         setInterval(function () { if (!verifiedSet) loadNames().then(apply); else apply(); }, 2000);
     })();
     </script>
+    <!-- Founding reverse-trial: 90 days of Pro free (no card). Nudge near the end,
+         prompt for a card once it ends. Card path uses the existing startCheckout(). -->
+    <script>
+    (function () {
+        var ref = 'uapiytquwuhtewqieegx';
+        var API = 'https://' + ref + '.supabase.co';
+        var ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhcGl5dHF1d3VodGV3cWllZWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NzcwMTksImV4cCI6MjA4OTI1MzAxOX0.BLs2RdStghm0_cF8t70cBTX1GWcowGRwID7TAG8Mg38';
+        function token() { try { var t = JSON.parse(localStorage.getItem('sb-' + ref + '-auth-token')); return (t && t.access_token) ? t.access_token : null; } catch (e) { return null; } }
+        function showBar(html, dismissible) {
+            var el = document.getElementById('aiadFoundingBar');
+            if (!el) {
+                el = document.createElement('div'); el.id = 'aiadFoundingBar';
+                el.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99998;padding:12px 18px;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;font-family:Inter,-apple-system,sans-serif;font-size:14px;background:rgba(17,17,17,0.97);backdrop-filter:blur(8px);border-top:1px solid rgba(255,255,255,0.12);color:#fff;';
+                document.body.appendChild(el);
+            }
+            var btn = '<button onclick="window.startCheckout && window.startCheckout(\'artist_pro\')" style="background:linear-gradient(135deg,#00D4FF,#0077B6);color:#001018;font-weight:600;border:none;border-radius:999px;padding:8px 18px;cursor:pointer;">Add card — 30% off for life</button>';
+            var x = dismissible ? '<span onclick="var e=document.getElementById(\'aiadFoundingBar\');if(e)e.remove();" style="cursor:pointer;opacity:.6;font-size:18px;padding:0 4px;">&times;</span>' : '';
+            el.innerHTML = html + btn + x;
+        }
+        async function check() {
+            var t = token(); if (!t) return;
+            try {
+                var res = await fetch(API + '/rest/v1/rpc/founding_trial_status', {
+                    method: 'POST',
+                    headers: { 'apikey': ANON, 'Authorization': 'Bearer ' + t, 'Content-Type': 'application/json' },
+                    body: '{}'
+                });
+                if (!res.ok) return;
+                var s = await res.json();
+                if (!s || !s.signed_in || !s.is_founding || s.has_active_sub || s.plan === 'artist_premier') return;
+                if (s.needs_card) {
+                    showBar('<span>Your 90-day founding Pro trial has ended. Keep Pro at your founding <strong>30% off for life</strong> — or stay on the free plan.</span>', false);
+                } else if (typeof s.days_left === 'number' && s.days_left <= 30 && s.plan === 'artist_pro') {
+                    showBar('<span><strong>Founding Pro trial:</strong> ' + s.days_left + ' day' + (s.days_left === 1 ? '' : 's') + ' of Pro left — lock in <strong>30% off for life</strong> anytime.</span>', true);
+                }
+            } catch (e) {}
+        }
+        document.addEventListener('DOMContentLoaded', function () { setTimeout(check, 2500); });
+        setTimeout(check, 4000);
+    })();
+    </script>
+    <!-- A la carte AI-credit top-up packs. window.openTopupModal() opens the picker;
+         startCheckout(pack) (existing) runs Stripe with the founder 30% coupon server-side. -->
+    <script>
+    (function () {
+        var ref = 'uapiytquwuhtewqieegx';
+        var ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhcGl5dHF1d3VodGV3cWllZWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NzcwMTksImV4cCI6MjA4OTI1MzAxOX0.BLs2RdStghm0_cF8t70cBTX1GWcowGRwID7TAG8Mg38';
+        var PACKS = [
+            { key: 'ai_credits_50',  credits: 50,  price: 5,  fprice: 3.5 },
+            { key: 'ai_credits_100', credits: 100, price: 9,  fprice: 6.3 },
+            { key: 'ai_credits_200', credits: 200, price: 16, fprice: 11.2 },
+            { key: 'ai_credits_500', credits: 500, price: 35, fprice: 24.5 }
+        ];
+        function tok() { try { var t = JSON.parse(localStorage.getItem('sb-' + ref + '-auth-token')); return t && t.access_token ? t.access_token : null; } catch (e) { return null; } }
+        async function isFounder() {
+            var t = tok(); if (!t) return false;
+            try {
+                var uid = JSON.parse(localStorage.getItem('sb-' + ref + '-auth-token')).user.id;
+                var r = await fetch('https://' + ref + '.supabase.co/rest/v1/profiles?select=founding_member&id=eq.' + uid, { headers: { apikey: ANON, Authorization: 'Bearer ' + t } });
+                var j = await r.json(); return !!(j && j[0] && j[0].founding_member);
+            } catch (e) { return false; }
+        }
+        window.openTopupModal = async function () {
+            if (!tok()) { (window.showToast || alert)('Please sign in first'); return; }
+            var founder = await isFounder();
+            var old = document.getElementById('aiadTopup'); if (old) old.remove();
+            var ov = document.createElement('div'); ov.id = 'aiadTopup';
+            ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;padding:20px;font-family:Inter,-apple-system,sans-serif;';
+            var cards = PACKS.map(function (p) {
+                var price = founder ? p.fprice : p.price;
+                var strike = founder ? '<span style="text-decoration:line-through;opacity:.5;font-size:12px;margin-right:6px;">$' + p.price.toFixed(2) + '</span>' : '';
+                return '<button onclick="window.startCheckout(\'' + p.key + '\');" style="text-align:left;background:#161616;border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:16px;cursor:pointer;color:#fff;transition:border .15s;" onmouseover="this.style.borderColor=\'#00D4FF\'" onmouseout="this.style.borderColor=\'rgba(255,255,255,0.1)\'">' +
+                    '<div style="font-size:22px;font-weight:700;">' + p.credits + ' credits</div>' +
+                    '<div style="margin-top:6px;color:#00D4FF;font-weight:600;">' + strike + '$' + price.toFixed(2) + '</div>' +
+                    '</button>';
+            }).join('');
+            ov.innerHTML = '<div style="max-width:460px;width:100%;background:#0f0f0f;border:1px solid rgba(255,255,255,0.12);border-radius:18px;padding:22px;">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><div style="font-size:18px;font-weight:700;color:#fff;">Top up AI credits</div><span onclick="var e=document.getElementById(\'aiadTopup\');if(e)e.remove();" style="cursor:pointer;color:#fff;opacity:.6;font-size:22px;">&times;</span></div>' +
+                '<div style="color:rgba(255,255,255,0.5);font-size:13px;margin-bottom:16px;">One-time purchase · pay as you go' + (founder ? ' · <span style="color:#00D4FF;">founding 30% off applied</span>' : '') + '</div>' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' + cards + '</div></div>';
+            ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove(); });
+            document.body.appendChild(ov);
+        };
+        window.buyCredits = function (key) { window.startCheckout && window.startCheckout(key); };
+        // Add a "Buy credits" affordance to the credits indicator if present.
+        setInterval(function () {
+            var ind = document.getElementById('agentCreditsIndicator');
+            if (ind && !document.getElementById('aiadBuyCreditsBtn')) {
+                var b = document.createElement('button'); b.id = 'aiadBuyCreditsBtn'; b.textContent = '+ Buy credits';
+                b.style.cssText = 'margin-top:8px;background:linear-gradient(135deg,#00D4FF,#0077B6);color:#001018;font-weight:600;border:none;border-radius:999px;padding:6px 14px;font-size:12px;cursor:pointer;width:100%;';
+                b.onclick = window.openTopupModal;
+                ind.appendChild(b);
+            }
+        }, 2500);
+    })();
+    </script>
 </body>
 </html>
