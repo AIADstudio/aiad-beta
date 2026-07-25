@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#0A0A0A" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <title>AIAD — Artist</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+      :root{
+        --teal-light:#00D4FF;--teal:#00B4D8;--teal-dark:#0077B6;
+        --bg-primary:#0A0A0A;--bg-card:#161616;
+        --text-primary:#FFFFFF;--text-secondary:rgba(255,255,255,0.6);
+        --text-muted:rgba(255,255,255,0.4);--border-default:rgba(255,255,255,0.08);
+        --font:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+      }
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{background:var(--bg-primary);color:var(--text-primary);font-family:var(--font);
+        min-height:100vh;-webkit-font-smoothing:antialiased}
+      .wrap{max-width:720px;margin:0 auto;padding:48px 20px}
+      .state{text-align:center;color:var(--text-muted);padding:80px 0;font-size:15px}
+      .header{display:flex;align-items:center;gap:20px}
+      .avatar{width:96px;height:96px;border-radius:50%;object-fit:cover;
+        background:rgba(255,255,255,0.08);border:1px solid var(--border-default);flex-shrink:0;
+        display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:600;color:var(--text-muted)}
+      .name-row{display:flex;align-items:center;gap:8px;font-size:26px;font-weight:700;line-height:1.1}
+      .handle{color:var(--text-muted);margin-top:4px;font-size:15px}
+      .meta{margin-top:8px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;
+        color:var(--text-secondary);font-size:14px}
+      .meta .role{text-transform:capitalize}
+      .founding{background:rgba(0,212,255,0.14);color:var(--teal-light);
+        border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600}
+      .check{width:24px;height:24px;flex-shrink:0}
+      .section-title{margin:40px 0 16px;font-size:12px;font-weight:600;letter-spacing:.08em;
+        text-transform:uppercase;color:var(--text-muted)}
+      .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+      @media(max-width:520px){.grid{grid-template-columns:repeat(2,1fr)}}
+      .post{aspect-ratio:1;border-radius:12px;overflow:hidden;border:1px solid var(--border-default);
+        background:var(--bg-card);position:relative}
+      .post img{width:100%;height:100%;object-fit:cover;display:block}
+      .post .txt{padding:14px;font-size:13px;color:var(--text-secondary);
+        display:flex;align-items:center;justify-content:center;height:100%;text-align:center}
+      .empty{border:1px solid var(--border-default);border-radius:14px;background:rgba(255,255,255,0.02);
+        padding:40px;text-align:center;color:var(--text-muted);font-size:14px}
+      .brand{margin-top:56px;text-align:center;color:var(--text-muted);font-size:13px}
+      .brand a{color:var(--teal-light);text-decoration:none}
+    </style>
+</head>
+<body>
+    <div class="wrap" id="root">
+      <div class="state">Loading…</div>
+    </div>
+
+    <!-- Reusable verified ("blue check") badge -->
+    <template id="checkTpl">
+      <svg class="check" viewBox="0 0 24 24" role="img" aria-label="Verified artist">
+        <title>Verified artist</title>
+        <path fill="#00B4D8" d="M12 1.5l2.35 1.71 2.9-.02 1.68 2.37 2.79.83.02 2.9L23.5 12l-1.66 2.31-.02 2.9-2.79.83-1.68 2.37-2.9-.02L12 22.5l-2.35-1.71-2.9.02-1.68-2.37-2.79-.83-.02-2.9L.5 12l1.66-2.31.02-2.9 2.79-.83 1.68-2.37 2.9.02L12 1.5z"/>
+        <path fill="#fff" d="M10.6 15.4l-3-3 1.4-1.4 1.6 1.6 4-4 1.4 1.4-5.4 5.4z"/>
+      </svg>
+    </template>
+
+    <script>
+      const SUPABASE_URL = 'https://uapiytquwuhtewqieegx.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhcGl5dHF1d3VodGV3cWllZWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NzcwMTksImV4cCI6MjA4OTI1MzAxOX0.BLs2RdStghm0_cF8t70cBTX1GWcowGRwID7TAG8Mg38';
+      const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+
+      const esc = (s) => (s == null ? '' : String(s).replace(/[&<>"']/g, c =>
+        ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])));
+
+      // Username from /artist/<username>, falling back to ?u=<username>
+      function getUsername() {
+        const parts = location.pathname.split('/').filter(Boolean);
+        const i = parts.indexOf('artist');
+        if (i !== -1 && parts[i + 1]) return decodeURIComponent(parts[i + 1]);
+        return new URLSearchParams(location.search).get('u') || '';
+      }
+
+      function checkSvg() {
+        return document.getElementById('checkTpl').innerHTML;
+      }
+
+      function render(p) {
+        const root = document.getElementById('root');
+        const name = p.full_name || ('@' + p.username);
+        const initial = esc(name.charAt(0).toUpperCase());
+        const avatar = p.avatar_url
+          ? `<img class="avatar" src="${esc(p.avatar_url)}" alt="${esc(name)}" />`
+          : `<div class="avatar">${initial}</div>`;
+
+        const posts = Array.isArray(p.posts) ? p.posts : [];
+        const postsHtml = posts.length
+          ? `<div class="grid">${posts.map(post => post.image_url
+                ? `<div class="post"><img src="${esc(post.image_url)}" alt="${esc(post.content || '')}"/></div>`
+                : `<div class="post"><div class="txt">${esc(post.content || '')}</div></div>`
+              ).join('')}</div>`
+          : `<div class="empty">No posts yet.</div>`;
+
+        document.title = `${name} — AIAD`;
+        root.innerHTML = `
+          <div class="header">
+            ${avatar}
+            <div>
+              <div class="name-row">${esc(name)}${p.verified ? checkSvg() : ''}</div>
+              <div class="handle">@${esc(p.username)}</div>
+              <div class="meta">
+                ${p.role ? `<span class="role">${esc(p.role)}</span>` : ''}
+                ${p.industry ? `<span>· ${esc(p.industry)}</span>` : ''}
+                ${p.founding_number != null ? `<span class="founding">Founding Artist #${esc(p.founding_number)}</span>` : ''}
+              </div>
+            </div>
+          </div>
+          <div class="section-title">Posts</div>
+          ${postsHtml}
+          <div class="brand">Powered by <a href="/">AIAD</a></div>
+        `;
+      }
+
+      function notFound(username) {
+        document.getElementById('root').innerHTML =
+          `<div class="state">No artist found at <strong>@${esc(username)}</strong>.<br/><br/>
+           <a href="/" style="color:var(--teal-light);text-decoration:none">← Back to AIAD</a></div>`;
+      }
+
+      (async function () {
+        const username = getUsername();
+        if (!username) return notFound('');
+        try {
+          const { data, error } = await db.rpc('public_artist_profile', { p_username: username });
+          if (error || !data) return notFound(username);
+          render(data);
+        } catch (e) {
+          notFound(username);
+        }
+      })();
+    </script>
+</body>
+</html>

@@ -3,6 +3,7 @@
   "rewrites": [
     { "source": "/terms",   "destination": "/terms.html" },
     { "source": "/privacy", "destination": "/privacy.html" },
-    { "source": "/dmca",    "destination": "/dmca.html" }
+    { "source": "/dmca",    "destination": "/dmca.html" },
+    { "source": "/artist/:username", "destination": "/artist.html" }
   ]
 }
