@@ -4,6 +4,7 @@
     { "source": "/terms",   "destination": "/terms.html" },
     { "source": "/privacy", "destination": "/privacy.html" },
     { "source": "/dmca",    "destination": "/dmca.html" },
-    { "source": "/artist/:username", "destination": "/artist" }
+    { "source": "/artist/:username", "destination": "/artist" },
+    { "source": "/admin", "destination": "/admin.html" }
   ]
 }

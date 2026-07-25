@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <title>AIAD — Admin Analytics</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+      :root{--teal:#00D4FF;--bg:#0A0A0A;--card:#161616;--bd:rgba(255,255,255,0.08);--tx:#fff;--mut:rgba(255,255,255,0.55);}
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{background:var(--bg);color:var(--tx);font-family:Inter,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+      .wrap{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
+      .top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:24px}
+      .brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.04em}
+      .brand img{width:26px;height:26px;border-radius:6px}
+      .muted{color:var(--mut)}
+      .btn{background:linear-gradient(135deg,#00D4FF,#0077B6);color:#001018;font-weight:600;border:none;border-radius:999px;padding:9px 16px;font-size:13px;cursor:pointer;text-decoration:none;display:inline-block}
+      .gate{max-width:440px;margin:12vh auto;text-align:center}
+      .gate h1{font-size:22px;margin-bottom:10px}
+      .gate p{color:var(--mut);margin-bottom:20px;line-height:1.6}
+      .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:26px}
+      .kpi{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px 16px}
+      .kpi .l{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
+      .kpi .v{font-size:26px;font-weight:800;margin-top:6px}
+      .kpi .s{font-size:12px;color:var(--teal);margin-top:2px}
+      .row2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:26px}
+      @media(max-width:760px){.row2{grid-template-columns:1fr}}
+      .panel{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:18px}
+      .panel h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin-bottom:14px}
+      .bar{display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:13px}
+      .bar .lbl{width:120px;flex-shrink:0;text-transform:capitalize;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .bar .track{flex:1;height:8px;background:rgba(255,255,255,0.06);border-radius:99px;overflow:hidden}
+      .bar .fill{height:100%;background:linear-gradient(90deg,#00D4FF,#0077B6)}
+      .bar .n{width:34px;text-align:right;font-weight:600}
+      .tablewrap{background:var(--card);border:1px solid var(--bd);border-radius:16px;overflow:hidden}
+      .tablehead{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--bd);gap:12px;flex-wrap:wrap}
+      .tablehead h2{font-size:15px;font-weight:700}
+      .search{background:rgba(255,255,255,0.05);border:1px solid var(--bd);border-radius:999px;padding:8px 14px;color:#fff;font-size:13px;min-width:220px}
+      table{width:100%;border-collapse:collapse;font-size:13px}
+      th,td{text-align:left;padding:11px 14px;border-bottom:1px solid rgba(255,255,255,0.05);white-space:nowrap}
+      th{color:var(--mut);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.05em;position:sticky;top:0;background:var(--card)}
+      td.email{color:var(--teal)}
+      .pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;background:rgba(255,255,255,0.08);text-transform:capitalize}
+      .pill.artist{background:rgba(0,212,255,0.15);color:#7fe6ff}
+      .pill.fan{background:rgba(255,102,255,0.15);color:#ff9dff}
+      .pill.collaborator{background:rgba(124,252,140,0.14);color:#a9f7b5}
+      .chk{color:var(--teal)}
+      .scroll{max-height:60vh;overflow:auto}
+      .err{color:#ff6b6b}
+    </style>
+</head>
+<body>
+    <div class="wrap">
+      <div class="top">
+        <div class="brand"><img src="/icon-192.png" alt="AIAD"/>AIAD · Admin Analytics</div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <span class="muted" id="genAt"></span>
+          <button class="btn" onclick="load()" style="background:rgba(255,255,255,0.08);color:#fff">Refresh</button>
+          <button class="btn" id="csvBtn" style="display:none" onclick="exportCsv()">Export CSV</button>
+        </div>
+      </div>
+      <div id="root"><div class="muted" style="padding:40px 0;text-align:center">Loading…</div></div>
+    </div>
+
+    <script>
+      const REF = 'uapiytquwuhtewqieegx';
+      const API = 'https://' + REF + '.supabase.co';
+      const ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhcGl5dHF1d3VodGV3cWllZWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NzcwMTksImV4cCI6MjA4OTI1MzAxOX0.BLs2RdStghm0_cF8t70cBTX1GWcowGRwID7TAG8Mg38';
+      let DATA = null;
+
+      const esc = (s)=> s==null?'':String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      function token(){ try{ return JSON.parse(localStorage.getItem('sb-'+REF+'-auth-token')).access_token; }catch(e){ return null; } }
+      function fmtDate(s){ try{ return new Date(s).toLocaleString(undefined,{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'}); }catch(e){ return s; } }
+
+      function gate(msg){
+        document.getElementById('root').innerHTML =
+          '<div class="gate"><h1>Admin access</h1><p>'+esc(msg)+'</p>'+
+          '<a class="btn" href="/">Sign in as founder</a></div>';
+      }
+
+      async function load(){
+        const t = token();
+        if(!t){ gate('You need to be signed in with the founder account to view site analytics. Sign in, then come back to this page.'); return; }
+        try{
+          const r = await fetch(API+'/rest/v1/rpc/admin_analytics',{method:'POST',headers:{apikey:ANON,Authorization:'Bearer '+t,'Content-Type':'application/json'},body:'{}'});
+          if(r.status===401 || r.status===403){ gate('This account is not authorized. Sign in with the founder account.'); return; }
+          const d = await r.json();
+          if(!r.ok || !d || d.message){ gate((d&&d.message)||'Could not load analytics. Make sure you are signed in as the founder.'); return; }
+          DATA = d; render(d);
+        }catch(e){ gate('Error: '+e.message); }
+      }
+
+      function bars(obj){
+        const entries = Object.entries(obj||{}).sort((a,b)=>b[1]-a[1]);
+        const max = entries.length ? entries[0][1] : 1;
+        if(!entries.length) return '<div class="muted" style="font-size:13px">No data yet.</div>';
+        return entries.map(([k,v])=>'<div class="bar"><span class="lbl">'+esc(k)+'</span><span class="track"><span class="fill" style="width:'+Math.round(v/max*100)+'%"></span></span><span class="n">'+v+'</span></div>').join('');
+      }
+
+      function render(d){
+        document.getElementById('genAt').textContent = 'Updated ' + fmtDate(d.generated_at);
+        document.getElementById('csvBtn').style.display = 'inline-block';
+        const t = d.totals || {};
+        const roles = t.by_role || {};
+        const kpi = (l,v,s)=>'<div class="kpi"><div class="l">'+l+'</div><div class="v">'+v+'</div>'+(s?'<div class="s">'+s+'</div>':'')+'</div>';
+        const cards =
+          kpi('Total users', t.users||0, (d.signups_today||0)+' today') +
+          kpi('Artists', roles.artist||0) +
+          kpi('Fans', roles.fan||0) +
+          kpi('Collaborators', roles.collaborator||0) +
+          kpi('Verified', t.verified||0) +
+          kpi('Founding', t.founding||0) +
+          kpi('Paying', t.paid||0, '$'+(t.mrr||0)+'/mo MRR') +
+          kpi('Signups 7d', d.signups_7d||0, (d.signups_30d||0)+' in 30d') +
+          kpi('Posts', t.posts||0) +
+          kpi('Tracks', t.tracks||0);
+
+        const users = d.users || [];
+        const rows = users.map(u=>(
+          '<tr data-s="'+esc(((u.name||'')+' '+(u.email||'')+' '+(u.username||'')+' '+(u.location||'')+' '+(u.genre||'')).toLowerCase())+'">'+
+            '<td>'+esc(u.name||'—')+(u.founding_number?' <span class="muted">#'+u.founding_number+'</span>':'')+'</td>'+
+            '<td class="email">'+esc(u.email||'')+'</td>'+
+            '<td>'+(u.username?'@'+esc(u.username):'')+'</td>'+
+            '<td><span class="pill '+esc(u.role||'')+'">'+esc(u.role||'—')+'</span></td>'+
+            '<td>'+esc(u.genre||u.industry||'—')+'</td>'+
+            '<td>'+esc(u.location||'—')+'</td>'+
+            '<td>'+esc(u.plan||'free')+'</td>'+
+            '<td>'+(u.verified?'<span class="chk">✓</span>':'')+'</td>'+
+            '<td class="muted">'+fmtDate(u.created_at)+'</td>'+
+          '</tr>'
+        )).join('');
+
+        document.getElementById('root').innerHTML =
+          '<div class="cards">'+cards+'</div>'+
+          '<div class="row2">'+
+            '<div class="panel"><h2>By genre / industry</h2>'+bars(d.by_genre)+'</div>'+
+            '<div class="panel"><h2>By location</h2>'+bars(d.by_location)+'</div>'+
+          '</div>'+
+          '<div class="tablewrap">'+
+            '<div class="tablehead"><h2>All signups ('+users.length+')</h2>'+
+              '<input class="search" id="q" placeholder="Search name, email, location, genre…" oninput="filter()"/></div>'+
+            '<div class="scroll"><table><thead><tr>'+
+              '<th>Name</th><th>Email</th><th>Username</th><th>Role</th><th>Genre</th><th>Location</th><th>Plan</th><th>Verified</th><th>Joined</th>'+
+            '</tr></thead><tbody id="tb">'+rows+'</tbody></table></div>'+
+          '</div>';
+      }
+
+      window.filter = function(){
+        const q = (document.getElementById('q').value||'').toLowerCase();
+        document.querySelectorAll('#tb tr').forEach(tr=>{ tr.style.display = tr.dataset.s.includes(q) ? '' : 'none'; });
+      };
+
+      window.exportCsv = function(){
+        if(!DATA||!DATA.users) return;
+        const cols = ['name','email','username','role','genre','industry','location','career_stage','plan','verified','founding_number','created_at'];
+        const head = cols.join(',');
+        const lines = DATA.users.map(u=>cols.map(c=>{ let v=u[c]==null?'':String(u[c]); if(/[",\n]/.test(v)) v='"'+v.replace(/"/g,'""')+'"'; return v; }).join(','));
+        const blob = new Blob([head+'\n'+lines.join('\n')],{type:'text/csv'});
+        const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='aiad-signups-'+new Date().toISOString().slice(0,10)+'.csv'; a.click();
+      };
+
+      load();
+    </script>
+</body>
+</html>
