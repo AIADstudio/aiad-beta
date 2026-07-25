@@ -173,7 +173,7 @@
 
       function render(p) {
         const root = document.getElementById('root');
-        const name = p.full_name || ('@' + p.username);
+        const name = p.display_name || ('@' + p.username);
         const initial = esc(name.charAt(0).toUpperCase());
         const avatar = p.avatar_url
           ? `<img class="avatar" src="${esc(p.avatar_url)}" alt="${esc(name)}" />`
@@ -191,6 +191,7 @@
             <div>
               <div class="name-row">${esc(name)}${p.verified ? checkSvg() : ''}</div>
               <div class="handle">@${esc(p.username)}</div>
+              ${p.tagline ? `<div style="margin-top:6px;color:var(--text-secondary);font-size:14px">${esc(p.tagline)}</div>` : ''}
               <div class="meta">
                 ${p.role ? `<span class="role">${esc(p.role)}</span>` : ''}
                 ${p.industry ? `<span>· ${esc(p.industry)}</span>` : ''}
