@@ -56,7 +56,7 @@
       .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
       @media(max-width:520px){.grid{grid-template-columns:repeat(3,1fr);gap:4px}}
       .post{aspect-ratio:1;border-radius:12px;overflow:hidden;border:1px solid var(--border-default);
-        background:var(--bg-card);position:relative;cursor:pointer}
+        background:var(--bg-card);position:relative;cursor:default}
       .post img,.post video{width:100%;height:100%;object-fit:cover;display:block}
       .post .txt{padding:14px;font-size:13px;color:var(--text-secondary);
         display:flex;align-items:center;justify-content:center;height:100%;text-align:center}
@@ -208,11 +208,8 @@
           <div class="brand">Powered by <a href="/">AIAD</a></div>
         `;
 
-        // Grid is view-only for the public: clicking a post routes to sign-in,
-        // it does NOT open the media. Full view/interaction requires an account.
-        root.querySelectorAll('.post[data-idx]').forEach(el => {
-          el.addEventListener('click', () => { window.location.href = '/'; });
-        });
+        // Grid is view-only for the public: posts are NOT clickable and do not
+        // open. To interact (like/comment/follow), visitors use the Sign up CTA.
       }
 
       function notFound(username) {
