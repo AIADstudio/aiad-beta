@@ -23861,15 +23861,27 @@ function toggleAgeRange(btn) {
         }
         async function loadNames() {
             try {
-                var r = await fetch(SB_URL + '/rest/v1/profiles?select=full_name,username&verified=eq.true',
+                var r = await fetch(SB_URL + '/rest/v1/profiles?select=id,full_name,username&verified=eq.true',
                     { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } });
                 if (!r.ok) return;
                 var rows = await r.json();
                 var s = new Set();
+                var vids = {};
                 (rows || []).forEach(function (x) {
                     if (x.full_name) s.add(x.full_name.trim().toLowerCase());
                     if (x.username)  s.add(x.username.trim().toLowerCase());
+                    if (x.id) vids[x.id] = 1;
                 });
+                // Also badge verified artists' stage names (artist_name is what
+                // shows on their dashboard sidebar, e.g. "Party G The Humble").
+                var r2 = await fetch(SB_URL + '/rest/v1/artist_profiles?select=artist_name,user_id',
+                    { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } });
+                if (r2.ok) {
+                    var arts = await r2.json();
+                    (arts || []).forEach(function (a) {
+                        if (a.artist_name && vids[a.user_id]) s.add(a.artist_name.trim().toLowerCase());
+                    });
+                }
                 verifiedSet = s;
             } catch (e) {}
         }
