@@ -13834,6 +13834,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
         function _openArtistPost(idx) {
             var post = _artistPostsData[idx];
             if (!post) return;
+            window.__openPost = post; // remember the open post so delete/archive always has a real id
             var overlay = document.getElementById('artistPostModal');
             if (!overlay) {
                 overlay = document.createElement('div');
@@ -14744,17 +14745,19 @@ Only capture real, meaningful decisions — not questions or general discussion.
             };
             menu.appendChild(mkItem('Archive Post', 'var(--text-secondary)', () => {
                 _closeArtistPost();
-                if (postId) {
-                    db.from('artist_posts').update({ archived: true }).eq('id', postId);
+                var aid = postId || (window.__openPost && window.__openPost.id);
+                if (aid) {
+                    db.from('artist_posts').update({ archived: true }).eq('id', aid);
                 }
                 showToast('Post archived');
                 setTimeout(loadArtistPosts, 300);
             }));
-            menu.appendChild(mkItem('Delete Post', '#ef4444', () => {
+            menu.appendChild(mkItem('Delete Post', '#ef4444', async () => {
+                var id = postId || (window.__openPost && window.__openPost.id);
                 _closeArtistPost();
-                if (postId) {
-                    db.from('artist_posts').delete().eq('id', postId);
-                }
+                if (!id) { showToast('Could not identify post'); return; }
+                const { error } = await db.from('artist_posts').delete().eq('id', id);
+                if (error) { showToast('Delete failed: ' + error.message); return; }
                 showToast('Post deleted');
                 setTimeout(loadArtistPosts, 300);
             }));
