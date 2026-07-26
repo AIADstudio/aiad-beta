@@ -76,10 +76,28 @@
       const PAL=['#00D4FF','#7A5CFF','#FF3DFF','#00E39A','#FFB020','#FF5C7A','#4D8BFF','#B980FF'];
       const esc=(s)=>s==null?'':String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
       // Share + auto-refresh the app's login session so an expired token self-renews.
-      const SB=window.supabase.createClient(API,ANON,{auth:{persistSession:true,autoRefreshToken:true,storageKey:'sb-'+REF+'-auth-token'}});
+      const SB=window.supabase.createClient(API,ANON,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:'sb-'+REF+'-auth-token'}});
       async function token(){ try{ const {data}=await SB.auth.getSession(); return data.session?data.session.access_token:null; }catch(e){ return null; } }
+      // If a magic-link sign-in completes on this page, load the dashboard automatically.
+      SB.auth.onAuthStateChange(function(ev,s){ if(s&&s.access_token) load(); });
       function fmtDate(s){ try{ return new Date(s).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}); }catch(e){ return s; } }
-      function gate(m){ document.getElementById('root').innerHTML='<div class="gate"><h1>Admin access</h1><p>'+esc(m)+'</p><a class="btn primary" href="/">Sign in as founder</a></div>'; }
+      function gate(m){
+        document.getElementById('root').innerHTML=
+          '<div class="gate"><h1>Admin access</h1><p>'+esc(m)+'</p>'+
+          '<input id="gEmail" type="email" placeholder="founder@aiad.studio" autocomplete="email" style="width:100%;background:#161616;border:1px solid var(--bd);border-radius:10px;padding:12px 14px;color:#fff;font-size:15px;margin-bottom:10px" onkeydown="if(event.key===\'Enter\')window.gLogin()"/>'+
+          '<button class="btn primary" style="width:100%;padding:12px" onclick="window.gLogin()">Email me a sign-in link</button>'+
+          '<div id="gMsg" class="muted" style="margin-top:12px;font-size:13px;line-height:1.5"></div></div>';
+      }
+      window.gLogin=async function(){
+        var em=(document.getElementById('gEmail').value||'').trim();
+        var msg=document.getElementById('gMsg');
+        if(!em){ msg.textContent='Enter your email.'; return; }
+        msg.textContent='Sending…';
+        try{
+          var res=await SB.auth.signInWithOtp({email:em,options:{emailRedirectTo:location.origin+'/admin'}});
+          msg.innerHTML = res.error ? ('Error: '+esc(res.error.message)) : '✓ Check your email for a sign-in link. Tap it and you\'ll land right back on this admin page.';
+        }catch(e){ msg.textContent='Error: '+e.message; }
+      };
 
       async function load(){
         const t=await token(); if(!t){ gate('Sign in with the founder account to view site analytics.'); return; }
