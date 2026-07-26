@@ -8,6 +8,9 @@
     <title>AIAD — Admin</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/css/jsvectormap.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/js/jsvectormap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/maps/world.js"></script>
     <style>
       :root{--teal:#00D4FF;--mag:#FF3DFF;--bg:#0A0A0A;--card:#141414;--bd:rgba(255,255,255,0.08);--tx:#fff;--mut:rgba(255,255,255,0.55);}
       *{box-sizing:border-box;margin:0;padding:0}
@@ -140,6 +143,7 @@
             '<div class="panel"><h2>By role</h2><div class="chartbox"><canvas id="cRole"></canvas></div></div>'+
             '<div class="panel"><h2>By plan</h2><div class="chartbox"><canvas id="cPlan"></canvas></div></div>'+
           '</div>'+
+          '<div class="panel" style="margin-bottom:16px"><h2>Where signups are coming from</h2><div id="worldmap" style="height:400px"></div></div>'+
           '<div class="grid g3">'+
             '<div class="panel"><h2>Conversion funnel</h2>'+funnel(d.funnel)+'</div>'+
             '<div class="panel"><h2>Posts by type</h2><div class="chartbox"><canvas id="cPost"></canvas></div></div>'+
@@ -163,7 +167,21 @@
         donut('cRole',roles);
         donut('cPlan',d.by_plan);
         donut('cPost',d.posts_by_type);
+        setTimeout(function(){ worldMap(d.by_country_code); }, 80);
         localStorage.setItem('aiad_admin_lastseen', String(Date.now()));
+      }
+      function worldMap(codes){
+        var el=document.getElementById('worldmap'); if(!el||!window.jsVectorMap) return;
+        try{ if(window._wm){ window._wm.destroy(); window._wm=null; } }catch(e){}
+        el.innerHTML='';
+        var vals={}; Object.keys(codes||{}).forEach(function(k){ vals[String(k).toUpperCase()]=codes[k]; });
+        try{
+          window._wm=new jsVectorMap({
+            selector:'#worldmap', map:'world', backgroundColor:'transparent', zoomOnScroll:false, zoomButtons:true,
+            regionStyle:{initial:{fill:'#242424',stroke:'#0A0A0A','stroke-width':0.4},hover:{fill:'#00D4FF'}},
+            series:{regions:[{attribute:'fill',scale:['#183640','#00D4FF'],normalizeFunction:'polynomial',values:vals}]}
+          });
+        }catch(e){ el.innerHTML='<div class="muted" style="padding:20px">Map unavailable.</div>'; }
       }
 
       window.filter=function(){ const q=(document.getElementById('q').value||'').toLowerCase(); document.querySelectorAll('#tb tr').forEach(tr=>{tr.style.display=tr.dataset.s.includes(q)?'':'none';}); };

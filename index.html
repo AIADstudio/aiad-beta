@@ -24102,15 +24102,15 @@ function toggleAgeRange(btn) {
       var REF='uapiytquwuhtewqieegx';
       var ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhcGl5dHF1d3VodGV3cWllZWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NzcwMTksImV4cCI6MjA4OTI1MzAxOX0.BLs2RdStghm0_cF8t70cBTX1GWcowGRwID7TAG8Mg38';
       async function capture(){
-        if(localStorage.getItem('aiad_geo_done')==='1') return;
+        if(localStorage.getItem('aiad_geo_done2')==='1') return;
         var s; try{ s=JSON.parse(localStorage.getItem('sb-'+REF+'-auth-token')); }catch(e){ return; }
         if(!s||!s.access_token) return;
         try{
           var g=await fetch('https://ipwho.is/').then(function(r){return r.json();}).catch(function(){return null;});
           if(g&&g.success){
-            await fetch('https://'+REF+'.supabase.co/rest/v1/rpc/set_signup_geo',{method:'POST',headers:{apikey:ANON,Authorization:'Bearer '+s.access_token,'Content-Type':'application/json'},body:JSON.stringify({p_country:g.country||null,p_city:g.city||null})});
+            await fetch('https://'+REF+'.supabase.co/rest/v1/rpc/set_signup_geo',{method:'POST',headers:{apikey:ANON,Authorization:'Bearer '+s.access_token,'Content-Type':'application/json'},body:JSON.stringify({p_country:g.country||null,p_city:g.city||null,p_code:g.country_code||null})});
           }
-          localStorage.setItem('aiad_geo_done','1');
+          localStorage.setItem('aiad_geo_done2','1');
         }catch(e){}
       }
       setTimeout(capture, 4500);
