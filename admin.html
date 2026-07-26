@@ -82,20 +82,24 @@
       SB.auth.onAuthStateChange(function(ev,s){ if(s&&s.access_token) load(); });
       function fmtDate(s){ try{ return new Date(s).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}); }catch(e){ return s; } }
       function gate(m){
+        var inp='width:100%;background:#161616;border:1px solid var(--bd);border-radius:10px;padding:12px 14px;color:#fff;font-size:15px;margin-bottom:10px';
         document.getElementById('root').innerHTML=
-          '<div class="gate"><h1>Admin access</h1><p>'+esc(m)+'</p>'+
-          '<input id="gEmail" type="email" placeholder="founder@aiad.studio" autocomplete="email" style="width:100%;background:#161616;border:1px solid var(--bd);border-radius:10px;padding:12px 14px;color:#fff;font-size:15px;margin-bottom:10px" onkeydown="if(event.key===\'Enter\')window.gLogin()"/>'+
-          '<button class="btn primary" style="width:100%;padding:12px" onclick="window.gLogin()">Email me a sign-in link</button>'+
+          '<div class="gate"><h1>Admin sign in</h1><p>'+esc(m)+'</p>'+
+          '<input id="gEmail" type="email" placeholder="Email" autocomplete="username" style="'+inp+'"/>'+
+          '<input id="gPass" type="password" placeholder="Password" autocomplete="current-password" style="'+inp+'" onkeydown="if(event.key===\'Enter\')window.gLogin()"/>'+
+          '<button class="btn primary" style="width:100%;padding:12px" onclick="window.gLogin()">Sign in</button>'+
           '<div id="gMsg" class="muted" style="margin-top:12px;font-size:13px;line-height:1.5"></div></div>';
       }
       window.gLogin=async function(){
         var em=(document.getElementById('gEmail').value||'').trim();
+        var pw=(document.getElementById('gPass').value||'');
         var msg=document.getElementById('gMsg');
-        if(!em){ msg.textContent='Enter your email.'; return; }
-        msg.textContent='Sending…';
+        if(!em||!pw){ msg.textContent='Enter your email and password.'; return; }
+        msg.textContent='Signing in…';
         try{
-          var res=await SB.auth.signInWithOtp({email:em,options:{emailRedirectTo:location.origin+'/admin'}});
-          msg.innerHTML = res.error ? ('Error: '+esc(res.error.message)) : '✓ Check your email for a sign-in link. Tap it and you\'ll land right back on this admin page.';
+          var res=await SB.auth.signInWithPassword({email:em,password:pw});
+          if(res.error){ msg.textContent=res.error.message; return; }
+          load();
         }catch(e){ msg.textContent='Error: '+e.message; }
       };
 
