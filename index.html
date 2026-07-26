@@ -16699,7 +16699,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     const res = await fetch('https://uapiytquwuhtewqieegx.supabase.co/functions/v1/music-production', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-                        body: JSON.stringify({ workId, statusUrl: window._falStatusUrl, responseUrl: window._falResponseUrl })
+                        body: JSON.stringify({ workId, statusUrl: window._falStatusUrl, responseUrl: window._falResponseUrl, model: (document.getElementById('musicModelSelect') || {}).value || 'minimax', user_id: (function(){try{return JSON.parse(localStorage.getItem('sb-uapiytquwuhtewqieegx-auth-token')).user.id;}catch(e){return null;}})() })
                     });
                     const data = await res.json();
 
