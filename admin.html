@@ -122,14 +122,18 @@
         const cards=kpi('Total users',t.users||0,(d.signups_today||0)+' today')+kpi('Artists',roles.artist||0)+kpi('Fans',roles.fan||0)+kpi('Collaborators',roles.collaborator||0)+kpi('Verified',t.verified||0)+kpi('Founding',t.founding||0)+kpi('Paying',t.paid||0,'$'+(t.mrr||0)+'/mo')+kpi('Signups 7d',d.signups_7d||0,(d.signups_30d||0)+' in 30d')+kpi('Posts',t.posts||0)+kpi('Tracks',t.tracks||0)+kpi('Avg credits',cr.avg_balance||0,(cr.unlimited||0)+' unlimited');
 
         const users=d.users||[];
-        const rows=users.map(u=>'<tr data-s="'+esc(((u.name||'')+' '+(u.email||'')+' '+(u.username||'')+' '+(u.location||'')+' '+(u.genre||'')).toLowerCase())+'">'+
+        const lastSeen=parseInt(localStorage.getItem('aiad_admin_lastseen')||'0',10);
+        const newCount=users.filter(u=>new Date(u.created_at).getTime()>lastSeen).length;
+        const banner=newCount>0?'<div style="background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:14px">🆕 <b>'+newCount+' new signup'+(newCount>1?'s':'')+'</b> since your last visit — highlighted below.</div>':'';
+        const rows=users.map(u=>{var isNew=new Date(u.created_at).getTime()>lastSeen; return '<tr data-s="'+esc(((u.name||'')+' '+(u.email||'')+' '+(u.username||'')+' '+(u.location||'')+' '+(u.genre||'')).toLowerCase())+'"'+(isNew?' style="background:rgba(0,212,255,0.07)"':'')+'>'+
           '<td>'+esc(u.name||'—')+(u.founding_number?' <span class="muted">#'+u.founding_number+'</span>':'')+'</td>'+
           '<td class="email">'+esc(u.email||'')+'</td><td>'+(u.username?'@'+esc(u.username):'')+'</td>'+
           '<td><span class="pill '+esc(u.role||'')+'">'+esc(u.role||'—')+'</span></td>'+
           '<td>'+esc(u.genre||u.industry||'—')+'</td><td>'+esc(u.location||'—')+'</td><td>'+esc(u.plan||'free')+'</td>'+
-          '<td>'+(u.verified?'<span class="chk">✓</span>':'')+'</td><td class="muted">'+fmtDate(u.created_at)+'</td></tr>').join('');
+          '<td>'+(u.verified?'<span class="chk">✓</span>':'')+'</td><td class="muted">'+fmtDate(u.created_at)+'</td></tr>';}).join('');
 
         document.getElementById('root').innerHTML=
+          banner+
           '<div class="cards">'+cards+'</div>'+
           '<div class="grid g3">'+
             '<div class="panel"><h2>Signups · last 30 days</h2><div class="chartbox"><canvas id="cSign"></canvas></div></div>'+
@@ -142,7 +146,7 @@
             '<div class="panel"><h2>Genre & interest map</h2>'+cloud(d.by_genre)+'</div>'+
           '</div>'+
           '<div class="grid g2">'+
-            '<div class="panel"><h2>Where they\'re from</h2>'+cloud(d.by_location)+'</div>'+
+            '<div class="panel"><h2>Where they\'re from</h2>'+cloud(Object.keys(d.by_country||{}).length?d.by_country:d.by_location)+'</div>'+
             '<div class="panel"><h2>Quick stats</h2><div style="font-size:13.5px;line-height:2;color:var(--mut)">'+
               'Verified rate: <b style="color:#fff">'+Math.round((t.verified||0)/((t.users||1))*100)+'%</b><br>'+
               'Paid conversion: <b style="color:#fff">'+Math.round((d.funnel&&d.funnel.paid||0)/((t.users||1))*100)+'%</b><br>'+
@@ -159,10 +163,11 @@
         donut('cRole',roles);
         donut('cPlan',d.by_plan);
         donut('cPost',d.posts_by_type);
+        localStorage.setItem('aiad_admin_lastseen', String(Date.now()));
       }
 
       window.filter=function(){ const q=(document.getElementById('q').value||'').toLowerCase(); document.querySelectorAll('#tb tr').forEach(tr=>{tr.style.display=tr.dataset.s.includes(q)?'':'none';}); };
-      window.exportCsv=function(){ if(!DATA||!DATA.users)return; const cols=['name','email','username','role','genre','industry','location','career_stage','plan','verified','founding_number','created_at']; const head=cols.join(','); const lines=DATA.users.map(u=>cols.map(c=>{let v=u[c]==null?'':String(u[c]); if(/[",\n]/.test(v))v='"'+v.replace(/"/g,'""')+'"'; return v;}).join(',')); const b=new Blob([head+'\n'+lines.join('\n')],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='aiad-signups-'+new Date().toISOString().slice(0,10)+'.csv'; a.click(); };
+      window.exportCsv=function(){ if(!DATA||!DATA.users)return; const cols=['name','email','username','role','genre','industry','location','country','city','career_stage','plan','verified','founding_number','created_at']; const head=cols.join(','); const lines=DATA.users.map(u=>cols.map(c=>{let v=u[c]==null?'':String(u[c]); if(/[",\n]/.test(v))v='"'+v.replace(/"/g,'""')+'"'; return v;}).join(',')); const b=new Blob([head+'\n'+lines.join('\n')],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='aiad-signups-'+new Date().toISOString().slice(0,10)+'.csv'; a.click(); };
 
       load();
 
