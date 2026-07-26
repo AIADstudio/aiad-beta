@@ -23514,9 +23514,11 @@ function toggleAgeRange(btn) {
             const roles = m.users_by_role || {};
             const roleChips = Object.keys(roles).map(k => `<span style="font-size:0.72rem;color:#cbd5e1;background:#1a1d28;border-radius:999px;padding:3px 10px;margin-right:6px;">${k}: ${roles[k]}</span>`).join('');
             adminBody().innerHTML = `
+                <a href="/admin" style="display:block;text-align:center;background:linear-gradient(135deg,#00D4FF,#0077B6);color:#001018;font-weight:700;border-radius:10px;padding:11px;margin-bottom:14px;text-decoration:none;">Open full analytics dashboard — charts, world map, AI agent →</a>
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;">
                     ${metricCard('Total users', m.users_total, '#fff')}
                     ${metricCard('MRR', '$' + Math.round(m.mrr||0), '#22c55e')}
+                    ${metricCard('Trialing founders', m.trialing_founders||0, '#a78bfa')}
                     ${metricCard('Paid subs', m.paid_subscribers, '#38bdf8')}
                     ${metricCard('Signups (7d)', m.signups_7d, '#a78bfa')}
                     ${metricCard('Verified', m.verified, '#06b6d4')}
