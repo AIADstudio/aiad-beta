@@ -24088,7 +24088,7 @@ function toggleAgeRange(btn) {
       function launcher(){
         if(!signedIn() || document.getElementById('aiadDiscBtn')) return;
         var b=document.createElement('button'); b.id='aiadDiscBtn'; b.title='Discover artists'; b.innerHTML='◎';
-        b.style.cssText='position:fixed;left:20px;bottom:20px;z-index:9997;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#00D4FF,#0077B6);color:#001018;font-size:24px;border:none;cursor:pointer;box-shadow:0 8px 30px rgba(0,180,216,0.35)';
+        b.style.cssText='position:fixed;left:22px;bottom:92px;z-index:9997;width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,#00D4FF,#0077B6);color:#001018;font-size:23px;border:none;cursor:pointer;box-shadow:0 8px 30px rgba(0,180,216,0.35)';
         b.onclick=function(){ overlay().style.display='block'; document.getElementById('aiadDiscBack').style.display='none'; document.getElementById('aiadDiscTitle').textContent='Discover artists'; document.getElementById('aiadDiscSearch').style.display=''; grid(''); };
         document.body.appendChild(b);
       }
