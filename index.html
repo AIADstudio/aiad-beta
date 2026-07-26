@@ -24001,7 +24001,17 @@ function toggleAgeRange(btn) {
             ov.innerHTML = '<div style="max-width:460px;width:100%;background:#0f0f0f;border:1px solid rgba(255,255,255,0.12);border-radius:18px;padding:22px;">' +
                 '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><div style="font-size:18px;font-weight:700;color:#fff;">Top up AI credits</div><span onclick="var e=document.getElementById(\'aiadTopup\');if(e)e.remove();" style="cursor:pointer;color:#fff;opacity:.6;font-size:22px;">&times;</span></div>' +
                 '<div style="color:rgba(255,255,255,0.5);font-size:13px;margin-bottom:16px;">One-time purchase · pay as you go' + (founder ? ' · <span style="color:#00D4FF;">founding 30% off applied</span>' : '') + '</div>' +
-                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' + cards + '</div></div>';
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' + cards + '</div>' +
+                '<div style="margin-top:18px;border-top:1px solid rgba(255,255,255,0.1);padding-top:16px;">' +
+                    '<div style="color:rgba(255,255,255,0.5);font-size:13px;margin-bottom:10px;">Or upgrade for more every month' + (founder ? ' (founding 30% off for life):' : ':') + '</div>' +
+                    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
+                        '<button onclick="window.startCheckout(\'artist_pro\')" style="text-align:left;background:#161616;border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:14px;cursor:pointer;color:#fff;">' +
+                            '<div style="font-weight:700;">Pro</div><div style="color:rgba(255,255,255,0.6);font-size:12px;margin-top:2px;">500 credits/mo</div>' +
+                            '<div style="color:#00D4FF;font-weight:600;margin-top:6px;">' + (founder ? '$56' : '$80') + '/mo</div></button>' +
+                        '<button onclick="window.startCheckout(\'artist_premier\')" style="text-align:left;background:#161616;border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:14px;cursor:pointer;color:#fff;">' +
+                            '<div style="font-weight:700;">Premier</div><div style="color:rgba(255,255,255,0.6);font-size:12px;margin-top:2px;">Unlimited credits</div>' +
+                            '<div style="color:#00D4FF;font-weight:600;margin-top:6px;">' + (founder ? '$105' : '$150') + '/mo</div></button>' +
+                    '</div></div></div>';
             ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove(); });
             document.body.appendChild(ov);
         };
