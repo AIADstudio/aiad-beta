@@ -72,12 +72,14 @@
       let DATA=null; const CHARTS=[];
       const PAL=['#00D4FF','#7A5CFF','#FF3DFF','#00E39A','#FFB020','#FF5C7A','#4D8BFF','#B980FF'];
       const esc=(s)=>s==null?'':String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-      function token(){ try{ return JSON.parse(localStorage.getItem('sb-'+REF+'-auth-token')).access_token; }catch(e){ return null; } }
+      // Share + auto-refresh the app's login session so an expired token self-renews.
+      const SB=window.supabase.createClient(API,ANON,{auth:{persistSession:true,autoRefreshToken:true,storageKey:'sb-'+REF+'-auth-token'}});
+      async function token(){ try{ const {data}=await SB.auth.getSession(); return data.session?data.session.access_token:null; }catch(e){ return null; } }
       function fmtDate(s){ try{ return new Date(s).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}); }catch(e){ return s; } }
       function gate(m){ document.getElementById('root').innerHTML='<div class="gate"><h1>Admin access</h1><p>'+esc(m)+'</p><a class="btn primary" href="/">Sign in as founder</a></div>'; }
 
       async function load(){
-        const t=token(); if(!t){ gate('Sign in with the founder account to view site analytics.'); return; }
+        const t=await token(); if(!t){ gate('Sign in with the founder account to view site analytics.'); return; }
         try{
           const r=await fetch(API+'/rest/v1/rpc/admin_analytics',{method:'POST',headers:{apikey:ANON,Authorization:'Bearer '+t,'Content-Type':'application/json'},body:'{}'});
           if(r.status===401||r.status===403){ gate('This account is not authorized. Sign in as the founder.'); return; }
@@ -178,7 +180,7 @@
         bubble('assistant','Hi — I run the back office. Ask me anything ("signups this week", "revenue", "who hasn\'t posted") or tell me to act ("verify @therealpartyg", "give @hardyindiigo 200 credits", "set @user to artist_pro").');
       }
       function bubble(role,text){ const t=document.getElementById('agentThread'); if(!t)return; const d=document.createElement('div'); d.style.cssText=role==='user'?'align-self:flex-end;max-width:85%;background:rgba(0,212,255,0.12);border:1px solid rgba(0,212,255,0.25);border-radius:12px 12px 2px 12px;padding:9px 12px':'align-self:flex-start;max-width:90%;background:#161616;border:1px solid var(--bd);border-radius:12px 12px 12px 2px;padding:9px 12px;white-space:pre-wrap'; d.textContent=text; t.appendChild(d); t.scrollTop=t.scrollHeight; return d; }
-      window.agentSend=async function(){ const inp=document.getElementById('agentInput'); const msg=(inp.value||'').trim(); if(!msg)return; inp.value=''; bubble('user',msg); const loading=bubble('assistant','…'); const t=token(); if(!t){loading.textContent='Sign in as founder first.';return;} try{ const r=await fetch(API+'/functions/v1/admin-assistant',{method:'POST',headers:{apikey:ANON,Authorization:'Bearer '+t,'Content-Type':'application/json'},body:JSON.stringify({message:msg,history:AGENT_HISTORY})}); const d=await r.json(); const ans=d.answer||d.error||'Something went wrong.'; loading.textContent=ans; AGENT_HISTORY.push({role:'user',content:msg},{role:'assistant',content:ans}); if(d.actions&&d.actions.length){ setTimeout(load,700); } }catch(e){ loading.textContent='Error: '+e.message; } };
+      window.agentSend=async function(){ const inp=document.getElementById('agentInput'); const msg=(inp.value||'').trim(); if(!msg)return; inp.value=''; bubble('user',msg); const loading=bubble('assistant','…'); const t=await token(); if(!t){loading.textContent='Sign in as founder first.';return;} try{ const r=await fetch(API+'/functions/v1/admin-assistant',{method:'POST',headers:{apikey:ANON,Authorization:'Bearer '+t,'Content-Type':'application/json'},body:JSON.stringify({message:msg,history:AGENT_HISTORY})}); const d=await r.json(); const ans=d.answer||d.error||'Something went wrong.'; loading.textContent=ans; AGENT_HISTORY.push({role:'user',content:msg},{role:'assistant',content:ans}); if(d.actions&&d.actions.length){ setTimeout(load,700); } }catch(e){ loading.textContent='Error: '+e.message; } };
       agentUI();
     </script>
 </body>
