@@ -24016,5 +24016,84 @@ function toggleAgeRange(btn) {
         }, 2500);
     })();
     </script>
+    <!-- In-app Discover: browse real artists (IG-style) and view their profiles.
+         Fully self-contained; reads public RPCs list_artists + public_artist_profile. -->
+    <script>
+    (function () {
+      var REF='uapiytquwuhtewqieegx', API='https://'+REF+'.supabase.co';
+      var ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhcGl5dHF1d3VodGV3cWllZWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NzcwMTksImV4cCI6MjA4OTI1MzAxOX0.BLs2RdStghm0_cF8t70cBTX1GWcowGRwID7TAG8Mg38';
+      function esc(s){return s==null?'':String(s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+      function signedIn(){ try{ return !!JSON.parse(localStorage.getItem('sb-'+REF+'-auth-token')).access_token; }catch(e){ return false; } }
+      function badge(v){ return v ? (window.aiadVerifiedBadge?window.aiadVerifiedBadge(true):'<span style="color:#00B4D8">✓</span>') : ''; }
+      async function rpc(fn,body){ var r=await fetch(API+'/rest/v1/rpc/'+fn,{method:'POST',headers:{apikey:ANON,Authorization:'Bearer '+ANON,'Content-Type':'application/json'},body:JSON.stringify(body||{})}); return r.ok?r.json():null; }
+
+      function overlay(){
+        var o=document.getElementById('aiadDiscover');
+        if(o) return o;
+        o=document.createElement('div'); o.id='aiadDiscover';
+        o.style.cssText='display:none;position:fixed;inset:0;z-index:99990;background:#0A0A0A;overflow:auto;font-family:Inter,-apple-system,sans-serif';
+        o.innerHTML='<div style="max-width:900px;margin:0 auto;padding:20px 18px 60px">'+
+          '<div style="display:flex;align-items:center;gap:12px;position:sticky;top:0;background:#0A0A0A;padding:8px 0 12px;z-index:2">'+
+            '<span id="aiadDiscBack" style="display:none;cursor:pointer;font-size:22px;color:#fff">←</span>'+
+            '<strong style="font-size:18px;color:#fff" id="aiadDiscTitle">Discover artists</strong>'+
+            '<input id="aiadDiscSearch" placeholder="Search name, genre, location…" style="flex:1;background:#161616;border:1px solid rgba(255,255,255,0.1);border-radius:999px;padding:9px 14px;color:#fff;font-size:13px"/>'+
+            '<span style="cursor:pointer;color:#fff;opacity:.6;font-size:24px" onclick="window.aiadCloseDiscover()">✕</span>'+
+          '</div><div id="aiadDiscBody"></div></div>';
+        document.body.appendChild(o);
+        var s=o.querySelector('#aiadDiscSearch');
+        s.addEventListener('input',function(){ clearTimeout(window._aiadDiscT); window._aiadDiscT=setTimeout(function(){ grid(s.value.trim()); },300); });
+        o.querySelector('#aiadDiscBack').onclick=function(){ document.getElementById('aiadDiscBack').style.display='none'; document.getElementById('aiadDiscTitle').textContent='Discover artists'; document.getElementById('aiadDiscSearch').style.display=''; grid(document.getElementById('aiadDiscSearch').value.trim()); };
+        return o;
+      }
+      window.aiadCloseDiscover=function(){ var o=document.getElementById('aiadDiscover'); if(o)o.style.display='none'; };
+
+      async function grid(search){
+        var body=document.getElementById('aiadDiscBody'); body.innerHTML='<div style="color:rgba(255,255,255,.5);padding:30px;text-align:center">Loading…</div>';
+        var list=await rpc('list_artists',{p_search:search||'',p_limit:60})||[];
+        if(!list.length){ body.innerHTML='<div style="color:rgba(255,255,255,.5);padding:30px;text-align:center">No artists found.</div>'; return; }
+        body.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px">'+list.map(function(a){
+          var av=a.avatar?'<img src="'+esc(a.avatar)+'" style="width:74px;height:74px;border-radius:50%;object-fit:cover"/>':'<div style="width:74px;height:74px;border-radius:50%;background:#222;display:flex;align-items:center;justify-content:center;font-size:26px;color:#666">'+esc((a.name||'?').charAt(0).toUpperCase())+'</div>';
+          return '<div onclick="window.aiadOpenArtist(\''+esc(a.username)+'\')" style="background:#141414;border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:16px;text-align:center;cursor:pointer;color:#fff">'+
+            av+'<div style="margin-top:10px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:5px">'+esc(a.name||'')+badge(a.verified)+'</div>'+
+            '<div style="color:rgba(255,255,255,.45);font-size:12px;margin-top:2px">@'+esc(a.username)+'</div>'+
+            (a.genre?'<div style="color:rgba(255,255,255,.6);font-size:12px;margin-top:4px">'+esc(a.genre)+'</div>':'')+'</div>';
+        }).join('')+'</div>';
+      }
+
+      window.aiadOpenArtist=async function(username){
+        overlay().style.display='block';
+        document.getElementById('aiadDiscBack').style.display='inline';
+        document.getElementById('aiadDiscTitle').textContent='';
+        document.getElementById('aiadDiscSearch').style.display='none';
+        var body=document.getElementById('aiadDiscBody'); body.innerHTML='<div style="color:rgba(255,255,255,.5);padding:30px;text-align:center">Loading…</div>';
+        var p=await rpc('public_artist_profile',{p_username:username});
+        if(!p){ body.innerHTML='<div style="color:rgba(255,255,255,.5);padding:30px;text-align:center">Profile not found.</div>'; return; }
+        var name=p.display_name||('@'+p.username);
+        var av=p.avatar_url?'<img src="'+esc(p.avatar_url)+'" style="width:92px;height:92px;border-radius:50%;object-fit:cover"/>':'<div style="width:92px;height:92px;border-radius:50%;background:#222;display:flex;align-items:center;justify-content:center;font-size:34px;color:#666">'+esc(name.charAt(0).toUpperCase())+'</div>';
+        var posts=Array.isArray(p.posts)?p.posts:[];
+        var grid=posts.length?('<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">'+posts.map(function(po){
+          if(po.media_url&&po.media_type==='video') return '<div style="aspect-ratio:1;border-radius:10px;overflow:hidden;background:#161616;position:relative"><video src="'+esc(po.media_url)+'#t=0.1" muted playsinline style="width:100%;height:100%;object-fit:cover"></video><span style="position:absolute;top:6px;right:8px;color:#fff">▶</span></div>';
+          if(po.media_url&&po.media_type==='audio') return '<div style="aspect-ratio:1;border-radius:10px;background:#161616;display:flex;align-items:center;justify-content:center;color:#00D4FF;font-size:30px">♪</div>';
+          if(po.media_url) return '<div style="aspect-ratio:1;border-radius:10px;overflow:hidden;background:#161616"><img src="'+esc(po.media_url)+'" style="width:100%;height:100%;object-fit:cover"/></div>';
+          return '<div style="aspect-ratio:1;border-radius:10px;background:#161616;display:flex;align-items:center;justify-content:center;padding:12px;text-align:center;color:rgba(255,255,255,.7);font-size:12px">'+esc(po.content||'')+'</div>';
+        }).join('')+'</div>'):'<div style="color:rgba(255,255,255,.4);text-align:center;padding:40px;border:1px solid rgba(255,255,255,.08);border-radius:14px">No posts yet.</div>';
+        body.innerHTML='<div style="display:flex;align-items:center;gap:18px;margin-bottom:18px">'+av+
+          '<div><div style="font-size:22px;font-weight:700;color:#fff;display:flex;align-items:center;gap:7px">'+esc(name)+badge(p.verified)+'</div>'+
+          '<div style="color:rgba(255,255,255,.45);font-size:14px">@'+esc(p.username)+'</div>'+
+          (p.tagline?'<div style="color:rgba(255,255,255,.65);font-size:13px;margin-top:5px">'+esc(p.tagline)+'</div>':'')+
+          '<div style="color:rgba(255,255,255,.55);font-size:13px;margin-top:5px">'+esc([p.role,p.industry,p.location].filter(Boolean).join(' · '))+(p.founding_number!=null?'  <span style="background:rgba(0,212,255,0.14);color:#7fe6ff;border-radius:999px;padding:2px 8px;font-size:11px">Founding #'+esc(p.founding_number)+'</span>':'')+'</div></div></div>'+
+          '<div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.4);margin:18px 0 12px">Posts</div>'+grid;
+      };
+
+      function launcher(){
+        if(!signedIn() || document.getElementById('aiadDiscBtn')) return;
+        var b=document.createElement('button'); b.id='aiadDiscBtn'; b.title='Discover artists'; b.innerHTML='◎';
+        b.style.cssText='position:fixed;left:20px;bottom:20px;z-index:9997;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#00D4FF,#0077B6);color:#001018;font-size:24px;border:none;cursor:pointer;box-shadow:0 8px 30px rgba(0,180,216,0.35)';
+        b.onclick=function(){ overlay().style.display='block'; document.getElementById('aiadDiscBack').style.display='none'; document.getElementById('aiadDiscTitle').textContent='Discover artists'; document.getElementById('aiadDiscSearch').style.display=''; grid(''); };
+        document.body.appendChild(b);
+      }
+      setInterval(launcher, 2500); setTimeout(launcher, 1500);
+    })();
+    </script>
 </body>
 </html>
