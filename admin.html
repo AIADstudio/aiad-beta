@@ -5,209 +5,180 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex, nofollow" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <title>AIAD — Admin Analytics</title>
+    <title>AIAD — Admin</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
-      :root{--teal:#00D4FF;--bg:#0A0A0A;--card:#161616;--bd:rgba(255,255,255,0.08);--tx:#fff;--mut:rgba(255,255,255,0.55);}
+      :root{--teal:#00D4FF;--mag:#FF3DFF;--bg:#0A0A0A;--card:#141414;--bd:rgba(255,255,255,0.08);--tx:#fff;--mut:rgba(255,255,255,0.55);}
       *{box-sizing:border-box;margin:0;padding:0}
       body{background:var(--bg);color:var(--tx);font-family:Inter,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
-      .wrap{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
-      .top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:24px}
+      .wrap{max-width:1280px;margin:0 auto;padding:26px 20px 90px}
+      .top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:22px}
       .brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.04em}
       .brand img{width:26px;height:26px;border-radius:6px}
       .muted{color:var(--mut)}
-      .btn{background:linear-gradient(135deg,#00D4FF,#0077B6);color:#001018;font-weight:600;border:none;border-radius:999px;padding:9px 16px;font-size:13px;cursor:pointer;text-decoration:none;display:inline-block}
-      .gate{max-width:440px;margin:12vh auto;text-align:center}
-      .gate h1{font-size:22px;margin-bottom:10px}
-      .gate p{color:var(--mut);margin-bottom:20px;line-height:1.6}
-      .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:26px}
-      .kpi{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px 16px}
-      .kpi .l{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
-      .kpi .v{font-size:26px;font-weight:800;margin-top:6px}
+      .btn{background:rgba(255,255,255,0.08);color:#fff;font-weight:600;border:none;border-radius:999px;padding:9px 16px;font-size:13px;cursor:pointer;text-decoration:none;display:inline-block}
+      .btn.primary{background:linear-gradient(135deg,#00D4FF,#0077B6);color:#001018}
+      .gate{max-width:440px;margin:14vh auto;text-align:center}
+      .gate h1{font-size:22px;margin-bottom:10px}.gate p{color:var(--mut);margin-bottom:20px;line-height:1.6}
+      .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:11px;margin-bottom:22px}
+      .kpi{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:13px 15px}
+      .kpi .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
+      .kpi .v{font-size:24px;font-weight:800;margin-top:6px}
       .kpi .s{font-size:12px;color:var(--teal);margin-top:2px}
-      .row2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:26px}
-      @media(max-width:760px){.row2{grid-template-columns:1fr}}
+      .grid{display:grid;gap:16px;margin-bottom:16px}
+      .g3{grid-template-columns:1.4fr 1fr 1fr}
+      .g2{grid-template-columns:1fr 1fr}
+      @media(max-width:900px){.g3,.g2{grid-template-columns:1fr}}
       .panel{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:18px}
       .panel h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin-bottom:14px}
-      .bar{display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:13px}
-      .bar .lbl{width:120px;flex-shrink:0;text-transform:capitalize;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-      .bar .track{flex:1;height:8px;background:rgba(255,255,255,0.06);border-radius:99px;overflow:hidden}
-      .bar .fill{height:100%;background:linear-gradient(90deg,#00D4FF,#0077B6)}
-      .bar .n{width:34px;text-align:right;font-weight:600}
-      .tablewrap{background:var(--card);border:1px solid var(--bd);border-radius:16px;overflow:hidden}
-      .tablehead{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--bd);gap:12px;flex-wrap:wrap}
+      .chartbox{position:relative;height:230px}
+      .funnel .step{display:flex;align-items:center;gap:10px;margin-bottom:9px;font-size:13px}
+      .funnel .lbl{width:92px;color:var(--mut);text-transform:capitalize}
+      .funnel .track{flex:1;height:22px;background:rgba(255,255,255,0.05);border-radius:7px;overflow:hidden}
+      .funnel .fill{height:100%;background:linear-gradient(90deg,#00D4FF,#7A5CFF);display:flex;align-items:center;padding-left:10px;font-size:12px;font-weight:700;color:#001018}
+      .funnel .pct{width:44px;text-align:right;color:var(--mut)}
+      .cloud{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline;line-height:1.4}
+      .cloud span{cursor:default}
+      .tablewrap{background:var(--card);border:1px solid var(--bd);border-radius:16px;overflow:hidden;margin-top:16px}
+      .tablehead{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid var(--bd);gap:12px;flex-wrap:wrap}
       .tablehead h2{font-size:15px;font-weight:700}
       .search{background:rgba(255,255,255,0.05);border:1px solid var(--bd);border-radius:999px;padding:8px 14px;color:#fff;font-size:13px;min-width:220px}
       table{width:100%;border-collapse:collapse;font-size:13px}
-      th,td{text-align:left;padding:11px 14px;border-bottom:1px solid rgba(255,255,255,0.05);white-space:nowrap}
+      th,td{text-align:left;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.05);white-space:nowrap}
       th{color:var(--mut);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.05em;position:sticky;top:0;background:var(--card)}
       td.email{color:var(--teal)}
       .pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;background:rgba(255,255,255,0.08);text-transform:capitalize}
-      .pill.artist{background:rgba(0,212,255,0.15);color:#7fe6ff}
-      .pill.fan{background:rgba(255,102,255,0.15);color:#ff9dff}
-      .pill.collaborator{background:rgba(124,252,140,0.14);color:#a9f7b5}
-      .chk{color:var(--teal)}
-      .scroll{max-height:60vh;overflow:auto}
-      .err{color:#ff6b6b}
+      .pill.artist{background:rgba(0,212,255,0.15);color:#7fe6ff}.pill.fan{background:rgba(255,102,255,0.15);color:#ff9dff}.pill.collaborator{background:rgba(124,252,140,0.14);color:#a9f7b5}
+      .chk{color:var(--teal)}.scroll{max-height:56vh;overflow:auto}
     </style>
 </head>
 <body>
     <div class="wrap">
       <div class="top">
-        <div class="brand"><img src="/icon-192.png" alt="AIAD"/>AIAD · Admin Analytics</div>
+        <div class="brand"><img src="/icon-192.png" alt="AIAD"/>AIAD · Admin</div>
         <div style="display:flex;gap:10px;align-items:center">
           <span class="muted" id="genAt"></span>
-          <button class="btn" onclick="load()" style="background:rgba(255,255,255,0.08);color:#fff">Refresh</button>
-          <button class="btn" id="csvBtn" style="display:none" onclick="exportCsv()">Export CSV</button>
+          <button class="btn" onclick="load()">Refresh</button>
+          <button class="btn primary" id="csvBtn" style="display:none" onclick="exportCsv()">Export CSV</button>
         </div>
       </div>
       <div id="root"><div class="muted" style="padding:40px 0;text-align:center">Loading…</div></div>
     </div>
 
     <script>
-      const REF = 'uapiytquwuhtewqieegx';
-      const API = 'https://' + REF + '.supabase.co';
-      const ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhcGl5dHF1d3VodGV3cWllZWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NzcwMTksImV4cCI6MjA4OTI1MzAxOX0.BLs2RdStghm0_cF8t70cBTX1GWcowGRwID7TAG8Mg38';
-      let DATA = null;
-
-      const esc = (s)=> s==null?'':String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      const REF='uapiytquwuhtewqieegx', API='https://'+REF+'.supabase.co';
+      const ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhcGl5dHF1d3VodGV3cWllZWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NzcwMTksImV4cCI6MjA4OTI1MzAxOX0.BLs2RdStghm0_cF8t70cBTX1GWcowGRwID7TAG8Mg38';
+      let DATA=null; const CHARTS=[];
+      const PAL=['#00D4FF','#7A5CFF','#FF3DFF','#00E39A','#FFB020','#FF5C7A','#4D8BFF','#B980FF'];
+      const esc=(s)=>s==null?'':String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
       function token(){ try{ return JSON.parse(localStorage.getItem('sb-'+REF+'-auth-token')).access_token; }catch(e){ return null; } }
-      function fmtDate(s){ try{ return new Date(s).toLocaleString(undefined,{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'}); }catch(e){ return s; } }
-
-      function gate(msg){
-        document.getElementById('root').innerHTML =
-          '<div class="gate"><h1>Admin access</h1><p>'+esc(msg)+'</p>'+
-          '<a class="btn" href="/">Sign in as founder</a></div>';
-      }
+      function fmtDate(s){ try{ return new Date(s).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}); }catch(e){ return s; } }
+      function gate(m){ document.getElementById('root').innerHTML='<div class="gate"><h1>Admin access</h1><p>'+esc(m)+'</p><a class="btn primary" href="/">Sign in as founder</a></div>'; }
 
       async function load(){
-        const t = token();
-        if(!t){ gate('You need to be signed in with the founder account to view site analytics. Sign in, then come back to this page.'); return; }
+        const t=token(); if(!t){ gate('Sign in with the founder account to view site analytics.'); return; }
         try{
-          const r = await fetch(API+'/rest/v1/rpc/admin_analytics',{method:'POST',headers:{apikey:ANON,Authorization:'Bearer '+t,'Content-Type':'application/json'},body:'{}'});
-          if(r.status===401 || r.status===403){ gate('This account is not authorized. Sign in with the founder account.'); return; }
-          const d = await r.json();
-          if(!r.ok || !d || d.message){ gate((d&&d.message)||'Could not load analytics. Make sure you are signed in as the founder.'); return; }
-          DATA = d; render(d);
+          const r=await fetch(API+'/rest/v1/rpc/admin_analytics',{method:'POST',headers:{apikey:ANON,Authorization:'Bearer '+t,'Content-Type':'application/json'},body:'{}'});
+          if(r.status===401||r.status===403){ gate('This account is not authorized. Sign in as the founder.'); return; }
+          const d=await r.json();
+          if(!r.ok||!d||d.message){ gate((d&&d.message)||'Could not load analytics.'); return; }
+          DATA=d; render(d);
         }catch(e){ gate('Error: '+e.message); }
       }
 
-      function bars(obj){
-        const entries = Object.entries(obj||{}).sort((a,b)=>b[1]-a[1]);
-        const max = entries.length ? entries[0][1] : 1;
-        if(!entries.length) return '<div class="muted" style="font-size:13px">No data yet.</div>';
-        return entries.map(([k,v])=>'<div class="bar"><span class="lbl">'+esc(k)+'</span><span class="track"><span class="fill" style="width:'+Math.round(v/max*100)+'%"></span></span><span class="n">'+v+'</span></div>').join('');
+      function donut(id,obj,opts){
+        const el=document.getElementById(id); if(!el) return;
+        const entries=Object.entries(obj||{}).filter(([k,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+        CHARTS.push(new Chart(el,{type:'doughnut',data:{labels:entries.map(e=>e[0]),datasets:[{data:entries.map(e=>e[1]),backgroundColor:PAL,borderColor:'#141414',borderWidth:2}]},options:{plugins:{legend:{position:'right',labels:{color:'#bbb',boxWidth:12,font:{size:11}}}},cutout:'62%',...(opts||{})}}));
+      }
+      function line(id,arr){
+        const el=document.getElementById(id); if(!el) return;
+        // fill last 30 days
+        const map={}; (arr||[]).forEach(p=>map[p.d]=p.c);
+        const days=[],vals=[]; const now=new Date();
+        for(let i=29;i>=0;i--){ const dt=new Date(now); dt.setDate(now.getDate()-i); const k=dt.toISOString().slice(0,10); days.push(dt.toLocaleDateString(undefined,{month:'short',day:'numeric'})); vals.push(map[k]||0); }
+        CHARTS.push(new Chart(el,{type:'bar',data:{labels:days,datasets:[{data:vals,backgroundColor:'#00D4FF',borderRadius:3,maxBarThickness:14}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#888',maxTicksLimit:8,font:{size:10}},grid:{display:false}},y:{ticks:{color:'#888',precision:0,font:{size:10}},grid:{color:'rgba(255,255,255,0.05)'}}}}}));
+      }
+      function funnel(f){
+        const order=['signed_up','onboarded','verified','posted','paid']; const base=(f&&f.signed_up)||1;
+        return '<div class="funnel">'+order.map(k=>{const v=(f&&f[k])||0;const pct=Math.round(v/base*100);return '<div class="step"><span class="lbl">'+k.replace('_',' ')+'</span><span class="track"><span class="fill" style="width:'+Math.max(pct,6)+'%">'+v+'</span></span><span class="pct">'+pct+'%</span></div>';}).join('')+'</div>';
+      }
+      function cloud(obj){
+        const entries=Object.entries(obj||{}).filter(([k,v])=>k&&k!=='unknown'&&v>0).sort((a,b)=>b[1]-a[1]).slice(0,30);
+        if(!entries.length) return '<span class="muted" style="font-size:13px">Not enough data yet.</span>';
+        const max=entries[0][1],min=entries[entries.length-1][1];
+        return '<div class="cloud">'+entries.map(([k,v],i)=>{const sz=14+Math.round((v-min)/((max-min)||1)*26);const col=PAL[i%PAL.length];return '<span style="font-size:'+sz+'px;color:'+col+';font-weight:'+(500+Math.round((v-min)/((max-min)||1)*300))+'" title="'+esc(k)+': '+v+'">'+esc(k)+'</span>';}).join('')+'</div>';
       }
 
       function render(d){
-        document.getElementById('genAt').textContent = 'Updated ' + fmtDate(d.generated_at);
-        document.getElementById('csvBtn').style.display = 'inline-block';
-        const t = d.totals || {};
-        const roles = t.by_role || {};
-        const kpi = (l,v,s)=>'<div class="kpi"><div class="l">'+l+'</div><div class="v">'+v+'</div>'+(s?'<div class="s">'+s+'</div>':'')+'</div>';
-        const cards =
-          kpi('Total users', t.users||0, (d.signups_today||0)+' today') +
-          kpi('Artists', roles.artist||0) +
-          kpi('Fans', roles.fan||0) +
-          kpi('Collaborators', roles.collaborator||0) +
-          kpi('Verified', t.verified||0) +
-          kpi('Founding', t.founding||0) +
-          kpi('Paying', t.paid||0, '$'+(t.mrr||0)+'/mo MRR') +
-          kpi('Signups 7d', d.signups_7d||0, (d.signups_30d||0)+' in 30d') +
-          kpi('Posts', t.posts||0) +
-          kpi('Tracks', t.tracks||0);
+        CHARTS.forEach(c=>{try{c.destroy()}catch(e){}}); CHARTS.length=0;
+        document.getElementById('genAt').textContent='Updated '+fmtDate(d.generated_at);
+        document.getElementById('csvBtn').style.display='inline-block';
+        const t=d.totals||{}, roles=t.by_role||{}, cr=d.credits||{};
+        const kpi=(l,v,s)=>'<div class="kpi"><div class="l">'+l+'</div><div class="v">'+v+'</div>'+(s?'<div class="s">'+s+'</div>':'')+'</div>';
+        const cards=kpi('Total users',t.users||0,(d.signups_today||0)+' today')+kpi('Artists',roles.artist||0)+kpi('Fans',roles.fan||0)+kpi('Collaborators',roles.collaborator||0)+kpi('Verified',t.verified||0)+kpi('Founding',t.founding||0)+kpi('Paying',t.paid||0,'$'+(t.mrr||0)+'/mo')+kpi('Signups 7d',d.signups_7d||0,(d.signups_30d||0)+' in 30d')+kpi('Posts',t.posts||0)+kpi('Tracks',t.tracks||0)+kpi('Avg credits',cr.avg_balance||0,(cr.unlimited||0)+' unlimited');
 
-        const users = d.users || [];
-        const rows = users.map(u=>(
-          '<tr data-s="'+esc(((u.name||'')+' '+(u.email||'')+' '+(u.username||'')+' '+(u.location||'')+' '+(u.genre||'')).toLowerCase())+'">'+
-            '<td>'+esc(u.name||'—')+(u.founding_number?' <span class="muted">#'+u.founding_number+'</span>':'')+'</td>'+
-            '<td class="email">'+esc(u.email||'')+'</td>'+
-            '<td>'+(u.username?'@'+esc(u.username):'')+'</td>'+
-            '<td><span class="pill '+esc(u.role||'')+'">'+esc(u.role||'—')+'</span></td>'+
-            '<td>'+esc(u.genre||u.industry||'—')+'</td>'+
-            '<td>'+esc(u.location||'—')+'</td>'+
-            '<td>'+esc(u.plan||'free')+'</td>'+
-            '<td>'+(u.verified?'<span class="chk">✓</span>':'')+'</td>'+
-            '<td class="muted">'+fmtDate(u.created_at)+'</td>'+
-          '</tr>'
-        )).join('');
+        const users=d.users||[];
+        const rows=users.map(u=>'<tr data-s="'+esc(((u.name||'')+' '+(u.email||'')+' '+(u.username||'')+' '+(u.location||'')+' '+(u.genre||'')).toLowerCase())+'">'+
+          '<td>'+esc(u.name||'—')+(u.founding_number?' <span class="muted">#'+u.founding_number+'</span>':'')+'</td>'+
+          '<td class="email">'+esc(u.email||'')+'</td><td>'+(u.username?'@'+esc(u.username):'')+'</td>'+
+          '<td><span class="pill '+esc(u.role||'')+'">'+esc(u.role||'—')+'</span></td>'+
+          '<td>'+esc(u.genre||u.industry||'—')+'</td><td>'+esc(u.location||'—')+'</td><td>'+esc(u.plan||'free')+'</td>'+
+          '<td>'+(u.verified?'<span class="chk">✓</span>':'')+'</td><td class="muted">'+fmtDate(u.created_at)+'</td></tr>').join('');
 
-        document.getElementById('root').innerHTML =
+        document.getElementById('root').innerHTML=
           '<div class="cards">'+cards+'</div>'+
-          '<div class="row2">'+
-            '<div class="panel"><h2>By genre / industry</h2>'+bars(d.by_genre)+'</div>'+
-            '<div class="panel"><h2>By location</h2>'+bars(d.by_location)+'</div>'+
+          '<div class="grid g3">'+
+            '<div class="panel"><h2>Signups · last 30 days</h2><div class="chartbox"><canvas id="cSign"></canvas></div></div>'+
+            '<div class="panel"><h2>By role</h2><div class="chartbox"><canvas id="cRole"></canvas></div></div>'+
+            '<div class="panel"><h2>By plan</h2><div class="chartbox"><canvas id="cPlan"></canvas></div></div>'+
           '</div>'+
-          '<div class="tablewrap">'+
-            '<div class="tablehead"><h2>All signups ('+users.length+')</h2>'+
-              '<input class="search" id="q" placeholder="Search name, email, location, genre…" oninput="filter()"/></div>'+
-            '<div class="scroll"><table><thead><tr>'+
-              '<th>Name</th><th>Email</th><th>Username</th><th>Role</th><th>Genre</th><th>Location</th><th>Plan</th><th>Verified</th><th>Joined</th>'+
-            '</tr></thead><tbody id="tb">'+rows+'</tbody></table></div>'+
-          '</div>';
+          '<div class="grid g3">'+
+            '<div class="panel"><h2>Conversion funnel</h2>'+funnel(d.funnel)+'</div>'+
+            '<div class="panel"><h2>Posts by type</h2><div class="chartbox"><canvas id="cPost"></canvas></div></div>'+
+            '<div class="panel"><h2>Genre & interest map</h2>'+cloud(d.by_genre)+'</div>'+
+          '</div>'+
+          '<div class="grid g2">'+
+            '<div class="panel"><h2>Where they\'re from</h2>'+cloud(d.by_location)+'</div>'+
+            '<div class="panel"><h2>Quick stats</h2><div style="font-size:13.5px;line-height:2;color:var(--mut)">'+
+              'Verified rate: <b style="color:#fff">'+Math.round((t.verified||0)/((t.users||1))*100)+'%</b><br>'+
+              'Paid conversion: <b style="color:#fff">'+Math.round((d.funnel&&d.funnel.paid||0)/((t.users||1))*100)+'%</b><br>'+
+              'Have posted: <b style="color:#fff">'+(d.funnel&&d.funnel.posted||0)+' of '+(t.users||0)+'</b><br>'+
+              'Founding slots used: <b style="color:#fff">'+(t.founding||0)+' / 100</b><br>'+
+              'Total credits in circulation: <b style="color:#fff">'+(cr.total_balance||0)+'</b>'+
+            '</div></div>'+
+          '</div>'+
+          '<div class="tablewrap"><div class="tablehead"><h2>All signups ('+users.length+')</h2>'+
+            '<input class="search" id="q" placeholder="Search name, email, location, genre…" oninput="filter()"/></div>'+
+            '<div class="scroll"><table><thead><tr><th>Name</th><th>Email</th><th>Username</th><th>Role</th><th>Genre</th><th>Location</th><th>Plan</th><th>Verified</th><th>Joined</th></tr></thead><tbody id="tb">'+rows+'</tbody></table></div></div>';
+
+        line('cSign',d.signups_by_day);
+        donut('cRole',roles);
+        donut('cPlan',d.by_plan);
+        donut('cPost',d.posts_by_type);
       }
 
-      window.filter = function(){
-        const q = (document.getElementById('q').value||'').toLowerCase();
-        document.querySelectorAll('#tb tr').forEach(tr=>{ tr.style.display = tr.dataset.s.includes(q) ? '' : 'none'; });
-      };
-
-      window.exportCsv = function(){
-        if(!DATA||!DATA.users) return;
-        const cols = ['name','email','username','role','genre','industry','location','career_stage','plan','verified','founding_number','created_at'];
-        const head = cols.join(',');
-        const lines = DATA.users.map(u=>cols.map(c=>{ let v=u[c]==null?'':String(u[c]); if(/[",\n]/.test(v)) v='"'+v.replace(/"/g,'""')+'"'; return v; }).join(','));
-        const blob = new Blob([head+'\n'+lines.join('\n')],{type:'text/csv'});
-        const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='aiad-signups-'+new Date().toISOString().slice(0,10)+'.csv'; a.click();
-      };
+      window.filter=function(){ const q=(document.getElementById('q').value||'').toLowerCase(); document.querySelectorAll('#tb tr').forEach(tr=>{tr.style.display=tr.dataset.s.includes(q)?'':'none';}); };
+      window.exportCsv=function(){ if(!DATA||!DATA.users)return; const cols=['name','email','username','role','genre','industry','location','career_stage','plan','verified','founding_number','created_at']; const head=cols.join(','); const lines=DATA.users.map(u=>cols.map(c=>{let v=u[c]==null?'':String(u[c]); if(/[",\n]/.test(v))v='"'+v.replace(/"/g,'""')+'"'; return v;}).join(',')); const b=new Blob([head+'\n'+lines.join('\n')],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='aiad-signups-'+new Date().toISOString().slice(0,10)+'.csv'; a.click(); };
 
       load();
 
-      // ── Admin Agent chat ─────────────────────────────────────────────
-      const AGENT_HISTORY = [];
+      // ── Admin Agent chat ──
+      const AGENT_HISTORY=[];
       function agentUI(){
-        const btn = document.createElement('button');
-        btn.id='agentFab';
-        btn.textContent='✦ Admin Agent';
+        const btn=document.createElement('button'); btn.textContent='✦ Admin Agent';
         btn.style.cssText='position:fixed;right:20px;bottom:20px;z-index:9998;background:linear-gradient(135deg,#00D4FF,#0077B6);color:#001018;font-weight:700;border:none;border-radius:999px;padding:12px 20px;font-size:14px;cursor:pointer;box-shadow:0 8px 30px rgba(0,180,216,0.35)';
-        btn.onclick=()=>{ const p=document.getElementById('agentPanel'); p.style.display = p.style.display==='flex'?'none':'flex'; document.getElementById('agentInput').focus(); };
+        btn.onclick=()=>{const p=document.getElementById('agentPanel');p.style.display=p.style.display==='flex'?'none':'flex';const i=document.getElementById('agentInput');if(i)i.focus();};
         document.body.appendChild(btn);
-
-        const panel=document.createElement('div');
-        panel.id='agentPanel';
+        const panel=document.createElement('div'); panel.id='agentPanel';
         panel.style.cssText='display:none;position:fixed;right:20px;bottom:74px;z-index:9999;width:min(440px,92vw);height:min(560px,72vh);background:#0f0f0f;border:1px solid var(--bd);border-radius:18px;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.6)';
-        panel.innerHTML=
-          '<div style="padding:14px 16px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center"><strong>Admin Agent</strong><span style="cursor:pointer;opacity:.6" onclick="document.getElementById(\'agentPanel\').style.display=\'none\'">✕</span></div>'+
-          '<div id="agentThread" style="flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:10px;font-size:13.5px;line-height:1.5"></div>'+
-          '<div style="padding:12px;border-top:1px solid var(--bd);display:flex;gap:8px"><input id="agentInput" placeholder="Ask or tell the agent… (e.g. verify @therealpartyg)" style="flex:1;background:rgba(255,255,255,0.05);border:1px solid var(--bd);border-radius:999px;padding:10px 14px;color:#fff;font-size:13px" onkeydown="if(event.key===\'Enter\')window.agentSend()"><button onclick="window.agentSend()" style="background:linear-gradient(135deg,#00D4FF,#0077B6);color:#001018;font-weight:600;border:none;border-radius:999px;padding:0 16px;cursor:pointer">Send</button></div>';
+        panel.innerHTML='<div style="padding:14px 16px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center"><strong>Admin Agent</strong><span style="cursor:pointer;opacity:.6" onclick="document.getElementById(\'agentPanel\').style.display=\'none\'">✕</span></div><div id="agentThread" style="flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:10px;font-size:13.5px;line-height:1.5"></div><div style="padding:12px;border-top:1px solid var(--bd);display:flex;gap:8px"><input id="agentInput" placeholder="Ask or tell the agent…" style="flex:1;background:rgba(255,255,255,0.05);border:1px solid var(--bd);border-radius:999px;padding:10px 14px;color:#fff;font-size:13px" onkeydown="if(event.key===\'Enter\')window.agentSend()"><button onclick="window.agentSend()" style="background:linear-gradient(135deg,#00D4FF,#0077B6);color:#001018;font-weight:600;border:none;border-radius:999px;padding:0 16px;cursor:pointer">Send</button></div>';
         document.body.appendChild(panel);
-        bubble('assistant','Hi — I run the back office. Ask me anything ("how many signups this week", "who\'s on a paid plan", "revenue"), or tell me to act ("verify @therealpartyg", "give @hardyindiigo 200 credits", "set @user to artist_pro").');
+        bubble('assistant','Hi — I run the back office. Ask me anything ("signups this week", "revenue", "who hasn\'t posted") or tell me to act ("verify @therealpartyg", "give @hardyindiigo 200 credits", "set @user to artist_pro").');
       }
-      function bubble(role,text){
-        const t=document.getElementById('agentThread'); if(!t) return;
-        const d=document.createElement('div');
-        d.style.cssText = role==='user'
-          ? 'align-self:flex-end;max-width:85%;background:rgba(0,212,255,0.12);border:1px solid rgba(0,212,255,0.25);border-radius:12px 12px 2px 12px;padding:9px 12px'
-          : 'align-self:flex-start;max-width:90%;background:#161616;border:1px solid var(--bd);border-radius:12px 12px 12px 2px;padding:9px 12px;white-space:pre-wrap';
-        d.textContent=text; t.appendChild(d); t.scrollTop=t.scrollHeight; return d;
-      }
-      window.agentSend=async function(){
-        const inp=document.getElementById('agentInput'); const msg=(inp.value||'').trim(); if(!msg) return;
-        inp.value=''; bubble('user',msg);
-        const loading=bubble('assistant','…');
-        const t=token();
-        if(!t){ loading.textContent='Sign in as the founder first.'; return; }
-        try{
-          const r=await fetch(API+'/functions/v1/admin-assistant',{method:'POST',headers:{apikey:ANON,Authorization:'Bearer '+t,'Content-Type':'application/json'},body:JSON.stringify({message:msg,history:AGENT_HISTORY})});
-          const d=await r.json();
-          const ans = d.answer || d.error || 'Something went wrong.';
-          loading.textContent=ans;
-          AGENT_HISTORY.push({role:'user',content:msg},{role:'assistant',content:ans});
-          if(d.actions && d.actions.length){ // a write happened → refresh dashboard
-            setTimeout(load, 600);
-          }
-        }catch(e){ loading.textContent='Error: '+e.message; }
-      };
+      function bubble(role,text){ const t=document.getElementById('agentThread'); if(!t)return; const d=document.createElement('div'); d.style.cssText=role==='user'?'align-self:flex-end;max-width:85%;background:rgba(0,212,255,0.12);border:1px solid rgba(0,212,255,0.25);border-radius:12px 12px 2px 12px;padding:9px 12px':'align-self:flex-start;max-width:90%;background:#161616;border:1px solid var(--bd);border-radius:12px 12px 12px 2px;padding:9px 12px;white-space:pre-wrap'; d.textContent=text; t.appendChild(d); t.scrollTop=t.scrollHeight; return d; }
+      window.agentSend=async function(){ const inp=document.getElementById('agentInput'); const msg=(inp.value||'').trim(); if(!msg)return; inp.value=''; bubble('user',msg); const loading=bubble('assistant','…'); const t=token(); if(!t){loading.textContent='Sign in as founder first.';return;} try{ const r=await fetch(API+'/functions/v1/admin-assistant',{method:'POST',headers:{apikey:ANON,Authorization:'Bearer '+t,'Content-Type':'application/json'},body:JSON.stringify({message:msg,history:AGENT_HISTORY})}); const d=await r.json(); const ans=d.answer||d.error||'Something went wrong.'; loading.textContent=ans; AGENT_HISTORY.push({role:'user',content:msg},{role:'assistant',content:ans}); if(d.actions&&d.actions.length){ setTimeout(load,700); } }catch(e){ loading.textContent='Error: '+e.message; } };
       agentUI();
     </script>
 </body>
