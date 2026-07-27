@@ -13834,7 +13834,6 @@ Only capture real, meaningful decisions — not questions or general discussion.
         function _openArtistPost(idx) {
             var post = _artistPostsData[idx];
             if (!post) return;
-            window.__openPost = post; // remember the open post so delete/archive always has a real id
             var overlay = document.getElementById('artistPostModal');
             if (!overlay) {
                 overlay = document.createElement('div');
@@ -14708,25 +14707,24 @@ Only capture real, meaningful decisions — not questions or general discussion.
             postCard.style.opacity = '0';
             postCard.style.transform = 'translateY(-8px)';
             setTimeout(() => postCard.remove(), 260);
-            if (postId) {
-                // RLS enforces ownership (auth.uid() = user_id); delete by id so this
-                // works even when AppState.currentUser hasn't been populated.
-                const { error } = await db.from('artist_posts').delete().eq('id', postId);
-                if (error) { showToast('Could not delete post'); return; }
+            if (postId && AppState.currentUser) {
+                await db.from('artist_posts').delete()
+                    .eq('id', postId)
+                    .eq('user_id', AppState.currentUser.id);
             }
             showToast('Post deleted');
-            if (typeof loadArtistPosts === 'function') setTimeout(loadArtistPosts, 300);
         }
 
         async function archivePost(postCard, postId) {
             postCard.style.transition = 'opacity 0.25s';
             postCard.style.opacity = '0';
             setTimeout(() => postCard.remove(), 260);
-            if (postId) {
-                await db.from('artist_posts').update({ archived: true }).eq('id', postId);
+            if (postId && AppState.currentUser) {
+                await db.from('artist_posts').update({ archived: true })
+                    .eq('id', postId)
+                    .eq('user_id', AppState.currentUser.id);
             }
             showToast('Post archived — hidden from feed');
-            if (typeof loadArtistPosts === 'function') setTimeout(loadArtistPosts, 300);
         }
 
         function _openPostDetailMenu(postId, btn) {
@@ -14745,19 +14743,17 @@ Only capture real, meaningful decisions — not questions or general discussion.
             };
             menu.appendChild(mkItem('Archive Post', 'var(--text-secondary)', () => {
                 _closeArtistPost();
-                var aid = postId || (window.__openPost && window.__openPost.id);
-                if (aid) {
-                    db.from('artist_posts').update({ archived: true }).eq('id', aid);
+                if (postId && AppState.currentUser) {
+                    db.from('artist_posts').update({ archived: true }).eq('id', postId).eq('user_id', AppState.currentUser.id);
                 }
                 showToast('Post archived');
                 setTimeout(loadArtistPosts, 300);
             }));
-            menu.appendChild(mkItem('Delete Post', '#ef4444', async () => {
-                var id = postId || (window.__openPost && window.__openPost.id);
+            menu.appendChild(mkItem('Delete Post', '#ef4444', () => {
                 _closeArtistPost();
-                if (!id) { showToast('Could not identify post'); return; }
-                const { error } = await db.from('artist_posts').delete().eq('id', id);
-                if (error) { showToast('Delete failed: ' + error.message); return; }
+                if (postId && AppState.currentUser) {
+                    db.from('artist_posts').delete().eq('id', postId).eq('user_id', AppState.currentUser.id);
+                }
                 showToast('Post deleted');
                 setTimeout(loadArtistPosts, 300);
             }));
@@ -16655,17 +16651,9 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 const res = await fetch('https://uapiytquwuhtewqieegx.supabase.co/functions/v1/music-production', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-                    body: JSON.stringify({ prompt, style, title, instrumental: musicIsInstrumental, lyrics, referenceUrl, model: (document.getElementById('musicModelSelect') || {}).value || 'minimax', user_id: (function(){try{return JSON.parse(localStorage.getItem('sb-uapiytquwuhtewqieegx-auth-token')).user.id;}catch(e){return null;}})() })
+                    body: JSON.stringify({ prompt, style, title, instrumental: musicIsInstrumental, lyrics, referenceUrl, model: (document.getElementById('musicModelSelect') || {}).value || 'minimax' })
                 });
                 const data = await res.json();
-                if (data && data.outOfCredits) {
-                    showToast("You're out of AI credits. Top up to keep creating.");
-                    if (window.openTopupModal) window.openTopupModal();
-                    document.getElementById('musicLoadingState').style.display = 'none';
-                    btn.disabled = false; btnText.textContent = 'Create';
-                    return;
-                }
-                if (data && data.remaining != null && window.loadAiCredits) { try { window.loadAiCredits(); } catch (e) {} }
                 if (!data.workId) {
                     showToast(data.error || 'Failed to start generation');
                     document.getElementById('musicLoadingState').style.display = 'none';
@@ -16699,7 +16687,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     const res = await fetch('https://uapiytquwuhtewqieegx.supabase.co/functions/v1/music-production', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-                        body: JSON.stringify({ workId, statusUrl: window._falStatusUrl, responseUrl: window._falResponseUrl, model: (document.getElementById('musicModelSelect') || {}).value || 'minimax', user_id: (function(){try{return JSON.parse(localStorage.getItem('sb-uapiytquwuhtewqieegx-auth-token')).user.id;}catch(e){return null;}})() })
+                        body: JSON.stringify({ workId, statusUrl: window._falStatusUrl, responseUrl: window._falResponseUrl })
                     });
                     const data = await res.json();
 
@@ -16971,7 +16959,6 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
 
         async function callCreativeStudio(tool, prompt, extra = {}) {
-            let _uid = null; try { _uid = JSON.parse(localStorage.getItem('sb-uapiytquwuhtewqieegx-auth-token')).user.id; } catch (e) {}
             const response = await fetch('https://uapiytquwuhtewqieegx.supabase.co/functions/v1/creative-studio', {
                 method: 'POST',
                 headers: {
@@ -16983,24 +16970,15 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     prompt,
                     artistName: '',
                     genre: AppState.artistProfile?.primaryGenre || '',
-                    user_id: _uid,
                     ...extra
                 })
             });
-            const data = await response.json().catch(() => ({}));
-            // Out of credits -> nudge a top-up instead of a hard error.
-            if (data && data.outOfCredits) {
-                (window.showToast || alert)("You're out of AI credits. Top up to keep creating.");
-                if (window.openTopupModal) window.openTopupModal();
-                throw new Error('out of credits');
-            }
             if (!response.ok) {
-                console.error('[AIAD] creative-studio error:', response.status, data);
+                const txt = await response.text();
+                console.error('[AIAD] creative-studio error:', response.status, txt);
                 throw new Error('Generation failed: ' + response.status);
             }
-            // Refresh the credit display from the authoritative server balance.
-            if (data && data.remaining != null && window.loadAiCredits) { try { window.loadAiCredits(); } catch (e) {} }
-            return data;
+            return await response.json();
         }
 
         // ── Studio History (localStorage) ────────────────────────────────────
@@ -17441,22 +17419,27 @@ Only capture real, meaningful decisions — not questions or general discussion.
         async function restoreUserSession() {
             if (!AppState.currentUser) return;
             try {
-                const { data: profile } = await db.from('profiles').select('*').eq('id', AppState.currentUser.id).single();
-                if (profile && profile.role) {
-                    AppState.userIndustry = profile.industry || 'music';
-                    AppState.userRole = profile.role;
+                let profile = null;
+                try { const _r = await db.from('profiles').select('*').eq('id', AppState.currentUser.id).maybeSingle(); profile = _r && _r.data; } catch (e) {}
+                // Never dump a returning/known user into onboarding — fall back to the role in
+                // their auth token or cache if the profile read hiccups (RLS/token timing).
+                const _meta = (AppState.currentUser && AppState.currentUser.user_metadata) || {};
+                const _role = (profile && profile.role) || _meta.role || localStorage.getItem('aiad_user_role');
+                if (_role) {
+                    AppState.userIndustry = (profile && profile.industry) || _meta.industry || localStorage.getItem('aiad_user_industry') || 'music';
+                    AppState.userRole = _role;
                     // Set avatar BEFORE setTimeout so jumpToDashboard can use it
-                    AppState.pendingAvatar = profile.avatar_url || '';
+                    AppState.pendingAvatar = (profile && profile.avatar_url) || '';
                     // Fallback: if profiles has no avatar, try artist_profiles
-                    if (!AppState.pendingAvatar && profile.role === 'artist') {
+                    if (!AppState.pendingAvatar && _role === 'artist') {
                         try {
                             const { data: ap } = await db.from('artist_profiles').select('avatar_url').eq('user_id', AppState.currentUser.id).maybeSingle();
                             if (ap && ap.avatar_url) AppState.pendingAvatar = ap.avatar_url;
                         } catch(e) {}
                     }
                     // Pre-populate avatar cache for this artist
-                    if (profile.avatar_url) { if (!AppState._cachedArtistAvatars) AppState._cachedArtistAvatars = {}; AppState._cachedArtistAvatars[AppState.currentUser?.id] = profile.avatar_url; }
-                    AppState.pendingAvatarRole = profile.role || 'artist';
+                    if (profile && profile.avatar_url) { if (!AppState._cachedArtistAvatars) AppState._cachedArtistAvatars = {}; AppState._cachedArtistAvatars[AppState.currentUser?.id] = profile.avatar_url; }
+                    AppState.pendingAvatarRole = _role || 'artist';
                     localStorage.setItem('aiad_user_industry', AppState.userIndustry);
                     localStorage.setItem('aiad_user_role', AppState.userRole);
                     const lastDashboard = localStorage.getItem('aiad_last_dashboard');
@@ -17577,7 +17560,15 @@ Only capture real, meaningful decisions — not questions or general discussion.
             await restoreUserSession();
 
             if (!AppState.userRole) {
-                navigateTo('industry-selection');
+                // Backstop: route by the role in the auth token / cache before ever
+                // sending a returning user to onboarding.
+                const mr = (data.user && data.user.user_metadata && data.user.user_metadata.role) || localStorage.getItem('aiad_user_role');
+                if (mr) {
+                    AppState.userRole = mr;
+                    jumpToDashboard(mr === 'fan' ? 'fan' : mr === 'collaborator' ? 'collab' : mr === 'supervisor' ? 'supervisor' : 'artist');
+                } else {
+                    navigateTo('industry-selection');
+                }
             }
         }
 
@@ -23514,11 +23505,9 @@ function toggleAgeRange(btn) {
             const roles = m.users_by_role || {};
             const roleChips = Object.keys(roles).map(k => `<span style="font-size:0.72rem;color:#cbd5e1;background:#1a1d28;border-radius:999px;padding:3px 10px;margin-right:6px;">${k}: ${roles[k]}</span>`).join('');
             adminBody().innerHTML = `
-                <a href="/admin" style="display:block;text-align:center;background:linear-gradient(135deg,#00D4FF,#0077B6);color:#001018;font-weight:700;border-radius:10px;padding:11px;margin-bottom:14px;text-decoration:none;">Open full analytics dashboard — charts, world map, AI agent →</a>
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;">
                     ${metricCard('Total users', m.users_total, '#fff')}
                     ${metricCard('MRR', '$' + Math.round(m.mrr||0), '#22c55e')}
-                    ${metricCard('Trialing founders', m.trialing_founders||0, '#a78bfa')}
                     ${metricCard('Paid subs', m.paid_subscribers, '#38bdf8')}
                     ${metricCard('Signups (7d)', m.signups_7d, '#a78bfa')}
                     ${metricCard('Verified', m.verified, '#06b6d4')}
@@ -23869,263 +23858,6 @@ function toggleAgeRange(btn) {
         });
         // Re-decorate + (re)mount buttons/pickers as auth state / views change.
         setInterval(() => { if (_verifiedNames) decorateBadges(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); injectStudioModelPickers(); wrapCreativeStudio(); }, 2500);
-    })();
-    </script>
-    <!-- Self-badge: also show the verified check on the current user's own name
-         (sidebar / header / feed author), which the main decorateBadges() skips. -->
-    <script>
-    (function () {
-        var SB_URL = 'https://uapiytquwuhtewqieegx.supabase.co';
-        var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhcGl5dHF1d3VodGV3cWllZWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NzcwMTksImV4cCI6MjA4OTI1MzAxOX0.BLs2RdStghm0_cF8t70cBTX1GWcowGRwID7TAG8Mg38';
-        var verifiedSet = null;
-        function badgeHtml() {
-            return (typeof window.aiadVerifiedBadge === 'function')
-                ? window.aiadVerifiedBadge(true)
-                : '<span class="aiad-verified" title="Verified by AIAD"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>';
-        }
-        async function loadNames() {
-            try {
-                var r = await fetch(SB_URL + '/rest/v1/profiles?select=id,full_name,username&verified=eq.true',
-                    { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } });
-                if (!r.ok) return;
-                var rows = await r.json();
-                var s = new Set();
-                var vids = {};
-                (rows || []).forEach(function (x) {
-                    if (x.full_name) s.add(x.full_name.trim().toLowerCase());
-                    if (x.username)  s.add(x.username.trim().toLowerCase());
-                    if (x.id) vids[x.id] = 1;
-                });
-                // Also badge verified artists' stage names (artist_name is what
-                // shows on their dashboard sidebar, e.g. "Party G The Humble").
-                var r2 = await fetch(SB_URL + '/rest/v1/artist_profiles?select=artist_name,user_id',
-                    { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } });
-                if (r2.ok) {
-                    var arts = await r2.json();
-                    (arts || []).forEach(function (a) {
-                        if (a.artist_name && vids[a.user_id]) s.add(a.artist_name.trim().toLowerCase());
-                    });
-                }
-                verifiedSet = s;
-            } catch (e) {}
-        }
-        function apply() {
-            if (!verifiedSet || !verifiedSet.size) return;
-            document.querySelectorAll('.dash-user-name, .dash-artist-name, .post-author, .dash-post-author')
-                .forEach(function (el) {
-                    if (el.querySelector('.aiad-verified')) return;           // idempotent
-                    var t = (el.textContent || '').trim().toLowerCase();
-                    if (t && verifiedSet.has(t)) el.insertAdjacentHTML('beforeend', badgeHtml());
-                });
-        }
-        loadNames().then(apply);
-        setInterval(function () { if (!verifiedSet) loadNames().then(apply); else apply(); }, 2000);
-    })();
-    </script>
-    <!-- Founding reverse-trial: 90 days of Pro free (no card). Nudge near the end,
-         prompt for a card once it ends. Card path uses the existing startCheckout(). -->
-    <script>
-    (function () {
-        var ref = 'uapiytquwuhtewqieegx';
-        var API = 'https://' + ref + '.supabase.co';
-        var ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhcGl5dHF1d3VodGV3cWllZWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NzcwMTksImV4cCI6MjA4OTI1MzAxOX0.BLs2RdStghm0_cF8t70cBTX1GWcowGRwID7TAG8Mg38';
-        function token() { try { var t = JSON.parse(localStorage.getItem('sb-' + ref + '-auth-token')); return (t && t.access_token) ? t.access_token : null; } catch (e) { return null; } }
-        function showBar(html, dismissible) {
-            var el = document.getElementById('aiadFoundingBar');
-            if (!el) {
-                el = document.createElement('div'); el.id = 'aiadFoundingBar';
-                el.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99998;padding:12px 18px;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;font-family:Inter,-apple-system,sans-serif;font-size:14px;background:rgba(17,17,17,0.97);backdrop-filter:blur(8px);border-top:1px solid rgba(255,255,255,0.12);color:#fff;';
-                document.body.appendChild(el);
-            }
-            var btn = '<button onclick="window.startCheckout && window.startCheckout(\'artist_pro\')" style="background:linear-gradient(135deg,#00D4FF,#0077B6);color:#001018;font-weight:600;border:none;border-radius:999px;padding:8px 18px;cursor:pointer;">Add card — 30% off for life</button>';
-            var x = dismissible ? '<span onclick="var e=document.getElementById(\'aiadFoundingBar\');if(e)e.remove();" style="cursor:pointer;opacity:.6;font-size:18px;padding:0 4px;">&times;</span>' : '';
-            el.innerHTML = html + btn + x;
-        }
-        async function check() {
-            var t = token(); if (!t) return;
-            try {
-                var res = await fetch(API + '/rest/v1/rpc/founding_trial_status', {
-                    method: 'POST',
-                    headers: { 'apikey': ANON, 'Authorization': 'Bearer ' + t, 'Content-Type': 'application/json' },
-                    body: '{}'
-                });
-                if (!res.ok) return;
-                var s = await res.json();
-                if (!s || !s.signed_in || !s.is_founding || s.has_active_sub || s.plan === 'artist_premier') return;
-                if (s.needs_card) {
-                    showBar('<span>Your 90-day founding Pro trial has ended. Keep Pro at your founding <strong>30% off for life</strong> — or stay on the free plan.</span>', false);
-                } else if (typeof s.days_left === 'number' && s.days_left <= 30 && s.plan === 'artist_pro') {
-                    showBar('<span><strong>Founding Pro trial:</strong> ' + s.days_left + ' day' + (s.days_left === 1 ? '' : 's') + ' of Pro left — lock in <strong>30% off for life</strong> anytime.</span>', true);
-                }
-            } catch (e) {}
-        }
-        document.addEventListener('DOMContentLoaded', function () { setTimeout(check, 2500); });
-        setTimeout(check, 4000);
-    })();
-    </script>
-    <!-- A la carte AI-credit top-up packs. window.openTopupModal() opens the picker;
-         startCheckout(pack) (existing) runs Stripe with the founder 30% coupon server-side. -->
-    <script>
-    (function () {
-        var ref = 'uapiytquwuhtewqieegx';
-        var ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhcGl5dHF1d3VodGV3cWllZWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NzcwMTksImV4cCI6MjA4OTI1MzAxOX0.BLs2RdStghm0_cF8t70cBTX1GWcowGRwID7TAG8Mg38';
-        var PACKS = [
-            { key: 'ai_credits_50',  credits: 50,  price: 5,  fprice: 3.5 },
-            { key: 'ai_credits_100', credits: 100, price: 9,  fprice: 6.3 },
-            { key: 'ai_credits_200', credits: 200, price: 16, fprice: 11.2 },
-            { key: 'ai_credits_500', credits: 500, price: 35, fprice: 24.5 }
-        ];
-        function tok() { try { var t = JSON.parse(localStorage.getItem('sb-' + ref + '-auth-token')); return t && t.access_token ? t.access_token : null; } catch (e) { return null; } }
-        async function isFounder() {
-            var t = tok(); if (!t) return false;
-            try {
-                var uid = JSON.parse(localStorage.getItem('sb-' + ref + '-auth-token')).user.id;
-                var r = await fetch('https://' + ref + '.supabase.co/rest/v1/profiles?select=founding_member&id=eq.' + uid, { headers: { apikey: ANON, Authorization: 'Bearer ' + t } });
-                var j = await r.json(); return !!(j && j[0] && j[0].founding_member);
-            } catch (e) { return false; }
-        }
-        window.openTopupModal = async function () {
-            if (!tok()) { (window.showToast || alert)('Please sign in first'); return; }
-            var founder = await isFounder();
-            var old = document.getElementById('aiadTopup'); if (old) old.remove();
-            var ov = document.createElement('div'); ov.id = 'aiadTopup';
-            ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;padding:20px;font-family:Inter,-apple-system,sans-serif;';
-            var cards = PACKS.map(function (p) {
-                var price = founder ? p.fprice : p.price;
-                var strike = founder ? '<span style="text-decoration:line-through;opacity:.5;font-size:12px;margin-right:6px;">$' + p.price.toFixed(2) + '</span>' : '';
-                return '<button onclick="window.startCheckout(\'' + p.key + '\');" style="text-align:left;background:#161616;border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:16px;cursor:pointer;color:#fff;transition:border .15s;" onmouseover="this.style.borderColor=\'#00D4FF\'" onmouseout="this.style.borderColor=\'rgba(255,255,255,0.1)\'">' +
-                    '<div style="font-size:22px;font-weight:700;">' + p.credits + ' credits</div>' +
-                    '<div style="margin-top:6px;color:#00D4FF;font-weight:600;">' + strike + '$' + price.toFixed(2) + '</div>' +
-                    '</button>';
-            }).join('');
-            ov.innerHTML = '<div style="max-width:460px;width:100%;background:#0f0f0f;border:1px solid rgba(255,255,255,0.12);border-radius:18px;padding:22px;">' +
-                '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><div style="font-size:18px;font-weight:700;color:#fff;">Top up AI credits</div><span onclick="var e=document.getElementById(\'aiadTopup\');if(e)e.remove();" style="cursor:pointer;color:#fff;opacity:.6;font-size:22px;">&times;</span></div>' +
-                '<div style="color:rgba(255,255,255,0.5);font-size:13px;margin-bottom:16px;">One-time purchase · pay as you go' + (founder ? ' · <span style="color:#00D4FF;">founding 30% off applied</span>' : '') + '</div>' +
-                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' + cards + '</div>' +
-                '<div style="margin-top:18px;border-top:1px solid rgba(255,255,255,0.1);padding-top:16px;">' +
-                    '<div style="color:rgba(255,255,255,0.5);font-size:13px;margin-bottom:10px;">Or upgrade for more every month' + (founder ? ' (founding 30% off for life):' : ':') + '</div>' +
-                    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
-                        '<button onclick="window.startCheckout(\'artist_pro\')" style="text-align:left;background:#161616;border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:14px;cursor:pointer;color:#fff;">' +
-                            '<div style="font-weight:700;">Pro</div><div style="color:rgba(255,255,255,0.6);font-size:12px;margin-top:2px;">500 credits/mo</div>' +
-                            '<div style="color:#00D4FF;font-weight:600;margin-top:6px;">' + (founder ? '$56' : '$80') + '/mo</div></button>' +
-                        '<button onclick="window.startCheckout(\'artist_premier\')" style="text-align:left;background:#161616;border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:14px;cursor:pointer;color:#fff;">' +
-                            '<div style="font-weight:700;">Premier</div><div style="color:rgba(255,255,255,0.6);font-size:12px;margin-top:2px;">Unlimited credits</div>' +
-                            '<div style="color:#00D4FF;font-weight:600;margin-top:6px;">' + (founder ? '$105' : '$150') + '/mo</div></button>' +
-                    '</div></div></div>';
-            ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove(); });
-            document.body.appendChild(ov);
-        };
-        window.buyCredits = function (key) { window.startCheckout && window.startCheckout(key); };
-        // Add a "Buy credits" affordance to the credits indicator if present.
-        setInterval(function () {
-            var ind = document.getElementById('agentCreditsIndicator');
-            if (ind && !document.getElementById('aiadBuyCreditsBtn')) {
-                var b = document.createElement('button'); b.id = 'aiadBuyCreditsBtn'; b.textContent = '+ Buy credits';
-                b.style.cssText = 'margin-top:8px;background:linear-gradient(135deg,#00D4FF,#0077B6);color:#001018;font-weight:600;border:none;border-radius:999px;padding:6px 14px;font-size:12px;cursor:pointer;width:100%;';
-                b.onclick = window.openTopupModal;
-                ind.appendChild(b);
-            }
-        }, 2500);
-    })();
-    </script>
-    <!-- In-app Discover: browse real artists (IG-style) and view their profiles.
-         Fully self-contained; reads public RPCs list_artists + public_artist_profile. -->
-    <script>
-    (function () {
-      var REF='uapiytquwuhtewqieegx', API='https://'+REF+'.supabase.co';
-      var ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhcGl5dHF1d3VodGV3cWllZWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NzcwMTksImV4cCI6MjA4OTI1MzAxOX0.BLs2RdStghm0_cF8t70cBTX1GWcowGRwID7TAG8Mg38';
-      function esc(s){return s==null?'':String(s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
-      function signedIn(){ try{ return !!JSON.parse(localStorage.getItem('sb-'+REF+'-auth-token')).access_token; }catch(e){ return false; } }
-      function badge(v){ return v ? (window.aiadVerifiedBadge?window.aiadVerifiedBadge(true):'<span style="color:#00B4D8">✓</span>') : ''; }
-      async function rpc(fn,body){ var r=await fetch(API+'/rest/v1/rpc/'+fn,{method:'POST',headers:{apikey:ANON,Authorization:'Bearer '+ANON,'Content-Type':'application/json'},body:JSON.stringify(body||{})}); return r.ok?r.json():null; }
-
-      function overlay(){
-        var o=document.getElementById('aiadDiscover');
-        if(o) return o;
-        o=document.createElement('div'); o.id='aiadDiscover';
-        o.style.cssText='display:none;position:fixed;inset:0;z-index:99990;background:#0A0A0A;overflow:auto;font-family:Inter,-apple-system,sans-serif';
-        o.innerHTML='<div style="max-width:900px;margin:0 auto;padding:20px 18px 60px">'+
-          '<div style="display:flex;align-items:center;gap:12px;position:sticky;top:0;background:#0A0A0A;padding:8px 0 12px;z-index:2">'+
-            '<span id="aiadDiscBack" style="display:none;cursor:pointer;font-size:22px;color:#fff">←</span>'+
-            '<strong style="font-size:18px;color:#fff" id="aiadDiscTitle">Discover artists</strong>'+
-            '<input id="aiadDiscSearch" placeholder="Search name, genre, location…" style="flex:1;background:#161616;border:1px solid rgba(255,255,255,0.1);border-radius:999px;padding:9px 14px;color:#fff;font-size:13px"/>'+
-            '<span style="cursor:pointer;color:#fff;opacity:.6;font-size:24px" onclick="window.aiadCloseDiscover()">✕</span>'+
-          '</div><div id="aiadDiscBody"></div></div>';
-        document.body.appendChild(o);
-        var s=o.querySelector('#aiadDiscSearch');
-        s.addEventListener('input',function(){ clearTimeout(window._aiadDiscT); window._aiadDiscT=setTimeout(function(){ grid(s.value.trim()); },300); });
-        o.querySelector('#aiadDiscBack').onclick=function(){ document.getElementById('aiadDiscBack').style.display='none'; document.getElementById('aiadDiscTitle').textContent='Discover artists'; document.getElementById('aiadDiscSearch').style.display=''; grid(document.getElementById('aiadDiscSearch').value.trim()); };
-        return o;
-      }
-      window.aiadCloseDiscover=function(){ var o=document.getElementById('aiadDiscover'); if(o)o.style.display='none'; };
-
-      async function grid(search){
-        var body=document.getElementById('aiadDiscBody'); body.innerHTML='<div style="color:rgba(255,255,255,.5);padding:30px;text-align:center">Loading…</div>';
-        var list=await rpc('list_artists',{p_search:search||'',p_limit:60})||[];
-        if(!list.length){ body.innerHTML='<div style="color:rgba(255,255,255,.5);padding:30px;text-align:center">No artists found.</div>'; return; }
-        body.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px">'+list.map(function(a){
-          var av=a.avatar?'<img src="'+esc(a.avatar)+'" style="width:74px;height:74px;border-radius:50%;object-fit:cover"/>':'<div style="width:74px;height:74px;border-radius:50%;background:#222;display:flex;align-items:center;justify-content:center;font-size:26px;color:#666">'+esc((a.name||'?').charAt(0).toUpperCase())+'</div>';
-          return '<div onclick="window.aiadOpenArtist(\''+esc(a.username)+'\')" style="background:#141414;border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:16px;text-align:center;cursor:pointer;color:#fff">'+
-            av+'<div style="margin-top:10px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:5px">'+esc(a.name||'')+badge(a.verified)+'</div>'+
-            '<div style="color:rgba(255,255,255,.45);font-size:12px;margin-top:2px">@'+esc(a.username)+'</div>'+
-            (a.genre?'<div style="color:rgba(255,255,255,.6);font-size:12px;margin-top:4px">'+esc(a.genre)+'</div>':'')+'</div>';
-        }).join('')+'</div>';
-      }
-
-      window.aiadOpenArtist=async function(username){
-        overlay().style.display='block';
-        document.getElementById('aiadDiscBack').style.display='inline';
-        document.getElementById('aiadDiscTitle').textContent='';
-        document.getElementById('aiadDiscSearch').style.display='none';
-        var body=document.getElementById('aiadDiscBody'); body.innerHTML='<div style="color:rgba(255,255,255,.5);padding:30px;text-align:center">Loading…</div>';
-        var p=await rpc('public_artist_profile',{p_username:username});
-        if(!p){ body.innerHTML='<div style="color:rgba(255,255,255,.5);padding:30px;text-align:center">Profile not found.</div>'; return; }
-        var name=p.display_name||('@'+p.username);
-        var av=p.avatar_url?'<img src="'+esc(p.avatar_url)+'" style="width:92px;height:92px;border-radius:50%;object-fit:cover"/>':'<div style="width:92px;height:92px;border-radius:50%;background:#222;display:flex;align-items:center;justify-content:center;font-size:34px;color:#666">'+esc(name.charAt(0).toUpperCase())+'</div>';
-        var posts=Array.isArray(p.posts)?p.posts:[];
-        var grid=posts.length?('<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">'+posts.map(function(po){
-          if(po.media_url&&po.media_type==='video') return '<div style="aspect-ratio:1;border-radius:10px;overflow:hidden;background:#161616;position:relative"><video src="'+esc(po.media_url)+'#t=0.1" muted playsinline style="width:100%;height:100%;object-fit:cover"></video><span style="position:absolute;top:6px;right:8px;color:#fff">▶</span></div>';
-          if(po.media_url&&po.media_type==='audio') return '<div style="aspect-ratio:1;border-radius:10px;background:#161616;display:flex;align-items:center;justify-content:center;color:#00D4FF;font-size:30px">♪</div>';
-          if(po.media_url) return '<div style="aspect-ratio:1;border-radius:10px;overflow:hidden;background:#161616"><img src="'+esc(po.media_url)+'" style="width:100%;height:100%;object-fit:cover"/></div>';
-          return '<div style="aspect-ratio:1;border-radius:10px;background:#161616;display:flex;align-items:center;justify-content:center;padding:12px;text-align:center;color:rgba(255,255,255,.7);font-size:12px">'+esc(po.content||'')+'</div>';
-        }).join('')+'</div>'):'<div style="color:rgba(255,255,255,.4);text-align:center;padding:40px;border:1px solid rgba(255,255,255,.08);border-radius:14px">No posts yet.</div>';
-        body.innerHTML='<div style="display:flex;align-items:center;gap:18px;margin-bottom:18px">'+av+
-          '<div><div style="font-size:22px;font-weight:700;color:#fff;display:flex;align-items:center;gap:7px">'+esc(name)+badge(p.verified)+'</div>'+
-          '<div style="color:rgba(255,255,255,.45);font-size:14px">@'+esc(p.username)+'</div>'+
-          (p.tagline?'<div style="color:rgba(255,255,255,.65);font-size:13px;margin-top:5px">'+esc(p.tagline)+'</div>':'')+
-          '<div style="color:rgba(255,255,255,.55);font-size:13px;margin-top:5px">'+esc([p.role,p.industry,p.location].filter(Boolean).join(' · '))+(p.founding_number!=null?'  <span style="background:rgba(0,212,255,0.14);color:#7fe6ff;border-radius:999px;padding:2px 8px;font-size:11px">Founding #'+esc(p.founding_number)+'</span>':'')+'</div></div></div>'+
-          '<div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.4);margin:18px 0 12px">Posts</div>'+grid;
-      };
-
-      function launcher(){
-        if(!signedIn() || document.getElementById('aiadDiscBtn')) return;
-        var b=document.createElement('button'); b.id='aiadDiscBtn'; b.title='Discover artists'; b.innerHTML='◎';
-        b.style.cssText='position:fixed;left:22px;bottom:92px;z-index:9997;width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,#00D4FF,#0077B6);color:#001018;font-size:23px;border:none;cursor:pointer;box-shadow:0 8px 30px rgba(0,180,216,0.35)';
-        b.onclick=function(){ overlay().style.display='block'; document.getElementById('aiadDiscBack').style.display='none'; document.getElementById('aiadDiscTitle').textContent='Discover artists'; document.getElementById('aiadDiscSearch').style.display=''; grid(''); };
-        document.body.appendChild(b);
-      }
-      setInterval(launcher, 2500); setTimeout(launcher, 1500);
-    })();
-    </script>
-    <!-- One-time geo capture: records the signed-in user's country/city (IP-based)
-         so "where they're from" is known for every signup, not just artists who type it. -->
-    <script>
-    (function(){
-      var REF='uapiytquwuhtewqieegx';
-      var ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhcGl5dHF1d3VodGV3cWllZWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NzcwMTksImV4cCI6MjA4OTI1MzAxOX0.BLs2RdStghm0_cF8t70cBTX1GWcowGRwID7TAG8Mg38';
-      async function capture(){
-        if(localStorage.getItem('aiad_geo_done2')==='1') return;
-        var s; try{ s=JSON.parse(localStorage.getItem('sb-'+REF+'-auth-token')); }catch(e){ return; }
-        if(!s||!s.access_token) return;
-        try{
-          var g=await fetch('https://ipwho.is/').then(function(r){return r.json();}).catch(function(){return null;});
-          if(g&&g.success){
-            await fetch('https://'+REF+'.supabase.co/rest/v1/rpc/set_signup_geo',{method:'POST',headers:{apikey:ANON,Authorization:'Bearer '+s.access_token,'Content-Type':'application/json'},body:JSON.stringify({p_country:g.country||null,p_city:g.city||null,p_code:g.country_code||null})});
-          }
-          localStorage.setItem('aiad_geo_done2','1');
-        }catch(e){}
-      }
-      setTimeout(capture, 4500);
     })();
     </script>
 </body>
