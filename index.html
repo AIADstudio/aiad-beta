@@ -23371,7 +23371,7 @@ function toggleAgeRange(btn) {
                 if (hasYT || hasSP) return;
                 const ob = await rest(`artist_onboarding?select=data&user_id=eq.${s.user.id}`);
                 const links = Array.isArray(ob) && ob[0] && ob[0].data && ob[0].data.links;
-                if (!links) return;
+                if (!links || (!links.spotify && !links.youtube)) { showConnectNudge(); return; }
                 const spId = (links.spotify || '').match(/artist\/([A-Za-z0-9]+)/);
                 const ytRaw = links.youtube || '';
                 const ytAt = ytRaw.match(/@([A-Za-z0-9_.\-]+)/); const ytCh = ytRaw.match(/channel\/([A-Za-z0-9_\-]+)/);
@@ -23451,6 +23451,94 @@ function toggleAgeRange(btn) {
             });
         }
         window.aiadLockIndustries = lockNonMusicIndustries;
+
+        // ── "Connect your socials" nudge + modal (older accounts / missing stats) ──
+        const CS_INPUT = 'width:100%;box-sizing:border-box;background:#12141d;border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:9px 11px;color:#fff;font-size:0.85rem;margin-bottom:10px;';
+        const CS_LABEL = 'display:block;font-size:0.74rem;color:#94a3b8;margin-bottom:3px;';
+        window.aiadConnectSocials = function () {
+            let ov = document.getElementById('aiadConnectOverlay');
+            if (ov) { ov.style.display = 'flex'; return; }
+            ov = document.createElement('div');
+            ov.id = 'aiadConnectOverlay';
+            ov.style.cssText = 'position:fixed;inset:0;background:rgba(3,5,12,0.85);backdrop-filter:blur(6px);z-index:100003;display:flex;align-items:center;justify-content:center;padding:18px;';
+            ov.innerHTML = `<div style="background:#0d0f17;border:1px solid rgba(255,255,255,0.1);border-radius:16px;max-width:460px;width:100%;padding:22px;max-height:90vh;overflow-y:auto;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><h3 style="margin:0;color:#fff;font-size:1.15rem;">🔗 Connect your socials</h3><button onclick="document.getElementById('aiadConnectOverlay').style.display='none'" style="background:none;border:none;color:#94a3b8;font-size:1.4rem;cursor:pointer;">×</button></div>
+                <p style="color:#94a3b8;font-size:0.82rem;margin:0 0 14px;">Paste your profiles — AIAD pulls your real stats automatically so your AI advice is built around your actual numbers.</p>
+                <label style="${CS_LABEL}">Spotify artist link</label><input id="cs_spotify" placeholder="https://open.spotify.com/artist/..." style="${CS_INPUT}">
+                <label style="${CS_LABEL}">YouTube channel</label><input id="cs_youtube" placeholder="https://youtube.com/@..." style="${CS_INPUT}">
+                <label style="${CS_LABEL}">Instagram</label><input id="cs_instagram" placeholder="@handle" style="${CS_INPUT}">
+                <label style="${CS_LABEL}">TikTok</label><input id="cs_tiktok" placeholder="@handle" style="${CS_INPUT}">
+                <div style="background:linear-gradient(90deg,rgba(29,185,84,0.14),rgba(6,182,212,0.10));border:1px solid rgba(29,185,84,0.4);border-radius:10px;padding:11px;margin:4px 0 14px;">
+                    <label style="display:block;font-size:0.8rem;color:#fff;font-weight:700;margin-bottom:2px;">🎧 Spotify monthly listeners</label>
+                    <p style="font-size:0.7rem;color:#94a3b8;margin:0 0 7px;">Spotify doesn't share this with apps — grab it from your Spotify for Artists home page.</p>
+                    <input id="cs_monthly" inputmode="numeric" placeholder="e.g. 2,296" style="width:100%;box-sizing:border-box;background:#0d0f17;border:1px solid rgba(29,185,84,0.5);border-radius:8px;padding:9px 11px;color:#fff;font-size:0.9rem;">
+                </div>
+                <button onclick="aiadSaveSocials(this)" style="width:100%;background:linear-gradient(135deg,#06b6d4,#3b82f6);color:#fff;border:none;border-radius:10px;padding:11px;font-size:0.9rem;font-weight:700;cursor:pointer;">Connect & scan</button>
+                <div id="cs_done" style="color:#22c55e;font-size:0.8rem;margin-top:10px;text-align:center;display:none;">✓ Connected — pulling your stats now.</div>
+            </div>`;
+            document.body.appendChild(ov);
+        };
+        window.aiadSaveSocials = async function (btn) {
+            const g = (id) => (document.getElementById(id) && document.getElementById(id).value || '').trim();
+            const spotify = g('cs_spotify'), youtube = g('cs_youtube'), instagram = g('cs_instagram'), tiktok = g('cs_tiktok'), monthly = g('cs_monthly');
+            if (!spotify && !youtube && !monthly) { (window.showToast || alert)('Add at least one link or your listener count'); return; }
+            btn.disabled = true; btn.textContent = 'Connecting…';
+            try {
+                await rpc('save_artist_socials', { p_spotify: spotify || null, p_youtube: youtube || null, p_instagram: instagram || null, p_tiktok: tiktok || null, p_monthly_listeners: monthly || null });
+                const s = sess();
+                if (s) {
+                    const spId = spotify.match(/artist\/([A-Za-z0-9]+)/);
+                    const ytAt = youtube.match(/@([A-Za-z0-9_.\-]+)/); const ytCh = youtube.match(/channel\/([A-Za-z0-9_\-]+)/);
+                    const yh = ytAt ? '@' + ytAt[1] : (ytCh ? ytCh[1] : '');
+                    const clean = (h) => (h || '').replace(/^.*@/, '').replace(/^https?:\/\/[^/]+\//, '').replace(/\/+$/, '').trim();
+                    fetch(`${SUPA}/functions/v1/fetch-artist-stats`, {
+                        method: 'POST', headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon(), 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ user_id: s.user.id, action: 'fetch', spotify_id: spId ? spId[1] : undefined, youtube_handle: yh || undefined, instagram_handle: clean(instagram) || undefined, tiktok_handle: clean(tiktok) || undefined, self_reported: { monthly_listeners: monthly || undefined } }),
+                    }).catch(() => {});
+                }
+                const done = document.getElementById('cs_done'); if (done) done.style.display = 'block';
+                const nudge = document.getElementById('aiadConnectNudge'); if (nudge) nudge.remove();
+                try { localStorage.setItem('aiad_nudge_dismissed', '1'); } catch (e) {}
+                setTimeout(() => { const ov = document.getElementById('aiadConnectOverlay'); if (ov) ov.style.display = 'none'; }, 1400);
+            } catch (e) { (window.showToast || alert)('Could not save — try again'); }
+            btn.disabled = false; btn.textContent = 'Connect & scan';
+        };
+        function showConnectNudge() {
+            if (document.getElementById('aiadConnectNudge')) return;
+            try { if (localStorage.getItem('aiad_nudge_dismissed') === '1') return; } catch (e) {}
+            const bar = document.createElement('div');
+            bar.id = 'aiadConnectNudge';
+            bar.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:99990;background:linear-gradient(135deg,#7c3aed,#db2777);color:#fff;border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 6px 24px rgba(0,0,0,0.45);max-width:92vw;font-size:0.84rem;';
+            bar.innerHTML = `<span>🔗 Connect your Spotify &amp; YouTube for personalized AI insights</span>
+                <button onclick="window.aiadConnectSocials()" style="background:#fff;color:#111;border:none;border-radius:8px;padding:6px 12px;font-weight:700;font-size:0.8rem;cursor:pointer;white-space:nowrap;">Connect</button>
+                <button onclick="this.parentElement.remove();try{localStorage.setItem('aiad_nudge_dismissed','1')}catch(e){}" style="background:none;border:none;color:rgba(255,255,255,0.85);font-size:1.15rem;cursor:pointer;line-height:1;">×</button>`;
+            document.body.appendChild(bar);
+        }
+        window.aiadShowConnectNudge = showConnectNudge;
+
+        // Hard block: intercept the industry-select function so NO path (click,
+        // keyboard, programmatic) can select a non-music category.
+        function lockIndustrySelectFn() {
+            if (typeof window.selectIndustryCard === 'function' && !window.selectIndustryCard.__musicLocked) {
+                const orig = window.selectIndustryCard;
+                window.selectIndustryCard = function (card) {
+                    const v = (card && card.dataset) ? card.dataset.value : null;
+                    if (v && v !== 'music') { (window.showToast || (() => {}))('Music-only for now — more industries coming soon'); return; }
+                    return orig.apply(this, arguments);
+                };
+                window.selectIndustryCard.__musicLocked = true;
+            }
+            // Also intercept any "select industry" by value helper if present.
+            if (typeof window.selectIndustry === 'function' && !window.selectIndustry.__musicLocked) {
+                const origI = window.selectIndustry;
+                window.selectIndustry = function (v) {
+                    if (v && v !== 'music') { (window.showToast || (() => {}))('Music-only for now — more industries coming soon'); return; }
+                    return origI.apply(this, arguments);
+                };
+                window.selectIndustry.__musicLocked = true;
+            }
+        }
+        window.aiadLockIndustrySelectFn = lockIndustrySelectFn;
 
         // Minimal, safe markdown → HTML (headings, bold, lists, breaks).
         function mdToHtml(md) {
@@ -23886,10 +23974,11 @@ function toggleAgeRange(btn) {
             }
         }
         document.addEventListener('DOMContentLoaded', () => {
-            setTimeout(() => { hookSettings(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); applyLiveMeta(); ensureArtistStats(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); loadVerifiedNames().then(() => decorateBadges()); }, 1500);
+            lockIndustrySelectFn();
+            setTimeout(() => { hookSettings(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); applyLiveMeta(); ensureArtistStats(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); loadVerifiedNames().then(() => decorateBadges()); }, 1500);
         });
         // Re-decorate + (re)mount buttons/pickers as auth state / views change.
-        setInterval(() => { if (_verifiedNames) decorateBadges(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); }, 2500);
+        setInterval(() => { if (_verifiedNames) decorateBadges(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); }, 2500);
     })();
     </script>
 </body>
