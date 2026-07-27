@@ -14703,15 +14703,16 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
 
         async function deletePost(postCard, postId) {
+            if (postId) {
+                try {
+                    const { data: n, error } = await db.rpc('delete_artist_post', { p_id: postId });
+                    if (error || n === -1) { showToast('Could not delete — try signing in again'); return; }
+                } catch (e) { showToast('Delete failed — try again'); return; }
+            }
             postCard.style.transition = 'opacity 0.25s, transform 0.25s';
             postCard.style.opacity = '0';
             postCard.style.transform = 'translateY(-8px)';
-            setTimeout(() => postCard.remove(), 260);
-            if (postId && AppState.currentUser) {
-                await db.from('artist_posts').delete()
-                    .eq('id', postId)
-                    .eq('user_id', AppState.currentUser.id);
-            }
+            setTimeout(() => { postCard.remove(); if (typeof loadArtistPosts === 'function') loadArtistPosts(); }, 260);
             showToast('Post deleted');
         }
 
@@ -14749,10 +14750,13 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 showToast('Post archived');
                 setTimeout(loadArtistPosts, 300);
             }));
-            menu.appendChild(mkItem('Delete Post', '#ef4444', () => {
+            menu.appendChild(mkItem('Delete Post', '#ef4444', async () => {
                 _closeArtistPost();
-                if (postId && AppState.currentUser) {
-                    db.from('artist_posts').delete().eq('id', postId).eq('user_id', AppState.currentUser.id);
+                if (postId && postId !== 'tmp') {
+                    try {
+                        const { data: n, error } = await db.rpc('delete_artist_post', { p_id: postId });
+                        if (error || n === -1) { showToast('Could not delete — try signing in again'); return; }
+                    } catch (e) { showToast('Delete failed — try again'); return; }
                 }
                 showToast('Post deleted');
                 setTimeout(loadArtistPosts, 300);
@@ -16763,9 +16767,9 @@ Only capture real, meaningful decisions — not questions or general discussion.
 
         async function generateTrackCoverArt(trackTitle, prompt, style) {
             try {
-                const coverPrompt = `Album cover art for a song called "${trackTitle}". Style: ${style || prompt}. Square format, visually striking, music-themed, no text or letters, dark moody aesthetic with vibrant accents.`;
-                const data = await callCreativeStudio('mixmedia', coverPrompt);
-                const imageUrl = data?.imageUrl || data?.url || data?.image_url || '';
+                const coverPrompt = `A song titled "${trackTitle}". Mood/style: ${style || prompt || 'modern'}. Dark, moody aesthetic with vibrant accents.`;
+                const data = await callCreativeStudio('coverart', coverPrompt);
+                const imageUrl = data?.result || data?.imageUrl || data?.url || data?.image_url || '';
                 if (!imageUrl) return;
 
                 // Upload to Supabase Storage for permanent URL
@@ -23771,7 +23775,11 @@ function toggleAgeRange(btn) {
                         ${OB_FIELD('ob_youtube','YouTube channel','https://youtube.com/@...')}
                         ${OB_FIELD('ob_instagram','Instagram','@handle')}
                         ${OB_FIELD('ob_tiktok','TikTok','@handle')}
-                        ${OB_FIELD('ob_monthly_listeners','Spotify monthly listeners (optional)','only if you want to set a baseline')}
+                        <div style="margin:14px 0;background:linear-gradient(90deg,rgba(29,185,84,0.14),rgba(6,182,212,0.10));border:1px solid rgba(29,185,84,0.4);border-radius:10px;padding:13px;">
+                            <label for="ob_monthly_listeners" style="display:block;font-size:0.85rem;color:#fff;font-weight:700;margin-bottom:2px;">🎧 Your Spotify monthly listeners</label>
+                            <p style="font-size:0.72rem;color:#94a3b8;margin:0 0 9px;">Spotify doesn't hand this number to apps — so drop it in here (it's on your Spotify for Artists home page). This single number sharpens every piece of AI career advice you'll get.</p>
+                            <input id="ob_monthly_listeners" inputmode="numeric" placeholder="e.g. 2,296" style="width:100%;box-sizing:border-box;background:#0d0f17;border:1px solid rgba(29,185,84,0.5);border-radius:8px;padding:10px 12px;color:#fff;font-size:0.95rem;">
+                        </div>
                         ${OB_FIELD('ob_following','Total following (optional)','rough is fine')}
                         <div style="font-size:0.72rem;color:#38bdf8;font-weight:700;letter-spacing:.05em;margin:16px 0 12px;">GOALS & CONTEXT</div>
                         ${OB_FIELD('ob_goal','Your #1 goal for the next 12 months','e.g. hit 50k monthly listeners and book a tour','area')}
