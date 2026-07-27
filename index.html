@@ -23428,6 +23428,30 @@ function toggleAgeRange(btn) {
             window.__csWrapped = true;
         }
 
+        // ── Music-first launch: disable non-music industry options at sign-up ──
+        function lockNonMusicIndustries() {
+            document.querySelectorAll('.card--industry[data-value]').forEach(card => {
+                if (card.dataset.value === 'music' || card.__aiadLocked) return;
+                card.__aiadLocked = true;
+                card.style.opacity = '0.38';
+                card.style.filter = 'grayscale(1)';
+                card.style.cursor = 'not-allowed';
+                if (getComputedStyle(card).position === 'static') card.style.position = 'relative';
+                card.removeAttribute('onclick');
+                card.setAttribute('aria-disabled', 'true');
+                card.tabIndex = -1;
+                card.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); (window.showToast || (() => {}))('Music-only for now — more industries coming soon'); }, true);
+                if (!card.querySelector('.aiad-soon-badge')) {
+                    const b = document.createElement('span');
+                    b.className = 'aiad-soon-badge';
+                    b.textContent = 'Soon';
+                    b.style.cssText = 'position:absolute;top:8px;right:8px;font-size:0.58rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#fff;background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.22);border-radius:999px;padding:2px 8px;z-index:2;';
+                    card.appendChild(b);
+                }
+            });
+        }
+        window.aiadLockIndustries = lockNonMusicIndustries;
+
         // Minimal, safe markdown → HTML (headings, bold, lists, breaks).
         function mdToHtml(md) {
             if (!md) return '';
@@ -23862,10 +23886,10 @@ function toggleAgeRange(btn) {
             }
         }
         document.addEventListener('DOMContentLoaded', () => {
-            setTimeout(() => { hookSettings(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); applyLiveMeta(); ensureArtistStats(); injectStudioModelPickers(); wrapCreativeStudio(); loadVerifiedNames().then(() => decorateBadges()); }, 1500);
+            setTimeout(() => { hookSettings(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); applyLiveMeta(); ensureArtistStats(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); loadVerifiedNames().then(() => decorateBadges()); }, 1500);
         });
         // Re-decorate + (re)mount buttons/pickers as auth state / views change.
-        setInterval(() => { if (_verifiedNames) decorateBadges(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); injectStudioModelPickers(); wrapCreativeStudio(); }, 2500);
+        setInterval(() => { if (_verifiedNames) decorateBadges(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); }, 2500);
     })();
     </script>
 </body>
