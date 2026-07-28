@@ -16593,6 +16593,23 @@ Only capture real, meaningful decisions — not questions or general discussion.
             document.getElementById('musicRefLabel').style.color = 'var(--teal-light)';
         }
 
+        // Generated audio comes back as a short-lived temp URL (expires → playback dies).
+        // Pull it through the function's audio proxy (avoids CORS) and store it permanently.
+        async function uploadTrackAudio(tempUrl) {
+            if (!tempUrl || !AppState.currentUser) return tempUrl;
+            try {
+                const res = await fetch('https://uapiytquwuhtewqieegx.supabase.co/functions/v1/music-production?proxy=' + encodeURIComponent(tempUrl), { headers: { 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
+                if (!res.ok) return tempUrl;
+                const blob = await res.blob();
+                if (!blob || blob.size < 1000) return tempUrl;
+                const fileName = AppState.currentUser.id + '/track_' + Date.now() + '.mp3';
+                const { error } = await db.storage.from('music-references').upload(fileName, blob, { contentType: blob.type || 'audio/mpeg', upsert: true });
+                if (error) throw new Error(error.message);
+                const { data } = db.storage.from('music-references').getPublicUrl(fileName);
+                return (data && data.publicUrl) || tempUrl;
+            } catch (e) { console.warn('[AIAD] Audio persist failed, using temp url:', e.message); return tempUrl; }
+        }
+
         async function uploadRefToSupabase(file) {
             // Upload to Supabase storage bucket 'music-references'
             // If bucket doesn't exist or upload fails, returns null (ref skipped gracefully)
@@ -16698,7 +16715,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     if (data.status === 'done' && data.audioUrl) {
                         clearInterval(musicPollInterval);
                         document.getElementById('musicProgressBar').style.width = '100%';
-                        setTimeout(() => {
+                        setTimeout(async () => {
                             document.getElementById('musicLoadingState').style.display = 'none';
                             document.getElementById('musicAudioPlayer').src = data.audioUrl;
                             document.getElementById('musicDownloadLink').href = data.audioUrl;
@@ -16729,18 +16746,28 @@ Only capture real, meaningful decisions — not questions or general discussion.
                             const trackMeta = { ...meta, lyrics: singleTrack.lyrics || meta.lyrics };
                             const trackAudioUrl = singleTrack.audioUrl || singleTrack.url;
                             const trackImageUrl = singleTrack.imageUrl || singleTrack.cover_url || '';
-                            addTrackToList(trackTitle, trackAudioUrl, trackImageUrl, trackMeta);
-                            saveTrackToDb(trackTitle, trackAudioUrl, trackImageUrl, trackMeta);
+                            document.getElementById('musicOutput').style.display = 'block';
+                            btn.disabled = false;
+                            btnText.textContent = 'Create';
+
+                            // Persist audio to permanent storage (temp URLs expire → playback + download break).
+                            const permAudio = await uploadTrackAudio(trackAudioUrl) || trackAudioUrl;
+                            const playerEl = document.getElementById('musicAudioPlayer');
+                            if (playerEl) playerEl.src = permAudio;
+                            const dlEl = document.getElementById('musicDownloadLink');
+                            if (dlEl) {
+                                const fn = (trackTitle || 'track').replace(/[^a-z0-9]+/gi, '_') + '.mp3';
+                                // Supabase forces a download via ?download=; the download attr is ignored cross-origin.
+                                dlEl.href = permAudio.includes('supabase.co') ? permAudio + '?download=' + fn : permAudio;
+                                dlEl.setAttribute('download', fn);
+                            }
+                            addTrackToList(trackTitle, permAudio, trackImageUrl, trackMeta);
+                            saveTrackToDb(trackTitle, permAudio, trackImageUrl, trackMeta);
 
                             // Auto-generate cover art in background if none provided
                             if (!trackImageUrl) {
                                 generateTrackCoverArt(trackTitle, prompt, style).catch(e => console.warn('[AIAD] Cover art gen failed:', e));
                             }
-
-                            document.getElementById('musicAudioPlayer').src = singleTrack.audioUrl || singleTrack.url;
-                            document.getElementById('musicOutput').style.display = 'block';
-                            btn.disabled = false;
-                            btnText.textContent = 'Create';
                         }, 500);
                     } else if (data.status === 'failed') {
                         clearInterval(musicPollInterval);
