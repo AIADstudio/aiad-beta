@@ -23523,6 +23523,22 @@ function toggleAgeRange(btn) {
         }
         window.aiadShowConnectNudge = showConnectNudge;
 
+        // The analytics/onboarding "Connect Spotify/YouTube" buttons used a broken OAuth
+        // redirect (app not configured for it). Repoint them to the working paste-link
+        // + auto-scan modal so "connect" actually works everywhere.
+        function wireConnectButtons() {
+            if (typeof window.aiadConnectSocials !== 'function') return;
+            if (!window.connectSpotify || !window.connectSpotify.__aiad) {
+                window.connectSpotify = function () { window.aiadConnectSocials(); };
+                window.connectSpotify.__aiad = true;
+            }
+            if (!window.connectYouTube || !window.connectYouTube.__aiad) {
+                window.connectYouTube = function () { window.aiadConnectSocials(); };
+                window.connectYouTube.__aiad = true;
+            }
+        }
+        window.aiadWireConnectButtons = wireConnectButtons;
+
         // Hard block: intercept the industry-select function so NO path (click,
         // keyboard, programmatic) can select a non-music category.
         function lockIndustrySelectFn() {
@@ -24100,11 +24116,11 @@ function toggleAgeRange(btn) {
             }
         }
         document.addEventListener('DOMContentLoaded', () => {
-            lockIndustrySelectFn(); wireCollabPersistence();
-            setTimeout(() => { hookSettings(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); applyLiveMeta(); ensureArtistStats(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); loadVerifiedNames().then(() => decorateBadges()); }, 1500);
+            lockIndustrySelectFn(); wireCollabPersistence(); wireConnectButtons();
+            setTimeout(() => { hookSettings(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); applyLiveMeta(); ensureArtistStats(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); wireConnectButtons(); loadVerifiedNames().then(() => decorateBadges()); }, 1500);
         });
         // Re-decorate + (re)mount buttons/pickers as auth state / views change.
-        setInterval(() => { if (_verifiedNames) decorateBadges(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); }, 2500);
+        setInterval(() => { if (_verifiedNames) decorateBadges(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); wireConnectButtons(); }, 2500);
     })();
     </script>
 </body>
