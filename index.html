@@ -24247,7 +24247,31 @@ Be direct and concrete with real industry insight — never generic filler. When
 
         function wsIndustry() { return (window.AppState && AppState.userIndustry) || localStorage.getItem('aiad_user_industry') || null; }
         function wsRole() { return (window.AppState && AppState.userRole) || localStorage.getItem('aiad_user_role') || null; }
-        function wsOnboardingVisible() { return [...document.querySelectorAll('[id^="page-"]')].some(el => el.offsetParent !== null); }
+        const WS_ONBOARD_CONTAINERS = ['fashionOnboardingContainer','streamerOnboardingContainer','visualArtsOnboardingContainer','writingOnboardingContainer','filmOnboardingContainer','gamesOnboardingContainer','multiOnboardingContainer'];
+        function wsOnboardingVisible() {
+            if ([...document.querySelectorAll('[id^="page-"]')].some(el => el.offsetParent !== null)) return true;
+            return WS_ONBOARD_CONTAINERS.some(id => { const e = document.getElementById(id); return e && e.offsetParent !== null; });
+        }
+        // In add-category mode the user already has an account + plan, so skip the pricing step
+        // that a fresh signup would hit and launch straight into the new category's dashboard.
+        const WS_LAUNCHERS = { fashion:'launchFashionDashboard', streaming:'launchStreamerDashboard', visual_arts:'launchVisualArtsDashboard', writing_publishing:'launchWritingDashboard', film_media:'launchFilmDashboard', games:'launchGamesDashboard', multi:'launchMultiDashboard' };
+        function wireAddCategory() {
+            if (typeof window.navigateTo === 'function' && !window.navigateTo.__aiadAddWrap) {
+                const orig = window.navigateTo;
+                window.navigateTo = function (page) {
+                    try {
+                        const add = sessionStorage.getItem('aiad_add_category');
+                        if (add && page === 'subscription-tier') {
+                            sessionStorage.removeItem('aiad_add_category');
+                            const fn = WS_LAUNCHERS[add];
+                            if (fn && typeof window[fn] === 'function') { _wsSyncedFor = null; return window[fn](); }
+                        }
+                    } catch (e) {}
+                    return orig.apply(this, arguments);
+                };
+                window.navigateTo.__aiadAddWrap = true;
+            }
+        }
         function wsInDashboard() {
             if (!sess()) return false;
             if (wsOnboardingVisible()) return false;
@@ -24290,10 +24314,12 @@ Be direct and concrete with real industry insight — never generic filler. When
 
         window.aiadAddCategory = function (ind) {
             wsCloseMenu();
+            // Mark add-category mode so the onboarding skips the pricing step (existing subscriber).
+            try { sessionStorage.setItem('aiad_add_category', ind || '1'); } catch (e) {}
+            wireAddCategory();
             // Fashion has a self-contained onboarding entry point.
             if (ind === 'fashion' && typeof window.showFashionOnboarding === 'function') { window.showFashionOnboarding(); return; }
             // Generic: restore the base layout and route into industry selection → role → onboarding.
-            try { sessionStorage.setItem('aiad_add_category', ind || '1'); } catch (e) {}
             const fd = document.getElementById('fashionDashboard'); if (fd) { fd.style.display = 'none'; fd.classList.remove('active'); }
             ['.header', '.main', '.footer'].forEach(sel => { const el = document.querySelector(sel); if (el) el.style.display = ''; });
             if (typeof window.navigateTo === 'function') window.navigateTo('industry-selection');
@@ -24345,10 +24371,10 @@ Be direct and concrete with real industry insight — never generic filler. When
 
         document.addEventListener('DOMContentLoaded', () => {
             lockIndustrySelectFn(); wireCollabPersistence(); wireConnectButtons();
-            setTimeout(() => { hookSettings(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); applyLiveMeta(); ensureArtistStats(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); wireConnectButtons(); wireFashionAgent(); wsSync(); loadVerifiedNames().then(() => decorateBadges()); }, 1500);
+            setTimeout(() => { hookSettings(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); applyLiveMeta(); ensureArtistStats(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); wireConnectButtons(); wireFashionAgent(); wireAddCategory(); wsSync(); loadVerifiedNames().then(() => decorateBadges()); }, 1500);
         });
         // Re-decorate + (re)mount buttons/pickers as auth state / views change.
-        setInterval(() => { if (_verifiedNames) decorateBadges(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); wireConnectButtons(); wireFashionAgent(); wsSync(); renderWsSwitcher(); }, 2500);
+        setInterval(() => { if (_verifiedNames) decorateBadges(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); wireConnectButtons(); wireFashionAgent(); wireAddCategory(); wsSync(); renderWsSwitcher(); }, 2500);
     })();
     </script>
 </body>
