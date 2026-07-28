@@ -16778,12 +16778,19 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     permanentUrl = await uploadGeneratedImage(imageUrl, 'covers');
                 }
 
-                // Update the most recent track card's cover image
+                // Update the MAIN output cover art (the most visible spot for the artist)
+                const coverImg = document.getElementById('musicCoverArt');
+                if (coverImg) { coverImg.src = permanentUrl; coverImg.style.display = 'block'; }
+                const coverPh = document.getElementById('musicCoverPlaceholder');
+                if (coverPh) coverPh.style.display = 'none';
+
+                // Update the most recent track card's cover image (match any cover element)
                 const firstCard = document.querySelector('#musicTrackList > div:first-child');
                 if (firstCard) {
-                    const coverDiv = firstCard.querySelector('div[style*="background:linear-gradient"]');
+                    const coverDiv = firstCard.querySelector('div[style*="linear-gradient"], div[style*="background"], img');
                     if (coverDiv) {
-                        coverDiv.style.background = `url(${permanentUrl}) center/cover no-repeat`;
+                        if (coverDiv.tagName === 'IMG') { coverDiv.src = permanentUrl; }
+                        else { coverDiv.style.background = `url(${permanentUrl}) center/cover no-repeat`; }
                     }
                 }
 
