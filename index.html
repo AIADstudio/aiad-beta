@@ -11871,10 +11871,15 @@ html, body {
                 localStorage.setItem('aiad_user_role', AppState.userRole);
             }
 
-            const industry = AppState.userIndustry;
-            const role = AppState.userRole;
+            // Fall back to the stored industry/role — AppState can get cleared while passing
+            // through the shared pricing page, which previously stranded fashion/streaming
+            // signups on the wrong (or no) dashboard.
+            const industry = AppState.userIndustry || localStorage.getItem('aiad_user_industry');
+            const role = AppState.userRole || localStorage.getItem('aiad_user_role');
+            AppState.userIndustry = industry;
+            AppState.userRole = role;
 
-            console.log('[Subscription] Routing to dashboard...');
+            console.log('[Subscription] Routing to dashboard... industry=' + industry + ' role=' + role);
 
             if (role === 'supporter') {
                 switchDashboard('fan');
