@@ -23665,6 +23665,151 @@ Be direct and concrete with real industry insight — never generic filler. When
         }
         window.aiadWireFashion = wireFashionAgent;
 
+        // ══════════════ FASHION AI DESIGN STUDIO (mirrors the music Creative Studio) ══════════════
+        function _fashProfile() { try { return JSON.parse(localStorage.getItem('aiad_fashion_profile') || '{}'); } catch (e) { return {}; } }
+        function fashBrand() { const p = _fashProfile(); return (window.AppState && AppState.artistProfile && AppState.artistProfile.brandName) || p.brandName || p.name || 'your label'; }
+        function fashFocus() { const p = _fashProfile(); return p.focus || 'ready-to-wear'; }
+        async function fashCall(tool, prompt, extra) {
+            const s = sess();
+            const r = await fetch(`${SUPA}/functions/v1/creative-studio`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + (s ? s.access_token : anon()), 'apikey': anon(), 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ tool, prompt, brand: fashBrand(), focus: fashFocus() }, extra || {})) });
+            return await r.json().catch(() => ({ error: 'bad response' }));
+        }
+        async function saveFashionDesign(kind, prompt, url, style) {
+            const s = sess(); if (!s) return;
+            try {
+                await fetch(`${SUPA}/rest/v1/fashion_designs`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon(), 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }, body: JSON.stringify({ user_id: s.user.id, brand: fashBrand(), kind, prompt, image_url: url, style: style || null, title: (prompt || kind).slice(0, 60) }) });
+            } catch (e) {}
+        }
+        function _designCard(d) {
+            const url = d.image_url || '';
+            return `<div style="position:relative;border:1px solid var(--f-border,#2a2f2a);border-radius:8px;overflow:hidden;background:var(--f-bg-elevated,#151815);">
+                <img src="${url}" style="width:100%;aspect-ratio:1;object-fit:cover;display:block;cursor:pointer;" onclick="window.open('${url}','_blank')">
+                <div style="padding:8px 10px;"><div style="font-size:0.72rem;color:var(--f-text-secondary,#9aa39a);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${(d.title || d.prompt || d.kind || 'Design').replace(/</g, '&lt;')}</div>
+                <div style="display:flex;gap:6px;margin-top:6px;"><a href="${url}" target="_blank" download style="font-size:0.66rem;color:var(--f-accent-green,#7fae82);text-decoration:none;">Open ↗</a>
+                <span onclick="aiadDeleteDesign('${d.id}',this)" style="font-size:0.66rem;color:#f87171;cursor:pointer;margin-left:auto;">Remove</span></div></div></div>`;
+        }
+        window.aiadDeleteDesign = async function (id, el) {
+            const s = sess(); if (!s) return;
+            try { await fetch(`${SUPA}/rest/v1/fashion_designs?id=eq.${id}`, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon() } }); } catch (e) {}
+            const card = el && el.closest('div[style*="position:relative"]'); if (card) card.remove();
+        };
+        async function loadFashionDesigns() {
+            const grid = document.getElementById('fashStudioGallery'); if (!grid) return;
+            const rows = await rest('fashion_designs?select=*&order=created_at.desc&limit=60');
+            if (Array.isArray(rows) && rows.length) { grid.innerHTML = rows.map(_designCard).join(''); const g = document.getElementById('fashStudioGalleryWrap'); if (g) g.style.display = ''; }
+            else { const g = document.getElementById('fashStudioGalleryWrap'); if (g) g.style.display = 'none'; }
+        }
+        window.aiadFashGen = async function (kind) {
+            const inp = document.getElementById('fashStudioPrompt'); const out = document.getElementById('fashStudioOut');
+            const style = (document.getElementById('fashStudioStyle') || {}).value || '';
+            const prompt = (inp && inp.value || '').trim();
+            if (!prompt) { (window.showToast || alert)('Describe the piece or collection first'); return; }
+            const tool = kind === 'moodboard' ? 'fashion_moodboard' : 'fashion_design';
+            out.innerHTML = `<div style="color:var(--f-text-secondary,#9aa39a);font-size:0.85rem;padding:16px;">Generating ${kind === 'moodboard' ? 'mood board' : 'design'}… this takes ~15–25s.</div>`;
+            try {
+                const j = await fashCall(tool, prompt, { style, model: (document.getElementById('fashStudioModel') || {}).value || 'nano' });
+                if (j && j.result) {
+                    out.innerHTML = `<div style="border:1px solid var(--f-border,#2a2f2a);border-radius:10px;overflow:hidden;"><img src="${j.result}" style="width:100%;display:block;"><div style="padding:10px 12px;display:flex;gap:12px;align-items:center;"><span style="font-size:0.78rem;color:var(--f-text-secondary,#9aa39a);flex:1;">${prompt.replace(/</g, '&lt;')}</span><a href="${j.result}" target="_blank" download style="font-size:0.75rem;color:var(--f-accent-green,#7fae82);">Download</a></div></div>`;
+                    await saveFashionDesign(kind, prompt, j.result, style);
+                    loadFashionDesigns();
+                } else { out.innerHTML = `<div style="color:#f87171;font-size:0.82rem;padding:14px;">${(j && j.error) || 'Generation failed — try again.'}</div>`; }
+            } catch (e) { out.innerHTML = `<div style="color:#f87171;font-size:0.82rem;padding:14px;">Error — try again.</div>`; }
+        };
+        window.aiadFashText = async function (kind) {
+            const inp = document.getElementById('fashStudioPrompt'); const out = document.getElementById('fashStudioOut');
+            const prompt = (inp && inp.value || '').trim();
+            if (!prompt) { (window.showToast || alert)('Describe the garment or concept first'); return; }
+            const tool = kind === 'techpack' ? 'fashion_techpack' : 'fashion_palette';
+            out.innerHTML = `<div style="color:var(--f-text-secondary,#9aa39a);font-size:0.85rem;padding:16px;">Generating ${kind === 'techpack' ? 'tech pack' : 'color & materials'}…</div>`;
+            try {
+                const j = await fashCall(tool, prompt, { model: 'sonnet' });
+                if (j && j.result) { out.innerHTML = `<div style="border:1px solid var(--f-border,#2a2f2a);border-radius:10px;padding:16px 18px;background:var(--f-bg-elevated,#151815);white-space:pre-wrap;font-size:0.83rem;line-height:1.6;color:var(--f-text-primary,#e8ece8);max-height:520px;overflow:auto;">${j.result.replace(/</g, '&lt;')}</div>`; }
+                else { out.innerHTML = `<div style="color:#f87171;font-size:0.82rem;padding:14px;">${(j && j.error) || 'Failed — try again.'}</div>`; }
+            } catch (e) { out.innerHTML = `<div style="color:#f87171;font-size:0.82rem;padding:14px;">Error — try again.</div>`; }
+        };
+        function injectFashionStudio() {
+            const sec = document.getElementById('fashion-section-studio');
+            if (!sec || document.getElementById('aiadFashionStudio')) return;
+            const header = sec.querySelector('.dash-section-header');
+            if (!header) return;
+            const panel = document.createElement('div');
+            panel.id = 'aiadFashionStudio';
+            panel.className = 'dash-content-card';
+            panel.style.cssText = 'margin-bottom:24px;border:1px solid var(--f-accent-green,#5c7c5e);background:linear-gradient(135deg,var(--f-bg-surface,#101310) 0%,rgba(92,124,94,0.10) 100%);padding:22px;border-radius:10px;';
+            panel.innerHTML = `
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+                    <h3 class="text-primary" style="font-weight:600;font-size:1.15rem;margin:0;">AI Design Studio</h3>
+                    <span style="font-size:0.62rem;padding:2px 8px;background:var(--f-accent-green-soft,rgba(92,124,94,0.18));color:var(--f-accent-green,#7fae82);border-radius:3px;text-transform:uppercase;letter-spacing:0.05em;">AI</span>
+                </div>
+                <p class="text-secondary" style="font-size:0.85rem;line-height:1.5;margin:0 0 14px;">Describe a piece or collection — generate design visuals, mood boards, factory-ready tech packs, and color/material palettes. Everything you make is saved to your studio.</p>
+                <textarea id="fashStudioPrompt" placeholder="e.g. An oversized deconstructed wool overcoat, raw hems, dusty sage and charcoal, Japanese-inspired minimalism for SS26" style="width:100%;min-height:74px;background:var(--f-bg-elevated,#151815);border:1px solid var(--f-border,#2a2f2a);border-radius:8px;color:var(--f-text-primary,#e8ece8);padding:12px 14px;font-size:0.86rem;font-family:inherit;resize:vertical;outline:none;"></textarea>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;align-items:center;">
+                    <input id="fashStudioStyle" placeholder="Aesthetic (optional): editorial, streetwear…" style="flex:1;min-width:200px;background:var(--f-bg-elevated,#151815);border:1px solid var(--f-border,#2a2f2a);border-radius:8px;color:var(--f-text-primary,#e8ece8);padding:9px 12px;font-size:0.8rem;outline:none;">
+                    <select id="fashStudioModel" style="background:var(--f-bg-elevated,#151815);border:1px solid var(--f-border,#2a2f2a);border-radius:8px;color:var(--f-text-primary,#e8ece8);padding:9px 10px;font-size:0.78rem;outline:none;">
+                        <option value="nano">Standard image</option><option value="nano-pro">Pro image</option><option value="flux">Flux</option>
+                    </select>
+                </div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
+                    <button onclick="aiadFashGen('design')" style="padding:10px 16px;background:var(--f-accent-green,#5c7c5e);color:#fff;border:none;border-radius:7px;font-size:0.82rem;font-weight:600;cursor:pointer;">✦ Generate Design</button>
+                    <button onclick="aiadFashGen('moodboard')" style="padding:10px 16px;background:transparent;color:var(--f-text-secondary,#9aa39a);border:1px solid var(--f-border,#2a2f2a);border-radius:7px;font-size:0.82rem;cursor:pointer;">Mood Board</button>
+                    <button onclick="aiadFashText('techpack')" style="padding:10px 16px;background:transparent;color:var(--f-text-secondary,#9aa39a);border:1px solid var(--f-border,#2a2f2a);border-radius:7px;font-size:0.82rem;cursor:pointer;">Tech Pack</button>
+                    <button onclick="aiadFashText('palette')" style="padding:10px 16px;background:transparent;color:var(--f-text-secondary,#9aa39a);border:1px solid var(--f-border,#2a2f2a);border-radius:7px;font-size:0.82rem;cursor:pointer;">Color & Materials</button>
+                </div>
+                <div id="fashStudioOut" style="margin-top:16px;"></div>
+                <div id="fashStudioGalleryWrap" style="display:none;margin-top:22px;padding-top:16px;border-top:1px solid var(--f-border,#2a2f2a);">
+                    <h4 class="text-hint" style="font-weight:500;letter-spacing:0.1em;text-transform:uppercase;font-size:0.65rem;margin:0 0 12px;color:var(--f-text-hint,#6b756b);">Your Designs</h4>
+                    <div id="fashStudioGallery" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;"></div>
+                </div>`;
+            header.insertAdjacentElement('afterend', panel);
+            loadFashionDesigns();
+        }
+
+        // AI Trends — real trend forecast (replaces the static editorial cards).
+        window.aiadFashTrends = async function () {
+            const out = document.getElementById('fashTrendsOut'); if (!out) return;
+            out.innerHTML = `<div style="color:var(--f-text-secondary,#9aa39a);font-size:0.85rem;padding:16px;">Forecasting trends for ${fashFocus()}… ~10s.</div>`;
+            try {
+                const j = await fashCall('fashion_trends', 'Give me the trend report for my label and focus.', { model: 'sonnet' });
+                if (j && j.result) out.innerHTML = `<div style="border:1px solid var(--f-border,#2a2f2a);border-radius:10px;padding:18px 20px;background:var(--f-bg-elevated,#151815);white-space:pre-wrap;font-size:0.85rem;line-height:1.65;color:var(--f-text-primary,#e8ece8);">${j.result.replace(/</g, '&lt;')}</div>`;
+                else out.innerHTML = `<div style="color:#f87171;font-size:0.82rem;padding:14px;">${(j && j.error) || 'Failed — try again.'}</div>`;
+            } catch (e) { out.innerHTML = `<div style="color:#f87171;font-size:0.82rem;padding:14px;">Error — try again.</div>`; }
+        };
+        function injectFashionTrends() {
+            const sec = document.getElementById('fashion-section-trends');
+            if (!sec || document.getElementById('aiadFashTrendsPanel')) return;
+            const header = sec.querySelector('.dash-section-header');
+            const panel = document.createElement('div');
+            panel.id = 'aiadFashTrendsPanel';
+            panel.style.cssText = 'margin-bottom:22px;';
+            panel.innerHTML = `<div class="dash-content-card" style="border:1px solid var(--f-accent-green,#5c7c5e);background:linear-gradient(135deg,var(--f-bg-surface,#101310) 0%,rgba(92,124,94,0.10) 100%);padding:20px;border-radius:10px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+                    <div><h3 class="text-primary" style="margin:0 0 4px;font-size:1.1rem;font-weight:600;">AI Trend Forecast</h3><p class="text-secondary" style="margin:0;font-size:0.82rem;">Live, tailored to your focus and season — silhouettes, color, fabrics, and moves to make.</p></div>
+                    <button onclick="aiadFashTrends()" style="padding:10px 18px;background:var(--f-accent-green,#5c7c5e);color:#fff;border:none;border-radius:7px;font-size:0.82rem;font-weight:600;cursor:pointer;white-space:nowrap;">Generate Report</button>
+                </div>
+                <div id="fashTrendsOut" style="margin-top:16px;"></div></div>`;
+            if (header) header.insertAdjacentElement('afterend', panel); else sec.insertAdjacentElement('afterbegin', panel);
+        }
+
+        // Overview: live counts from the DB (designs made), replacing hardcoded zeros where possible.
+        async function refreshFashionOverview() {
+            const sec = document.getElementById('fashion-section-overview'); if (!sec || !sess()) return;
+            if (sec.__statsLoaded) return; sec.__statsLoaded = true;
+            const rows = await rest('fashion_designs?select=id');
+            const n = Array.isArray(rows) ? rows.length : 0;
+            let badge = document.getElementById('fashDesignCount');
+            if (!badge) {
+                const hdr = sec.querySelector('.dash-section-header');
+                if (hdr) { const b = document.createElement('div'); b.id = 'fashDesignCount'; b.style.cssText = 'font-size:0.8rem;color:var(--f-accent-green,#7fae82);margin-top:4px;'; b.textContent = n + ' AI design' + (n === 1 ? '' : 's') + ' in your studio'; hdr.appendChild(b); }
+            }
+        }
+        function wireFashionDashboardExtras() {
+            if (!document.getElementById('fashionDashboard')) return;
+            injectFashionStudio();
+            injectFashionTrends();
+            refreshFashionOverview();
+        }
+        window.aiadWireFashionExtras = wireFashionDashboardExtras;
+
         // Hard block: intercept the industry-select function so NO path (click,
         // keyboard, programmatic) can select a non-music category.
         function lockIndustrySelectFn() {
@@ -24428,10 +24573,10 @@ Be direct and concrete with real industry insight — never generic filler. When
 
         document.addEventListener('DOMContentLoaded', () => {
             lockIndustrySelectFn(); wireCollabPersistence(); wireConnectButtons();
-            setTimeout(() => { hookSettings(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); applyLiveMeta(); ensureArtistStats(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); wireConnectButtons(); wireFashionAgent(); wireAddCategory(); wsSync(); loadVerifiedNames().then(() => decorateBadges()); }, 1500);
+            setTimeout(() => { hookSettings(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); applyLiveMeta(); ensureArtistStats(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); wireConnectButtons(); wireFashionAgent(); wireAddCategory(); wireFashionDashboardExtras(); wsSync(); loadVerifiedNames().then(() => decorateBadges()); }, 1500);
         });
         // Re-decorate + (re)mount buttons/pickers as auth state / views change.
-        setInterval(() => { if (_verifiedNames) decorateBadges(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); wireConnectButtons(); wireFashionAgent(); wireAddCategory(); wsSync(); renderWsSwitcher(); }, 2500);
+        setInterval(() => { if (_verifiedNames) decorateBadges(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); wireConnectButtons(); wireFashionAgent(); wireAddCategory(); wireFashionDashboardExtras(); wsSync(); renderWsSwitcher(); }, 2500);
     })();
     </script>
 </body>
