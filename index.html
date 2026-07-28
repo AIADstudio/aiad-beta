@@ -23802,10 +23802,150 @@ Be direct and concrete with real industry insight — never generic filler. When
                 if (hdr) { const b = document.createElement('div'); b.id = 'fashDesignCount'; b.style.cssText = 'font-size:0.8rem;color:var(--f-accent-green,#7fae82);margin-top:4px;'; b.textContent = n + ' AI design' + (n === 1 ? '' : 's') + ' in your studio'; hdr.appendChild(b); }
             }
         }
+        // ── MILESTONES: real collection milestone tracker (mirrors music project milestones) ──
+        const FASH_DEFAULT_MILESTONES = [
+            { title: 'Concept Development', detail: 'Define collection theme, mood, and direction' },
+            { title: 'Design & Sketching', detail: 'Complete all look sketches and technical drawings' },
+            { title: 'Sampling', detail: 'Produce sample garments for all looks' },
+            { title: 'Lookbook Shoot', detail: 'Photography and visual content production' },
+            { title: 'Presentation', detail: 'Show or private presentation event' },
+            { title: 'Collection Drop', detail: 'Public release and sales begin' }
+        ];
+        async function loadFashionMilestones() {
+            const wrap = document.getElementById('fashMilestoneList'); if (!wrap || !sess()) return;
+            let rows = await rest('fashion_milestones?select=*&order=sort.asc,created_at.asc');
+            if (Array.isArray(rows) && rows.length === 0) {
+                const s = sess();
+                await fetch(`${SUPA}/rest/v1/fashion_milestones`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon(), 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }, body: JSON.stringify(FASH_DEFAULT_MILESTONES.map((m, i) => ({ user_id: s.user.id, title: m.title, detail: m.detail, status: i < 2 ? 'done' : 'todo', sort: i }))) });
+                rows = await rest('fashion_milestones?select=*&order=sort.asc,created_at.asc');
+            }
+            rows = Array.isArray(rows) ? rows : [];
+            const done = rows.filter(r => r.status === 'done').length;
+            const pct = rows.length ? Math.round(done / rows.length * 100) : 0;
+            const bar = document.getElementById('fashMilestoneProgress'); if (bar) bar.innerHTML = `<div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--f-text-secondary,#9aa39a);margin-bottom:6px;"><span>${done} of ${rows.length} complete</span><span>${pct}%</span></div><div style="height:5px;background:var(--f-bg-elevated,#151815);border-radius:3px;"><div style="width:${pct}%;height:100%;background:var(--f-accent-green,#5c7c5e);border-radius:3px;transition:width .3s;"></div></div>`;
+            wrap.innerHTML = rows.map(m => `<div style="display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--f-border,#2a2f2a);">
+                <div onclick="aiadToggleMilestone('${m.id}','${m.status === 'done' ? 'todo' : 'done'}')" style="width:26px;height:26px;border-radius:50%;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;${m.status === 'done' ? 'background:var(--f-accent-green,#5c7c5e);' : 'border:2px solid var(--f-border,#3a3f3a);'}">${m.status === 'done' ? '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" style="width:13px;"><polyline points="20 6 9 17 4 12"/></svg>' : ''}</div>
+                <div style="flex:1;"><div style="font-size:0.9rem;color:${m.status === 'done' ? 'var(--f-text-hint,#6b756b)' : 'var(--f-text-primary,#e8ece8)'};${m.status === 'done' ? 'text-decoration:line-through;' : ''}">${(m.title || '').replace(/</g, '&lt;')}</div>
+                ${m.detail ? `<div style="font-size:0.78rem;color:var(--f-text-secondary,#9aa39a);margin-top:2px;">${m.detail.replace(/</g, '&lt;')}</div>` : ''}
+                ${m.due_date ? `<div style="font-size:0.72rem;color:var(--f-text-hint,#6b756b);margin-top:4px;">Target: ${m.due_date}</div>` : ''}</div>
+                <span onclick="aiadDeleteMilestone('${m.id}')" style="color:#6b756b;cursor:pointer;font-size:1rem;">×</span></div>`).join('');
+        }
+        window.aiadAddMilestone = async function () {
+            const t = document.getElementById('fashMsTitle'), d = document.getElementById('fashMsDate');
+            const title = (t && t.value || '').trim(); if (!title) { (window.showToast || alert)('Milestone title required'); return; }
+            const s = sess(); if (!s) return;
+            await fetch(`${SUPA}/rest/v1/fashion_milestones`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon(), 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }, body: JSON.stringify({ user_id: s.user.id, title, due_date: (d && d.value) || null, status: 'todo', sort: 99 }) });
+            if (t) t.value = ''; if (d) d.value = '';
+            loadFashionMilestones();
+        };
+        window.aiadToggleMilestone = async function (id, status) {
+            const s = sess(); if (!s) return;
+            await fetch(`${SUPA}/rest/v1/fashion_milestones?id=eq.${id}`, { method: 'PATCH', headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon(), 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }, body: JSON.stringify({ status }) });
+            loadFashionMilestones(); refreshFashionAnalytics(true);
+        };
+        window.aiadDeleteMilestone = async function (id) {
+            const s = sess(); if (!s) return;
+            await fetch(`${SUPA}/rest/v1/fashion_milestones?id=eq.${id}`, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon() } });
+            loadFashionMilestones();
+        };
+        function injectFashionMilestones() {
+            const sec = document.getElementById('fashion-section-milestones');
+            if (!sec || document.getElementById('aiadFashMilestones')) return;
+            const header = sec.querySelector('.dash-section-header');
+            const panel = document.createElement('div');
+            panel.id = 'aiadFashMilestones';
+            panel.className = 'dash-content-card';
+            panel.style.cssText = 'padding:20px;border-radius:10px;border:1px solid var(--f-border,#2a2f2a);margin-bottom:20px;';
+            panel.innerHTML = `<div id="fashMilestoneProgress" style="margin-bottom:16px;"></div>
+                <div id="fashMilestoneList"></div>
+                <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;">
+                    <input id="fashMsTitle" placeholder="New milestone…" style="flex:1;min-width:180px;background:var(--f-bg-elevated,#151815);border:1px solid var(--f-border,#2a2f2a);border-radius:7px;color:var(--f-text-primary,#e8ece8);padding:9px 12px;font-size:0.82rem;outline:none;">
+                    <input id="fashMsDate" type="date" style="background:var(--f-bg-elevated,#151815);border:1px solid var(--f-border,#2a2f2a);border-radius:7px;color:var(--f-text-secondary,#9aa39a);padding:9px 10px;font-size:0.8rem;outline:none;">
+                    <button onclick="aiadAddMilestone()" style="padding:9px 16px;background:var(--f-accent-green,#5c7c5e);color:#fff;border:none;border-radius:7px;font-size:0.82rem;font-weight:600;cursor:pointer;">Add</button>
+                </div>`;
+            if (header) header.insertAdjacentElement('afterend', panel); else sec.insertAdjacentElement('afterbegin', panel);
+            // Hide the old static timeline card that followed the header.
+            const staticCard = panel.nextElementSibling; if (staticCard && staticCard.classList.contains('dash-content-card')) staticCard.style.display = 'none';
+            loadFashionMilestones();
+        }
+
+        // ── SUPPORTERS: post updates to supporters + live feed (mirrors music community) ──
+        async function loadFashionUpdates() {
+            const feed = document.getElementById('fashUpdatesFeed'); if (!feed || !sess()) return;
+            const s = sess();
+            const rows = await rest(`creator_updates?select=*&user_id=eq.${s.user.id}&order=created_at.desc&limit=30`);
+            if (Array.isArray(rows) && rows.length) feed.innerHTML = rows.map(u => `<div style="padding:14px 0;border-bottom:1px solid var(--f-border,#2a2f2a);">
+                <div style="font-size:0.86rem;color:var(--f-text-primary,#e8ece8);white-space:pre-wrap;">${(u.body || '').replace(/</g, '&lt;')}</div>
+                ${u.image_url ? `<img src="${u.image_url}" style="margin-top:8px;max-width:220px;border-radius:8px;">` : ''}
+                <div style="font-size:0.72rem;color:var(--f-text-hint,#6b756b);margin-top:6px;">${new Date(u.created_at).toLocaleDateString()} · <span onclick="aiadDeleteUpdate('${u.id}')" style="cursor:pointer;color:#f87171;">delete</span></div></div>`).join('');
+            else feed.innerHTML = `<div style="font-size:0.82rem;color:var(--f-text-hint,#6b756b);padding:12px 0;">No updates yet — post your first collection update above.</div>`;
+        }
+        window.aiadPostUpdate = async function () {
+            const ta = document.getElementById('fashUpdateBody'); const body = (ta && ta.value || '').trim();
+            if (!body) { (window.showToast || alert)('Write something first'); return; }
+            const s = sess(); if (!s) { (window.showToast || alert)('Sign in to post'); return; }
+            await fetch(`${SUPA}/rest/v1/creator_updates`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon(), 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }, body: JSON.stringify({ user_id: s.user.id, industry: 'fashion', body }) });
+            if (ta) ta.value = '';
+            (window.showToast || (() => {}))('Update posted to your supporters');
+            loadFashionUpdates(); refreshFashionAnalytics(true);
+        };
+        window.aiadDeleteUpdate = async function (id) {
+            const s = sess(); if (!s) return;
+            await fetch(`${SUPA}/rest/v1/creator_updates?id=eq.${id}`, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon() } });
+            loadFashionUpdates();
+        };
+        function injectFashionSupporters() {
+            const sec = document.getElementById('fashion-section-supporters');
+            if (!sec || document.getElementById('aiadFashSupporters')) return;
+            const header = sec.querySelector('.dash-section-header');
+            const panel = document.createElement('div');
+            panel.id = 'aiadFashSupporters';
+            panel.className = 'dash-content-card';
+            panel.style.cssText = 'padding:20px;border-radius:10px;border:1px solid var(--f-border,#2a2f2a);margin-bottom:20px;';
+            panel.innerHTML = `<h3 class="text-primary" style="margin:0 0 4px;font-size:1.05rem;font-weight:600;">Post an update</h3>
+                <p class="text-secondary" style="margin:0 0 12px;font-size:0.8rem;">Share collection progress, drops, and behind-the-scenes with your supporters.</p>
+                <textarea id="fashUpdateBody" placeholder="What's new in the atelier?" style="width:100%;min-height:64px;background:var(--f-bg-elevated,#151815);border:1px solid var(--f-border,#2a2f2a);border-radius:8px;color:var(--f-text-primary,#e8ece8);padding:11px 13px;font-size:0.85rem;font-family:inherit;resize:vertical;outline:none;"></textarea>
+                <div style="display:flex;justify-content:flex-end;margin-top:10px;"><button onclick="aiadPostUpdate()" style="padding:9px 18px;background:var(--f-accent-green,#5c7c5e);color:#fff;border:none;border-radius:7px;font-size:0.82rem;font-weight:600;cursor:pointer;">Post</button></div>
+                <div id="fashUpdatesFeed" style="margin-top:14px;"></div>`;
+            if (header) header.insertAdjacentElement('afterend', panel); else sec.insertAdjacentElement('afterbegin', panel);
+            loadFashionUpdates();
+        }
+
+        // ── ANALYTICS: real numbers from studio activity ──
+        async function refreshFashionAnalytics(force) {
+            const grid = document.getElementById('fashAnalyticsGrid'); if (!grid || !sess()) return;
+            if (grid.__loaded && !force) return; grid.__loaded = true;
+            const s = sess();
+            const [designs, ms, updates] = await Promise.all([
+                rest(`fashion_designs?select=kind&user_id=eq.${s.user.id}`),
+                rest(`fashion_milestones?select=status&user_id=eq.${s.user.id}`),
+                rest(`creator_updates?select=id&user_id=eq.${s.user.id}`)
+            ]);
+            const D = Array.isArray(designs) ? designs : [], M = Array.isArray(ms) ? ms : [], U = Array.isArray(updates) ? updates : [];
+            const nDesign = D.filter(d => d.kind === 'design').length, nMood = D.filter(d => d.kind === 'moodboard').length;
+            const msDone = M.filter(m => m.status === 'done').length;
+            const stat = (label, val) => `<div style="background:var(--f-bg-elevated,#151815);border:1px solid var(--f-border,#2a2f2a);border-radius:10px;padding:18px;"><div style="font-size:1.7rem;font-weight:700;color:var(--f-text-primary,#e8ece8);">${val}</div><div style="font-size:0.72rem;color:var(--f-text-secondary,#9aa39a);text-transform:uppercase;letter-spacing:0.05em;margin-top:4px;">${label}</div></div>`;
+            grid.innerHTML = stat('Designs generated', nDesign) + stat('Mood boards', nMood) + stat('Milestones done', msDone + ' / ' + M.length) + stat('Supporter updates', U.length);
+        }
+        function injectFashionAnalytics() {
+            const sec = document.getElementById('fashion-section-analytics');
+            if (!sec || document.getElementById('aiadFashAnalytics')) return;
+            const header = sec.querySelector('.dash-section-header');
+            const panel = document.createElement('div');
+            panel.id = 'aiadFashAnalytics';
+            panel.style.cssText = 'margin-bottom:20px;';
+            panel.innerHTML = `<div id="fashAnalyticsGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;"></div>`;
+            if (header) header.insertAdjacentElement('afterend', panel); else sec.insertAdjacentElement('afterbegin', panel);
+            refreshFashionAnalytics(true);
+        }
+
         function wireFashionDashboardExtras() {
             if (!document.getElementById('fashionDashboard')) return;
             injectFashionStudio();
             injectFashionTrends();
+            injectFashionMilestones();
+            injectFashionSupporters();
+            injectFashionAnalytics();
             refreshFashionOverview();
         }
         window.aiadWireFashionExtras = wireFashionDashboardExtras;
