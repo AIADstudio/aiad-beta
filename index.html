@@ -24263,6 +24263,12 @@ Be direct and concrete with real industry insight — never generic filler. When
                         const add = sessionStorage.getItem('aiad_add_category');
                         if (add && page === 'subscription-tier') {
                             sessionStorage.removeItem('aiad_add_category');
+                            const tier = sessionStorage.getItem('aiad_add_tier') || null;
+                            const price = parseInt(sessionStorage.getItem('aiad_add_price') || '0', 10);
+                            const allAccess = sessionStorage.getItem('aiad_add_allaccess') === '1';
+                            sessionStorage.removeItem('aiad_add_tier'); sessionStorage.removeItem('aiad_add_price'); sessionStorage.removeItem('aiad_add_allaccess');
+                            // Record the chosen plan/entitlement for this new industry.
+                            try { rpc('add_paid_workspace', { p_industry: add, p_role: 'creator', p_tier: tier, p_price_cents: price, p_all_access: allAccess }); } catch (e) {}
                             const fn = WS_LAUNCHERS[add];
                             if (fn && typeof window[fn] === 'function') { _wsSyncedFor = null; return window[fn](); }
                         }
@@ -24312,19 +24318,65 @@ Be direct and concrete with real industry insight — never generic filler. When
             location.reload();
         };
 
-        window.aiadAddCategory = function (ind) {
-            wsCloseMenu();
-            // Mark add-category mode so the onboarding skips the pricing step (existing subscriber).
+        // Multi-industry pricing: each added industry = its tier − 20%; All-Access = $300/mo, all industries, max credits.
+        const WS_TIER_PRICES = [['starter', 'Starter', 29], ['pro', 'Pro', 59], ['studio', 'Studio', 149]];
+        const WS_ADDON_DISCOUNT = 0.20;
+        const WS_ALL_ACCESS_PRICE = 300;
+        const wsDisc = p => Math.round(p * (1 - WS_ADDON_DISCOUNT));
+
+        window.aiadAddCategory = function (ind) { wsCloseMenu(); wsShowPricing(ind); };
+
+        async function wsShowPricing(ind) {
+            let ent = {};
+            try { ent = await rpc('my_entitlements', {}) || {}; } catch (e) {}
+            // Already on All-Access → this industry is included, skip pricing.
+            if (ent.all_access) {
+                try { sessionStorage.setItem('aiad_add_tier', 'all_access'); sessionStorage.setItem('aiad_add_price', '0'); sessionStorage.setItem('aiad_add_allaccess', '1'); } catch (e) {}
+                wsProceedAddOnboarding(ind);
+                return;
+            }
+            const label = WS_LABELS[ind] || ind;
+            const tierRows = WS_TIER_PRICES.map(([id, name, price]) => `
+                <div onclick="aiadPickAddTier('${ind}','${id}',${wsDisc(price)})" style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 16px;border:1px solid rgba(255,255,255,0.1);border-radius:12px;cursor:pointer;background:rgba(255,255,255,0.02);" onmouseover="this.style.borderColor='rgba(20,197,209,0.5)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.1)'">
+                    <div><div style="font-size:0.95rem;font-weight:600;color:#fff;">${name}</div><div style="font-size:0.72rem;color:#64748b;margin-top:2px;">for ${label}</div></div>
+                    <div style="text-align:right;"><span style="color:#64748b;text-decoration:line-through;font-size:0.82rem;">$${price}</span> <span style="color:#14c5d1;font-weight:700;font-size:1.05rem;">$${wsDisc(price)}</span><span style="color:#94a3b8;font-size:0.72rem;">/mo</span><div style="font-size:0.66rem;color:#5cc98a;margin-top:1px;">20% multi-industry discount</div></div>
+                </div>`).join('');
+            let ov = document.getElementById('aiadAddPricing');
+            if (!ov) { ov = document.createElement('div'); ov.id = 'aiadAddPricing'; document.body.appendChild(ov); }
+            ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(4,8,14,0.82);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:20px;';
+            ov.innerHTML = `
+                <div style="max-width:440px;width:100%;background:#0b1220;border:1px solid rgba(255,255,255,0.1);border-radius:18px;padding:26px 24px;box-shadow:0 24px 70px rgba(0,0,0,0.6);font-family:inherit;">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+                        <div style="font-size:1.2rem;font-weight:700;color:#fff;">Add ${label}</div>
+                        <div onclick="aiadCloseAddPricing()" style="cursor:pointer;color:#64748b;font-size:1.3rem;line-height:1;">×</div>
+                    </div>
+                    <div style="font-size:0.82rem;color:#94a3b8;margin-bottom:18px;line-height:1.5;">Add ${label} as a second workspace on your existing login — <b style="color:#5cc98a;">20% off</b> any tier because you're already a member.</div>
+                    <div style="display:flex;flex-direction:column;gap:10px;">${tierRows}</div>
+                    <div style="display:flex;align-items:center;gap:10px;margin:16px 0;"><div style="flex:1;height:1px;background:rgba(255,255,255,0.08);"></div><span style="font-size:0.7rem;color:#64748b;">OR GO ALL-IN</span><div style="flex:1;height:1px;background:rgba(255,255,255,0.08);"></div></div>
+                    <div onclick="aiadPickAllAccess('${ind}')" style="padding:16px;border:1px solid rgba(167,139,250,0.5);border-radius:14px;cursor:pointer;background:linear-gradient(135deg,rgba(167,139,250,0.12),rgba(20,197,209,0.1));" onmouseover="this.style.borderColor='#a78bfa'" onmouseout="this.style.borderColor='rgba(167,139,250,0.5)'">
+                        <div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-size:1rem;font-weight:700;color:#fff;">All-Access</div><div><span style="color:#a78bfa;font-weight:800;font-size:1.15rem;">$${WS_ALL_ACCESS_PRICE}</span><span style="color:#94a3b8;font-size:0.72rem;">/mo</span></div></div>
+                        <div style="font-size:0.75rem;color:#c4b5fd;margin-top:4px;">Unlock <b>every</b> industry + <b>max credits</b> across all of them. Best value at 3+ categories.</div>
+                    </div>
+                </div>`;
+        }
+        window.aiadCloseAddPricing = function () { const o = document.getElementById('aiadAddPricing'); if (o) o.remove(); };
+        window.aiadPickAddTier = function (ind, tier, price) {
+            try { sessionStorage.setItem('aiad_add_tier', tier); sessionStorage.setItem('aiad_add_price', String(price * 100)); sessionStorage.removeItem('aiad_add_allaccess'); } catch (e) {}
+            aiadCloseAddPricing(); wsProceedAddOnboarding(ind);
+        };
+        window.aiadPickAllAccess = function (ind) {
+            try { sessionStorage.setItem('aiad_add_tier', 'all_access'); sessionStorage.setItem('aiad_add_price', String(WS_ALL_ACCESS_PRICE * 100)); sessionStorage.setItem('aiad_add_allaccess', '1'); } catch (e) {}
+            aiadCloseAddPricing(); wsProceedAddOnboarding(ind);
+        };
+        function wsProceedAddOnboarding(ind) {
             try { sessionStorage.setItem('aiad_add_category', ind || '1'); } catch (e) {}
             wireAddCategory();
-            // Fashion has a self-contained onboarding entry point.
             if (ind === 'fashion' && typeof window.showFashionOnboarding === 'function') { window.showFashionOnboarding(); return; }
-            // Generic: restore the base layout and route into industry selection → role → onboarding.
             const fd = document.getElementById('fashionDashboard'); if (fd) { fd.style.display = 'none'; fd.classList.remove('active'); }
             ['.header', '.main', '.footer'].forEach(sel => { const el = document.querySelector(sel); if (el) el.style.display = ''; });
             if (typeof window.navigateTo === 'function') window.navigateTo('industry-selection');
             window.scrollTo(0, 0);
-        };
+        }
 
         function wsCloseMenu() { const m = document.getElementById('aiadWsMenu'); if (m) m.style.display = 'none'; }
 
