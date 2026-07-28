@@ -15743,6 +15743,22 @@ Only capture real, meaningful decisions — not questions or general discussion.
             btn.disabled = false;
 
             if (error) {
+                // Same email already has an account → this is an existing user adding a NEW category.
+                // Sign them in and drop them into the category picker to onboard the new one.
+                if (/already registered|already exists|already been registered/i.test(error.message || '')) {
+                    btn.disabled = true; btn.querySelector('span').textContent = 'Signing in…';
+                    const { data: si, error: siErr } = await db.auth.signInWithPassword({ email, password });
+                    btn.disabled = false; btn.querySelector('span').textContent = 'Create Account';
+                    if (siErr || !si?.user) {
+                        showToast('That email already has an account. Use the same password to add a new category, or sign in.');
+                        return;
+                    }
+                    AppState.currentUser = si.user;
+                    try { localStorage.removeItem('aiad_pending_profile'); } catch (e) {}
+                    showToast('Welcome back — pick the category you want to add.');
+                    navigateTo('industry-selection');
+                    return;
+                }
                 showToast('Error: ' + error.message);
                 return;
             }
@@ -24220,12 +24236,119 @@ Be direct and concrete with real industry insight — never generic filler. When
                 window.showArtistView.__pricingHooked = true;
             }
         }
+        // ══════════════ MULTI-CATEGORY: one login, separate profile per category ══════════════
+        // A signed-in user can operate in several categories (music, fashion, …). Each is its own
+        // workspace/profile in user_workspaces; a switcher moves between them and "Add a category"
+        // runs that category's full onboarding. profiles.industry tracks the active one so login
+        // resumes where they left off.
+        const WS_LABELS = { music:'Music', fashion:'Fashion', streaming:'Streaming', visual_arts:'Visual Arts', writing_publishing:'Writing & Publishing', film_media:'Film & Media', games:'Games', multi:'Multi-Discipline' };
+        const WS_UNLOCKED = ['music','fashion'];
+        let _wsSyncedFor = null, _wsList = null;
+
+        function wsIndustry() { return (window.AppState && AppState.userIndustry) || localStorage.getItem('aiad_user_industry') || null; }
+        function wsRole() { return (window.AppState && AppState.userRole) || localStorage.getItem('aiad_user_role') || null; }
+        function wsOnboardingVisible() { return [...document.querySelectorAll('[id^="page-"]')].some(el => el.offsetParent !== null); }
+        function wsInDashboard() {
+            if (!sess()) return false;
+            if (wsOnboardingVisible()) return false;
+            const fd = document.getElementById('fashionDashboard');
+            if (fd && (fd.classList.contains('active') || fd.style.display === '')) return true;
+            // Music/other dashboards hide the marketing header.
+            const hdr = document.querySelector('.header');
+            return !!(hdr && hdr.style.display === 'none');
+        }
+
+        // Record the category the user is actively in as a workspace, and mark it active
+        // (once per category per page load). This is what makes both profiles persist server-side.
+        async function wsSync() {
+            if (!wsInDashboard()) return;
+            const ind = wsIndustry(); if (!ind) return;
+            if (_wsSyncedFor === ind) return;
+            _wsSyncedFor = ind;
+            try {
+                await rpc('ensure_workspace', { p_industry: ind, p_role: wsRole() });
+                await rpc('set_active_industry', { p_industry: ind });
+                _wsList = null; // force refresh
+            } catch (e) {}
+            renderWsSwitcher();
+        }
+
+        async function wsFetch() {
+            if (_wsList) return _wsList;
+            try { const r = await rpc('my_workspaces', {}); _wsList = Array.isArray(r) ? r : (r ? [r] : []); }
+            catch (e) { _wsList = []; }
+            return _wsList;
+        }
+
+        window.aiadSwitchCategory = async function (ind) {
+            if (ind === wsIndustry()) { wsCloseMenu(); return; }
+            try { await rpc('set_active_industry', { p_industry: ind }); } catch (e) {}
+            localStorage.setItem('aiad_user_industry', ind);
+            localStorage.setItem('aiad_last_dashboard', ind);
+            location.reload();
+        };
+
+        window.aiadAddCategory = function (ind) {
+            wsCloseMenu();
+            // Fashion has a self-contained onboarding entry point.
+            if (ind === 'fashion' && typeof window.showFashionOnboarding === 'function') { window.showFashionOnboarding(); return; }
+            // Generic: restore the base layout and route into industry selection → role → onboarding.
+            try { sessionStorage.setItem('aiad_add_category', ind || '1'); } catch (e) {}
+            const fd = document.getElementById('fashionDashboard'); if (fd) { fd.style.display = 'none'; fd.classList.remove('active'); }
+            ['.header', '.main', '.footer'].forEach(sel => { const el = document.querySelector(sel); if (el) el.style.display = ''; });
+            if (typeof window.navigateTo === 'function') window.navigateTo('industry-selection');
+            window.scrollTo(0, 0);
+        };
+
+        function wsCloseMenu() { const m = document.getElementById('aiadWsMenu'); if (m) m.style.display = 'none'; }
+
+        async function renderWsSwitcher() {
+            let bar = document.getElementById('aiadWsSwitcher');
+            if (!wsInDashboard()) { if (bar) bar.style.display = 'none'; return; }
+            const list = await wsFetch();
+            const cur = wsIndustry();
+            const have = new Set((list || []).map(w => w.industry));
+            have.add(cur);
+            const addable = WS_UNLOCKED.filter(i => !have.has(i));
+
+            if (!bar) {
+                bar = document.createElement('div');
+                bar.id = 'aiadWsSwitcher';
+                bar.style.cssText = 'position:fixed;left:18px;bottom:18px;z-index:99990;font-family:inherit;';
+                document.body.appendChild(bar);
+            }
+            bar.style.display = '';
+            const items = (list || []).map(w => {
+                const active = w.industry === cur;
+                return `<div onclick="aiadSwitchCategory('${w.industry}')" style="display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;border-radius:8px;${active?'background:rgba(20,197,209,0.12);':''}" onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background='${active?'rgba(20,197,209,0.12)':'transparent'}'">
+                    <span style="width:7px;height:7px;border-radius:50%;background:${active?'#14c5d1':'rgba(255,255,255,0.25)'};"></span>
+                    <span style="font-size:0.82rem;color:${active?'#e8fbff':'#cbd5e1'};font-weight:${active?'600':'400'};">${WS_LABELS[w.industry]||w.industry}</span>
+                    ${active?'<span style="margin-left:auto;font-size:0.62rem;color:#14c5d1;">active</span>':''}
+                </div>`;
+            }).join('');
+            const addItems = addable.map(i => `<div onclick="aiadAddCategory('${i}')" style="display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;border-radius:8px;color:#94a3b8;" onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background='transparent'">
+                    <span style="font-size:0.95rem;line-height:1;color:#14c5d1;">＋</span>
+                    <span style="font-size:0.82rem;">Add ${WS_LABELS[i]||i}</span></div>`).join('');
+            bar.innerHTML = `
+                <div id="aiadWsMenu" style="display:none;margin-bottom:8px;min-width:210px;background:#0d1420;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:6px;box-shadow:0 12px 40px rgba(0,0,0,0.55);">
+                    <div style="padding:7px 12px 4px;font-size:0.62rem;letter-spacing:0.08em;text-transform:uppercase;color:#64748b;">Your categories</div>
+                    ${items}
+                    ${addItems ? '<div style="height:1px;background:rgba(255,255,255,0.07);margin:5px 8px;"></div>'+addItems : ''}
+                </div>
+                <div onclick="(function(){var m=document.getElementById('aiadWsMenu');m.style.display=m.style.display==='none'?'block':'none';})()" style="display:inline-flex;align-items:center;gap:9px;padding:9px 14px;background:#0d1420;border:1px solid rgba(255,255,255,0.12);border-radius:999px;cursor:pointer;box-shadow:0 6px 22px rgba(0,0,0,0.4);">
+                    <span style="width:8px;height:8px;border-radius:50%;background:#14c5d1;"></span>
+                    <span style="font-size:0.8rem;color:#e2e8f0;font-weight:600;">${WS_LABELS[cur]||cur||'Category'}</span>
+                    <span style="font-size:0.7rem;color:#64748b;">▾</span>
+                </div>`;
+        }
+        window.aiadRenderWsSwitcher = renderWsSwitcher;
+
         document.addEventListener('DOMContentLoaded', () => {
             lockIndustrySelectFn(); wireCollabPersistence(); wireConnectButtons();
-            setTimeout(() => { hookSettings(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); applyLiveMeta(); ensureArtistStats(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); wireConnectButtons(); wireFashionAgent(); loadVerifiedNames().then(() => decorateBadges()); }, 1500);
+            setTimeout(() => { hookSettings(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); applyLiveMeta(); ensureArtistStats(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); wireConnectButtons(); wireFashionAgent(); wsSync(); loadVerifiedNames().then(() => decorateBadges()); }, 1500);
         });
         // Re-decorate + (re)mount buttons/pickers as auth state / views change.
-        setInterval(() => { if (_verifiedNames) decorateBadges(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); wireConnectButtons(); wireFashionAgent(); }, 2500);
+        setInterval(() => { if (_verifiedNames) decorateBadges(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); wireConnectButtons(); wireFashionAgent(); wsSync(); renderWsSwitcher(); }, 2500);
     })();
     </script>
 </body>
