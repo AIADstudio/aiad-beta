@@ -23464,8 +23464,9 @@ function toggleAgeRange(btn) {
 
         // ── Music-first launch: disable non-music industry options at sign-up ──
         function lockNonMusicIndustries() {
+            const UNLOCKED = { music: 1, fashion: 1 };
             document.querySelectorAll('.card--industry[data-value]').forEach(card => {
-                if (card.dataset.value === 'music' || card.__aiadLocked) return;
+                if (UNLOCKED[card.dataset.value] || card.__aiadLocked) return;
                 card.__aiadLocked = true;
                 card.style.opacity = '0.38';
                 card.style.filter = 'grayscale(1)';
@@ -23566,6 +23567,83 @@ function toggleAgeRange(btn) {
         }
         window.aiadWireConnectButtons = wireConnectButtons;
 
+        // ══════════════ FASHION: real "Atelier" AI advisor ══════════════
+        const FASHION_SYS = `You are AIAD's fashion-industry advisor — a seasoned strategist who combines a creative director, a production/sourcing manager, a wholesale buyer, and a fashion PR/marketing lead in one. You advise independent fashion designers and emerging brands across the ENTIRE fashion business, end to end. You give specific, concrete, current-industry advice on:
+- DESIGN & CREATIVE: collection concept and cohesion, silhouette and range planning, colour stories, moodboards, seasonal direction, and building a signature aesthetic.
+- FABRIC & MATERIALS: choosing the right fabrics/textiles for a look and price point, weights and blends, trims and hardware, deadstock vs new, MOQs, and where/how to source them.
+- SUPPLIERS & PRODUCTION: finding and vetting manufacturers and mills, sampling pace, tech packs, grading, QC, lead times, costing/BOM, small-batch vs factory, domestic vs overseas.
+- TREND & MARKET: reading trend signals and forecasting, what's commercial vs runway, positioning against comparable brands, and timing.
+- SALES & WHOLESALE: pricing (cost → wholesale → RRP, keystone/markup), linesheets, buyer appointments, trade shows, finding and approaching stockists, terms, and DTC/e-commerce strategy.
+- PR & MARKETING: press and editorial outreach, product placement and celebrity/stylist dressing, influencer seeding, campaign and lookbook shoots (casting, location, budget, deliverables), social and content strategy, and launch/drop cadence.
+- BUSINESS: cash flow for a fashion cycle, inventory risk, fashion week vs independent presentation, sustainability/compliance, and scaling.
+
+Be direct and concrete with real industry insight — never generic filler. When useful, give names of the type of vendor/partner to look for, realistic numbers/ranges, and the exact next step. Keep it tight and lead with the answer.`;
+        let _fashionChatHistory = [];
+        window.askFashionAgent = function (question) { openFashionChat(question); };
+        function openFashionChat(initialQ) {
+            let ov = document.getElementById('aiadFashionChat');
+            if (!ov) {
+                ov = document.createElement('div');
+                ov.id = 'aiadFashionChat';
+                ov.style.cssText = 'position:fixed;inset:0;background:rgba(3,5,12,0.85);backdrop-filter:blur(6px);z-index:100002;display:flex;align-items:center;justify-content:center;padding:18px;';
+                ov.innerHTML = `<div style="background:#0d0f17;border:1px solid rgba(255,255,255,0.1);border-radius:16px;max-width:560px;width:100%;height:80vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.6);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.08);"><div style="display:flex;align-items:center;gap:8px;"><span style="width:8px;height:8px;border-radius:50%;background:#5C7C5E;"></span><h3 style="margin:0;color:#fff;font-size:1.05rem;letter-spacing:0.05em;">AIAD Atelier</h3></div><button onclick="document.getElementById('aiadFashionChat').style.display='none'" style="background:none;border:none;color:#94a3b8;font-size:1.5rem;cursor:pointer;line-height:1;">×</button></div>
+                    <div id="aiadFashionMsgs" style="flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:12px;"></div>
+                    <div style="padding:14px 18px;border-top:1px solid rgba(255,255,255,0.08);display:flex;gap:8px;">
+                        <input id="aiadFashionInput" placeholder="Strategy, positioning, industry insight..." style="flex:1;background:#12141d;border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:10px 12px;color:#fff;font-size:0.86rem;" onkeydown="if(event.key==='Enter')window.aiadFashionSend()">
+                        <button onclick="window.aiadFashionSend()" style="background:#5C7C5E;color:#fff;border:none;border-radius:8px;padding:10px 16px;font-weight:600;font-size:0.84rem;cursor:pointer;">Send</button>
+                    </div></div>`;
+                document.body.appendChild(ov);
+            }
+            ov.style.display = 'flex';
+            const input = document.getElementById('aiadFashionInput');
+            if (initialQ && input) { input.value = initialQ; window.aiadFashionSend(); }
+            else if (input) input.focus();
+        }
+        window.aiadFashionSend = async function () {
+            const input = document.getElementById('aiadFashionInput'); const msgs = document.getElementById('aiadFashionMsgs');
+            if (!input || !msgs) return;
+            const q = input.value.trim(); if (!q) return;
+            input.value = '';
+            msgs.insertAdjacentHTML('beforeend', `<div style="align-self:flex-end;max-width:85%;background:rgba(92,124,94,0.18);border:1px solid rgba(92,124,94,0.35);border-radius:12px;padding:9px 12px;color:#fff;font-size:0.85rem;">${q.replace(/</g, '&lt;')}</div>`);
+            const loadId = 'fl' + Date.now();
+            msgs.insertAdjacentHTML('beforeend', `<div id="${loadId}" style="align-self:flex-start;color:#94a3b8;font-size:0.82rem;">Atelier is thinking…</div>`);
+            msgs.scrollTop = msgs.scrollHeight;
+            _fashionChatHistory.push({ role: 'user', content: q });
+            try {
+                const s = sess();
+                const r = await fetch(`${SUPA}/functions/v1/ai-agent`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + (s ? s.access_token : anon()), 'apikey': anon(), 'Content-Type': 'application/json' }, body: JSON.stringify({ message: q, conversationHistory: _fashionChatHistory.slice(0, -1), systemContext: FASHION_SYS }) });
+                const j = await r.json();
+                const ans = j.answer || j.error || 'Something went wrong.';
+                _fashionChatHistory.push({ role: 'assistant', content: ans });
+                const l = document.getElementById(loadId); if (l) l.remove();
+                msgs.insertAdjacentHTML('beforeend', `<div style="align-self:flex-start;max-width:88%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:10px 13px;color:#e2e8f0;font-size:0.85rem;line-height:1.55;white-space:pre-wrap;">${ans.replace(/</g, '&lt;')}</div>`);
+                msgs.scrollTop = msgs.scrollHeight;
+            } catch (e) { const l = document.getElementById(loadId); if (l) l.remove(); msgs.insertAdjacentHTML('beforeend', `<div style="color:#f87171;font-size:0.82rem;">Error — try again.</div>`); }
+        };
+        function wireFashionAgent() {
+            const inp = document.querySelector('input.agent-input[placeholder*="positioning"]');
+            if (inp && !inp.__wired) {
+                inp.__wired = true;
+                const btn = inp.parentElement && inp.parentElement.querySelector('.agent-send-btn');
+                const go = () => { const v = inp.value.trim(); if (v) { inp.value = ''; window.askFashionAgent(v); } };
+                if (btn) btn.addEventListener('click', go);
+                inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+            }
+            // Make the fashion share-link actually copy something real.
+            if (!window.generateShareLink || !window.generateShareLink.__aiad) {
+                const link = 'https://aiad.studio/look/' + Math.random().toString(36).slice(2, 10);
+                window.generateShareLink = function () {
+                    try { if (window.closeModal) closeModal(); } catch (e) {}
+                    try { navigator.clipboard.writeText(link); } catch (e) {}
+                    try { if (typeof addFabraFileCard === 'function') { window.fabraFileCount = (window.fabraFileCount || 0) + 1; addFabraFileCard('share-' + Date.now(), link, 'share-link', 'Just now'); } } catch (e) {}
+                    (window.showToast || (() => {}))('Share link copied to clipboard ✓');
+                };
+                window.generateShareLink.__aiad = true;
+            }
+        }
+        window.aiadWireFashion = wireFashionAgent;
+
         // Hard block: intercept the industry-select function so NO path (click,
         // keyboard, programmatic) can select a non-music category.
         function lockIndustrySelectFn() {
@@ -23573,7 +23651,7 @@ function toggleAgeRange(btn) {
                 const orig = window.selectIndustryCard;
                 window.selectIndustryCard = function (card) {
                     const v = (card && card.dataset) ? card.dataset.value : null;
-                    if (v && v !== 'music') { (window.showToast || (() => {}))('Music-only for now — more industries coming soon'); return; }
+                    if (v && v !== 'music' && v !== 'fashion') { (window.showToast || (() => {}))('This industry is coming soon'); return; }
                     return orig.apply(this, arguments);
                 };
                 window.selectIndustryCard.__musicLocked = true;
@@ -23582,7 +23660,7 @@ function toggleAgeRange(btn) {
             if (typeof window.selectIndustry === 'function' && !window.selectIndustry.__musicLocked) {
                 const origI = window.selectIndustry;
                 window.selectIndustry = function (v) {
-                    if (v && v !== 'music') { (window.showToast || (() => {}))('Music-only for now — more industries coming soon'); return; }
+                    if (v && v !== 'music' && v !== 'fashion') { (window.showToast || (() => {}))('This industry is coming soon'); return; }
                     return origI.apply(this, arguments);
                 };
                 window.selectIndustry.__musicLocked = true;
@@ -24144,10 +24222,10 @@ function toggleAgeRange(btn) {
         }
         document.addEventListener('DOMContentLoaded', () => {
             lockIndustrySelectFn(); wireCollabPersistence(); wireConnectButtons();
-            setTimeout(() => { hookSettings(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); applyLiveMeta(); ensureArtistStats(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); wireConnectButtons(); loadVerifiedNames().then(() => decorateBadges()); }, 1500);
+            setTimeout(() => { hookSettings(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); applyLiveMeta(); ensureArtistStats(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); wireConnectButtons(); wireFashionAgent(); loadVerifiedNames().then(() => decorateBadges()); }, 1500);
         });
         // Re-decorate + (re)mount buttons/pickers as auth state / views change.
-        setInterval(() => { if (_verifiedNames) decorateBadges(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); wireConnectButtons(); }, 2500);
+        setInterval(() => { if (_verifiedNames) decorateBadges(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); wireConnectButtons(); wireFashionAgent(); }, 2500);
     })();
     </script>
 </body>
