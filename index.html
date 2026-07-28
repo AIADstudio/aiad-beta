@@ -23540,6 +23540,125 @@ function toggleAgeRange(btn) {
         }
         window.aiadLockIndustrySelectFn = lockIndustrySelectFn;
 
+        // ══════════════ SYNC LICENSING MARKETPLACE (artist ↔ supervisor) ══════════════
+        let _syncCatalog = [];
+        function _syncCard(t, forSupervisor) {
+            const uses = Array.isArray(t.use_cases) ? t.use_cases.join(', ') : '';
+            const meta = [t.genre, t.mood, t.bpm ? t.bpm + ' BPM' : ''].filter(Boolean).join(' · ');
+            const actions = forSupervisor
+                ? `<button onclick="aiadSaveSync('${t.id}',this)" style="padding:7px 12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:#cbd5e1;font-size:0.72rem;cursor:pointer;">Save</button>
+                   <button onclick="aiadLicenseSync('${t.id}',${JSON.stringify(t.title||'')},${t.price||0},this)" style="padding:7px 14px;background:var(--teal,#14c5d1);border:none;border-radius:8px;color:#000;font-size:0.72rem;font-weight:700;cursor:pointer;">License</button>`
+                : `<span style="padding:4px 10px;background:rgba(20,197,209,0.1);border:1px solid rgba(20,197,209,0.2);border-radius:4px;font-size:0.65rem;color:var(--teal,#14c5d1);">Listed</span>`;
+            return `<div style="display:flex;align-items:center;gap:14px;padding:14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:10px;">
+                <div style="flex:1;min-width:0;"><div style="font-size:0.9rem;font-weight:600;color:var(--text-primary);">${(t.title||'').replace(/</g,'&lt;')}</div>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;">${forSupervisor ? ((t.artist_name||'Artist') + (meta?' · '+meta:'')) : meta}</div>
+                ${uses?`<div style="font-size:0.68rem;color:var(--text-hint,#64748b);margin-top:2px;">${uses.replace(/</g,'&lt;')}</div>`:''}</div>
+                <div style="font-size:0.9rem;font-weight:700;color:var(--teal,#14c5d1);">$${t.price||''}</div>${actions}</div>`;
+        }
+        window.handleSyncSubmit = async function () {
+            const g = (id) => (document.getElementById(id) && document.getElementById(id).value || '').trim();
+            const title = g('syncTrackTitle'), price = g('syncTrackPrice'), genre = g('syncTrackGenre'), mood = g('syncTrackMood'), bpm = g('syncTrackBpm');
+            if (!title || !price) { (window.showToast || alert)('Track title and price are required'); return; }
+            const s = sess(); if (!s) { (window.showToast || alert)('Please sign in'); return; }
+            const useCases = Array.from(document.querySelectorAll('#syncUseCases .style-tag-chip.selected')).map(el => el.textContent.trim());
+            const artistName = (window.AppState && AppState.artistProfile && AppState.artistProfile.artistName) || (s.user.user_metadata && s.user.user_metadata.username) || 'Artist';
+            try {
+                await fetch(`${SUPA}/rest/v1/sync_listings`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon(), 'Content-Type': 'application/json' }, body: JSON.stringify({ artist_id: s.user.id, artist_name: artistName, title, price: parseFloat(price) || null, genre, mood, bpm, use_cases: useCases }) });
+                (window.showToast || alert)(`"${title}" listed in the Sync Library`);
+                ['syncTrackTitle', 'syncTrackPrice', 'syncTrackBpm'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+                loadMyListings();
+            } catch (e) { (window.showToast || alert)('Could not list track — try again'); }
+        };
+        async function loadMyListings() {
+            const s = sess(); const list = document.getElementById('syncListedTracks'); if (!s || !list) return;
+            const rows = await rest(`sync_listings?select=*&artist_id=eq.${s.user.id}&order=created_at.desc`);
+            if (Array.isArray(rows) && rows.length) list.innerHTML = rows.map(t => _syncCard(t, false)).join('');
+        }
+        async function loadSyncCatalog() {
+            const el = document.getElementById('syncCatalogList'); if (!el) return;
+            const rows = await rest('sync_listings?select=*&order=created_at.desc&limit=200');
+            _syncCatalog = Array.isArray(rows) ? rows : [];
+            if (_syncCatalog.length) el.innerHTML = _syncCatalog.map(t => _syncCard(t, true)).join('');
+        }
+        window.filterSyncCatalog = function () {
+            const mood = (document.getElementById('filterMood') && document.getElementById('filterMood').value || '').toLowerCase();
+            const genre = (document.getElementById('filterGenre') && document.getElementById('filterGenre').value || '').toLowerCase();
+            const use = (document.getElementById('filterUse') && document.getElementById('filterUse').value || '').toLowerCase();
+            const el = document.getElementById('syncCatalogList'); if (!el) return;
+            const filtered = _syncCatalog.filter(t =>
+                (!mood || (t.mood || '').toLowerCase() === mood) &&
+                (!genre || (t.genre || '').toLowerCase() === genre) &&
+                (!use || (Array.isArray(t.use_cases) && t.use_cases.some(u => (u || '').toLowerCase() === use))));
+            el.innerHTML = filtered.length ? filtered.map(t => _syncCard(t, true)).join('') : '<div style="text-align:center;padding:50px 20px;color:var(--text-muted);font-size:0.85rem;">No tracks match your filters</div>';
+        };
+        window.aiadSaveSync = async function (id, btn) {
+            const s = sess(); if (!s) return;
+            await fetch(`${SUPA}/rest/v1/sync_saves`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon(), 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' }, body: JSON.stringify({ supervisor_id: s.user.id, listing_id: id }) }).catch(() => {});
+            btn.textContent = 'Saved ✓'; btn.disabled = true;
+        };
+        window.aiadLicenseSync = async function (id, title, price, btn) {
+            const s = sess(); if (!s) return;
+            const project = prompt('What project is this license for? (optional)') || null;
+            if (btn) { btn.disabled = true; btn.textContent = 'Licensing…'; }
+            const supName = (s.user.user_metadata && (s.user.user_metadata.full_name || s.user.user_metadata.username)) || 'Supervisor';
+            await fetch(`${SUPA}/rest/v1/sync_licenses`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon(), 'Content-Type': 'application/json' }, body: JSON.stringify({ listing_id: id, supervisor_id: s.user.id, supervisor_name: supName, title, price: price || null, project, status: 'requested' }) }).catch(() => {});
+            if (btn) { btn.textContent = 'Requested ✓'; btn.style.background = '#22c55e'; }
+            (window.showToast || alert)(`License requested for "${title}" — the artist has been notified.`);
+        };
+        window.handleLicenseTrack = function (trackId, title, price) { window.aiadLicenseSync(trackId, title, price, null); };
+        async function loadSupervisorLicenses() {
+            const s = sess(); const view = document.getElementById('supervisorLicensesView'); if (!s || !view || view.__loaded) return;
+            const rows = await rest(`sync_licenses?select=*&supervisor_id=eq.${s.user.id}&order=created_at.desc`);
+            if (!Array.isArray(rows) || !rows.length) return;
+            view.__loaded = true;
+            const box = view.querySelector('div'); if (!box) return;
+            box.innerHTML = `<h1 style="font-size:1.3rem;font-weight:700;color:var(--text-primary);margin-bottom:6px;">My Licenses</h1>
+                <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:20px;">Tracks you've licensed through AIAD</p>
+                <div style="display:flex;flex-direction:column;gap:8px;">${rows.map(r => `<div style="display:flex;align-items:center;gap:14px;padding:14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:10px;"><div style="flex:1;"><div style="font-size:0.9rem;font-weight:600;color:var(--text-primary);">${(r.title||'Track').replace(/</g,'&lt;')}</div><div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;">${r.project?r.project+' · ':''}${new Date(r.created_at).toLocaleDateString()}</div></div><div style="font-size:0.85rem;font-weight:700;color:var(--teal,#14c5d1);">$${r.price||''}</div><span style="padding:4px 10px;background:rgba(167,139,250,0.12);border:1px solid rgba(167,139,250,0.25);border-radius:4px;font-size:0.65rem;color:#a78bfa;text-transform:capitalize;">${r.status||'requested'}</span></div>`).join('')}</div>`;
+        }
+        function wireSyncMarketplace() {
+            const cat = document.getElementById('syncCatalogList');
+            if (cat && cat.offsetParent !== null && !cat.__lastLoad) { cat.__lastLoad = Date.now(); loadSyncCatalog(); }
+            const my = document.getElementById('syncListedTracks');
+            if (my && my.offsetParent !== null && !my.__lastLoad) { my.__lastLoad = Date.now(); loadMyListings(); }
+            const lic = document.getElementById('supervisorLicensesView');
+            if (lic && lic.offsetParent !== null) loadSupervisorLicenses();
+        }
+        window.aiadWireSync = wireSyncMarketplace;
+
+        // ── Collaborator persistence: save profile edits + availability to the DB ──
+        function wireCollabPersistence() {
+            if (!window.__collabWrapped && typeof window.saveCollabProfileEdit === 'function') {
+                const orig = window.saveCollabProfileEdit;
+                window.saveCollabProfileEdit = function () {
+                    const name = (document.getElementById('settingsDisplayNameInput') || {}).value;
+                    const loc = (document.getElementById('settingsCollabLocationInput') || {}).value;
+                    const r = orig.apply(this, arguments);
+                    try {
+                        const s = sess();
+                        if (s) {
+                            const patch = {};
+                            if (name && name.trim()) patch.full_name = name.trim();
+                            if (loc && loc.trim()) patch.location = loc.trim();
+                            if (Object.keys(patch).length) rest(`profiles?id=eq.${s.user.id}`, { method: 'PATCH', headers: { 'Prefer': 'return=minimal' }, body: JSON.stringify(patch) });
+                        }
+                    } catch (e) {}
+                    return r;
+                };
+                window.__collabWrapped = true;
+            }
+            if (!window.__collabStatusWrapped && typeof window.setCollabStatus === 'function') {
+                const origS = window.setCollabStatus;
+                window.setCollabStatus = function (status) {
+                    const r = origS.apply(this, arguments);
+                    try { const s = sess(); if (s && status) rest(`profiles?id=eq.${s.user.id}`, { method: 'PATCH', headers: { 'Prefer': 'return=minimal' }, body: JSON.stringify({ collab_status: status }) }); } catch (e) {}
+                    return r;
+                };
+                window.__collabStatusWrapped = true;
+            }
+        }
+        window.aiadWireCollab = wireCollabPersistence;
+
         // Minimal, safe markdown → HTML (headings, bold, lists, breaks).
         function mdToHtml(md) {
             if (!md) return '';
@@ -23974,11 +24093,11 @@ function toggleAgeRange(btn) {
             }
         }
         document.addEventListener('DOMContentLoaded', () => {
-            lockIndustrySelectFn();
-            setTimeout(() => { hookSettings(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); applyLiveMeta(); ensureArtistStats(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); loadVerifiedNames().then(() => decorateBadges()); }, 1500);
+            lockIndustrySelectFn(); wireCollabPersistence();
+            setTimeout(() => { hookSettings(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); applyLiveMeta(); ensureArtistStats(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); loadVerifiedNames().then(() => decorateBadges()); }, 1500);
         });
         // Re-decorate + (re)mount buttons/pickers as auth state / views change.
-        setInterval(() => { if (_verifiedNames) decorateBadges(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); }, 2500);
+        setInterval(() => { if (_verifiedNames) decorateBadges(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); }, 2500);
     })();
     </script>
 </body>
