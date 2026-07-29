@@ -19211,7 +19211,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     body: JSON.stringify({ message: msg, context: 'You are AIAD Agent helping an industry collaborator (' + roles + '). Give concise, practical advice for music industry professionals.', userId: AppState.currentUser?.id || 'anon' })
                 });
                 const data = await response.json();
-                const reply = data.response || data.message || 'I can help with that. Could you provide more details?';
+                const reply = data.answer || data.response || data.message || data.reply || 'I can help with that. Could you provide more details?';
                 const el = document.getElementById(typingId);
                 if (el) el.innerHTML = '<div style="display:inline-block;max-width:90%;padding:10px 14px;background:var(--bg-card);border:1px solid var(--border-default);border-radius:12px 12px 12px 4px;font-size:0.82rem;line-height:1.5;color:var(--text-secondary);">' + reply.replace(/\n/g, '<br>') + '</div>';
             } catch(e) {
