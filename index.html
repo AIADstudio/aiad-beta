@@ -24778,5 +24778,42 @@ Be direct and concrete with real industry insight — never generic filler. When
   } catch (e) {}
 })();
 </script>
+<script>
+/* AIAD credit fix — sync the studio credit counter to the real DB balance so paid artists
+   are not capped at the free-tier 20. Also registers the artist_* plan names. */
+(function(){
+  var SU='https://uapiytquwuhtewqieegx.supabase.co';
+  var ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhcGl5dHF1d3VodGV3cWllZWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NzcwMTksImV4cCI6MjA4OTI1MzAxOX0.BLs2RdStghm0_cF8t70cBTX1GWcowGRwID7TAG8Mg38';
+  function sess(){
+    try{ if(typeof getSession==='function'){ var s=getSession(); if(s&&s.access_token&&s.user) return s; } }catch(e){}
+    try{ var raw=JSON.parse(localStorage.getItem('sb-uapiytquwuhtewqieegx-auth-token')); var c=raw&&(raw.currentSession||raw); if(c&&c.access_token&&c.user) return c; }catch(e){}
+    return null;
+  }
+  async function sync(){
+    try{
+      var s=sess(); if(!s) return;
+      var r=await fetch(SU+'/rest/v1/ai_credits?select=balance,allowance&user_id=eq.'+s.user.id,{headers:{apikey:ANON,Authorization:'Bearer '+s.access_token}});
+      if(!r.ok) return; var rows=await r.json(); var row=rows&&rows[0]; if(!row) return;
+      var unlimited=row.allowance>=999999;
+      if(window.AppState){
+        AppState.aiCreditsMax = unlimited?Infinity:row.allowance;
+        AppState.aiCreditsRemaining = unlimited?Infinity:row.balance;
+      }
+      try{ localStorage.setItem('aiad_ai_credits', unlimited?'999999':String(row.balance)); }catch(e){}
+      try{ if(typeof updateAICreditsDisplay==='function') updateAICreditsDisplay(); }catch(e){}
+      try{ if(typeof updateCreditsDisplay==='function') updateCreditsDisplay(unlimited?999999:row.balance); }catch(e){}
+    }catch(e){}
+  }
+  try{ if(typeof SubscriptionTiers!=='undefined'){
+    SubscriptionTiers.artist_starter = SubscriptionTiers.artist_starter || SubscriptionTiers.starter;
+    SubscriptionTiers.artist_pro     = SubscriptionTiers.artist_pro     || SubscriptionTiers.pro;
+    SubscriptionTiers.artist_premier = SubscriptionTiers.artist_premier || Object.assign({}, SubscriptionTiers.pro, {aiCredits: Infinity});
+  }}catch(e){}
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', sync); else sync();
+  setInterval(sync, 4000);
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden) sync(); });
+})();
+</script>
 </body>
+
 </html>
