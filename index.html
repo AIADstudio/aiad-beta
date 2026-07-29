@@ -24838,6 +24838,46 @@ Be direct and concrete with real industry insight — never generic filler. When
   document.addEventListener('visibilitychange', function(){ if(!document.hidden) sync(); });
 })();
 </script>
+<script>
+/* AIAD onboarding zip capture — additive & guarded; adds an optional ZIP/Postal field
+   next to onboarding location inputs and saves it to profiles.signup_zip after signup.
+   Never blocks or alters the existing onboarding flow. */
+(function(){
+  var SU='https://uapiytquwuhtewqieegx.supabase.co';
+  var ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhcGl5dHF1d3VodGV3cWllZWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NzcwMTksImV4cCI6MjA4OTI1MzAxOX0.BLs2RdStghm0_cF8t70cBTX1GWcowGRwID7TAG8Mg38';
+  var LOC_IDS=['obLocation','collabLocation','fanLocation','srLocation','fanArtistLocation'];
+  function ensureZip(){
+    try{
+      LOC_IDS.forEach(function(id){
+        var loc=document.getElementById(id);
+        if(loc && !document.getElementById(id+'Zip')){
+          var zip=document.createElement('input');
+          zip.id=id+'Zip'; zip.placeholder='ZIP / Postal code (optional)';
+          zip.setAttribute('autocomplete','postal-code'); zip.setAttribute('inputmode','text');
+          try{ zip.style.cssText=loc.style.cssText; }catch(e){}
+          zip.addEventListener('input',function(){ var v=(zip.value||'').trim(); if(v) window.__aiadZip=v; });
+          if(loc.parentNode) loc.parentNode.insertBefore(zip, loc.nextSibling);
+        }
+      });
+    }catch(e){}
+  }
+  function sess(){
+    try{ if(typeof getSession==='function'){ var s=getSession(); if(s&&s.access_token&&s.user) return s; } }catch(e){}
+    try{ var raw=JSON.parse(localStorage.getItem('sb-uapiytquwuhtewqieegx-auth-token')); var c=raw&&(raw.currentSession||raw); if(c&&c.access_token&&c.user) return c; }catch(e){}
+    return null;
+  }
+  async function saveZip(){
+    try{
+      if(!window.__aiadZip) return;
+      var s=sess(); if(!s) return;
+      await fetch(SU+'/rest/v1/profiles?id=eq.'+s.user.id,{method:'PATCH',headers:{apikey:ANON,Authorization:'Bearer '+s.access_token,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({signup_zip:window.__aiadZip})});
+      window.__aiadZip=null;
+    }catch(e){}
+  }
+  setInterval(function(){ ensureZip(); saveZip(); }, 1500);
+})();
+</script>
 </body>
+
 
 </html>
