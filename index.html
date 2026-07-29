@@ -24900,7 +24900,83 @@ Be direct and concrete with real industry insight — never generic filler. When
   setInterval(paint, 1500);
 })();
 </script>
+<script>
+/* AIAD library upload + sync-list — additive & guarded. Artists upload their own songs into
+   the library and optionally list them in the Sync Library for music supervisors. */
+(function(){
+  var SU='https://uapiytquwuhtewqieegx.supabase.co';
+  var ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhcGl5dHF1d3VodGV3cWllZWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NzcwMTksImV4cCI6MjA4OTI1MzAxOX0.BLs2RdStghm0_cF8t70cBTX1GWcowGRwID7TAG8Mg38';
+  function sess(){
+    try{ if(typeof getSession==='function'){ var s=getSession(); if(s&&s.access_token&&s.user) return s; } }catch(e){}
+    try{ var r=JSON.parse(localStorage.getItem('sb-uapiytquwuhtewqieegx-auth-token')); var c=r&&(r.currentSession||r); if(c&&c.access_token&&c.user) return c; }catch(e){}
+    return null;
+  }
+  function jh(tok){ return { apikey:ANON, Authorization:'Bearer '+tok, 'Content-Type':'application/json' }; }
+  function openModal(){
+    var s=sess(); if(!s){ alert('Sign in to upload your music.'); return; }
+    if(document.getElementById('aiadUpModal')) return;
+    var ov=document.createElement('div'); ov.id='aiadUpModal';
+    ov.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:20px';
+    var inp='width:100%;background:#0f0f0f;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:10px 12px;color:#fff;margin-bottom:10px;font-size:.9rem';
+    ov.innerHTML='<div style="background:#141414;border:1px solid rgba(255,255,255,.1);border-radius:16px;max-width:440px;width:100%;padding:22px;color:#fff;font-family:Inter,-apple-system,sans-serif">'
+      +'<div style="font-weight:700;font-size:1.1rem;margin-bottom:14px">Upload a track</div>'
+      +'<input id="aiadUpFile" type="file" accept="audio/*" style="width:100%;margin-bottom:12px;color:#ccc;font-size:.82rem"/>'
+      +'<input id="aiadUpTitle" placeholder="Track title" style="'+inp+'"/>'
+      +'<input id="aiadUpGenre" placeholder="Genre (optional)" style="'+inp+'"/>'
+      +'<label style="display:flex;gap:8px;align-items:center;font-size:.85rem;margin-bottom:8px;color:#cfcfcf"><input id="aiadUpPublic" type="checkbox" checked/> Public — visible to everyone (off = private, only you)</label>'
+      +'<label style="display:flex;gap:8px;align-items:center;font-size:.85rem;margin-bottom:16px;color:#cfcfcf"><input id="aiadUpSync" type="checkbox"/> Also list in the Sync Library (for music supervisors)</label>'
+      +'<div style="display:flex;gap:10px;justify-content:flex-end"><button id="aiadUpCancel" type="button" style="background:transparent;border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer">Cancel</button>'
+      +'<button id="aiadUpGo" type="button" style="background:linear-gradient(135deg,#00D4FF,#0077B6);color:#001018;font-weight:700;border:none;border-radius:999px;padding:8px 18px;cursor:pointer">Upload</button></div>'
+      +'<div id="aiadUpMsg" style="font-size:.8rem;color:#9aa;margin-top:10px"></div></div>';
+    document.body.appendChild(ov);
+    ov.addEventListener('click',function(e){ if(e.target===ov) ov.remove(); });
+    document.getElementById('aiadUpCancel').onclick=function(){ ov.remove(); };
+    document.getElementById('aiadUpGo').onclick=doUpload;
+  }
+  async function doUpload(){
+    var msg=document.getElementById('aiadUpMsg');
+    try{
+      var s=sess(); if(!s){ msg.textContent='Sign in first.'; return; }
+      var f=document.getElementById('aiadUpFile').files[0];
+      if(!f){ msg.textContent='Choose an audio file.'; return; }
+      var title=(document.getElementById('aiadUpTitle').value||f.name.replace(/\.[^.]+$/,'')||'Untitled').trim();
+      var genre=(document.getElementById('aiadUpGenre').value||'').trim();
+      var isPublic=document.getElementById('aiadUpPublic').checked;
+      var toSync=document.getElementById('aiadUpSync').checked;
+      msg.textContent='Uploading audio…';
+      var ext=((f.name.split('.').pop())||'mp3').toLowerCase();
+      var path='tracks/'+s.user.id+'/'+Date.now()+'.'+ext;
+      var up=await fetch(SU+'/storage/v1/object/artist-media/'+path,{method:'POST',headers:{apikey:ANON,Authorization:'Bearer '+s.access_token,'Content-Type':(f.type||'audio/mpeg'),'x-upsert':'false'},body:f});
+      if(!up.ok){ msg.textContent='Upload failed ('+up.status+').'; return; }
+      var url=SU+'/storage/v1/object/public/artist-media/'+path;
+      msg.textContent='Saving to your library…';
+      var tr=await fetch(SU+'/rest/v1/tracks',{method:'POST',headers:Object.assign(jh(s.access_token),{Prefer:'return=minimal'}),body:JSON.stringify({user_id:s.user.id,title:title,url:url,genre:(genre||null),is_public:isPublic})});
+      if(!tr.ok){ msg.textContent='Could not save track ('+tr.status+').'; return; }
+      if(toSync){
+        var name=null; try{ name=(window.AppState&&AppState.artistProfile&&(AppState.artistProfile.artist_name||AppState.artistProfile.full_name))||null; }catch(e){}
+        await fetch(SU+'/rest/v1/sync_listings',{method:'POST',headers:Object.assign(jh(s.access_token),{Prefer:'return=minimal'}),body:JSON.stringify({artist_id:s.user.id,artist_name:name,title:title,genre:(genre||null),audio_url:url})});
+      }
+      msg.textContent='Done!'+(toSync?' Listed in Sync Library.':'');
+      setTimeout(function(){ try{ var m=document.getElementById('aiadUpModal'); if(m)m.remove(); if(typeof loadTracks==='function'){ loadTracks(); } else { location.reload(); } }catch(e){ location.reload(); } }, 800);
+    }catch(e){ msg.textContent='Error: '+e.message; }
+  }
+  function ensureBtn(){
+    try{
+      var lib=document.getElementById('musicLibraryList');
+      if(lib && lib.parentNode && !document.getElementById('aiadUploadBtn')){
+        var b=document.createElement('button'); b.id='aiadUploadBtn'; b.type='button';
+        b.textContent='⬆ Upload your music';
+        b.style.cssText='display:block;width:100%;margin:0 0 14px;background:linear-gradient(135deg,#00D4FF,#0077B6);color:#001018;font-weight:700;border:none;border-radius:10px;padding:12px;cursor:pointer;font-size:.9rem';
+        b.onclick=openModal;
+        lib.parentNode.insertBefore(b, lib);
+      }
+    }catch(e){}
+  }
+  setInterval(ensureBtn, 1500);
+})();
+</script>
 </body>
+
 
 
 </html>
