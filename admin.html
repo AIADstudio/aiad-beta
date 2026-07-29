@@ -12,7 +12,7 @@
     <script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/js/jsvectormap.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/maps/world.js"></script>
     <style>
-      :root{--teal:#00D4FF;--mag:#FF3DFF;--bg:#0A0A0A;--card:#141414;--bd:rgba(255,255,255,0.08);--tx:#fff;--mut:rgba(255,255,255,0.55);}
+      :root{--teal:#00D4FF;--mag:#FF3DFF;--bg:#0A0A0A;--card:#141414;--bd:rgba(255,255,255,0.08);--tx:#fff;--mut:rgba(255,255,255,0.55);--artist:#FF3DFF;--collab:#FFB020;--fan:#4D8BFF;}
       *{box-sizing:border-box;margin:0;padding:0}
       body{background:var(--bg);color:var(--tx);font-family:Inter,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
       .wrap{max-width:1280px;margin:0 auto;padding:26px 20px 90px}
@@ -54,6 +54,21 @@
       .pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;background:rgba(255,255,255,0.08);text-transform:capitalize}
       .pill.artist{background:rgba(0,212,255,0.15);color:#7fe6ff}.pill.fan{background:rgba(255,102,255,0.15);color:#ff9dff}.pill.collaborator{background:rgba(124,252,140,0.14);color:#a9f7b5}
       .chk{color:var(--teal)}.scroll{max-height:56vh;overflow:auto}
+      /* pending onboarding */
+      .porow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.05)}
+      .porow:last-child{border-bottom:none}
+      .poname{flex:1;min-width:0}
+      .poname .n{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .poname .e{font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .podays{font-size:12px;font-weight:700;white-space:nowrap}
+      /* world map role dots */
+      #worldmap{height:440px}
+      .maplegend{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;font-size:12px;color:var(--mut)}
+      .maplegend b{display:inline-flex;align-items:center;gap:6px;font-weight:600;color:#ddd}
+      .ldot{width:10px;height:10px;border-radius:50%;display:inline-block}
+      .jvm-marker circle{transform-box:fill-box;transform-origin:center}
+      @keyframes aiadPulse{0%{opacity:.9;transform:scale(.55)}70%{opacity:0;transform:scale(2.4)}100%{opacity:0;transform:scale(2.4)}}
+      .aiad-ping{transform-box:fill-box;transform-origin:center;animation:aiadPulse 1.8s ease-out infinite}
     </style>
 </head>
 <body>
@@ -74,6 +89,7 @@
       const ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhcGl5dHF1d3VodGV3cWllZWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NzcwMTksImV4cCI6MjA4OTI1MzAxOX0.BLs2RdStghm0_cF8t70cBTX1GWcowGRwID7TAG8Mg38';
       let DATA=null; const CHARTS=[];
       const PAL=['#00D4FF','#7A5CFF','#FF3DFF','#00E39A','#FFB020','#FF5C7A','#4D8BFF','#B980FF'];
+      const ROLECOL={artist:'#FF3DFF',collaborator:'#FFB020',fan:'#4D8BFF'};
       const esc=(s)=>s==null?'':String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
       // Share + auto-refresh the app's login session so an expired token self-renews.
       const SB=window.supabase.createClient(API,ANON,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:'sb-'+REF+'-auth-token'}});
@@ -111,7 +127,6 @@
           const d=await r.json();
           if(!r.ok||!d||d.message){ gate((d&&d.message)||'Could not load analytics.'); return; }
           DATA=d; render(d);
-          try{ const ru=await fetch(API+'/rest/v1/rpc/admin_usage',{method:'POST',headers:{apikey:ANON,Authorization:'Bearer '+t,'Content-Type':'application/json'},body:'{}'}); if(ru.ok){ const du=await ru.json(); if(du&&!du.message) renderUsage(du); } }catch(e){}
         }catch(e){ gate('Error: '+e.message); }
       }
 
@@ -138,6 +153,25 @@
         const max=entries[0][1],min=entries[entries.length-1][1];
         return '<div class="cloud">'+entries.map(([k,v],i)=>{const sz=14+Math.round((v-min)/((max-min)||1)*26);const col=PAL[i%PAL.length];return '<span style="font-size:'+sz+'px;color:'+col+';font-weight:'+(500+Math.round((v-min)/((max-min)||1)*300))+'" title="'+esc(k)+': '+v+'">'+esc(k)+'</span>';}).join('')+'</div>';
       }
+      // Pending onboarding — people who signed up but never finished setup.
+      function pendingPanel(list){
+        list=list||[];
+        var head='<h2>Pending onboarding'+(list.length?' ('+list.length+')':'')+'</h2>';
+        if(!list.length) return '<div class="panel">'+head+'<div class="muted" style="font-size:13px">Everyone who signed up finished onboarding. Nothing stuck. 🎉</div></div>';
+        var rows=list.map(function(u){
+          var days=u.days||0;
+          var urg=days>=7?'#FF5C7A':days>=3?'#FFB020':'#7fe6ff';
+          var who=esc(u.name||u.email||'Someone');
+          var meta=esc((u.email||'')+(u.country?' · '+u.country:''));
+          var subj=encodeURIComponent('Finish setting up your AIAD profile');
+          var bodyt=encodeURIComponent('Hi '+((u.name||'there'))+",\n\nYou signed up for AIAD but haven't finished setting up your profile yet — it only takes a minute to pick your role and you're in.\n\nJump back in: https://www.aiad.studio\n\n— The AIAD team");
+          var mailto=u.email?('mailto:'+encodeURIComponent(u.email)+'?subject='+subj+'&body='+bodyt):'#';
+          return '<div class="porow"><div class="poname"><div class="n">'+who+'</div><div class="e">'+meta+'</div></div>'+
+                 '<span class="podays" style="color:'+urg+'">'+days+'d</span>'+
+                 '<a class="btn" style="padding:6px 12px;font-size:12px" href="'+mailto+'">Nudge</a></div>';
+        }).join('');
+        return '<div class="panel">'+head+'<div style="max-height:340px;overflow:auto">'+rows+'</div></div>';
+      }
 
       function render(d){
         CHARTS.forEach(c=>{try{c.destroy()}catch(e){}}); CHARTS.length=0;
@@ -145,104 +179,144 @@
         document.getElementById('csvBtn').style.display='inline-block';
         const t=d.totals||{}, roles=t.by_role||{}, cr=d.credits||{};
         const kpi=(l,v,s)=>'<div class="kpi"><div class="l">'+l+'</div><div class="v">'+v+'</div>'+(s?'<div class="s">'+s+'</div>':'')+'</div>';
-        const cards=kpi('Total users',t.users||0,(d.signups_today||0)+' today')+kpi('Artists',roles.artist||0)+kpi('Fans',roles.fan||0)+kpi('Collaborators',roles.collaborator||0)+kpi('Verified',t.verified||0)+kpi('Founding',t.founding||0)+kpi('Paying',t.paid||0,'$'+(t.mrr||0)+'/mo')+kpi('Signups 7d',d.signups_7d||0,(d.signups_30d||0)+' in 30d')+kpi('Posts',t.posts||0)+kpi('Tracks',t.tracks||0)+kpi('Avg credits',cr.avg_balance||0,(cr.unlimited||0)+' unlimited');
+        const cards=kpi('Total users',t.users||0,(d.signups_today||0)+' today')+kpi('Artists',roles.artist||0)+kpi('Fans',roles.fan||0)+kpi('Collaborators',roles.collaborator||0)+kpi('Verified',t.verified||0)+kpi('Founding',t.founding||0)+kpi('Paying',t.paid||0,'$'+(t.mrr||0)+'/mo')+kpi('Signups 7d',d.signups_7d||0,(d.signups_30d||0)+' in 30d')+kpi('Posts',t.posts||0)+kpi('Tracks',t.tracks||0)+kpi('Avg credits',cr.avg_balance||0,(cr.unlimited||0)+' unlimited')+kpi('Pending setup',(d.pending_onboarding||[]).length,'not onboarded');
 
         const users=d.users||[];
         const lastSeen=parseInt(localStorage.getItem('aiad_admin_lastseen')||'0',10);
         const newCount=users.filter(u=>new Date(u.created_at).getTime()>lastSeen).length;
         const banner=newCount>0?'<div style="background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:14px">🆕 <b>'+newCount+' new signup'+(newCount>1?'s':'')+'</b> since your last visit — highlighted below.</div>':'';
-        const rows=users.map(u=>{var isNew=new Date(u.created_at).getTime()>lastSeen; return '<tr data-s="'+esc(((u.name||'')+' '+(u.email||'')+' '+(u.username||'')+' '+(u.location||'')+' '+(u.genre||'')).toLowerCase())+'"'+(isNew?' style="background:rgba(0,212,255,0.07)"':'')+'>'+
+        const rows=users.map(u=>{var isNew=new Date(u.created_at).getTime()>lastSeen; return '<tr data-s="'+esc(((u.name||'')+' '+(u.email||'')+' '+(u.username||'')+' '+(u.location||'')+' '+(u.city||'')+' '+(u.country||'')+' '+(u.genre||'')).toLowerCase())+'"'+(isNew?' style="background:rgba(0,212,255,0.07)"':'')+'>'+
           '<td>'+esc(u.name||'—')+(u.founding_number?' <span class="muted">#'+u.founding_number+'</span>':'')+'</td>'+
           '<td class="email">'+esc(u.email||'')+'</td><td>'+(u.username?'@'+esc(u.username):'')+'</td>'+
           '<td><span class="pill '+esc(u.role||'')+'">'+esc(u.role||'—')+'</span></td>'+
-          '<td>'+esc(u.genre||u.industry||'—')+'</td><td>'+esc(u.location||'—')+'</td><td>'+esc(u.plan||'free')+'</td>'+
+          '<td>'+esc(u.genre||u.industry||'—')+'</td><td>'+esc([u.city,u.country].filter(Boolean).join(', ')||u.location||'—')+'</td><td>'+esc(u.plan||'free')+'</td>'+
           '<td>'+(u.verified?'<span class="chk">✓</span>':'')+'</td><td class="muted">'+fmtDate(u.created_at)+'</td></tr>';}).join('');
 
         document.getElementById('root').innerHTML=
           banner+
           '<div class="cards">'+cards+'</div>'+
-          '<div id="usageSection"></div>'+
           '<div class="grid g3">'+
             '<div class="panel"><h2>Signups · last 30 days</h2><div class="chartbox"><canvas id="cSign"></canvas></div></div>'+
             '<div class="panel"><h2>By role</h2><div class="chartbox"><canvas id="cRole"></canvas></div></div>'+
             '<div class="panel"><h2>By plan</h2><div class="chartbox"><canvas id="cPlan"></canvas></div></div>'+
           '</div>'+
-          '<div class="panel" style="margin-bottom:16px"><h2>Where signups are coming from</h2><div id="worldmap" style="height:400px"></div></div>'+
+          '<div class="panel" style="margin-bottom:16px"><h2>Live activity map — where your community is</h2>'+
+            '<div class="maplegend"><b><span class="ldot" style="background:'+ROLECOL.artist+'"></span>Artists</b><b><span class="ldot" style="background:'+ROLECOL.collaborator+'"></span>Collaborators</b><b><span class="ldot" style="background:'+ROLECOL.fan+'"></span>Fans</b><span style="margin-left:auto">'+users.length+' located</span></div>'+
+            '<div id="worldmap"></div></div>'+
           '<div class="grid g3">'+
             '<div class="panel"><h2>Conversion funnel</h2>'+funnel(d.funnel)+'</div>'+
             '<div class="panel"><h2>Posts by type</h2><div class="chartbox"><canvas id="cPost"></canvas></div></div>'+
             '<div class="panel"><h2>Genre & interest map</h2>'+cloud(d.by_genre)+'</div>'+
           '</div>'+
           '<div class="grid g2">'+
-            '<div class="panel"><h2>Where they\'re from</h2>'+cloud(Object.keys(d.by_country||{}).length?d.by_country:d.by_location)+'</div>'+
+            pendingPanel(d.pending_onboarding)+
             '<div class="panel"><h2>Quick stats</h2><div style="font-size:13.5px;line-height:2;color:var(--mut)">'+
               'Verified rate: <b style="color:#fff">'+Math.round((t.verified||0)/((t.users||1))*100)+'%</b><br>'+
               'Paid conversion: <b style="color:#fff">'+Math.round((d.funnel&&d.funnel.paid||0)/((t.users||1))*100)+'%</b><br>'+
               'Have posted: <b style="color:#fff">'+(d.funnel&&d.funnel.posted||0)+' of '+(t.users||0)+'</b><br>'+
+              'Onboarded: <b style="color:#fff">'+(d.funnel&&d.funnel.onboarded||0)+' of '+(t.users||0)+'</b><br>'+
               'Founding slots used: <b style="color:#fff">'+(t.founding||0)+' / 100</b><br>'+
               'Total credits in circulation: <b style="color:#fff">'+(cr.total_balance||0)+'</b>'+
             '</div></div>'+
           '</div>'+
+          '<div class="grid g2">'+
+            '<div class="panel"><h2>Where they\'re from</h2>'+cloud(Object.keys(d.by_country||{}).length?d.by_country:d.by_location)+'</div>'+
+            '<div class="panel"><h2>Top cities</h2>'+cloud(cityCounts(users))+'</div>'+
+          '</div>'+
           '<div class="tablewrap"><div class="tablehead"><h2>All signups ('+users.length+')</h2>'+
-            '<input class="search" id="q" placeholder="Search name, email, location, genre…" oninput="filter()"/></div>'+
+            '<input class="search" id="q" placeholder="Search name, email, city, genre…" oninput="filter()"/></div>'+
             '<div class="scroll"><table><thead><tr><th>Name</th><th>Email</th><th>Username</th><th>Role</th><th>Genre</th><th>Location</th><th>Plan</th><th>Verified</th><th>Joined</th></tr></thead><tbody id="tb">'+rows+'</tbody></table></div></div>';
 
         line('cSign',d.signups_by_day);
         donut('cRole',roles);
         donut('cPlan',d.by_plan);
         donut('cPost',d.posts_by_type);
-        setTimeout(function(){ worldMap(d.by_country_code); }, 80);
+        setTimeout(function(){ worldMap(d); }, 80);
         localStorage.setItem('aiad_admin_lastseen', String(Date.now()));
       }
-      function renderUsage(du){
-        const el=document.getElementById('usageSection'); if(!el) return;
-        const T=du.totals||{}, arts=du.artists||[], tools=du.tools||[];
-        const groups={}; arts.forEach(a=>{ (groups[a.cohort_week]=groups[a.cohort_week]||[]).push(a); });
-        const weeks=Object.keys(groups).sort().reverse();
-        let tbl='';
-        weeks.forEach(w=>{
-          tbl+='<div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin:14px 0 6px">Signed up week of '+esc(w)+'</div>';
-          tbl+='<table><thead><tr><th>Artist</th><th>Minutes</th><th>Sessions</th><th>Active days</th><th>Last seen</th><th>Status</th></tr></thead><tbody>';
-          groups[w].sort((a,b)=>(+b.est_minutes||0)-(+a.est_minutes||0)).forEach(a=>{
-            const m=+a.est_minutes||0;
-            const st=m>0?'<span class="pill artist">active</span>':'<span class="pill">no activity yet</span>';
-            tbl+='<tr><td>'+esc(a.name||a.email)+'<br><span class="muted" style="font-size:11px">'+esc(a.email)+'</span></td>'+
-              '<td>'+m+'</td><td>'+(+a.sessions||0)+'</td><td>'+(+a.active_days||0)+'</td>'+
-              '<td class="muted">'+(a.last_seen?esc(a.last_seen):'—')+'</td><td>'+st+'</td></tr>';
-          });
-          tbl+='</tbody></table>';
-        });
-        let toolsHtml;
-        if(!tools.length){ toolsHtml='<span class="muted" style="font-size:13px">No tool activity yet — fills in as artists move through the app.</span>'; }
-        else{ toolsHtml='<table><thead><tr><th>Tool / area</th><th>Events</th><th>Artists</th><th>Sessions</th><th>Last used</th></tr></thead><tbody>'+
-            tools.map(t=>'<tr><td>'+esc(t.tool)+'</td><td>'+(+t.events||0)+'</td><td>'+(+t.users||0)+'</td><td>'+(+t.sessions||0)+'</td><td class="muted">'+(t.last_used?esc(t.last_used):'—')+'</td></tr>').join('')+'</tbody></table>';
+
+      function cityCounts(users){ var o={}; (users||[]).forEach(function(u){ var c=[u.city,u.country].filter(Boolean).join(', '); if(c) o[c]=(o[c]||0)+1; }); return o; }
+
+      // Compact gazetteer: city -> [lat,lng]. Unknown cities fall back to country centroid.
+      var CITY={
+        'london':[51.5,-0.12],'manchester':[53.48,-2.24],'birmingham':[52.48,-1.9],'glasgow':[55.86,-4.25],'dublin':[53.35,-6.26],
+        'new york':[40.71,-74.0],'brooklyn':[40.68,-73.94],'los angeles':[34.05,-118.24],'san francisco':[37.77,-122.42],'chicago':[41.88,-87.63],
+        'atlanta':[33.75,-84.39],'miami':[25.76,-80.19],'houston':[29.76,-95.37],'dallas':[32.78,-96.8],'austin':[30.27,-97.74],
+        'seattle':[47.61,-122.33],'boston':[42.36,-71.06],'washington':[38.9,-77.04],'nashville':[36.16,-86.78],'detroit':[42.33,-83.05],
+        'toronto':[43.65,-79.38],'vancouver':[49.28,-123.12],'montreal':[45.5,-73.57],'mexico city':[19.43,-99.13],
+        'paris':[48.85,2.35],'berlin':[52.52,13.4],'amsterdam':[52.37,4.9],'madrid':[40.42,-3.7],'barcelona':[41.39,2.17],
+        'lisbon':[38.72,-9.14],'rome':[41.9,12.5],'milan':[45.46,9.19],'stockholm':[59.33,18.06],'copenhagen':[55.68,12.57],
+        'oslo':[59.91,10.75],'berlin ':[52.52,13.4],'vienna':[48.21,16.37],'zurich':[47.37,8.54],'warsaw':[52.23,21.01],
+        'lagos':[6.52,3.38],'accra':[5.6,-0.19],'nairobi':[-1.29,36.82],'johannesburg':[-26.2,28.05],'cape town':[-33.92,18.42],
+        'cairo':[30.04,31.24],'casablanca':[33.57,-7.59],'kingston':[17.97,-76.79],'lagos ':[6.52,3.38],
+        'sao paulo':[-23.55,-46.63],'rio de janeiro':[-22.91,-43.17],'buenos aires':[-34.6,-58.38],'bogota':[4.71,-74.07],'lima':[-12.05,-77.04],
+        'tokyo':[35.68,139.69],'seoul':[37.57,126.98],'beijing':[39.9,116.4],'shanghai':[31.23,121.47],'hong kong':[22.32,114.17],
+        'singapore':[1.35,103.82],'bangkok':[13.76,100.5],'jakarta':[-6.21,106.85],'manila':[14.6,120.98],'mumbai':[19.08,72.88],
+        'delhi':[28.61,77.21],'bangalore':[12.97,77.59],'dubai':[25.2,55.27],'tel aviv':[32.09,34.78],'istanbul':[41.01,28.98],
+        'sydney':[-33.87,151.21],'melbourne':[-37.81,144.96],'auckland':[-36.85,174.76],'perth':[-31.95,115.86]
+      };
+      // Country centroids (ISO-2) as fallback.
+      var CC={'US':[39.8,-98.6],'GB':[54,-2],'CA':[56.1,-106.3],'AU':[-25.3,133.8],'NZ':[-41,174],'IE':[53.4,-8],'FR':[46.6,2.2],'DE':[51.2,10.4],'ES':[40.2,-3.7],'PT':[39.4,-8.2],'IT':[41.9,12.6],'NL':[52.1,5.3],'SE':[60.1,18.6],'NO':[60.5,8.5],'DK':[56,10],'CH':[46.8,8.2],'AT':[47.6,14.6],'PL':[51.9,19.1],'NG':[9.1,8.7],'GH':[7.9,-1],'KE':[0.02,37.9],'ZA':[-30.6,22.9],'EG':[26.8,30.8],'MA':[31.8,-7.1],'BR':[-14.2,-51.9],'AR':[-38.4,-63.6],'CO':[4.6,-74.3],'PE':[-9.2,-75],'MX':[23.6,-102.5],'JP':[36.2,138.3],'KR':[35.9,127.8],'CN':[35.9,104.2],'HK':[22.3,114.2],'SG':[1.35,103.8],'TH':[15.9,100.99],'ID':[-0.8,113.9],'PH':[12.9,121.8],'IN':[20.6,79],'AE':[23.4,53.8],'IL':[31,34.9],'TR':[39,35.2],'JM':[18.1,-77.3]};
+      function coordsFor(city,country,cc){
+        if(city){ var k=String(city).trim().toLowerCase(); if(CITY[k]) return CITY[k].slice(); }
+        var code=(cc||'').toUpperCase();
+        if(code && CC[code]) return CC[code].slice();
+        if(country && String(country).trim().length===2 && CC[String(country).trim().toUpperCase()]) return CC[String(country).trim().toUpperCase()].slice();
+        if(country){ var nm=String(country).trim(); // country name -> code best-effort
+          var NAME={'united states':'US','usa':'US','united kingdom':'GB','uk':'GB','england':'GB','canada':'CA','australia':'AU','new zealand':'NZ','ireland':'IE','france':'FR','germany':'DE','spain':'ES','portugal':'PT','italy':'IT','netherlands':'NL','sweden':'SE','norway':'NO','denmark':'DK','switzerland':'CH','austria':'AT','poland':'PL','nigeria':'NG','ghana':'GH','kenya':'KE','south africa':'ZA','egypt':'EG','morocco':'MA','brazil':'BR','argentina':'AR','colombia':'CO','peru':'PE','mexico':'MX','japan':'JP','south korea':'KR','china':'CN','hong kong':'HK','singapore':'SG','thailand':'TH','indonesia':'ID','philippines':'PH','india':'IN','uae':'AE','united arab emirates':'AE','israel':'IL','turkey':'TR','jamaica':'JM'};
+          var code2=NAME[nm.toLowerCase()]; if(code2&&CC[code2]) return CC[code2].slice();
         }
-        const kpi=(l,v)=>'<div class="kpi"><div class="l">'+l+'</div><div class="v">'+v+'</div></div>';
-        el.innerHTML=
-          '<div class="panel" style="margin-bottom:16px"><h2>Artist Usage · time on platform</h2>'+
-            '<div class="cards" style="margin-bottom:16px">'+kpi('Active artists',(T.active||0)+' / '+(T.artists||0))+kpi('Total minutes',T.total_minutes||0)+kpi('Total sessions',T.total_sessions||0)+'</div>'+
-            '<div class="chartbox" style="height:200px"><canvas id="cUsage"></canvas></div>'+
-          '</div>'+
-          '<div class="grid g2">'+
-            '<div class="panel"><h2>Per artist</h2><div class="scroll" style="max-height:46vh">'+(tbl||'<span class="muted">No artists yet.</span>')+'</div></div>'+
-            '<div class="panel"><h2>Tool leaderboard</h2>'+toolsHtml+'</div>'+
-          '</div>';
-        const rows=arts.slice().sort((a,b)=>(+b.est_minutes||0)-(+a.est_minutes||0));
-        const el2=document.getElementById('cUsage');
-        if(el2&&window.Chart){ CHARTS.push(new Chart(el2,{type:'bar',data:{labels:rows.map(a=>a.name||(a.email||'').split('@')[0]),datasets:[{data:rows.map(a=>+a.est_minutes||0),backgroundColor:'#FF3DFF',borderRadius:4,maxBarThickness:40}]},options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y+' min'}}},scales:{x:{ticks:{color:'#888',font:{size:10}},grid:{display:false}},y:{beginAtZero:true,ticks:{color:'#888',precision:0,font:{size:10}},grid:{color:'rgba(255,255,255,0.05)'}}}}})); }
+        return null;
       }
-      function worldMap(codes){
+      function jitter(c,i){ if(!c) return c; var a=(i%12)*0.5236; var r=0.6+((i%5)*0.25); return [c[0]+Math.sin(a)*r, c[1]+Math.cos(a)*r]; }
+
+      function worldMap(d){
         var el=document.getElementById('worldmap'); if(!el||!window.jsVectorMap) return;
         try{ if(window._wm){ window._wm.destroy(); window._wm=null; } }catch(e){}
         el.innerHTML='';
-        var vals={}; Object.keys(codes||{}).forEach(function(k){ vals[String(k).toUpperCase()]=codes[k]; });
+        var users=(d&&d.users)||[];
+        // build role-colored markers, jittering co-located points so they don't overlap
+        var seen={}; var markers=[]; var colors=[];
+        users.forEach(function(u,i){
+          var c=coordsFor(u.city,u.country,u.country_code);
+          if(!c) return;
+          var key=c[0].toFixed(2)+','+c[1].toFixed(2);
+          seen[key]=(seen[key]||0); c=jitter(c,seen[key]); seen[key]++;
+          var role=(u.role||'fan').toLowerCase();
+          markers.push({name:(u.name||u.email||'Member')+' · '+role+(u.city?' · '+u.city:''),coords:c});
+          colors.push(ROLECOL[role]||'#00D4FF');
+        });
+        var codes=d&&d.by_country_code||{}; var vals={}; Object.keys(codes).forEach(function(k){ vals[String(k).toUpperCase()]=codes[k]; });
         try{
           window._wm=new jsVectorMap({
             selector:'#worldmap', map:'world', backgroundColor:'transparent', zoomOnScroll:false, zoomButtons:true,
-            regionStyle:{initial:{fill:'#242424',stroke:'#0A0A0A','stroke-width':0.4},hover:{fill:'#00D4FF'}},
-            series:{regions:[{attribute:'fill',scale:['#183640','#00D4FF'],normalizeFunction:'polynomial',values:vals}]}
+            regionStyle:{initial:{fill:'#1c1c1c',stroke:'#0A0A0A','stroke-width':0.4},hover:{fill:'#2a2a2a'}},
+            series:{regions:[{attribute:'fill',scale:['#141b1f','#173a44'],normalizeFunction:'polynomial',values:vals}]},
+            markers:markers,
+            markerStyle:{initial:{r:5,fill:'#00D4FF','fill-opacity':0.95,stroke:'#0A0A0A','stroke-width':1},hover:{r:7}},
+            onMarkerTooltipShow:function(ev,tip,idx){ tip.text(markers[idx].name); }
           });
+          // color each marker by role + add a pulsing ring behind it
+          setTimeout(function(){ styleMarkers(el,colors); },60);
         }catch(e){ el.innerHTML='<div class="muted" style="padding:20px">Map unavailable.</div>'; }
+      }
+      function styleMarkers(el,colors){
+        try{
+          var circles=el.querySelectorAll('.jvm-marker');
+          circles.forEach(function(circ,i){
+            var col=colors[i]||'#00D4FF';
+            circ.setAttribute('fill',col);
+            circ.style.fill=col;
+            // clone as a pulsing ring behind the solid dot
+            var ping=circ.cloneNode(true);
+            ping.removeAttribute('class'); ping.setAttribute('fill','none');
+            ping.setAttribute('stroke',col); ping.setAttribute('stroke-width','2');
+            ping.setAttribute('r', circ.getAttribute('r')||'5');
+            ping.classList.add('aiad-ping');
+            ping.style.animationDelay=((i%9)*0.2)+'s';
+            circ.parentNode.insertBefore(ping,circ);
+          });
+        }catch(e){}
       }
 
       window.filter=function(){ const q=(document.getElementById('q').value||'').toLowerCase(); document.querySelectorAll('#tb tr').forEach(tr=>{tr.style.display=tr.dataset.s.includes(q)?'':'none';}); };
