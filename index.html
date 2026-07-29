@@ -16913,6 +16913,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             try {
                 const payload = {
                     user_id: AppState.currentUser.id,
+                    is_public: (window.__aiadPublish === false ? false : true),
                     title: title || 'Untitled',
                     url: audioUrl,
                     cover_url: imageUrl || null,
@@ -24875,6 +24876,28 @@ Be direct and concrete with real industry insight — never generic filler. When
     }catch(e){}
   }
   setInterval(function(){ ensureZip(); saveZip(); }, 1500);
+})();
+</script>
+<script>
+/* AIAD track visibility — SoundCloud-style public/private choice at publish time. Additive & guarded. */
+(function(){
+  if(window.__aiadPublish===undefined) window.__aiadPublish=true;
+  function paint(){
+    try{
+      var anchor=document.getElementById('musicGenerateBtn');
+      if(!anchor||!anchor.parentNode) return;
+      if(document.getElementById('aiadVisToggle')) return;
+      var wrap=document.createElement('div'); wrap.id='aiadVisToggle';
+      wrap.style.cssText='display:flex;gap:8px;align-items:center;margin:10px 0;font-size:0.82rem;color:var(--text-secondary)';
+      function btn(v,label){ return '<button type=\"button\" data-v=\"'+v+'\" class=\"aiadVisBtn\" style=\"cursor:pointer;border-radius:999px;padding:6px 12px;font-size:0.8rem;border:1px solid var(--border-default);background:transparent;color:var(--text-secondary)\">'+label+'</button>'; }
+      wrap.innerHTML='<span>Publish as:</span>'+btn('public','\ud83c\udf10 Public')+btn('private','\ud83d\udd12 Private');
+      anchor.parentNode.insertBefore(wrap, anchor);
+      function sync(){ wrap.querySelectorAll('.aiadVisBtn').forEach(function(b){ var on=(b.getAttribute('data-v')==='public')===(window.__aiadPublish!==false); b.style.background=on?'var(--teal)':'transparent'; b.style.color=on?'#001018':'var(--text-secondary)'; b.style.borderColor=on?'var(--teal)':'var(--border-default)'; }); }
+      wrap.querySelectorAll('.aiadVisBtn').forEach(function(b){ b.addEventListener('click',function(){ window.__aiadPublish=(b.getAttribute('data-v')==='public'); sync(); }); });
+      sync();
+    }catch(e){}
+  }
+  setInterval(paint, 1500);
 })();
 </script>
 </body>
