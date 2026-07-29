@@ -111,6 +111,7 @@
           const d=await r.json();
           if(!r.ok||!d||d.message){ gate((d&&d.message)||'Could not load analytics.'); return; }
           DATA=d; render(d);
+          try{ const ru=await fetch(API+'/rest/v1/rpc/admin_usage',{method:'POST',headers:{apikey:ANON,Authorization:'Bearer '+t,'Content-Type':'application/json'},body:'{}'}); if(ru.ok){ const du=await ru.json(); if(du&&!du.message) renderUsage(du); } }catch(e){}
         }catch(e){ gate('Error: '+e.message); }
       }
 
@@ -160,6 +161,7 @@
         document.getElementById('root').innerHTML=
           banner+
           '<div class="cards">'+cards+'</div>'+
+          '<div id="usageSection"></div>'+
           '<div class="grid g3">'+
             '<div class="panel"><h2>Signups · last 30 days</h2><div class="chartbox"><canvas id="cSign"></canvas></div></div>'+
             '<div class="panel"><h2>By role</h2><div class="chartbox"><canvas id="cRole"></canvas></div></div>'+
@@ -191,6 +193,43 @@
         donut('cPost',d.posts_by_type);
         setTimeout(function(){ worldMap(d.by_country_code); }, 80);
         localStorage.setItem('aiad_admin_lastseen', String(Date.now()));
+      }
+      function renderUsage(du){
+        const el=document.getElementById('usageSection'); if(!el) return;
+        const T=du.totals||{}, arts=du.artists||[], tools=du.tools||[];
+        const groups={}; arts.forEach(a=>{ (groups[a.cohort_week]=groups[a.cohort_week]||[]).push(a); });
+        const weeks=Object.keys(groups).sort().reverse();
+        let tbl='';
+        weeks.forEach(w=>{
+          tbl+='<div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin:14px 0 6px">Signed up week of '+esc(w)+'</div>';
+          tbl+='<table><thead><tr><th>Artist</th><th>Minutes</th><th>Sessions</th><th>Active days</th><th>Last seen</th><th>Status</th></tr></thead><tbody>';
+          groups[w].sort((a,b)=>(+b.est_minutes||0)-(+a.est_minutes||0)).forEach(a=>{
+            const m=+a.est_minutes||0;
+            const st=m>0?'<span class="pill artist">active</span>':'<span class="pill">no activity yet</span>';
+            tbl+='<tr><td>'+esc(a.name||a.email)+'<br><span class="muted" style="font-size:11px">'+esc(a.email)+'</span></td>'+
+              '<td>'+m+'</td><td>'+(+a.sessions||0)+'</td><td>'+(+a.active_days||0)+'</td>'+
+              '<td class="muted">'+(a.last_seen?esc(a.last_seen):'—')+'</td><td>'+st+'</td></tr>';
+          });
+          tbl+='</tbody></table>';
+        });
+        let toolsHtml;
+        if(!tools.length){ toolsHtml='<span class="muted" style="font-size:13px">No tool activity yet — fills in as artists move through the app.</span>'; }
+        else{ toolsHtml='<table><thead><tr><th>Tool / area</th><th>Events</th><th>Artists</th><th>Sessions</th><th>Last used</th></tr></thead><tbody>'+
+            tools.map(t=>'<tr><td>'+esc(t.tool)+'</td><td>'+(+t.events||0)+'</td><td>'+(+t.users||0)+'</td><td>'+(+t.sessions||0)+'</td><td class="muted">'+(t.last_used?esc(t.last_used):'—')+'</td></tr>').join('')+'</tbody></table>';
+        }
+        const kpi=(l,v)=>'<div class="kpi"><div class="l">'+l+'</div><div class="v">'+v+'</div></div>';
+        el.innerHTML=
+          '<div class="panel" style="margin-bottom:16px"><h2>Artist Usage · time on platform</h2>'+
+            '<div class="cards" style="margin-bottom:16px">'+kpi('Active artists',(T.active||0)+' / '+(T.artists||0))+kpi('Total minutes',T.total_minutes||0)+kpi('Total sessions',T.total_sessions||0)+'</div>'+
+            '<div class="chartbox" style="height:200px"><canvas id="cUsage"></canvas></div>'+
+          '</div>'+
+          '<div class="grid g2">'+
+            '<div class="panel"><h2>Per artist</h2><div class="scroll" style="max-height:46vh">'+(tbl||'<span class="muted">No artists yet.</span>')+'</div></div>'+
+            '<div class="panel"><h2>Tool leaderboard</h2>'+toolsHtml+'</div>'+
+          '</div>';
+        const rows=arts.slice().sort((a,b)=>(+b.est_minutes||0)-(+a.est_minutes||0));
+        const el2=document.getElementById('cUsage');
+        if(el2&&window.Chart){ CHARTS.push(new Chart(el2,{type:'bar',data:{labels:rows.map(a=>a.name||(a.email||'').split('@')[0]),datasets:[{data:rows.map(a=>+a.est_minutes||0),backgroundColor:'#FF3DFF',borderRadius:4,maxBarThickness:40}]},options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y+' min'}}},scales:{x:{ticks:{color:'#888',font:{size:10}},grid:{display:false}},y:{beginAtZero:true,ticks:{color:'#888',precision:0,font:{size:10}},grid:{color:'rgba(255,255,255,0.05)'}}}}})); }
       }
       function worldMap(codes){
         var el=document.getElementById('worldmap'); if(!el||!window.jsVectorMap) return;
