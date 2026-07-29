@@ -24719,5 +24719,64 @@ Be direct and concrete with real industry insight — never generic filler. When
         setInterval(() => { if (_verifiedNames) decorateBadges(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); wireConnectButtons(); wireFashionAgent(); wireAddCategory(); wireFashionDashboardExtras(); wsSync(); renderWsSwitcher(); }, 2500);
     })();
     </script>
+<!-- AIAD usage tracking (self-contained, fail-safe) -->
+<script>
+(function () {
+  try {
+    if (window.__aiadUsageTracking) return;
+    window.__aiadUsageTracking = true;
+    var client = null;
+    try { if (typeof db !== 'undefined' && db && db.from) client = db; } catch (e) {}
+    if (!client) {
+      if (!(window.supabase && window.supabase.createClient)) return;
+      var dualStorage = {
+        getItem: function (k) { try { return localStorage.getItem(k) || sessionStorage.getItem(k); } catch (e) { return null; } },
+        setItem: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+        removeItem: function (k) { try { localStorage.removeItem(k); sessionStorage.removeItem(k); } catch (e) {} }
+      };
+      client = window.supabase.createClient(
+        'https://uapiytquwuhtewqieegx.supabase.co',
+        'sb_publishable__Sf-E-902ZXinTwNfA3iug_F55M8QCP',
+        { auth: { persistSession: true, autoRefreshToken: true, storage: dualStorage } }
+      );
+    }
+    var sessionId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random();
+    var userId = null;
+    function refreshUser() {
+      client.auth.getSession()
+        .then(function (r) { userId = (r && r.data && r.data.session && r.data.session.user) ? r.data.session.user.id : null; })
+        .catch(function () {});
+    }
+    refreshUser();
+    try { client.auth.onAuthStateChange(function (_e, s) { userId = (s && s.user) ? s.user.id : null; }); } catch (e) {}
+    function currentTool() {
+      try {
+        var h = (location.hash || '').replace(/^#\/?/, '').split('?')[0];
+        return h || (location.pathname.replace(/^\//, '') || 'home');
+      } catch (e) { return 'unknown'; }
+    }
+    function track(eventType, tool, metadata) {
+      try {
+        if (!userId) return;
+        client.from('usage_events').insert({
+          user_id: userId, session_id: sessionId, event_type: eventType,
+          tool: tool || null, metadata: metadata || {}
+        }).then(function () {}, function () {});
+      } catch (e) {}
+    }
+    (function fireStart(n) {
+      if (userId) return track('session_start', null, { path: location.pathname });
+      if (n > 0) setTimeout(function () { fireStart(n - 1); }, 1000);
+    })(12);
+    setInterval(function () {
+      if (document.visibilityState === 'visible') track('heartbeat', currentTool());
+    }, 30000);
+    window.addEventListener('hashchange', function () { track('tool_open', currentTool()); });
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible') track('heartbeat', currentTool());
+    });
+  } catch (e) {}
+})();
+</script>
 </body>
 </html>
