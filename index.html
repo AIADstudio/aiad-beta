@@ -9896,8 +9896,18 @@ html, body {
                     'Mixing/Mastering Engineer',
                     'Songwriter',
                     'Vocal Producer',
+                    'Director',
                     'Music Video Director',
+                    'Director of Photography',
+                    'Cinematographer',
                     'Videographer',
+                    'Film / Video Editor',
+                    'Colorist',
+                    'Art Director',
+                    'Set Designer',
+                    'Sound Designer',
+                    'Composer / Scoring',
+                    'Animator / Motion Designer',
                     'Photographer',
                     'Graphic Designer',
                     'Stylist',
@@ -9913,6 +9923,13 @@ html, body {
                     'Marketing / Promotions',
                     'Radio Plugger',
                     'Tour Manager',
+                    'Production Company',
+                    'Creative Agency',
+                    'Ad / Brand Agency',
+                    'Content Studio',
+                    'Sync Agency',
+                    'Music Publisher',
+                    'Record Label',
                     'Distributor / Label Services'
                 ]
             },
@@ -25029,7 +25046,52 @@ Be direct and concrete with real industry insight — never generic filler. When
   setInterval(ensureBtn, 1500);
 })();
 </script>
+<script>
+/* AIAD credit ticker enforcer — makes the studio credit badge always reflect the real DB
+   balance/allowance (fixes unlimited/founder or paid tiers showing the free 20). Guarded. */
+(function(){
+  var SU='https://uapiytquwuhtewqieegx.supabase.co';
+  var ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhcGl5dHF1d3VodGV3cWllZWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NzcwMTksImV4cCI6MjA4OTI1MzAxOX0.BLs2RdStghm0_cF8t70cBTX1GWcowGRwID7TAG8Mg38';
+  var MAX, BAL;
+  function sess(){
+    try{ if(typeof getSession==='function'){ var s=getSession(); if(s&&s.access_token&&s.user) return s; } }catch(e){}
+    try{ var r=JSON.parse(localStorage.getItem('sb-uapiytquwuhtewqieegx-auth-token')); var c=r&&(r.currentSession||r); if(c&&c.access_token&&c.user) return c; }catch(e){}
+    return null;
+  }
+  async function pull(){
+    try{
+      var s=sess(); if(!s) return;
+      var r=await fetch(SU+'/rest/v1/ai_credits?select=balance,allowance&user_id=eq.'+s.user.id,{headers:{apikey:ANON,Authorization:'Bearer '+s.access_token}});
+      if(!r.ok) return; var rows=await r.json(); var row=rows&&rows[0]; if(!row) return;
+      if(row.allowance>=999999){ MAX=Infinity; BAL=Infinity; } else { MAX=row.allowance; BAL=row.balance; }
+      enforce();
+    }catch(e){}
+  }
+  function enforce(){
+    try{ if(MAX===undefined) return; if(window.AppState){ AppState.aiCreditsMax=MAX; AppState.aiCreditsRemaining=BAL; } }catch(e){}
+  }
+  function wrap(){
+    try{
+      if(window.__aiadCredWrapped) return;
+      if(typeof window.updateAICreditsDisplay==='function'){
+        var orig=window.updateAICreditsDisplay;
+        window.updateAICreditsDisplay=function(){ enforce(); return orig.apply(this,arguments); };
+        window.__aiadCredWrapped=true;
+      }
+      if(typeof window.checkAndConsumeAICredits==='function' && !window.__aiadConsumeWrapped){
+        var oc=window.checkAndConsumeAICredits;
+        window.checkAndConsumeAICredits=function(){ enforce(); if(MAX===Infinity) return true; return oc.apply(this,arguments); };
+        window.__aiadConsumeWrapped=true;
+      }
+    }catch(e){}
+  }
+  setInterval(function(){ wrap(); enforce(); }, 700);
+  setInterval(pull, 5000);
+  pull();
+})();
+</script>
 </body>
+
 
 
 
