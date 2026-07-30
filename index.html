@@ -9898,7 +9898,6 @@ html, body {
                     'Vocal Producer',
                     'Director',
                     'Music Video Director',
-                    'Director of Photography',
                     'Cinematographer',
                     'Videographer',
                     'Film / Video Editor',
@@ -19136,7 +19135,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             targetDiv.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-muted);font-size:0.85rem;">Searching...</div>';
 
             try {
-                let query = db.from('artist_profiles').select('id, user_id, artist_name, tagline, short_bio, location, avatar_url, primary_genre').limit(q ? 10 : 2);
+                let query = db.from('artist_profiles').select('id, user_id, artist_name, tagline, short_bio, location, avatar_url, primary_genre').order('created_at', { ascending: false }).limit(200);
                 if (q) query = query.ilike('artist_name', '%' + q + '%');
                 if (genre) query = query.ilike('primary_genre', '%' + genre + '%');
                 if (loc) {
