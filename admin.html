@@ -189,7 +189,9 @@
           '<td>'+esc(u.name||'—')+(u.founding_number?' <span class="muted">#'+u.founding_number+'</span>':'')+'</td>'+
           '<td class="email">'+esc(u.email||'')+'</td><td>'+(u.username?'@'+esc(u.username):'')+'</td>'+
           '<td><span class="pill '+esc(u.role||'')+'">'+esc(u.role||'—')+'</span></td>'+
-          '<td>'+esc(u.genre||u.industry||'—')+'</td><td>'+esc([u.city,u.country].filter(Boolean).join(', ')||u.location||'—')+'</td><td>'+esc(u.plan||'free')+'</td>'+
+          '<td>'+esc(u.genre||u.industry||'—')+'</td><td>'+esc([u.city,u.country].filter(Boolean).join(', ')||u.location||'—')+'</td>'+
+          '<td>'+(((u.posts||0)>0||(u.tracks||0)>0)?('<span style="color:var(--teal)">'+(u.posts||0)+' posts</span>'+((u.tracks||0)>0?' · '+(u.tracks||0)+' tracks':'')):'<span class="muted">none</span>')+'</td>'+
+          '<td>'+esc(u.plan||'free')+'</td>'+
           '<td>'+(u.verified?'<span class="chk">✓</span>':'')+'</td><td class="muted">'+fmtDate(u.created_at)+'</td></tr>';}).join('');
 
         document.getElementById('root').innerHTML=
@@ -225,7 +227,7 @@
           '</div>'+
           '<div class="tablewrap"><div class="tablehead"><h2>All signups ('+users.length+')</h2>'+
             '<input class="search" id="q" placeholder="Search name, email, city, genre…" oninput="filter()"/></div>'+
-            '<div class="scroll"><table><thead><tr><th>Name</th><th>Email</th><th>Username</th><th>Role</th><th>Genre</th><th>Location</th><th>Plan</th><th>Verified</th><th>Joined</th></tr></thead><tbody id="tb">'+rows+'</tbody></table></div></div>';
+            '<div class="scroll"><table><thead><tr><th>Name</th><th>Email</th><th>Username</th><th>Role</th><th>Genre</th><th>Location</th><th>Activity</th><th>Plan</th><th>Verified</th><th>Joined</th></tr></thead><tbody id="tb">'+rows+'</tbody></table></div></div>';
 
         line('cSign',d.signups_by_day);
         donut('cRole',roles);
@@ -320,7 +322,7 @@
       }
 
       window.filter=function(){ const q=(document.getElementById('q').value||'').toLowerCase(); document.querySelectorAll('#tb tr').forEach(tr=>{tr.style.display=tr.dataset.s.includes(q)?'':'none';}); };
-      window.exportCsv=function(){ if(!DATA||!DATA.users)return; const cols=['name','email','username','role','genre','industry','location','country','city','career_stage','plan','verified','founding_number','created_at']; const head=cols.join(','); const lines=DATA.users.map(u=>cols.map(c=>{let v=u[c]==null?'':String(u[c]); if(/[",\n]/.test(v))v='"'+v.replace(/"/g,'""')+'"'; return v;}).join(',')); const b=new Blob([head+'\n'+lines.join('\n')],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='aiad-signups-'+new Date().toISOString().slice(0,10)+'.csv'; a.click(); };
+      window.exportCsv=function(){ if(!DATA||!DATA.users)return; const cols=['name','email','username','role','genre','industry','location','country','city','career_stage','plan','verified','founding_number','posts','tracks','last_active','created_at']; const head=cols.join(','); const lines=DATA.users.map(u=>cols.map(c=>{let v=u[c]==null?'':String(u[c]); if(/[",\n]/.test(v))v='"'+v.replace(/"/g,'""')+'"'; return v;}).join(',')); const b=new Blob([head+'\n'+lines.join('\n')],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='aiad-signups-'+new Date().toISOString().slice(0,10)+'.csv'; a.click(); };
 
       load();
 
