@@ -24943,20 +24943,30 @@ Be direct and concrete with real industry insight — never generic filler. When
       var genre=(document.getElementById('aiadUpGenre').value||'').trim();
       var isPublic=document.getElementById('aiadUpPublic').checked;
       var toSync=document.getElementById('aiadUpSync').checked;
-      msg.textContent='Uploading audio…';
+      var name=null; try{ name=(window.AppState&&AppState.artistProfile&&(AppState.artistProfile.artist_name||AppState.artistProfile.full_name))||null; }catch(e){}
       var ext=((f.name.split('.').pop())||'mp3').toLowerCase();
-      var path='tracks/'+s.user.id+'/'+Date.now()+'.'+ext;
-      var up=await fetch(SU+'/storage/v1/object/artist-media/'+path,{method:'POST',headers:{apikey:ANON,Authorization:'Bearer '+s.access_token,'Content-Type':(f.type||'audio/mpeg'),'x-upsert':'false'},body:f});
-      if(!up.ok){ msg.textContent='Upload failed ('+up.status+').'; return; }
-      var url=SU+'/storage/v1/object/public/artist-media/'+path;
-      msg.textContent='Saving to your library…';
-      var tr=await fetch(SU+'/rest/v1/tracks',{method:'POST',headers:Object.assign(jh(s.access_token),{Prefer:'return=minimal'}),body:JSON.stringify({user_id:s.user.id,title:title,url:url,genre:(genre||null),is_public:isPublic})});
-      if(!tr.ok){ msg.textContent='Could not save track ('+tr.status+').'; return; }
       if(toSync){
-        var name=null; try{ name=(window.AppState&&AppState.artistProfile&&(AppState.artistProfile.artist_name||AppState.artistProfile.full_name))||null; }catch(e){}
-        await fetch(SU+'/rest/v1/sync_listings',{method:'POST',headers:Object.assign(jh(s.access_token),{Prefer:'return=minimal'}),body:JSON.stringify({artist_id:s.user.id,artist_name:name,title:title,genre:(genre||null),audio_url:url})});
+        // Licensable master -> PRIVATE bucket + license-gated listing. Not publicly downloadable.
+        msg.textContent='Uploading master (protected)…';
+        var mpath=s.user.id+'/'+Date.now()+'.'+ext;
+        var upm=await fetch(SU+'/storage/v1/object/sync-masters/'+mpath,{method:'POST',headers:{apikey:ANON,Authorization:'Bearer '+s.access_token,'Content-Type':(f.type||'audio/mpeg'),'x-upsert':'false'},body:f});
+        if(!upm.ok){ msg.textContent='Upload failed ('+upm.status+').'; return; }
+        msg.textContent='Listing in Sync Library…';
+        var sl=await fetch(SU+'/rest/v1/sync_listings',{method:'POST',headers:Object.assign(jh(s.access_token),{Prefer:'return=minimal'}),body:JSON.stringify({artist_id:s.user.id,artist_name:name,title:title,genre:(genre||null),master_path:mpath})});
+        if(!sl.ok){ msg.textContent='Could not list ('+sl.status+').'; return; }
+        msg.textContent='Done! Master stored privately and listed in the Sync Library (license-gated).';
+      } else {
+        // Social/library track -> public bucket (shareable). Visibility controlled by is_public.
+        msg.textContent='Uploading…';
+        var path='tracks/'+s.user.id+'/'+Date.now()+'.'+ext;
+        var up=await fetch(SU+'/storage/v1/object/artist-media/'+path,{method:'POST',headers:{apikey:ANON,Authorization:'Bearer '+s.access_token,'Content-Type':(f.type||'audio/mpeg'),'x-upsert':'false'},body:f});
+        if(!up.ok){ msg.textContent='Upload failed ('+up.status+').'; return; }
+        var url=SU+'/storage/v1/object/public/artist-media/'+path;
+        msg.textContent='Saving to your library…';
+        var tr=await fetch(SU+'/rest/v1/tracks',{method:'POST',headers:Object.assign(jh(s.access_token),{Prefer:'return=minimal'}),body:JSON.stringify({user_id:s.user.id,title:title,url:url,genre:(genre||null),is_public:isPublic})});
+        if(!tr.ok){ msg.textContent='Could not save track ('+tr.status+').'; return; }
+        msg.textContent='Done! Added to your library.';
       }
-      msg.textContent='Done!'+(toSync?' Listed in Sync Library.':'');
       setTimeout(function(){ try{ var m=document.getElementById('aiadUpModal'); if(m)m.remove(); if(typeof loadTracks==='function'){ loadTracks(); } else { location.reload(); } }catch(e){ location.reload(); } }, 800);
     }catch(e){ msg.textContent='Error: '+e.message; }
   }
