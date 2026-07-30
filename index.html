@@ -24912,6 +24912,39 @@ Be direct and concrete with real industry insight — never generic filler. When
     return null;
   }
   function jh(tok){ return { apikey:ANON, Authorization:'Bearer '+tok, 'Content-Type':'application/json' }; }
+  function aiadEncodeWav(buf){
+    var ch=1, sr=buf.sampleRate, len=buf.length, data=buf.getChannelData(0);
+    var bl=len*2, ab=new ArrayBuffer(44+bl), v=new DataView(ab);
+    function ws(o,s){ for(var i=0;i<s.length;i++) v.setUint8(o+i,s.charCodeAt(i)); }
+    ws(0,'RIFF'); v.setUint32(4,36+bl,true); ws(8,'WAVE'); ws(12,'fmt ');
+    v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,ch,true);
+    v.setUint32(24,sr,true); v.setUint32(28,sr*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true);
+    ws(36,'data'); v.setUint32(40,bl,true);
+    var o=44; for(var i=0;i<len;i++){ var x=Math.max(-1,Math.min(1,data[i])); v.setInt16(o,x<0?x*0x8000:x*0x7FFF,true); o+=2; }
+    return new Blob([ab],{type:'audio/wav'});
+  }
+  async function aiadMakeWatermarkedPreview(file){
+    try{
+      var AC=window.AudioContext||window.webkitAudioContext; if(!AC) return null;
+      var ab=await file.arrayBuffer();
+      var actx=new AC(); var dec=await actx.decodeAudioData(ab); try{actx.close();}catch(e){}
+      var sr=22050, dur=Math.min(dec.duration, 240); // cap preview at 4 min
+      var off=new OfflineAudioContext(1, Math.ceil(dur*sr), sr);
+      var src=off.createBufferSource(); src.buffer=dec; src.connect(off.destination); src.start(0);
+      // periodic double-blip watermark every ~12s
+      for(var t=4; t<dur-1; t+=12){
+        [0,0.35].forEach(function(dt){
+          var osc=off.createOscillator(), g=off.createGain();
+          osc.type='sine'; osc.frequency.value=1150;
+          var a=t+dt;
+          g.gain.setValueAtTime(0,a); g.gain.linearRampToValueAtTime(0.16,a+0.02); g.gain.linearRampToValueAtTime(0,a+0.22);
+          osc.connect(g).connect(off.destination); osc.start(a); osc.stop(a+0.25);
+        });
+      }
+      var rendered=await off.startRendering();
+      return aiadEncodeWav(rendered);
+    }catch(e){ return null; }
+  }
   function openModal(){
     var s=sess(); if(!s){ alert('Sign in to upload your music.'); return; }
     if(document.getElementById('aiadUpModal')) return;
@@ -24946,15 +24979,26 @@ Be direct and concrete with real industry insight — never generic filler. When
       var name=null; try{ name=(window.AppState&&AppState.artistProfile&&(AppState.artistProfile.artist_name||AppState.artistProfile.full_name))||null; }catch(e){}
       var ext=((f.name.split('.').pop())||'mp3').toLowerCase();
       if(toSync){
-        // Licensable master -> PRIVATE bucket + license-gated listing. Not publicly downloadable.
+        // Licensable master -> PRIVATE bucket. Supervisors hear a WATERMARKED preview; full master is license-gated.
+        var stamp=Date.now();
         msg.textContent='Uploading master (protected)…';
-        var mpath=s.user.id+'/'+Date.now()+'.'+ext;
+        var mpath=s.user.id+'/'+stamp+'.'+ext;
         var upm=await fetch(SU+'/storage/v1/object/sync-masters/'+mpath,{method:'POST',headers:{apikey:ANON,Authorization:'Bearer '+s.access_token,'Content-Type':(f.type||'audio/mpeg'),'x-upsert':'false'},body:f});
         if(!upm.ok){ msg.textContent='Upload failed ('+upm.status+').'; return; }
+        var ppath=null;
+        try{
+          msg.textContent='Creating watermarked preview…';
+          var pblob=await aiadMakeWatermarkedPreview(f);
+          if(pblob){
+            ppath=s.user.id+'/'+stamp+'-preview.wav';
+            var upp=await fetch(SU+'/storage/v1/object/sync-masters/'+ppath,{method:'POST',headers:{apikey:ANON,Authorization:'Bearer '+s.access_token,'Content-Type':'audio/wav','x-upsert':'true'},body:pblob});
+            if(!upp.ok) ppath=null;
+          }
+        }catch(e){ ppath=null; }
         msg.textContent='Listing in Sync Library…';
-        var sl=await fetch(SU+'/rest/v1/sync_listings',{method:'POST',headers:Object.assign(jh(s.access_token),{Prefer:'return=minimal'}),body:JSON.stringify({artist_id:s.user.id,artist_name:name,title:title,genre:(genre||null),master_path:mpath})});
+        var sl=await fetch(SU+'/rest/v1/sync_listings',{method:'POST',headers:Object.assign(jh(s.access_token),{Prefer:'return=minimal'}),body:JSON.stringify({artist_id:s.user.id,artist_name:name,title:title,genre:(genre||null),master_path:mpath,preview_path:ppath})});
         if(!sl.ok){ msg.textContent='Could not list ('+sl.status+').'; return; }
-        msg.textContent='Done! Master stored privately and listed in the Sync Library (license-gated).';
+        msg.textContent='Done! '+(ppath?'Watermarked preview is live':'Listed')+' in the Sync Library — full master stays private and license-gated.';
       } else {
         // Social/library track -> public bucket (shareable). Visibility controlled by is_public.
         msg.textContent='Uploading…';
