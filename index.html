@@ -18866,7 +18866,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                         '<div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:4px;">' + (p.primary_genre || 'Music') + '</div>' +
                         (p.location ? '<div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:12px;">' + p.location + '</div>' : '<div style="margin-bottom:12px;"></div>') +
                         (isSup ? '<div style="font-size:0.8rem;color:#FFB347;font-weight:600;margin-bottom:12px;">$' + d.amount + '/mo</div>' : '<div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px;">Following</div>') +
-                        '<button class="collab-btn secondary" style="width:100%;padding:8px;" onclick="event.stopPropagation();if(typeof loadArtistPage===\'function\')loadArtistPage(\'' + pid + '\');">View Profile</button>' +
+                        '<button class="collab-btn secondary" style="width:100%;padding:8px;" onclick="event.stopPropagation();aiadViewArtist(\'' + pid + '\');">View Profile</button>' +
                     '</div>';
                 }).join('');
             } catch(e) {
@@ -19169,7 +19169,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                         (a.tagline ? '<div style="font-size:0.82rem;color:var(--text-secondary);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + a.tagline + '</div>' : '') +
                         '</div>' +
                         '<div style="display:flex;gap:8px;flex-shrink:0;">' +
-                        '<button onclick="event.stopPropagation();if(typeof loadArtistPage===\'function\')loadArtistPage(\'' + pid + '\')" style="padding:8px 16px;border-radius:9px;border:1px solid var(--border-default);background:transparent;color:var(--text-secondary);font-size:0.82rem;cursor:pointer;font-family:var(--font-body);">View Profile</button>' +
+                        '<button onclick="event.stopPropagation();aiadViewArtist(\'' + pid + '\')" style="padding:8px 16px;border-radius:9px;border:1px solid var(--border-default);background:transparent;color:var(--text-secondary);font-size:0.82rem;cursor:pointer;font-family:var(--font-body);">View Profile</button>' +
                         '<button onclick="event.stopPropagation();collabFollowFromDiscover(\'' + pid + '\',\'' + name.replace(/'/g, "\\'") + '\',this)" style="' + followStyle + '">' + (isFollowed ? 'Following' : 'Follow') + '</button>' +
                         '</div>' +
                     '</div>';
@@ -25089,7 +25089,112 @@ Be direct and concrete with real industry insight — never generic filler. When
   pull();
 })();
 </script>
+<script>
+/* AIAD collab enhancements: grid feed + post lightbox (#32), artist profile modal (#33),
+   fashion-aware onboarding tiers (#34). All additive & guarded. */
+(function(){
+  var SU='https://uapiytquwuhtewqieegx.supabase.co';
+  var ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhcGl5dHF1d3VodGV3cWllZWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NzcwMTksImV4cCI6MjA4OTI1MzAxOX0.BLs2RdStghm0_cF8t70cBTX1GWcowGRwID7TAG8Mg38';
+  function sess(){
+    try{ if(typeof getSession==='function'){ var s=getSession(); if(s&&s.access_token) return s; } }catch(e){}
+    try{ var r=JSON.parse(localStorage.getItem('sb-uapiytquwuhtewqieegx-auth-token')); var c=r&&(r.currentSession||r); if(c&&c.access_token) return c; }catch(e){}
+    return null;
+  }
+  function isImg(u){ return u && (/\.(jpg|jpeg|png|gif|webp)/i.test(u) || u.indexOf('data:image')===0); }
+  function isVid(u){ return u && /\.(mp4|mov|webm)/i.test(u); }
+
+  /* ---------- #32 grid feed ---------- */
+  window.renderCollabFeed = function(list){
+    try{
+      var data = (typeof _collabFeedData!=='undefined' && _collabFeedData) ? _collabFeedData : (window._collabFeedData||[]);
+      var filt = (typeof _collabFeedFilter!=='undefined' && _collabFeedFilter) ? _collabFeedFilter : 'all';
+      var filtered = filt==='all' ? data : data.filter(function(p){ return p._relType===filt; });
+      window._collabFeedFiltered = filtered;
+      if(!filtered.length){ list.innerHTML='<div style="padding:40px;text-align:center;color:var(--text-muted);font-size:.85rem">No posts match this filter.</div>'; return; }
+      var tiles = filtered.map(function(p, idx){
+        var name = (p._artist&&p._artist.artist_name)||'Artist';
+        var av = (p._artist&&p._artist.avatar_url)||'';
+        var avatarEl = (av && (av.indexOf('http')===0||av.indexOf('data:')===0)) ? '<img src="'+av+'" style="width:24px;height:24px;border-radius:50%;object-fit:cover">' : '<div style="width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#0d2f3f,#1a4a5e);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.65rem;color:var(--teal-light)">'+((name[0]||'A').toUpperCase())+'</div>';
+        var mUrl = p.media_url||'';
+        var thumb;
+        if(isImg(mUrl)) thumb='<div style="width:100%;aspect-ratio:1;background:#111 center/cover no-repeat;background-image:url(\''+mUrl+'\')"></div>';
+        else if(isVid(mUrl)) thumb='<div style="width:100%;aspect-ratio:1;background:#000;position:relative"><video src="'+mUrl+'" muted playsinline style="width:100%;height:100%;object-fit:cover"></video><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.5rem">&#9654;</div></div>';
+        else thumb='<div style="width:100%;aspect-ratio:1;background:var(--bg-secondary);display:flex;align-items:center;justify-content:center;padding:14px"><div style="font-size:.8rem;color:var(--text-secondary);line-height:1.5;text-align:center;overflow:hidden;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical">'+(((p.content||'Post')+'').slice(0,140))+'</div></div>';
+        return '<div onclick="aiadOpenFeedPost('+idx+')" style="background:var(--bg-card);border:1px solid var(--border-default);border-radius:12px;overflow:hidden;cursor:pointer">'+thumb+'<div style="display:flex;align-items:center;gap:8px;padding:8px 10px">'+avatarEl+'<div style="flex:1;min-width:0;font-size:.76rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+name+'</div></div></div>';
+      }).join('');
+      list.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px">'+tiles+'</div>';
+    }catch(e){}
+  };
+  window.aiadOpenFeedPost = function(idx){
+    var p = (window._collabFeedFiltered||[])[idx]; if(!p) return;
+    var name=(p._artist&&p._artist.artist_name)||'Artist';
+    var mUrl=p.media_url||'';
+    var media = isImg(mUrl) ? '<img src="'+mUrl+'" style="width:100%;max-height:70vh;object-fit:contain;background:#000">' : (isVid(mUrl) ? '<video src="'+mUrl+'" controls autoplay playsinline style="width:100%;max-height:70vh;background:#000"></video>' : '');
+    var ov=document.createElement('div'); ov.id='aiadFeedLightbox';
+    ov.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:20px';
+    ov.innerHTML='<div style="max-width:640px;width:100%;max-height:90vh;overflow:auto;background:#141414;border-radius:16px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px"><div style="font-weight:700;color:#fff">'+name+'</div><span style="cursor:pointer;color:#fff;opacity:.7;font-size:1.2rem" onclick="var m=document.getElementById(\'aiadFeedLightbox\');if(m)m.remove()">&#10005;</span></div>'
+      +media+(p.content?'<div style="padding:14px 16px;color:#ddd;font-size:.9rem;line-height:1.6">'+p.content+'</div>':'')+'</div>';
+    ov.addEventListener('click',function(e){ if(e.target===ov) ov.remove(); });
+    document.body.appendChild(ov);
+  };
+
+  /* ---------- #33 artist profile modal ---------- */
+  window.aiadViewArtist = async function(pid){
+    if(!pid) return;
+    var s=sess(); var hdr={apikey:ANON}; if(s) hdr.Authorization='Bearer '+s.access_token;
+    var ap=null;
+    try{ var r=await fetch(SU+'/rest/v1/artist_profiles?or=(id.eq.'+pid+',user_id.eq.'+pid+')&select=id,user_id,artist_name,tagline,short_bio,location,avatar_url,primary_genre&limit=1',{headers:hdr}); var j=await r.json(); ap=j&&j[0]; }catch(e){}
+    if(!ap) ap={artist_name:'Artist', user_id:pid};
+    var tracks=[];
+    try{ var tr=await fetch(SU+'/rest/v1/tracks?user_id=eq.'+(ap.user_id||pid)+'&is_public=eq.true&select=title,url,cover_url,genre&order=created_at.desc&limit=8',{headers:hdr}); tracks=await tr.json(); if(!Array.isArray(tracks)) tracks=[]; }catch(e){}
+    var av = ap.avatar_url && (ap.avatar_url.indexOf('http')===0||ap.avatar_url.indexOf('data:')===0) ? '<img src="'+ap.avatar_url+'" style="width:64px;height:64px;border-radius:50%;object-fit:cover">' : '<div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#0d2f3f,#1a4a5e);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.4rem;color:#7fe6ff">'+(((ap.artist_name||'A')[0]).toUpperCase())+'</div>';
+    var tks = tracks.length ? tracks.map(function(t){ return '<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06)"><div style="flex:1;min-width:0"><div style="font-size:.85rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(t.title||'Untitled')+'</div><div style="font-size:.72rem;color:#999">'+(t.genre||'')+'</div></div>'+(t.url?'<audio controls preload="none" src="'+t.url+'" style="height:30px;max-width:180px"></audio>':'')+'</div>'; }).join('') : '<div style="color:#888;font-size:.85rem;padding:10px 0">No public tracks yet.</div>';
+    var ov=document.createElement('div'); ov.id='aiadArtistModal';
+    ov.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;padding:20px;font-family:Inter,-apple-system,sans-serif';
+    ov.innerHTML='<div style="background:#141414;border:1px solid rgba(255,255,255,.1);border-radius:18px;max-width:520px;width:100%;max-height:85vh;overflow:auto;padding:24px;color:#fff">'
+      +'<div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="display:flex;gap:14px;align-items:center">'+av+'<div><div style="font-weight:800;font-size:1.2rem">'+(ap.artist_name||'Artist')+'</div><div style="color:#9aa;font-size:.85rem">'+[ap.primary_genre,ap.location].filter(Boolean).join(' · ')+'</div></div></div><span style="cursor:pointer;opacity:.6;font-size:1.2rem" onclick="var m=document.getElementById(\'aiadArtistModal\');if(m)m.remove()">&#10005;</span></div>'
+      +((ap.short_bio||ap.tagline)?'<div style="margin-top:14px;color:#cfcfcf;font-size:.9rem;line-height:1.5">'+(ap.short_bio||ap.tagline)+'</div>':'')
+      +'<div style="margin-top:18px;font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:#888">Recent public tracks</div>'+tks
+      +'</div>';
+    ov.addEventListener('click',function(e){ if(e.target===ov) ov.remove(); });
+    var ex=document.getElementById('aiadArtistModal'); if(ex) ex.remove();
+    document.body.appendChild(ov);
+  };
+
+  /* ---------- #34 fashion-aware onboarding tiers ---------- */
+  var FX=[[/music tracks/gi,'designs'],[/Unlimited songwriting/gi,'Unlimited tech packs'],[/songwriting generations/gi,'tech pack generations'],[/merch designs/gi,'moodboards'],[/Social analytics \(Spotify, IG\)/gi,'Trend & social analytics'],[/Fan Q&A included/gi,'Buyer inquiries included'],[/Sync library listing/gi,'Wholesale \/ sync listing']];
+  function fashionOn(){
+    try{
+      if(window.AppState && (AppState.userIndustry==='fashion'||AppState.onboardingIndustry==='fashion'||AppState.selectedIndustry==='fashion')) return true;
+      if((localStorage.getItem('aiad_user_industry')||'')==='fashion') return true;
+      if((sessionStorage.getItem('aiad_add_category')||'')==='fashion') return true;
+      if(document.body && document.body.classList.contains('fashion-theme')) return true;
+      var b=document.querySelector('.industry-badge, [class*="onboard-badge"]'); if(b && /fashion/i.test(b.textContent)) return true;
+    }catch(e){}
+    return false;
+  }
+  function fashionizeTiers(){
+    try{
+      if(!fashionOn()) return;
+      document.querySelectorAll('.tier-feature').forEach(function(el){
+        var base=el.getAttribute('data-fx0')||el.textContent;
+        var nt=base; FX.forEach(function(m){ nt=nt.replace(m[0],m[1]); });
+        if(nt!==el.textContent){ if(!el.getAttribute('data-fx0')) el.setAttribute('data-fx0', base); el.textContent=nt; }
+      });
+      document.querySelectorAll('.tier-desc,[class*="tier-desc"]').forEach(function(el){
+        if(el.children.length) return;
+        var base=el.getAttribute('data-fx0')||el.textContent;
+        var nt=base.replace(/artists/gi,'designers').replace(/artist/gi,'designer');
+        if(nt!==el.textContent){ if(!el.getAttribute('data-fx0')) el.setAttribute('data-fx0', base); el.textContent=nt; }
+      });
+    }catch(e){}
+  }
+  setInterval(fashionizeTiers, 800);
+})();
+</script>
 </body>
+
 
 
 
