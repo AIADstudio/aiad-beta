@@ -17549,6 +17549,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                         if (AppState.userRole === 'artist' && profile && profile.onboarded === false && window.aiadStartOnboarding) {
                             const IDASH = { music:'artist', fashion:'fashion', streaming:'streamer', visual_arts:'visualarts', writing_publishing:'writing', film_media:'film', games:'games', multi:'multi' };
                             window.aiadStartOnboarding({ dash: IDASH[profile.industry] || 'artist' });
+                            return;
                         }
                         if (lastDashboard) {
                             jumpToDashboard(lastDashboard);
