@@ -25193,6 +25193,115 @@ Be direct and concrete with real industry insight — never generic filler. When
   setInterval(fashionizeTiers, 800);
 })();
 </script>
+<script>
+/* AIAD founder-only ROLE PREVIEW switcher — test every role's onboarding + dashboard
+   on the founder login, with zero new accounts / emails. Guards real profile writes. */
+(function(){
+  try {
+    var FOUNDER_EMAIL = 'founder@aiad.studio';
+    var FOUNDER_ID = 'ed9c7f5c-9c3c-4999-8bba-468d5ba9d935';
+
+    // --- Guard: never let a PREVIEW jump overwrite the founder's real role in the DB ---
+    if (!window.__aiadSaveGuarded && typeof window.saveProfileToSupabase === 'function') {
+      var _origSave = window.saveProfileToSupabase;
+      window.saveProfileToSupabase = function(){
+        if (window.__aiadPreview) { console.log('[AIAD preview] skipped profile save'); return; }
+        return _origSave.apply(this, arguments);
+      };
+      window.__aiadSaveGuarded = true;
+    }
+
+    function isFounder(){
+      try {
+        var u = (window.AppState && AppState.currentUser) || null;
+        if (!u) return false;
+        return (u.email && u.email.toLowerCase() === FOUNDER_EMAIL) || u.id === FOUNDER_ID;
+      } catch(e){ return false; }
+    }
+
+    function exitToShell(){
+      document.querySelectorAll('.dashboard-container, .collab-dashboard').forEach(function(d){
+        d.style.display='none'; d.classList.remove('active');
+      });
+      ['.header','.main','.footer'].forEach(function(s){ var e=document.querySelector(s); if(e) e.style.display=''; });
+      var dp=document.getElementById('demoPanel'); if(dp) dp.style.display='none';
+    }
+
+    // Launch a role's ONBOARDING flow (first screen)
+    window.aiadPreviewOnboarding = function(role){
+      window.__aiadPreview = true;
+      try { AppState.userIndustry = 'music'; } catch(e){}
+      exitToShell();
+      if (role === 'artist'){ AppState.userRole='creator'; navigateTo('artist-profile'); }
+      else if (role === 'collaborator'){ AppState.userRole='collaborator'; navigateTo('collaborator-roles'); setTimeout(function(){ try{renderCollaboratorRoles();}catch(e){} },100); }
+      else if (role === 'fan'){ AppState.userRole='supporter'; navigateTo('fan-preferences'); setTimeout(function(){ try{renderFanPreferences();}catch(e){} },100); }
+      else if (role === 'supervisor'){ AppState.userRole='supervisor'; navigateTo('supervisor-profile'); }
+    };
+
+    // Jump straight to a role's DASHBOARD
+    window.aiadPreviewDashboard = function(dash){
+      window.__aiadPreview = true;
+      try { jumpToDashboard(dash); } catch(e){ console.warn('[AIAD preview] dash err', e); }
+    };
+
+    function btn(label, fn, cls){
+      var b=document.createElement('button');
+      b.textContent=label; b.onclick=fn;
+      b.style.cssText='cursor:pointer;border:0;border-radius:6px;padding:5px 8px;font-size:11px;font-weight:600;'+
+        (cls==='ob'?'background:#2a2f3a;color:#cfe;':'background:#00d4ff;color:#04121a;');
+      return b;
+    }
+
+    function buildPanel(){
+      if (document.getElementById('aiadPreviewPanel')) return;
+      var wrap=document.createElement('div');
+      wrap.id='aiadPreviewPanel';
+      wrap.style.cssText='position:fixed;left:14px;bottom:14px;z-index:2147483000;background:#12151c;'+
+        'border:1px solid #2a2f3a;border-radius:12px;padding:10px 12px;box-shadow:0 8px 30px rgba(0,0,0,.5);'+
+        'font-family:system-ui,-apple-system,sans-serif;max-width:250px;';
+      var head=document.createElement('div');
+      head.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;';
+      var title=document.createElement('div');
+      title.innerHTML='&#128295; Preview role';
+      title.style.cssText='color:#fff;font-size:12px;font-weight:700;';
+      var min=document.createElement('span');
+      min.textContent='—'; min.style.cssText='cursor:pointer;color:#89f;font-size:14px;user-select:none;';
+      var body=document.createElement('div');
+      min.onclick=function(){ body.style.display = body.style.display==='none'?'':'none'; };
+      head.appendChild(title); head.appendChild(min);
+      wrap.appendChild(head); wrap.appendChild(body);
+
+      var note=document.createElement('div');
+      note.textContent='Founder test tool · won’t change your account';
+      note.style.cssText='color:#6b7280;font-size:9.5px;margin-bottom:8px;';
+      body.appendChild(note);
+
+      var roles=[['Artist','artist','artist'],['Collaborator','collaborator','collab'],['Supervisor','supervisor','supervisor'],['Fan','fan','fan']];
+      roles.forEach(function(r){
+        var row=document.createElement('div');
+        row.style.cssText='display:flex;align-items:center;gap:6px;margin-bottom:6px;';
+        var lbl=document.createElement('div');
+        lbl.textContent=r[0];
+        lbl.style.cssText='color:#cbd5e1;font-size:11px;width:78px;flex:0 0 78px;';
+        row.appendChild(lbl);
+        row.appendChild(btn('Onboarding', function(){ aiadPreviewOnboarding(r[1]); }, 'ob'));
+        row.appendChild(btn('Dashboard', function(){ aiadPreviewDashboard(r[2]); }, 'db'));
+        body.appendChild(row);
+      });
+
+      document.body.appendChild(wrap);
+    }
+
+    // Show the panel once the founder is logged in.
+    var tries=0;
+    var iv=setInterval(function(){
+      tries++;
+      if (isFounder()){ buildPanel(); }
+      if (tries>600) clearInterval(iv); // ~15 min safety
+    }, 1500);
+  } catch(e){ console.warn('[AIAD preview] init failed', e); }
+})();
+</script>
 </body>
 
 
