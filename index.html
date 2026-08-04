@@ -24517,6 +24517,7 @@ Be direct and concrete with real industry insight — never generic filler. When
                 success_3yr: g('ob_success'), release_cadence: g('ob_cadence'), team: g('ob_team'),
                 submitted_at: new Date().toISOString(),
             };
+            if (!data.city) { try { showToast('Please add your location to continue.'); } catch(_e){ alert('Please add your location to continue.'); } var _c = document.getElementById('ob_city'); if (_c) _c.focus(); return; }
             btn.disabled = true; btn.textContent = 'Saving…';
             try { await rpc('save_artist_onboarding', { p_data: data }); } catch (e) {}
             // Auto-fetch public stats from the links (no manual numbers). YouTube works now;
