@@ -10094,9 +10094,16 @@ html, body {
             ]
         };
 
+        // Canonical tiers. Keys match profiles.plan / stripe-checkout PLANS, prices match
+        // Stripe, and aiCredits match public.ai_allowance_for_plan(). Legacy keys are
+        // aliased below so previously-saved localStorage values still resolve.
+        // Canonical tiers. Keys match profiles.plan / stripe-checkout PLANS, prices match
+        // Stripe ($29/$59/$99), and aiCredits match public.ai_allowance_for_plan()
+        // (20/150/500/2000). Legacy keys are aliased below so previously-saved
+        // localStorage/profile values still resolve.
         const SubscriptionTiers = {
             free: {
-                name: 'Observer',
+                name: 'Free',
                 price: 0,
                 priceLabel: 'Free',
                 aiCredits: 20,
@@ -10109,94 +10116,72 @@ html, body {
                     'No memory, no personalization',
                     'Credits do not roll over'
                 ],
-                upsellTo: 'starter'
+                upsellTo: 'artist_starter'
             },
-            starter: {
-                name: 'Creator',
+            artist_starter: {
+                name: 'Starter',
                 price: 29,
                 priceLabel: '$29/mo',
-                aiCredits: 300,
+                aiCredits: 150,
                 aiAccess: 'AIAD Agent (guided mode)',
                 features: [
-                    '300 AI credits/month',
+                    '150 AI credits/month',
                     'Full dashboard access (industry-specific)',
                     'Post content & interact with supporters',
                     'Basic analytics overview',
-                    'Standard responses',
                     'Limited context memory',
                     'Credits reset monthly'
                 ],
-                upsellTo: 'growth'
+                upsellTo: 'artist_pro'
             },
-            growth: {
-                name: 'Professional',
+            artist_pro: {
+                name: 'Pro',
                 price: 59,
                 priceLabel: '$59/mo',
-                aiCredits: 800,
+                aiCredits: 500,
                 aiAccess: 'AIAD Agent with decision context',
                 features: [
-                    '800 AI credits/month',
+                    '500 AI credits/month',
                     'Advanced dashboard features',
                     'Supporter & collaborator insights',
                     'Monetization tools visible',
-                    'Deeper strategic responses',
                     'Persistent short-term memory',
                     'Priority response quality'
                 ],
-                upsellTo: 'pro'
+                upsellTo: 'artist_premier'
             },
-            pro: {
-                name: 'Studio',
+            artist_premier: {
+                name: 'Established',
                 price: 99,
                 priceLabel: '$99/mo',
-                aiCredits: 1800,
-                aiAccess: 'AIAD Agent in Guidance Mode',
-                features: [
-                    '1,800 AI credits/month',
-                    'Full analytics & milestones',
-                    'Revenue tracking (high-level)',
-                    'Collaborator management',
-                    'Long-term memory enabled',
-                    'Cross-context reasoning',
-                    'Credits roll over 1 month'
-                ],
-                upsellTo: 'elite'
-            },
-            elite: {
-                name: 'Director',
-                price: 159,
-                priceLabel: '$159/mo',
-                aiCredits: 3500,
+                aiCredits: 2000,
                 aiAccess: 'AIAD Agent in Decision Mode',
                 features: [
-                    '3,500 AI credits/month',
+                    '2,000 AI credits/month',
                     'All platform features unlocked',
+                    'Full analytics & milestones',
                     'Strategic planning tools',
-                    'Priority visibility & discovery',
-                    'Deep memory + pattern recognition',
-                    'Scenario modeling & forecasts',
-                    'Credits roll over 2 months'
-                ],
-                upsellTo: 'unlimited'
-            },
-            unlimited: {
-                name: 'Executive',
-                price: 199,
-                priceLabel: '$199/mo',
-                aiCredits: Infinity,
-                aiAccess: 'Unlimited AI usage',
-                features: [
-                    'Unlimited AI credits',
-                    'Everything in Elite',
-                    'Highest priority processing',
-                    'Early access to new features',
-                    'No usage caps',
-                    'Full Decision Memory',
-                    'Always-on contextual intelligence'
+                    'Long-term memory + cross-context reasoning',
+                    'Priority visibility & discovery'
                 ],
                 upsellTo: null
             }
         };
+
+        // Legacy tier keys → canonical. Older sessions persisted these in
+        // localStorage['aiad_subscription_tier'] and some profiles.plan rows.
+        (function aliasLegacyTiers() {
+            const legacy = {
+                starter:   'artist_starter',
+                growth:    'artist_pro',
+                pro:       'artist_premier',
+                elite:     'artist_premier',
+                unlimited: 'artist_premier',
+            };
+            Object.keys(legacy).forEach(function (k) {
+                if (!SubscriptionTiers[k]) SubscriptionTiers[k] = SubscriptionTiers[legacy[k]];
+            });
+        })();
 
         const AICreditCosts = {
             shortQuestion: 1,
@@ -10240,8 +10225,11 @@ html, body {
             collaboratorRole: null,
 
             subscriptionTier: 'free',
-            aiCreditsRemaining: 25,
-            aiCreditsMax: 25,
+            // Unknown until loadAiCredits() reads the real ai_credits row. These used to
+            // default to 25/25, which is what the generation gate ran off — a phantom
+            // counter with no relationship to the actual balance.
+            aiCreditsRemaining: null,
+            aiCreditsMax: null,
             aiCreditsResetDate: null
         };
 
@@ -14483,7 +14471,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             const message = input.value.trim();
             if (!message) return;
 
-            if (!checkAndConsumeAICredits('mediumResponse')) {
+            if (!await checkAndConsumeAICredits('mediumResponse')) {
                 showAICreditUpsell();
                 return;
             }
@@ -14616,6 +14604,17 @@ Only capture real, meaningful decisions — not questions or general discussion.
 
             const remaining = AppState.aiCreditsRemaining;
             const max = AppState.aiCreditsMax;
+
+            // Balance not loaded yet — show a neutral placeholder rather than a
+            // fabricated number. loadAiCredits() fills this in from the DB.
+            if (remaining === null || max === null || max === undefined) {
+                creditsValue.textContent = '— / —';
+                creditsBarFill.style.width = '0%';
+                creditsBarFill.classList.remove('warning', 'critical');
+                creditsValue.classList.remove('warning', 'critical');
+                return;
+            }
+
             const percentage = max === Infinity ? 100 : (remaining / max) * 100;
 
             if (max === Infinity) {
@@ -14650,32 +14649,77 @@ Only capture real, meaningful decisions — not questions or general discussion.
             });
         }
 
-        function checkAndConsumeAICredits(actionType) {
+        // Frontend action keys → the action names public.ai_cost_for() understands.
+        // Unmapped names silently fall through to the DB's `else 1`, so every key in
+        // AICreditCosts must appear here.
+        const AI_DB_ACTION = {
+            shortQuestion:   'agent_chat',
+            mediumResponse:  'agent_chat',
+            longStrategy:    'text_sonnet',
+            creativeGen:     'image',
+            fileReasoning:   'text_opus',
+            songwriting:     'songwriting',
+            artwork:         'image',
+            merchDesign:     'image',
+            mixMedia:        'image',
+            musicProduction: 'music',
+            videoGeneration: 'music',
+        };
 
-            if (AppState.aiCreditsMax === Infinity) {
+        // Single source of truth for credits: the ai_credits table, via spend_ai_credit().
+        // The DB function handles cost lookup, the 30-day period reset, allowance re-sync
+        // and the unlimited (founder) short-circuit, so we do not second-guess it here.
+        async function checkAndConsumeAICredits(actionType) {
+            const getSess = window.__aiadSession;
+            const spend   = window.__aiadSpendCredit;
+            const sess    = (typeof getSess === 'function') ? getSess() : null;
+
+            // Signed out → nothing to meter against. Let the caller proceed; the edge
+            // function still requires auth for anything that costs real money.
+            if (!sess || !sess.user || typeof spend !== 'function') return true;
+
+            const dbAction = AI_DB_ACTION[actionType] || 'agent_chat';
+            let remaining;
+            try {
+                remaining = await spend(sess, dbAction);
+            } catch (e) {
+                console.error('[credits] spend threw:', e);
+                remaining = null;
+            }
+
+            if (remaining === null || remaining === undefined) {
+                // Could not reach the credit service. Fail OPEN rather than block a paying
+                // user on a transient error — the previous phantom-counter bug blocked
+                // everyone, which is the worse failure.
+                console.warn('[credits] balance unavailable, allowing action without charge');
                 return true;
             }
 
-            const cost = AICreditCosts[actionType] || AICreditCosts.mediumResponse;
-
-            if (AppState.aiCreditsRemaining < cost) {
+            if (remaining === -1) {                       // insufficient balance
+                syncCreditState(0);
                 return false;
             }
 
-            AppState.aiCreditsRemaining -= cost;
-            localStorage.setItem('aiad_ai_credits', AppState.aiCreditsRemaining);
+            syncCreditState(remaining);
 
-            updateAICreditsDisplay();
-
-            const percentage = (AppState.aiCreditsRemaining / AppState.aiCreditsMax) * 100;
-            if (percentage === 20) {
-                showToast('⚠️ AI Credits: 80% used', 3000);
-            } else if (percentage === 5) {
-                showToast('⚠️ AI Credits: 95% used', 3000);
+            if (remaining !== 999999 && AppState.aiCreditsMax) {
+                const pct = (remaining / AppState.aiCreditsMax) * 100;
+                if (pct <= 5)       showToast('⚠️ AI Credits: 95% used', 3000);
+                else if (pct <= 20) showToast('⚠️ AI Credits: 80% used', 3000);
             }
-
             return true;
         }
+
+        // Push a freshly-authoritative balance into AppState + every visible counter.
+        function syncCreditState(remaining) {
+            const unlimited = (remaining === 999999);
+            AppState.aiCreditsRemaining = unlimited ? Infinity : remaining;
+            if (unlimited) AppState.aiCreditsMax = Infinity;
+            try { localStorage.setItem('aiad_ai_credits', unlimited ? '999999' : String(remaining)); } catch (e) {}
+            try { updateAICreditsDisplay(); } catch (e) {}
+            try { if (typeof updateCreditsDisplay === 'function') updateCreditsDisplay(remaining); } catch (e) {}
+        }
+        window.syncCreditState = syncCreditState;
 
         function showAICreditUpsell() {
             const currentTier = AppState.subscriptionTier;
@@ -16175,7 +16219,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             const prompt = document.getElementById('merchAIPrompt').value.trim();
             if (!prompt) { showToast('Describe your design first'); return; }
 
-            if (!checkAndConsumeAICredits('merchDesign')) {
+            if (!await checkAndConsumeAICredits('merchDesign')) {
                 showAICreditUpsell();
                 return;
             }
@@ -16306,7 +16350,14 @@ Only capture real, meaningful decisions — not questions or general discussion.
             const res = await fetch(`https://uapiytquwuhtewqieegx.supabase.co/functions/v1/music-production?proxy=${encodeURIComponent(url)}`, {
                 headers: { 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
             });
+            // The proxy answers 502 + a JSON error body when the upstream link is dead
+            // (transient CDN URLs expire). Without these guards we wrap that error body
+            // in a blob URL and hand it to <audio>, which then "loads" forever.
+            if (!res.ok) throw new Error('Audio proxy failed (' + res.status + ')');
             const blob = await res.blob();
+            if (!blob || !/^audio\//i.test(blob.type || '')) {
+                throw new Error('Proxy returned non-audio content (' + ((blob && blob.type) || 'unknown') + ')');
+            }
             return URL.createObjectURL(blob);
         }
 
@@ -16800,7 +16851,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             const prompt = document.getElementById('musicPrompt').value.trim();
             if (!prompt) { showToast('Describe your track first'); return; }
 
-            if (!checkAndConsumeAICredits('musicProduction')) {
+            if (!await checkAndConsumeAICredits('musicProduction')) {
                 showAICreditUpsell();
                 return;
             }
@@ -17372,7 +17423,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             const prompt = document.getElementById('songwritingInput').value.trim();
             if (!prompt) { showToast('Add a prompt first'); return; }
 
-            if (!checkAndConsumeAICredits('songwriting')) {
+            if (!await checkAndConsumeAICredits('songwriting')) {
                 showAICreditUpsell();
                 return;
             }
@@ -17490,7 +17541,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             const prompt = document.getElementById('mixmediaInput').value.trim();
             if (!prompt) { showToast('Describe what you want first'); return; }
 
-            if (!checkAndConsumeAICredits('mixMedia')) {
+            if (!await checkAndConsumeAICredits('mixMedia')) {
                 showAICreditUpsell();
                 return;
             }
@@ -20035,7 +20086,14 @@ Only capture real, meaningful decisions — not questions or general discussion.
 
             const player = document.getElementById('globalAudioPlayer');
             player.src = track.audioUrl;
-            player.play();
+            // play() rejects on a dead/expired source; without this the UI sits on
+            // "Loading audio…" forever with nothing in the console.
+            Promise.resolve(player.play()).catch((e) => {
+                console.error('[AIAD] playback failed:', e);
+                showToast('Playback failed — this track link may have expired');
+                if (currentPlayingRowId) setRowPlayState(currentPlayingRowId, false);
+                try { updateBottomPlayBtn(false); } catch (_e) {}
+            });
 
             if (currentPlayingRowId) setRowPlayState(currentPlayingRowId, true);
 
@@ -22735,13 +22793,19 @@ function toggleAgeRange(btn) {
             return m ? m[0] : null;
         }
 
-        // Atomically consume one AI credit. Returns remaining (>=0), 999999 for unlimited, -1 if out, or null on error.
-        async function spendAiCredit(sess) {
+        // Atomically consume credits for an action. Returns remaining (>=0), 999999 for
+        // unlimited, -1 if out, or null on error. When `action` is given we call the
+        // cost-aware spend_ai_credit(p_user, p_action) overload; otherwise the 1-credit one.
+        async function spendAiCredit(sess, action) {
             const c = _client();
+            const params = action
+                ? { p_user: sess.user.id, p_action: action }
+                : { p_user: sess.user.id };
             try {
                 if (c) {
-                    const { data, error } = await c.rpc('spend_ai_credit', { p_user: sess.user.id });
+                    const { data, error } = await c.rpc('spend_ai_credit', params);
                     if (!error && typeof data === 'number') return data;
+                    if (error) console.warn('[credits] rpc error:', error.message || error);
                 }
                 // REST fallback
                 const anon = _anonKey();
@@ -22749,12 +22813,18 @@ function toggleAgeRange(btn) {
                 const res = await fetch(`${SU}/rest/v1/rpc/spend_ai_credit`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sess.access_token, 'apikey': anon || '' },
-                    body: JSON.stringify({ p_user: sess.user.id }),
+                    body: JSON.stringify(params),
                 });
+                if (!res.ok) { console.warn('[credits] spend REST failed', res.status); return null; }
                 const val = await res.json();
                 return (typeof val === 'number') ? val : null;
             } catch (e) { console.warn('[credits] spend', e); return null; }
         }
+
+        // The credit gate lives in a different <script> block, so these must be reachable
+        // on window — without the exports it silently fails open and charges nobody.
+        window.__aiadSession     = getSession;
+        window.__aiadSpendCredit = spendAiCredit;
 
         function updateCreditsDisplay(remaining) {
             const val = document.getElementById('creditsValue');
@@ -22771,25 +22841,51 @@ function toggleAgeRange(btn) {
 
         // Load current balance + allowance and paint the indicator.
         async function loadAiCredits() {
-            const sess = getSession();
-            if (!sess) return;
+            // Prefer the supabase client's session: it transparently refreshes an expired
+            // access token. Reading localStorage directly (the old path) hands PostgREST a
+            // stale JWT, which 401s — and a 401 body is not an array, so the old code fell
+            // into the "no row" branch and painted a phantom 20 for everyone.
+            let sess = null;
+            const c = _client();
+            try {
+                if (c?.auth?.getSession) sess = (await c.auth.getSession())?.data?.session || null;
+            } catch (e) { /* fall through to the localStorage read */ }
+            if (!sess?.access_token) sess = getSession();
+            if (!sess?.user) return;
+
             try {
                 const anon = _anonKey();
                 const SU = (typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL) || 'https://uapiytquwuhtewqieegx.supabase.co';
                 const res = await fetch(`${SU}/rest/v1/ai_credits?select=balance,allowance&user_id=eq.${sess.user.id}`, {
                     headers: { 'Authorization': 'Bearer ' + sess.access_token, 'apikey': anon || '' },
                 });
-                const rows = await res.json();
-                const row = Array.isArray(rows) ? rows[0] : null;
-                if (row) {
-                    window.__aiCreditMax = row.allowance >= 999999 ? null : row.allowance;
-                    updateCreditsDisplay(row.allowance >= 999999 ? 999999 : row.balance);
-                } else {
-                    // No row yet → free tier defaults.
-                    window.__aiCreditMax = 20;
-                    updateCreditsDisplay(20);
+                if (!res.ok) {
+                    // Auth/permission failure — say so instead of inventing a balance.
+                    console.warn('[credits] balance fetch failed:', res.status, await res.text().catch(() => ''));
+                    return;
                 }
-            } catch (e) { /* silent */ }
+                const rows = await res.json();
+                if (!Array.isArray(rows)) { console.warn('[credits] unexpected balance payload:', rows); return; }
+                const row = rows[0];
+                if (!row) {
+                    // RLS filtered everything (returns [] with HTTP 200) or the row is not
+                    // provisioned yet. Either way we do not know the balance — leave the
+                    // counter alone rather than showing a made-up number.
+                    console.warn('[credits] no ai_credits row visible for user');
+                    return;
+                }
+                const unlimited = row.allowance >= 999999;
+                window.__aiCreditMax = unlimited ? null : row.allowance;
+                // Seed the gate's state from the same authoritative row, so the counter and
+                // the generation gate can never disagree again.
+                if (window.AppState) {
+                    AppState.aiCreditsMax       = unlimited ? Infinity : row.allowance;
+                    AppState.aiCreditsRemaining = unlimited ? Infinity : row.balance;
+                }
+                try { localStorage.setItem('aiad_ai_credits', unlimited ? '999999' : String(row.balance)); } catch (e) {}
+                updateCreditsDisplay(unlimited ? 999999 : row.balance);
+                try { if (typeof updateAICreditsDisplay === 'function') updateAICreditsDisplay(); } catch (e) {}
+            } catch (e) { console.warn('[credits] loadAiCredits', e); }
         }
         window.loadAiCredits = loadAiCredits;
 
@@ -23403,11 +23499,15 @@ function toggleAgeRange(btn) {
         window.aiadDecorateBadges = decorateBadges;
 
         // ── Pricing renderer (monthly/annual + founding banner) ──
+        // Prices MUST match stripe-checkout's PLANS map ($29/$59/$99) and credits MUST
+        // match public.ai_allowance_for_plan() (20/150/500/2000). These previously showed
+        // $30/$80/$150 and "Unlimited", none of which was what the customer was charged
+        // or granted.
         const TIERS = [
-            { key:null,              name:'Free',    m:0,   credits:'20 credits/mo' },
-            { key:'artist_starter',  name:'Starter', m:30,  credits:'100 credits/mo' },
-            { key:'artist_pro',      name:'Pro',     m:80,  credits:'500 credits/mo' },
-            { key:'artist_premier',  name:'Premier', m:150, credits:'Unlimited credits' },
+            { key:null,              name:'Free',        m:0,  credits:'20 credits/mo' },
+            { key:'artist_starter',  name:'Starter',     m:29, credits:'150 credits/mo' },
+            { key:'artist_pro',      name:'Pro',         m:59, credits:'500 credits/mo' },
+            { key:'artist_premier',  name:'Established', m:99, credits:'2,000 credits/mo' },
         ];
         async function renderPricing() {
             const mount = document.getElementById('aiadPricingMount');
@@ -25410,6 +25510,88 @@ Be direct and concrete with real industry insight — never generic filler. When
       if (tries>600) clearInterval(iv); // ~15 min safety
     }, 1500);
   } catch(e){ console.warn('[AIAD preview] init failed', e); }
+})();
+</script>
+
+<!-- Global AI credit counter: one node shown across every in-app dashboard.
+     The per-dashboard indicator (#creditsValue) only exists inside the artist
+     dashboard; duplicating that id would break getElementById, so the other
+     views share this pill instead. -->
+<script>
+(function () {
+  var PILL_ID = 'aiadCreditPill';
+
+  function pill() {
+    var el = document.getElementById(PILL_ID);
+    if (el) return el;
+    el = document.createElement('div');
+    el.id = PILL_ID;
+    el.style.cssText = [
+      'position:fixed', 'right:16px', 'bottom:16px', 'z-index:9998',
+      'display:none', 'align-items:center', 'gap:8px',
+      'padding:8px 14px', 'border-radius:999px',
+      'background:rgba(20,20,24,0.92)', 'border:1px solid rgba(255,255,255,0.12)',
+      'backdrop-filter:blur(8px)', '-webkit-backdrop-filter:blur(8px)',
+      'color:#fff', 'font-size:0.78rem', 'font-weight:600',
+      'font-family:var(--font-body,system-ui)', 'letter-spacing:0.02em',
+      'box-shadow:0 4px 18px rgba(0,0,0,0.35)', 'pointer-events:none',
+      'user-select:none'
+    ].join(';');
+    el.innerHTML =
+      '<span style="width:7px;height:7px;border-radius:50%;background:#00D4FF;flex:none;"></span>' +
+      '<span style="opacity:0.65;font-weight:500;">AI Credits</span>' +
+      '<span id="' + PILL_ID + 'Val">— / —</span>';
+    (document.body || document.documentElement).appendChild(el);
+    return el;
+  }
+
+  function dashboardVisible() {
+    var nodes = document.querySelectorAll('[id$="Dashboard"]');
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      if (n.classList.contains('active') && n.offsetParent !== null) return true;
+    }
+    return false;
+  }
+
+  function text() {
+    var S = window.AppState;
+    var rem = S ? S.aiCreditsRemaining : null;
+    var max = S ? S.aiCreditsMax : null;
+    if (rem === Infinity || max === Infinity || rem === 999999) return '∞ Unlimited';
+    if (rem === null || rem === undefined || max === null || max === undefined) return '— / —';
+    return rem + ' / ' + max;
+  }
+
+  function render() {
+    try {
+      var el = pill();
+      if (!dashboardVisible()) { el.style.display = 'none'; return; }
+      el.style.display = 'flex';
+      var v = document.getElementById(PILL_ID + 'Val');
+      if (v) {
+        var t = text();
+        if (v.textContent !== t) v.textContent = t;
+      }
+      // Colour the dot as the balance runs down.
+      var S = window.AppState, dot = el.firstElementChild;
+      if (dot && S && typeof S.aiCreditsRemaining === 'number' && typeof S.aiCreditsMax === 'number' && S.aiCreditsMax > 0) {
+        var pct = (S.aiCreditsRemaining / S.aiCreditsMax) * 100;
+        dot.style.background = pct <= 10 ? '#ff4d4f' : (pct <= 25 ? '#ffa940' : '#00D4FF');
+      }
+    } catch (e) { /* never let the pill break a page */ }
+  }
+
+  function start() {
+    render();
+    setInterval(render, 1000);
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden && typeof window.loadAiCredits === 'function') window.loadAiCredits();
+    });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
 })();
 </script>
 </body>
