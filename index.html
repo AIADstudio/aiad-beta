@@ -846,9 +846,20 @@ html, body {
                 <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:24px;">
 
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                        <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:14px 16px;">
+                            <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--text-muted);margin-bottom:8px;">Email</div>
+                            <input type="email" id="supervisorEmail" placeholder="you@email.com" autocomplete="email" oninput="validateSupervisorProfile()" style="background:transparent;border:none;outline:none;color:var(--text-primary);font-size:0.95rem;width:100%;font-family:inherit;" onfocus="this.closest('div').style.borderColor='rgba(167,139,250,0.5)'" onblur="this.closest('div').style.borderColor='rgba(255,255,255,0.08)'">
+                        </div>
+                        <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:14px 16px;">
+                            <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--text-muted);margin-bottom:8px;">Password</div>
+                            <input type="password" id="supervisorPassword" placeholder="Minimum 6 characters" autocomplete="new-password" oninput="validateSupervisorProfile()" style="background:transparent;border:none;outline:none;color:var(--text-primary);font-size:0.95rem;width:100%;font-family:inherit;" onfocus="this.closest('div').style.borderColor='rgba(167,139,250,0.5)'" onblur="this.closest('div').style.borderColor='rgba(255,255,255,0.08)'">
+                        </div>
+                    </div>
+
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
                         <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:14px 16px;transition:border-color 0.2s;" onfocus-within="this.style.borderColor='rgba(167,139,250,0.4)'">
                             <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--text-muted);margin-bottom:8px;">Full Name</div>
-                            <input type="text" id="supervisorName" placeholder="Your name" style="background:transparent;border:none;outline:none;color:var(--text-primary);font-size:0.95rem;width:100%;font-family:inherit;" onfocus="this.closest('div').style.borderColor='rgba(167,139,250,0.5)'" onblur="this.closest('div').style.borderColor='rgba(255,255,255,0.08)'">
+                            <input type="text" id="supervisorName" placeholder="Your name" oninput="validateSupervisorProfile()" style="background:transparent;border:none;outline:none;color:var(--text-primary);font-size:0.95rem;width:100%;font-family:inherit;" onfocus="this.closest('div').style.borderColor='rgba(167,139,250,0.5)'" onblur="this.closest('div').style.borderColor='rgba(255,255,255,0.08)'">
                         </div>
                         <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:14px 16px;">
                             <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--text-muted);margin-bottom:8px;">Company / Studio</div>
@@ -858,7 +869,7 @@ html, body {
 
                     <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:14px 16px;">
                         <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--text-muted);margin-bottom:8px;">Your Role</div>
-                        <select id="supervisorRole" style="background:transparent;border:none;outline:none;color:var(--text-primary);font-size:0.95rem;width:100%;cursor:pointer;appearance:none;-webkit-appearance:none;font-family:inherit;" onfocus="this.closest('div').style.borderColor='rgba(167,139,250,0.5)'" onblur="this.closest('div').style.borderColor='rgba(255,255,255,0.08)'">
+                        <select id="supervisorRole" onchange="validateSupervisorProfile()" style="background:transparent;border:none;outline:none;color:var(--text-primary);font-size:0.95rem;width:100%;cursor:pointer;appearance:none;-webkit-appearance:none;font-family:inherit;" onfocus="this.closest('div').style.borderColor='rgba(167,139,250,0.5)'" onblur="this.closest('div').style.borderColor='rgba(255,255,255,0.08)'">
                             <option value="" style="background:#0a0a0f;">Select your role</option>
                             <option style="background:#0a0a0f;">Music Supervisor</option>
                             <option style="background:#0a0a0f;">Music Director</option>
@@ -887,7 +898,7 @@ html, body {
 
                 <div style="display:flex;align-items:center;justify-content:space-between;">
                     <button onclick="navigateTo('role-selection')" style="background:transparent;border:none;color:var(--text-muted);cursor:pointer;font-size:0.875rem;padding:0;">← Back</button>
-                    <button onclick="handleSupervisorProfileContinue()" style="padding:12px 32px;background:linear-gradient(135deg,#a78bfa,#7c3aed);border:none;border-radius:10px;color:#fff;font-size:0.875rem;font-weight:600;cursor:pointer;letter-spacing:0.02em;">Continue</button>
+                    <button id="supervisorProfileBtn" disabled onclick="handleSupervisorProfileContinue()" style="padding:12px 32px;background:linear-gradient(135deg,#a78bfa,#7c3aed);border:none;border-radius:10px;color:#fff;font-size:0.875rem;font-weight:600;cursor:not-allowed;letter-spacing:0.02em;opacity:0.5;"><span>Continue</span></button>
                 </div>
 
             </div>
@@ -12003,13 +12014,106 @@ html, body {
             }
         }
 
-        function handleSupervisorProfileContinue() {
+        function validateSupervisorProfile() {
+            const name = (document.getElementById('supervisorName')?.value || '').trim();
+            const role = document.getElementById('supervisorRole')?.value || '';
+            const email = (document.getElementById('supervisorEmail')?.value || '').trim();
+            const password = document.getElementById('supervisorPassword')?.value || '';
+            const btn = document.getElementById('supervisorProfileBtn');
+            if (btn) {
+                const ok = !!(name && role && email.includes('@') && password.length >= 6);
+                btn.disabled = !ok;
+                btn.style.opacity = ok ? '1' : '0.5';
+                btn.style.cursor = ok ? 'pointer' : 'not-allowed';
+            }
+        }
+
+        async function handleSupervisorProfileContinue() {
+            const btn = document.getElementById('supervisorProfileBtn');
+            const setLabel = (t) => { const s = btn?.querySelector('span'); if (s) s.textContent = t; };
+
             const name = document.getElementById('supervisorName').value.trim();
             const company = document.getElementById('supervisorCompany').value.trim();
             const role = document.getElementById('supervisorRole').value;
+            const email = (document.getElementById('supervisorEmail')?.value || '').trim();
+            const password = document.getElementById('supervisorPassword')?.value || '';
+
             if (!name || !role) { showToast('Please fill in your name and role'); return; }
-            AppState.supervisorProfile = { name, company, role, workTypes: supervisorWorkTypes };
+            if (!email.includes('@')) { showToast('Please enter a valid email'); return; }
+            if (password.length < 6) { showToast('Password must be at least 6 characters'); return; }
+
+            AppState.supervisorProfile = { name, company, role, workTypes: supervisorWorkTypes, email };
             localStorage.setItem('aiad_supervisor_profile', JSON.stringify(AppState.supervisorProfile));
+
+            if (btn) btn.disabled = true;
+            setLabel('Creating account...');
+
+            // NOTE: `profiles` has no company column — company lives in auth user metadata
+            // and AppState/localStorage only.
+            const profileRow = () => ({
+                full_name: name,
+                username: name.toLowerCase().replace(/\s+/g, '_'),
+                role: 'supervisor',
+                industry: 'music',
+            });
+
+            try {
+                const { data: authData, error } = await db.auth.signUp({
+                    email, password,
+                    options: {
+                        data: { full_name: name, role: 'supervisor', company: company || '' },
+                        emailRedirectTo: 'https://aiad.studio/?verified=1',
+                    },
+                });
+
+                if (error) {
+                    if (error.message.includes('already registered') || error.message.includes('already exists')) {
+                        // Existing account — sign in and continue the flow.
+                        const { error: signInErr } = await db.auth.signInWithPassword({ email, password });
+                        if (signInErr) {
+                            showToast('That email is already registered. ' + signInErr.message);
+                            if (btn) btn.disabled = false; setLabel('Continue'); return;
+                        }
+                        const u = (await db.auth.getUser()).data?.user;
+                        if (u) {
+                            AppState.currentUser = u;
+                            await db.from('profiles').upsert({ id: u.id, email, ...profileRow() }, { onConflict: 'id' });
+                        }
+                        if (btn) btn.disabled = false; setLabel('Continue');
+                        navigateTo('supervisor-tier');
+                        return;
+                    }
+                    showToast('Error: ' + error.message);
+                    if (btn) btn.disabled = false; setLabel('Continue'); return;
+                }
+
+                localStorage.setItem('aiad_supervisor_email', email);
+
+                // Email confirmation is ON → no session yet. Stash the profile for after verification.
+                if (authData?.user && !authData?.session) {
+                    try {
+                        localStorage.setItem('aiad_pending_profile', JSON.stringify({ email, ...profileRow() }));
+                    } catch (e) {}
+                    if (btn) btn.disabled = false; setLabel('Continue');
+                    showVerifyEmailScreen(email);   // on verify → supervisor dashboard
+                    return;
+                }
+
+                // Edge case: confirmation OFF → session exists, create profile and continue the flow.
+                const user = authData?.user || (await db.auth.getUser()).data?.user;
+                if (user) {
+                    AppState.currentUser = user;
+                    await db.from('profiles').upsert({ id: user.id, email, ...profileRow() }, { onConflict: 'id' });
+                }
+            } catch (e) {
+                console.warn('[AIAD] Supervisor signup error:', e);
+                showToast('Account creation failed: ' + (e.message || e));
+                if (btn) btn.disabled = false; setLabel('Continue');
+                return;
+            }
+
+            setLabel('Continue');
+            if (btn) btn.disabled = false;
             navigateTo('supervisor-tier');
         }
 
@@ -15838,6 +15942,10 @@ Only capture real, meaningful decisions — not questions or general discussion.
             const INDUSTRY_DASH = { music: 'artist', fashion: 'fashion', streaming: 'streamer', visual_arts: 'visualarts', writing_publishing: 'writing', film_media: 'film', games: 'games', multi: 'multi' };
             if (role === 'collaborator') {
                 if (typeof jumpToDashboard === 'function') jumpToDashboard('collab'); else navigateTo('collaborator-complete');
+            } else if (role === 'supervisor') {
+                // Supervisors carry industry 'music' — route by role first so they don't
+                // fall through to the artist dashboard.
+                if (typeof jumpToDashboard === 'function') jumpToDashboard('supervisor'); else navigateTo('supervisor-complete');
             } else if (role === 'fan') {
                 if (typeof jumpToDashboard === 'function') jumpToDashboard('fan'); else navigateTo('industry-selection');
             } else if (industry && INDUSTRY_DASH[industry]) {
