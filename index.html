@@ -5537,7 +5537,7 @@ html, body {
                                 <div class="settings-usage-item"><div class="settings-usage-label">Decision memories</div><div class="settings-usage-value">24 / Unlimited</div></div>
                             </div>
                             <h3 style="font-size: 0.9375rem; font-weight: 500; margin-bottom: var(--space-md); color: var(--text-secondary);">Available Plans</h3>
-                            <div id="aiadPricingMount"></div>
+                            <div id="aiadPricingMountSettings" class="aiad-pricing-mount"></div>
                             <details style="margin-top: var(--space-lg);"><summary style="cursor: pointer; font-size: 0.9375rem; color: var(--text-secondary);">Billing History</summary>
                                 <table class="settings-billing-table" style="margin-top: var(--space-md);"><thead><tr><th>Date</th><th>Description</th><th>Amount</th><th></th></tr></thead><tbody>
                                     <tr><td>Jan 21, 2026</td><td>Pro Plan - Monthly</td><td>$19.00</td><td><a href="#" class="settings-billing-link">Download</a></td></tr>
@@ -23510,8 +23510,11 @@ function toggleAgeRange(btn) {
             { key:'artist_premier',  name:'Established', m:99, credits:'2,000 credits/mo' },
         ];
         async function renderPricing() {
-            const mount = document.getElementById('aiadPricingMount');
-            if (!mount) return;
+            // Two separate mounts (artist settings + onboarding step 2). They used to
+            // share one id, so getElementById always resolved to the settings div and
+            // the onboarding "Choose your plan" step rendered into a hidden element.
+            const mounts = document.querySelectorAll('.aiad-pricing-mount');
+            if (!mounts.length) return;
             const s = sess();
             let currentPlan = 'free', founding = false;
             if (s) {
@@ -23552,7 +23555,7 @@ function toggleAgeRange(btn) {
                 return `<div class="aiad-plan ${isCurrent?'current':''}"><div class="aiad-plan-name">${t.name}</div><div class="aiad-plan-price">${priceHtml}</div><div class="aiad-plan-sub">${sub}</div>${btn}</div>`;
             }).join('');
 
-            mount.innerHTML = `
+            const html = `
                 ${banner}
                 <div class="aiad-price-toggle">
                     <button class="${iv==='month'?'active':''}" onclick="window.__setInterval('month')">Monthly</button>
@@ -23560,6 +23563,7 @@ function toggleAgeRange(btn) {
                 </div>
                 <div class="aiad-plan-grid">${cards}</div>
                 <p style="font-size:0.72rem;color:var(--text-hint);margin-top:10px;">Manage or cancel anytime from <a href="#" onclick="window.openBillingPortal();return false;" style="color:var(--teal,#06b6d4);">the billing portal</a>.</p>`;
+            mounts.forEach((m) => { m.innerHTML = html; });
         }
         window.__setInterval = (iv) => { window.__aiadBillingInterval = iv; renderPricing(); };
         window.aiadRenderPricing = renderPricing;
@@ -24708,7 +24712,7 @@ Be direct and concrete with real industry insight — never generic filler. When
                     </div>
                     <div id="aiadObStep2" style="display:none;background:#0d0f17;border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:20px;">
                         <div style="text-align:center;margin-bottom:8px;"><div style="font-size:1.15rem;font-weight:700;color:#fff;">Choose your plan</div><p style="color:#94a3b8;font-size:0.82rem;margin:4px 0 0;">Start free and upgrade anytime — or unlock the full AI toolkit now.</p></div>
-                        <div id="aiadPricingMount"></div>
+                        <div id="aiadPricingMountOnboarding" class="aiad-pricing-mount"></div>
                         <button onclick="aiadFinishOnboarding('${dash}')" style="width:100%;margin-top:12px;background:transparent;color:#94a3b8;border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:11px;font-size:0.88rem;font-weight:600;cursor:pointer;">Start on Free →</button>
                     </div>
                 </div>`;
