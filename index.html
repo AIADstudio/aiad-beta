@@ -4058,7 +4058,7 @@ html, body {
                             <h1 class="view-title">Collaborators</h1>
                             <p class="view-subtitle">Find and work with talented creators</p>
                         </div>
-                        <button class="primary-btn" onclick="showToast('Opening collaborator marketplace...')">
+                        <button class="primary-btn" onclick="loadCollaborators(true)">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
                             Find Collaborators
                         </button>
@@ -13502,6 +13502,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             } else if (view === 'collaborators') {
                 viewEl.classList.add('active');
                 navItems[3].classList.add('active');
+                setTimeout(() => { try { loadCollaborators(); } catch (e) {} }, 100);
             } else if (view === 'schedule') {
                 viewEl.classList.add('active');
                 navItems[5].classList.add('active');
@@ -16257,10 +16258,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     if (designUrl.startsWith('data:')) {
                         _persistDesign = await uploadGeneratedImage(designUrl, 'merch');
                     }
-                    var _mhist2  = _shGet('merch');
-                    _mhist2.unshift({ date: new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'}), label: _mlabel, url: _persistDesign });
-                    _shSet('merch', _mhist2);
-                    renderStudioHistory('merch');
+                    var _mhist2 = _shAdd('merch', { date: new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'}), label: _mlabel, url: _persistDesign });
                     var _mhEmpty = document.getElementById('merchHistoryEmpty');
                     if (_mhEmpty) _mhEmpty.style.display = 'none';
                     console.log('[AIAD] merch history saved, total items:', _mhist2.length, 'url:', _persistDesign.slice(0,60));
@@ -17271,6 +17269,97 @@ Only capture real, meaningful decisions — not questions or general discussion.
         // In-memory history store — no size limits, survives full session
         var _studioHistoryMem = {};
 
+        // ── Collaborators browse ───────────────────────────────────────────────
+        // Uses the list_artists RPC rather than a direct profiles select: profiles RLS
+        // only exposes the current user's own row, so a raw query returns just you.
+        // list_artists is SECURITY DEFINER and returns the public directory.
+        let _collabLoading = false;
+
+        async function loadCollaborators(force) {
+            const grid = document.getElementById('collaboratorsGrid');
+            if (!grid) return;
+            if (_collabLoading) return;
+            if (grid.dataset.loaded === '1' && !force) return;
+            _collabLoading = true;
+            grid.dataset.loaded = '1';
+
+            grid.innerHTML = '<div style="grid-column:1/-1;padding:24px;text-align:center;color:var(--text-muted);font-size:0.875rem;">Loading collaborators…</div>';
+
+            try {
+                const { data, error } = await db.rpc('list_artists', { p_search: null, p_limit: 48 });
+                if (error) throw new Error(error.message || 'list_artists failed');
+
+                const rows = Array.isArray(data) ? data : (data ? JSON.parse(data) : []);
+                if (!rows.length) {
+                    grid.innerHTML = '<div style="grid-column:1/-1;padding:24px;text-align:center;color:var(--text-muted);font-size:0.875rem;">No collaborators yet.</div>';
+                    return;
+                }
+                grid.innerHTML = rows.map(renderCollaboratorCard).join('');
+            } catch (e) {
+                console.warn('[AIAD] loadCollaborators failed:', e);
+                grid.dataset.loaded = '';
+                grid.innerHTML = '<div style="grid-column:1/-1;padding:24px;text-align:center;color:var(--text-muted);font-size:0.875rem;">Could not load collaborators. '
+                    + '<button onclick="loadCollaborators(true)" style="background:none;border:none;color:var(--teal,#06b6d4);cursor:pointer;text-decoration:underline;font:inherit;">Retry</button></div>';
+            } finally {
+                _collabLoading = false;
+            }
+        }
+        window.loadCollaborators = loadCollaborators;
+
+        function _esc(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
+                { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+            ));
+        }
+
+        function renderCollaboratorCard(a) {
+            const name     = _esc(a.name || a.username || 'Unnamed');
+            const username = _esc(a.username || '');
+            const genre    = _esc(a.genre || '');
+            const location = _esc(a.location || '');
+            const initial  = (a.name || a.username || '?').trim().charAt(0).toUpperCase();
+            const avatar = a.avatar
+                ? `<img src="${_esc(a.avatar)}" alt="" style="width:48px;height:48px;border-radius:50%;object-fit:cover;flex:none;">`
+                : `<div style="width:48px;height:48px;border-radius:50%;flex:none;background:linear-gradient(135deg,#00B4D8,#FF00FF);display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;">${_esc(initial)}</div>`;
+            const badge = a.verified
+                ? '<span title="Verified" style="color:#00D4FF;font-size:0.75rem;">✓</span>' : '';
+            const founding = a.founding_number
+                ? `<span style="font-size:0.68rem;color:var(--text-hint);">Founding #${_esc(a.founding_number)}</span>` : '';
+
+            return `
+                <div class="collaborator-card" style="background:var(--bg-card);border:1px solid var(--border-default);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px;">
+                    <div style="display:flex;align-items:center;gap:12px;min-width:0;">
+                        ${avatar}
+                        <div style="min-width:0;">
+                            <div style="font-weight:600;font-size:0.95rem;display:flex;align-items:center;gap:6px;">
+                                <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}</span>${badge}
+                            </div>
+                            <div style="font-size:0.78rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                ${genre || '—'}${location ? ' · ' + location : ''}
+                            </div>
+                            ${founding}
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:8px;">
+                        <button class="artist-action-btn primary" style="flex:1;" onclick="viewCollaboratorProfile('${username}')">View Profile</button>
+                        <button class="artist-action-btn" style="flex:1;" onclick="messageCollaborator('${username}')">Message</button>
+                    </div>
+                </div>`;
+        }
+
+        function viewCollaboratorProfile(username) {
+            if (!username) { showToast('No profile available'); return; }
+            // Public artist pages are served at /artist/:username (see vercel.json rewrite).
+            window.open('/artist/' + encodeURIComponent(username), '_blank', 'noopener');
+        }
+        window.viewCollaboratorProfile = viewCollaboratorProfile;
+
+        function messageCollaborator(username) {
+            // Direct messaging is not built yet — say so plainly rather than pretending.
+            showToast('Messaging isn\'t available yet' + (username ? ' — find @' + username + ' on their profile' : ''));
+        }
+        window.messageCollaborator = messageCollaborator;
+
         function _shGet(key) {
             // 1. Memory first (full data, no size limit)
             if (_studioHistoryMem[key] && _studioHistoryMem[key].length > 0) {
@@ -17304,10 +17393,79 @@ Only capture real, meaningful decisions — not questions or general discussion.
             } catch(e) {}
         }
 
+        // ── Durable generation history (public.creations) ──────────────────────
+        // localStorage is a cache only: it is per-browser, lost on cache clear, and
+        // capped by quota. The creations table is the durable, cross-device record.
+        // RLS on creations is ALL with auth.uid() = user_id, and user_id defaults to
+        // auth.uid(), so we never send it from the client.
+
+        // item shape ↔ creations row
+        function _shToRow(key, item) {
+            if (key === 'songwriting') {
+                return { kind: 'songwriting', title: (item.preview || '').slice(0, 120),
+                         content: item.lyrics || '',
+                         meta: { date: item.date || '', genre: item.genre || '', mood: item.mood || '' } };
+            }
+            return { kind: key, title: item.label || '', url: item.url || '',
+                     meta: { date: item.date || '' } };
+        }
+
+        function _shFromRow(key, row) {
+            const meta = row.meta || {};
+            const date = meta.date || (row.created_at
+                ? new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                : '');
+            if (key === 'songwriting') {
+                return { date, genre: meta.genre || '', mood: meta.mood || '',
+                         preview: (row.content || '').slice(0, 200), lyrics: row.content || '' };
+            }
+            return { date, label: row.title || '', url: row.url || '' };
+        }
+
+        // Best-effort insert. Never blocks or fails the generation itself.
+        async function _shPersist(key, item) {
+            try {
+                if (!AppState.currentUser) return;
+                const { error } = await db.from('creations').insert(_shToRow(key, item));
+                if (error) console.warn('[AIAD] creations insert failed:', error.message);
+            } catch (e) { console.warn('[AIAD] creations insert threw:', e); }
+        }
+
+        // Add one generation: memory + localStorage cache, durable row, re-render.
+        function _shAdd(key, item) {
+            const items = _shGet(key);
+            items.unshift(item);
+            _shSet(key, items);
+            renderStudioHistory(key);
+            _shPersist(key, item);
+            return items;
+        }
+
+        // Load durable history and merge it over the local cache.
+        async function _shLoadFromDb(key) {
+            try {
+                if (!AppState.currentUser) return;
+                const { data, error } = await db
+                    .from('creations')
+                    .select('kind,title,content,url,meta,created_at')
+                    .eq('kind', key)
+                    .order('created_at', { ascending: false })
+                    .limit(30);
+                if (error) { console.warn('[AIAD] creations load failed:', error.message); return; }
+                if (!Array.isArray(data) || !data.length) return;
+                _studioHistoryMem[key] = data.map((r) => _shFromRow(key, r));
+                _shSet(key, _studioHistoryMem[key]);
+                renderStudioHistory(key);
+            } catch (e) { console.warn('[AIAD] creations load threw:', e); }
+        }
+
         function clearStudioHistory(key) {
             localStorage.removeItem('aiad_sh_'+key);
+            _studioHistoryMem[key] = [];
             renderStudioHistory(key);
-            showToast('History cleared');
+            // Local-only clear: the durable rows in creations are intentionally left
+            // alone so history is not destroyed across devices by a cache clear.
+            showToast('History cleared on this device');
         }
 
         function renderStudioHistory(key) {
@@ -17417,6 +17575,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     }
                 } catch(e) {}
                 renderStudioHistory(k);
+                // Then pull the durable rows; they win over the local cache.
+                _shLoadFromDb(k);
             });
         }
 
@@ -17450,10 +17610,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 if (output) {
                     document.getElementById('songwritingOutput').textContent = output;
                     // auto-save to history
-                    const _sh = _shGet('songwriting');
-                    _sh.unshift({ date: new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'}), genre, mood, preview: output.slice(0,200), lyrics: output });
-                    _shSet('songwriting', _sh);
-                    renderStudioHistory('songwriting');
+                    _shAdd('songwriting', { date: new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'}), genre, mood, preview: output.slice(0,200), lyrics: output });
                 } else {
                     console.error('Songwriting response:', data);
                     showToast('Unexpected response. Check console for details.');
@@ -17592,10 +17749,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     if (imageUrl.startsWith('data:')) {
                         _persistUrl = await uploadGeneratedImage(imageUrl, 'mixmedia');
                     }
-                    var _mhist = _shGet('mixmedia');
-                    _mhist.unshift({ date: new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'}), label: assetLabel + ' — ' + prompt.slice(0,40), url: _persistUrl });
-                    _shSet('mixmedia', _mhist);
-                    renderStudioHistory('mixmedia');
+                    var _mhist = _shAdd('mixmedia', { date: new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'}), label: assetLabel + ' — ' + prompt.slice(0,40), url: _persistUrl });
                     console.log('[AIAD] mixmedia history saved, total items:', _mhist.length, 'url:', _persistUrl.slice(0,60));
                 } else {
                     console.error('[AIAD] Mix-media: no image URL found in response:', data);
