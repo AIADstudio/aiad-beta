@@ -608,6 +608,27 @@ html, body {
 
     <main class="main" id="mainContainer">
 
+        <!-- Clickwrap Terms agreement, shared by every signup form. -->
+        <style>
+          .aiad-terms-consent{
+            display:flex; align-items:flex-start; gap:10px;
+            margin:16px 0 4px; padding:12px 14px;
+            border:1px solid var(--border-default, rgba(255,255,255,0.08));
+            border-radius:10px;
+            background:var(--bg-card, rgba(255,255,255,0.03));
+            font-size:0.8rem; line-height:1.45;
+            color:var(--text-secondary, rgba(255,255,255,0.6));
+          }
+          .aiad-terms-consent input[type="checkbox"]{
+            width:16px; height:16px; margin:1px 0 0; flex:none; cursor:pointer;
+            accent-color:var(--teal, #00B4D8);
+          }
+          .aiad-terms-consent label{ cursor:pointer; }
+          .aiad-terms-consent a{
+            color:var(--teal-light, #00D4FF); text-decoration:underline;
+          }
+        </style>
+
         <div class="page" id="page-sign-in">
             <div class="sign-in-container">
                 <div class="sign-in-logo">
@@ -659,6 +680,10 @@ html, body {
                                 <option value="collaborator">Collaborator</option>
                             </select>
                         </div>
+                        <div class="aiad-terms-consent">
+                            <input type="checkbox" id="signUpTerms" onchange="validateSignUp()">
+                            <label for="signUpTerms">I agree to the <a href="/terms" target="_blank" rel="noopener">Terms &amp; Conditions</a> and <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a></label>
+                        </div>
                         <button class="btn-primary btn-fan" id="signUpBtn" disabled onclick="handleSignUp()" style="max-width: 100%;">
                             <span>Create Account</span>
                         </button>
@@ -689,11 +714,13 @@ html, body {
                     Don't have an account? <a onclick="toggleAuthMode()">Sign up</a>
                 </div>
 
+                <!-- Signup consent is now the clickwrap checkbox on the form above.
+                     This notice remains for the SIGN-IN path (returning users), where
+                     no new agreement is being captured. -->
                 <div style="margin-top:28px;text-align:center;font-size:0.74rem;color:var(--text-hint, #64748b);">
-                    By signing in you agree to our
-                    <a href="/terms" style="color:var(--text-muted, #94a3b8);text-decoration:underline;">Terms</a>,
-                    <a href="/privacy" style="color:var(--text-muted, #94a3b8);text-decoration:underline;">Privacy</a>, and
-                    <a href="/dmca" style="color:var(--text-muted, #94a3b8);text-decoration:underline;">DMCA</a> policies.
+                    <a href="/terms" target="_blank" rel="noopener" style="color:var(--text-muted, #94a3b8);text-decoration:underline;">Terms</a>,
+                    <a href="/privacy" target="_blank" rel="noopener" style="color:var(--text-muted, #94a3b8);text-decoration:underline;">Privacy</a>, and
+                    <a href="/dmca" target="_blank" rel="noopener" style="color:var(--text-muted, #94a3b8);text-decoration:underline;">DMCA</a> policies.
                 </div>
             </div>
         </div>
@@ -920,6 +947,10 @@ html, body {
 
                 </div>
 
+                <div class="aiad-terms-consent">
+                    <input type="checkbox" id="supervisorTerms" onchange="validateSupervisorProfile()">
+                    <label for="supervisorTerms">I agree to the <a href="/terms" target="_blank" rel="noopener">Terms &amp; Conditions</a> and <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a></label>
+                </div>
                 <div style="display:flex;align-items:center;justify-content:space-between;">
                     <button onclick="navigateTo('role-selection')" style="background:transparent;border:none;color:var(--text-muted);cursor:pointer;font-size:0.875rem;padding:0;">← Back</button>
                     <button id="supervisorProfileBtn" disabled onclick="handleSupervisorProfileContinue()" style="padding:12px 32px;background:linear-gradient(135deg,#a78bfa,#7c3aed);border:none;border-radius:10px;color:#fff;font-size:0.875rem;font-weight:600;cursor:not-allowed;letter-spacing:0.02em;opacity:0.5;"><span>Continue</span></button>
@@ -1073,6 +1104,10 @@ html, body {
                     </div>
                 </div>
 
+                <div class="aiad-terms-consent">
+                    <input type="checkbox" id="artistTerms" onchange="validateArtistForm()">
+                    <label for="artistTerms">I agree to the <a href="/terms" target="_blank" rel="noopener">Terms &amp; Conditions</a> and <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a></label>
+                </div>
                 <div class="actions actions-form">
                     <button class="btn-primary btn-artist" id="artistProfileBtn" disabled onclick="handleArtistProfileContinue()"><span>Continue</span></button>
                     <button class="btn-secondary" onclick="navigateTo('role-selection')">← Back</button>
@@ -1438,6 +1473,10 @@ html, body {
                     </div>
                 </div>
 
+                <div class="aiad-terms-consent">
+                    <input type="checkbox" id="fanTerms" onchange="validateFanProfile()">
+                    <label for="fanTerms">I agree to the <a href="/terms" target="_blank" rel="noopener">Terms &amp; Conditions</a> and <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a></label>
+                </div>
                 <div class="actions actions-form">
                     <button class="btn-primary btn-fan" id="fanProfileBtn" disabled onclick="handleFanProfileContinue()"><span>Continue</span></button>
                     <button class="btn-secondary" onclick="navigateTo('role-selection')">← Back</button>
@@ -1606,6 +1645,10 @@ html, body {
                     </div>
                 </div>
 
+                <div class="aiad-terms-consent">
+                    <input type="checkbox" id="collabTerms" onchange="validateCollabProfile()">
+                    <label for="collabTerms">I agree to the <a href="/terms" target="_blank" rel="noopener">Terms &amp; Conditions</a> and <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a></label>
+                </div>
                 <div class="actions">
                     <button class="btn-primary btn-collab" id="collabProfileBtn" disabled onclick="handleCollabProfileContinue()"><span>Continue</span></button>
                     <button class="btn-secondary" onclick="navigateTo('collaborator-roles')">← Back</button>
@@ -10242,6 +10285,34 @@ html, body {
         // repairs all of them at once.
         window.AppState = AppState;
 
+        // ── Terms clickwrap ────────────────────────────────────────────────────
+        // Every signup form must capture an affirmative agreement. The checkbox
+        // gates the submit button (mirroring each form's existing field validation)
+        // and each handler re-checks before calling signUp, so the guard holds even
+        // if the button is re-enabled by other code.
+        const AIAD_TERMS_VERSION = '2026-08';
+
+        function aiadTermsChecked(id) {
+            const el = document.getElementById(id);
+            return !!(el && el.checked);
+        }
+
+        // Returns true when it is safe to proceed; otherwise toasts and returns false.
+        function aiadTermsGuard(id) {
+            if (aiadTermsChecked(id)) return true;
+            showToast('Please agree to the Terms to continue');
+            return false;
+        }
+
+        // Consent columns written onto the profiles row. Timestamped client-side
+        // because these go through a client upsert, not a SQL default.
+        function aiadTermsConsent() {
+            return { terms_accepted_at: new Date().toISOString(), terms_version: AIAD_TERMS_VERSION };
+        }
+        window.aiadTermsChecked = aiadTermsChecked;
+        window.aiadTermsGuard   = aiadTermsGuard;
+        window.aiadTermsConsent = aiadTermsConsent;
+
         function getIndustryConfig() {
             return AppState.industryConfig || IndustryConfig.music;
         }
@@ -11643,10 +11714,11 @@ html, body {
             const email = document.getElementById('artistEmail')?.value.trim();
             const password = document.getElementById('artistPassword')?.value;
             AppState.artistProfile.primaryGenre = genre;
-            document.getElementById('artistProfileBtn').disabled = !(genre && level && fullName && username && email && password && password.length >= 6);
+            document.getElementById('artistProfileBtn').disabled = !(genre && level && fullName && username && email && password && password.length >= 6 && aiadTermsChecked('artistTerms'));
         }
 
         async function handleArtistProfileContinue() {
+            if (!aiadTermsGuard('artistTerms')) return;
             const btn = document.getElementById('artistProfileBtn');
             btn.disabled = true;
             btn.querySelector('span').textContent = 'Creating account...';
@@ -11691,6 +11763,7 @@ html, body {
                     localStorage.setItem('aiad_pending_profile', JSON.stringify({
                         email, full_name: fullName, username, role: 'artist',
                         industry: AppState.userIndustry || 'music',
+                        ...aiadTermsConsent(),
                     }));
                 } catch (e) {}
                 btn.disabled = false; btn.querySelector('span').textContent = 'Continue';
@@ -11708,6 +11781,7 @@ html, body {
                     username,
                     role: 'artist',
                     industry: AppState.userIndustry || 'music',
+                    ...aiadTermsConsent(),
                 }, { onConflict: 'id' });
             }
 
@@ -12060,7 +12134,7 @@ html, body {
             const password = document.getElementById('supervisorPassword')?.value || '';
             const btn = document.getElementById('supervisorProfileBtn');
             if (btn) {
-                const ok = !!(name && role && email.includes('@') && password.length >= 6);
+                const ok = !!(name && role && email.includes('@') && password.length >= 6 && aiadTermsChecked('supervisorTerms'));
                 btn.disabled = !ok;
                 btn.style.opacity = ok ? '1' : '0.5';
                 btn.style.cursor = ok ? 'pointer' : 'not-allowed';
@@ -12068,6 +12142,7 @@ html, body {
         }
 
         async function handleSupervisorProfileContinue() {
+            if (!aiadTermsGuard('supervisorTerms')) return;
             const btn = document.getElementById('supervisorProfileBtn');
             const setLabel = (t) => { const s = btn?.querySelector('span'); if (s) s.textContent = t; };
 
@@ -12116,7 +12191,7 @@ html, body {
                         const u = (await db.auth.getUser()).data?.user;
                         if (u) {
                             AppState.currentUser = u;
-                            await db.from('profiles').upsert({ id: u.id, email, ...profileRow() }, { onConflict: 'id' });
+                            await db.from('profiles').upsert({ id: u.id, email, ...profileRow(), ...aiadTermsConsent() }, { onConflict: 'id' });
                         }
                         if (btn) btn.disabled = false; setLabel('Continue');
                         navigateTo('supervisor-tier');
@@ -12131,7 +12206,7 @@ html, body {
                 // Email confirmation is ON → no session yet. Stash the profile for after verification.
                 if (authData?.user && !authData?.session) {
                     try {
-                        localStorage.setItem('aiad_pending_profile', JSON.stringify({ email, ...profileRow() }));
+                        localStorage.setItem('aiad_pending_profile', JSON.stringify({ email, ...profileRow(), ...aiadTermsConsent() }));
                     } catch (e) {}
                     if (btn) btn.disabled = false; setLabel('Continue');
                     showVerifyEmailScreen(email);   // on verify → supervisor dashboard
@@ -12142,7 +12217,7 @@ html, body {
                 const user = authData?.user || (await db.auth.getUser()).data?.user;
                 if (user) {
                     AppState.currentUser = user;
-                    await db.from('profiles').upsert({ id: user.id, email, ...profileRow() }, { onConflict: 'id' });
+                    await db.from('profiles').upsert({ id: user.id, email, ...profileRow(), ...aiadTermsConsent() }, { onConflict: 'id' });
                 }
             } catch (e) {
                 console.warn('[AIAD] Supervisor signup error:', e);
@@ -15925,10 +16000,11 @@ Only capture real, meaningful decisions — not questions or general discussion.
             const email = document.getElementById('signUpEmail').value.trim();
             const password = document.getElementById('signUpPassword').value;
             const role = document.getElementById('signUpRole').value;
-            document.getElementById('signUpBtn').disabled = !(name && username && email && password.length >= 6 && role);
+            document.getElementById('signUpBtn').disabled = !(name && username && email && password.length >= 6 && role && aiadTermsChecked('signUpTerms'));
         }
 
         async function handleSignUp() {
+            if (!aiadTermsGuard('signUpTerms')) return;
             const name = document.getElementById('signUpName').value.trim();
             const username = document.getElementById('signUpUsername').value.trim();
             const email = document.getElementById('signUpEmail').value.trim();
@@ -15977,6 +16053,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             try {
                 localStorage.setItem('aiad_pending_profile', JSON.stringify({
                     email, full_name: name, username, role,
+                    ...aiadTermsConsent(),
                 }));
             } catch (e) {}
 
@@ -15990,6 +16067,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     await db.from('profiles').upsert({
                         id: data.user.id,
                         email, full_name: name, username, role,
+                        ...aiadTermsConsent(),
                     }, { onConflict: 'id' });
                     AppState.currentUser = data.user;
                 }
@@ -16016,6 +16094,11 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     if (pending.industry)   row.industry  = pending.industry;
                     if (pending.location)   row.location  = pending.location;
                     if (pending.avatar_url) row.avatar_url = pending.avatar_url;
+                    // Terms consent captured at signup. With email confirmation ON there
+                    // is no session at signup time, so the profiles row is first created
+                    // here — this is where the consent has to land for most users.
+                    if (pending.terms_accepted_at) row.terms_accepted_at = pending.terms_accepted_at;
+                    if (pending.terms_version)     row.terms_version     = pending.terms_version;
                     await db.from('profiles').upsert(row, { onConflict: 'id' });
                     localStorage.removeItem('aiad_pending_profile');
                 }
@@ -18611,7 +18694,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             const password = document.getElementById('collabPassword')?.value || '';
 
             const btn = document.getElementById('collabProfileBtn');
-            btn.disabled = !(displayName && location && experience && email.includes('@') && password.length >= 6);
+            btn.disabled = !(displayName && location && experience && email.includes('@') && password.length >= 6 && aiadTermsChecked('collabTerms'));
 
             AppState.collaborator.profile.displayName = displayName;
             AppState.collaborator.profile.location = location;
@@ -18695,6 +18778,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
 
         async function handleCollabProfileContinue() {
+            if (!aiadTermsGuard('collabTerms')) return;
             const btn = document.getElementById('collabProfileBtn');
             btn.disabled = true;
             btn.querySelector('span').textContent = 'Creating account...';
@@ -18729,6 +18813,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                                 role: 'collaborator', industry: AppState.userIndustry || 'music',
                                 location: AppState.collaborator.profile.location || '',
                                 avatar_url: AppState.collaborator.profile.avatarUrl || '',
+                                ...aiadTermsConsent(),
                             }, { onConflict: 'id' });
                         }
                         btn.disabled = false; btn.querySelector('span').textContent = 'Continue';
@@ -18752,6 +18837,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                             industry: AppState.userIndustry || 'music',
                             location: AppState.collaborator.profile.location || '',
                             avatar_url: AppState.collaborator.profile.avatarUrl || '',
+                            ...aiadTermsConsent(),
                         }));
                     } catch (e) {}
                     btn.disabled = false; btn.querySelector('span').textContent = 'Continue';
@@ -18769,6 +18855,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                         role: 'collaborator', industry: AppState.userIndustry || 'music',
                         location: AppState.collaborator.profile.location || '',
                         avatar_url: AppState.collaborator.profile.avatarUrl || '',
+                        ...aiadTermsConsent(),
                     }, { onConflict: 'id' });
                 }
             } catch(e) {
@@ -21324,11 +21411,12 @@ document.addEventListener('keydown', function(e) {
             const email = (document.getElementById('fanEmail')?.value || '').trim();
             const pass  = document.getElementById('fanPassword')?.value || '';
             const btn   = document.getElementById('fanProfileBtn');
-            if (btn) btn.disabled = !(name.length >= 2 && email.includes('@') && pass.length >= 6);
+            if (btn) btn.disabled = !(name.length >= 2 && email.includes('@') && pass.length >= 6 && aiadTermsChecked('fanTerms'));
         }
 
         // Step 1 → 2: sign up + save to Supabase, then navigate to preferences
         async function handleFanProfileContinue() {
+            if (!aiadTermsGuard('fanTerms')) return;
             const btn = document.getElementById('fanProfileBtn');
             btn.disabled = true;
             btn.querySelector('span').textContent = 'Creating account...';
@@ -21372,6 +21460,7 @@ document.addEventListener('keydown', function(e) {
                         email, full_name: name,
                         username: name.toLowerCase().replace(/\s+/g, '_'),
                         role: 'fan', industry: 'music', location,
+                        ...aiadTermsConsent(),
                     }));
                 } catch (e) {}
                 btn.disabled = false; btn.querySelector('span').textContent = 'Continue';
@@ -21387,6 +21476,7 @@ document.addEventListener('keydown', function(e) {
                     id: userData.id, email, full_name: name,
                     username: name.toLowerCase().replace(/\s+/g, '_'),
                     role: 'fan', industry: 'music',
+                    ...aiadTermsConsent(),
                 }, { onConflict: 'id' });
 
                 AppState.currentUser = userData;
