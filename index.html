@@ -14628,14 +14628,15 @@ Only capture real, meaningful decisions — not questions or general discussion.
             if (creditsValue && creditsBarFill) {
                 creditsValue.classList.remove('warning', 'critical');
                 creditsBarFill.classList.remove('warning', 'critical');
+                const setVal = (t) => { if (creditsValue.textContent !== t) creditsValue.textContent = t; };
                 if (unknown) {
-                    creditsValue.textContent = '— / —';
+                    setVal('— / —');
                     creditsBarFill.style.width = '0%';
                 } else if (unlimited) {
-                    creditsValue.textContent = '∞ Unlimited';
+                    setVal('∞ Unlimited');
                     creditsBarFill.style.width = '100%';
                 } else {
-                    creditsValue.textContent = `${remaining} / ${max}`;
+                    setVal(`${remaining} / ${max}`);
                     creditsBarFill.style.width = percentage + '%';
                     if (percentage <= 20) {
                         creditsBarFill.classList.add('critical');
@@ -14650,11 +14651,15 @@ Only capture real, meaningful decisions — not questions or general discussion.
             const studioText = unknown ? '— credits'
                              : unlimited ? '∞ Unlimited'
                              : `${remaining} / ${max} credits`;
+            const badgeColor = (!unlimited && !unknown && percentage <= 20) ? '#FF4444'
+                             : (!unlimited && !unknown && percentage <= 50) ? '#FFA500'
+                             : 'var(--text-secondary)';
             badges.forEach((el) => {
-                el.textContent = studioText;
-                el.style.color = (!unlimited && !unknown && percentage <= 20) ? '#FF4444'
-                               : (!unlimited && !unknown && percentage <= 50) ? '#FFA500'
-                               : 'var(--text-secondary)';
+                // Only write when the value actually changed. Unconditional textContent
+                // assignment fires DOM mutations on every paint, which the nav-indicator
+                // MutationObserver would pick up and turn into a paint loop.
+                if (el.textContent !== studioText) el.textContent = studioText;
+                if (el.style.color !== badgeColor) el.style.color = badgeColor;
             });
         }
 
@@ -17819,6 +17824,12 @@ Only capture real, meaningful decisions — not questions or general discussion.
         const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
             auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storage: aiadAuthStorage },
         });
+
+        // Same reason as `window.AppState` above: `const db` at the top level of a
+        // classic <script> lives in the global lexical environment and is NOT a property
+        // of `window`. Anything reading `window.db` (including _client()'s first branch
+        // and the nav credit indicator's auth hook) silently saw undefined.
+        window.db = db;
 
         // ── Single session resolver ────────────────────────────────────────────────
         // aiadAuthStorage above puts the token in sessionStorage when "remember me" is
@@ -25785,81 +25796,119 @@ Be direct and concrete with real industry insight — never generic filler. When
 })();
 </script>
 
-<!-- Global AI credit counter: one node shown across every in-app dashboard.
-     The per-dashboard indicator (#creditsValue) only exists inside the artist
-     dashboard; duplicating that id would break getElementById, so the other
-     views share this pill instead. -->
+<!-- Global AI credit indicator.
+     One indicator injected into every dashboard's nav chrome, so it is present on
+     every in-app view (feed, agents, studios, collaborators, stats, settings, …)
+     rather than only the Agents tab and the studio views.
+
+     The value span carries class="studio-credits-text", which is what
+     updateAICreditsDisplay() already paints — so these are driven by exactly the
+     same loadAiCredits source of truth as the artist panel indicator, with no
+     second paint path to drift out of sync. -->
+<style>
+  .aiad-nav-credits{
+    display:flex; align-items:center; gap:8px;
+    margin:0 0 12px 0; padding:9px 12px;
+    border:1px solid var(--border-default, rgba(255,255,255,0.08));
+    border-radius:10px;
+    background:var(--bg-card, rgba(255,255,255,0.04));
+    font-size:0.74rem; line-height:1.2; white-space:nowrap;
+  }
+  .aiad-nav-credits .aiad-nav-credits-dot{
+    width:6px; height:6px; border-radius:50%; background:#00D4FF; flex:none;
+  }
+  .aiad-nav-credits .aiad-nav-credits-label{
+    color:var(--text-muted, rgba(255,255,255,0.4));
+    text-transform:uppercase; letter-spacing:0.08em; font-size:0.58rem; font-weight:600;
+  }
+  .aiad-nav-credits .studio-credits-text{
+    margin-left:auto; font-weight:700;
+    color:var(--text-secondary, rgba(255,255,255,0.6));
+  }
+</style>
 <script>
 (function () {
-  var PILL_ID = 'aiadCreditPill';
-
-  function pill() {
-    var el = document.getElementById(PILL_ID);
-    if (el) return el;
-    el = document.createElement('div');
-    el.id = PILL_ID;
-    el.style.cssText = [
-      'position:fixed', 'right:16px', 'bottom:16px', 'z-index:9998',
-      'display:none', 'align-items:center', 'gap:8px',
-      'padding:8px 14px', 'border-radius:999px',
-      'background:rgba(20,20,24,0.92)', 'border:1px solid rgba(255,255,255,0.12)',
-      'backdrop-filter:blur(8px)', '-webkit-backdrop-filter:blur(8px)',
-      'color:#fff', 'font-size:0.78rem', 'font-weight:600',
-      'font-family:var(--font-body,system-ui)', 'letter-spacing:0.02em',
-      'box-shadow:0 4px 18px rgba(0,0,0,0.35)', 'pointer-events:none',
-      'user-select:none'
-    ].join(';');
-    el.innerHTML =
-      '<span style="width:7px;height:7px;border-radius:50%;background:#00D4FF;flex:none;"></span>' +
-      '<span style="opacity:0.65;font-weight:500;">AI Credits</span>' +
-      '<span id="' + PILL_ID + 'Val">— / —</span>';
-    (document.body || document.documentElement).appendChild(el);
-    return el;
-  }
-
-  function dashboardVisible() {
-    var nodes = document.querySelectorAll('[id$="Dashboard"]');
-    for (var i = 0; i < nodes.length; i++) {
-      var n = nodes[i];
-      if (n.classList.contains('active') && n.offsetParent !== null) return true;
-    }
-    return false;
-  }
-
-  function text() {
-    var S = window.AppState;
-    var rem = S ? S.aiCreditsRemaining : null;
-    var max = S ? S.aiCreditsMax : null;
-    if (rem === Infinity || max === Infinity || rem === 999999) return '∞ Unlimited';
-    if (rem === null || rem === undefined || max === null || max === undefined) return '— / —';
-    return rem + ' / ' + max;
-  }
-
-  function render() {
+  function ensureIndicator(dash) {
     try {
-      var el = pill();
-      if (!dashboardVisible()) { el.style.display = 'none'; return; }
-      el.style.display = 'flex';
-      var v = document.getElementById(PILL_ID + 'Val');
-      if (v) {
-        var t = text();
-        if (v.textContent !== t) v.textContent = t;
-      }
-      // Colour the dot as the balance runs down.
-      var S = window.AppState, dot = el.firstElementChild;
-      if (dot && S && typeof S.aiCreditsRemaining === 'number' && typeof S.aiCreditsMax === 'number' && S.aiCreditsMax > 0) {
-        var pct = (S.aiCreditsRemaining / S.aiCreditsMax) * 100;
-        dot.style.background = pct <= 10 ? '#ff4d4f' : (pct <= 25 ? '#ffa940' : '#00D4FF');
-      }
-    } catch (e) { /* never let the pill break a page */ }
+      if (!dash || dash.querySelector('.aiad-nav-credits')) return;
+      // Prefer the nav; fall back to the left sidebar, then the dashboard itself.
+      var host = dash.querySelector('.dash-nav')
+              || dash.querySelector('.dash-sidebar-left')
+              || dash;
+      if (!host) return;
+      var box = document.createElement('div');
+      box.className = 'aiad-nav-credits';
+      box.setAttribute('title', 'AI credits remaining');
+      box.innerHTML =
+        '<span class="aiad-nav-credits-dot"></span>' +
+        '<span class="aiad-nav-credits-label">AI Credits</span>' +
+        '<span class="studio-credits-text">\u2014 credits</span>';
+      host.insertBefore(box, host.firstChild);
+    } catch (e) { /* never let the indicator break a dashboard */ }
+  }
+
+  function ensureAll() {
+    try {
+      var dashes = document.querySelectorAll('[id$="Dashboard"]');
+      for (var i = 0; i < dashes.length; i++) ensureIndicator(dashes[i]);
+      // Repaint from the single source of truth.
+      if (typeof window.updateAICreditsDisplay === 'function') window.updateAICreditsDisplay();
+    } catch (e) {}
+  }
+
+  function refresh() {
+    ensureAll();
+    if (typeof window.loadAiCredits === 'function') {
+      try { window.loadAiCredits(); } catch (e) {}
+    }
   }
 
   function start() {
-    render();
-    setInterval(render, 1000);
-    document.addEventListener('visibilitychange', function () {
-      if (!document.hidden && typeof window.loadAiCredits === 'function') window.loadAiCredits();
-    });
+    ensureAll();
+
+    // View change: dashboards and sub-views toggle the `active` class. Watch only that.
+    //
+    // Deliberately NOT observing childList: painting sets textContent and toggles
+    // classes on the credit elements, which would fire mutations that re-trigger
+    // ensureAll() → paint → mutation … an infinite loop. For the same reason we
+    // ignore any mutation whose target is part of the credit UI. Late-mounted
+    // dashboards are covered by the bounded interval below instead.
+    function isCreditNode(n) {
+      try {
+        if (!n || n.nodeType !== 1) return false;
+        if (n.id === 'creditsValue' || n.id === 'creditsBarFill') return true;
+        if (n.classList && (n.classList.contains('studio-credits-text') ||
+                            n.classList.contains('aiad-nav-credits'))) return true;
+        return !!(n.closest && n.closest('.aiad-nav-credits'));
+      } catch (e) { return false; }
+    }
+
+    try {
+      var mo = new MutationObserver(function (muts) {
+        for (var i = 0; i < muts.length; i++) {
+          if (muts[i].attributeName !== 'class') continue;
+          if (isCreditNode(muts[i].target)) continue;
+          ensureAll();
+          return;
+        }
+      });
+      mo.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'] });
+    } catch (e) {}
+
+    // Auth change → re-pull the balance.
+    try {
+      if (window.db && window.db.auth && window.db.auth.onAuthStateChange) {
+        window.db.auth.onAuthStateChange(function (evt) {
+          if (evt === 'SIGNED_IN' || evt === 'TOKEN_REFRESHED' || evt === 'INITIAL_SESSION') refresh();
+        });
+      }
+    } catch (e) {}
+
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) refresh(); });
+
+    // Safety net: a slow boot can mount a dashboard after our observer is wired.
+    var ticks = 0;
+    var iv = setInterval(function () { ensureAll(); if (++ticks > 20) clearInterval(iv); }, 1000);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
