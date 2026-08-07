@@ -4058,7 +4058,7 @@ html, body {
                             <h1 class="view-title">Collaborators</h1>
                             <p class="view-subtitle">Find and work with talented creators</p>
                         </div>
-                        <button class="primary-btn" onclick="showToast('Opening collaborator marketplace...')">
+                        <button class="primary-btn" onclick="loadCollaborators(true)">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
                             Find Collaborators
                         </button>
@@ -5537,7 +5537,7 @@ html, body {
                                 <div class="settings-usage-item"><div class="settings-usage-label">Decision memories</div><div class="settings-usage-value">24 / Unlimited</div></div>
                             </div>
                             <h3 style="font-size: 0.9375rem; font-weight: 500; margin-bottom: var(--space-md); color: var(--text-secondary);">Available Plans</h3>
-                            <div id="aiadPricingMount"></div>
+                            <div id="aiadPricingMountSettings" class="aiad-pricing-mount"></div>
                             <details style="margin-top: var(--space-lg);"><summary style="cursor: pointer; font-size: 0.9375rem; color: var(--text-secondary);">Billing History</summary>
                                 <table class="settings-billing-table" style="margin-top: var(--space-md);"><thead><tr><th>Date</th><th>Description</th><th>Amount</th><th></th></tr></thead><tbody>
                                     <tr><td>Jan 21, 2026</td><td>Pro Plan - Monthly</td><td>$19.00</td><td><a href="#" class="settings-billing-link">Download</a></td></tr>
@@ -10094,9 +10094,16 @@ html, body {
             ]
         };
 
+        // Canonical tiers. Keys match profiles.plan / stripe-checkout PLANS, prices match
+        // Stripe, and aiCredits match public.ai_allowance_for_plan(). Legacy keys are
+        // aliased below so previously-saved localStorage values still resolve.
+        // Canonical tiers. Keys match profiles.plan / stripe-checkout PLANS, prices match
+        // Stripe ($29/$59/$99), and aiCredits match public.ai_allowance_for_plan()
+        // (20/150/500/2000). Legacy keys are aliased below so previously-saved
+        // localStorage/profile values still resolve.
         const SubscriptionTiers = {
             free: {
-                name: 'Observer',
+                name: 'Free',
                 price: 0,
                 priceLabel: 'Free',
                 aiCredits: 20,
@@ -10109,94 +10116,72 @@ html, body {
                     'No memory, no personalization',
                     'Credits do not roll over'
                 ],
-                upsellTo: 'starter'
+                upsellTo: 'artist_starter'
             },
-            starter: {
-                name: 'Creator',
+            artist_starter: {
+                name: 'Starter',
                 price: 29,
                 priceLabel: '$29/mo',
-                aiCredits: 300,
+                aiCredits: 150,
                 aiAccess: 'AIAD Agent (guided mode)',
                 features: [
-                    '300 AI credits/month',
+                    '150 AI credits/month',
                     'Full dashboard access (industry-specific)',
                     'Post content & interact with supporters',
                     'Basic analytics overview',
-                    'Standard responses',
                     'Limited context memory',
                     'Credits reset monthly'
                 ],
-                upsellTo: 'growth'
+                upsellTo: 'artist_pro'
             },
-            growth: {
-                name: 'Professional',
+            artist_pro: {
+                name: 'Pro',
                 price: 59,
                 priceLabel: '$59/mo',
-                aiCredits: 800,
+                aiCredits: 500,
                 aiAccess: 'AIAD Agent with decision context',
                 features: [
-                    '800 AI credits/month',
+                    '500 AI credits/month',
                     'Advanced dashboard features',
                     'Supporter & collaborator insights',
                     'Monetization tools visible',
-                    'Deeper strategic responses',
                     'Persistent short-term memory',
                     'Priority response quality'
                 ],
-                upsellTo: 'pro'
+                upsellTo: 'artist_premier'
             },
-            pro: {
-                name: 'Studio',
+            artist_premier: {
+                name: 'Established',
                 price: 99,
                 priceLabel: '$99/mo',
-                aiCredits: 1800,
-                aiAccess: 'AIAD Agent in Guidance Mode',
-                features: [
-                    '1,800 AI credits/month',
-                    'Full analytics & milestones',
-                    'Revenue tracking (high-level)',
-                    'Collaborator management',
-                    'Long-term memory enabled',
-                    'Cross-context reasoning',
-                    'Credits roll over 1 month'
-                ],
-                upsellTo: 'elite'
-            },
-            elite: {
-                name: 'Director',
-                price: 159,
-                priceLabel: '$159/mo',
-                aiCredits: 3500,
+                aiCredits: 2000,
                 aiAccess: 'AIAD Agent in Decision Mode',
                 features: [
-                    '3,500 AI credits/month',
+                    '2,000 AI credits/month',
                     'All platform features unlocked',
+                    'Full analytics & milestones',
                     'Strategic planning tools',
-                    'Priority visibility & discovery',
-                    'Deep memory + pattern recognition',
-                    'Scenario modeling & forecasts',
-                    'Credits roll over 2 months'
-                ],
-                upsellTo: 'unlimited'
-            },
-            unlimited: {
-                name: 'Executive',
-                price: 199,
-                priceLabel: '$199/mo',
-                aiCredits: Infinity,
-                aiAccess: 'Unlimited AI usage',
-                features: [
-                    'Unlimited AI credits',
-                    'Everything in Elite',
-                    'Highest priority processing',
-                    'Early access to new features',
-                    'No usage caps',
-                    'Full Decision Memory',
-                    'Always-on contextual intelligence'
+                    'Long-term memory + cross-context reasoning',
+                    'Priority visibility & discovery'
                 ],
                 upsellTo: null
             }
         };
+
+        // Legacy tier keys → canonical. Older sessions persisted these in
+        // localStorage['aiad_subscription_tier'] and some profiles.plan rows.
+        (function aliasLegacyTiers() {
+            const legacy = {
+                starter:   'artist_starter',
+                growth:    'artist_pro',
+                pro:       'artist_premier',
+                elite:     'artist_premier',
+                unlimited: 'artist_premier',
+            };
+            Object.keys(legacy).forEach(function (k) {
+                if (!SubscriptionTiers[k]) SubscriptionTiers[k] = SubscriptionTiers[legacy[k]];
+            });
+        })();
 
         const AICreditCosts = {
             shortQuestion: 1,
@@ -10240,10 +10225,22 @@ html, body {
             collaboratorRole: null,
 
             subscriptionTier: 'free',
-            aiCreditsRemaining: 25,
-            aiCreditsMax: 25,
+            // Unknown until loadAiCredits() reads the real ai_credits row. These used to
+            // default to 25/25, which is what the generation gate ran off — a phantom
+            // counter with no relationship to the actual balance.
+            aiCreditsRemaining: null,
+            aiCreditsMax: null,
             aiCreditsResetDate: null
         };
+
+        // AppState is declared with `const` at the top level of a classic <script>, which
+        // puts it in the global LEXICAL environment — it never becomes a property of
+        // `window`. Twelve places in this file are written as `if (window.AppState) { … }`
+        // (the credit paint path, the 4s sync IIFE, the credit pill, several others); every
+        // one of those guards was silently false, so their bodies never ran. That is why a
+        // perfectly good ai_credits fetch never reached the counter. Exporting it here
+        // repairs all of them at once.
+        window.AppState = AppState;
 
         function getIndustryConfig() {
             return AppState.industryConfig || IndustryConfig.music;
@@ -11908,8 +11905,10 @@ html, body {
             AppState.subscriptionTier = AppState.selectedTier;
             const tierConfig = SubscriptionTiers[AppState.selectedTier];
             if (tierConfig) {
+                // Optimistic only — reconciled against ai_credits by loadAiCredits().
                 AppState.aiCreditsMax = tierConfig.aiCredits;
                 AppState.aiCreditsRemaining = tierConfig.aiCredits;
+                if (typeof window.loadAiCredits === 'function') window.loadAiCredits();
             }
 
             localStorage.setItem('aiad_subscription_tier', AppState.selectedTier);
@@ -13512,6 +13511,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             } else if (view === 'collaborators') {
                 viewEl.classList.add('active');
                 navItems[3].classList.add('active');
+                setTimeout(() => { try { loadCollaborators(); } catch (e) {} }, 100);
             } else if (view === 'schedule') {
                 viewEl.classList.add('active');
                 navItems[5].classList.add('active');
@@ -14483,7 +14483,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             const message = input.value.trim();
             if (!message) return;
 
-            if (!checkAndConsumeAICredits('mediumResponse')) {
+            if (!await checkAndConsumeAICredits('mediumResponse')) {
                 showAICreditUpsell();
                 return;
             }
@@ -14600,82 +14600,140 @@ Only capture real, meaningful decisions — not questions or general discussion.
         function initializeAICredits() {
             const savedTier = localStorage.getItem('aiad_subscription_tier') || 'free';
             AppState.subscriptionTier = savedTier;
-            const tierConfig = SubscriptionTiers[savedTier] || SubscriptionTiers['free'];
-            if (!tierConfig) return;
-            AppState.aiCreditsMax = tierConfig.aiCredits;
-            AppState.aiCreditsRemaining = tierConfig.aiCredits;
-            localStorage.setItem('aiad_ai_credits', AppState.aiCreditsRemaining);
+
+            // Do NOT seed the balance from the tier config. That guessed the free tier's
+            // 20 from localStorage and wrote it straight into AppState, which is what
+            // #creditsValue and every .studio-credits-text badge render — so the founder
+            // (unlimited) and every paying user saw a hardcoded 20/20 until, and unless,
+            // a DB read happened to overwrite it. The real balance comes from
+            // loadAiCredits() below; leave it unknown until then.
+            if (typeof window.loadAiCredits === 'function') window.loadAiCredits();
             updateAICreditsDisplay();
         }
 
         function updateAICreditsDisplay() {
-            const creditsValue = document.getElementById('creditsValue');
+            const creditsValue   = document.getElementById('creditsValue');
             const creditsBarFill = document.getElementById('creditsBarFill');
-
-            if (!creditsValue || !creditsBarFill) return;
+            const badges         = document.querySelectorAll('.studio-credits-text');
 
             const remaining = AppState.aiCreditsRemaining;
-            const max = AppState.aiCreditsMax;
-            const percentage = max === Infinity ? 100 : (remaining / max) * 100;
+            const max       = AppState.aiCreditsMax;
+            const unlimited = (max === Infinity || remaining === Infinity);
+            const unknown   = !unlimited && (remaining === null || remaining === undefined ||
+                                             max === null || max === undefined);
+            const percentage = unlimited ? 100 : (unknown ? 0 : (remaining / max) * 100);
 
-            if (max === Infinity) {
-                creditsValue.textContent = '∞ Unlimited';
-                creditsBarFill.style.width = '100%';
-                creditsBarFill.classList.remove('warning', 'critical');
+            // The panel indicator only exists inside the artist dashboard. It must not
+            // gate the studio badges, which live on several other views.
+            if (creditsValue && creditsBarFill) {
                 creditsValue.classList.remove('warning', 'critical');
-            } else {
-                creditsValue.textContent = `${remaining} / ${max}`;
-                creditsBarFill.style.width = percentage + '%';
-
                 creditsBarFill.classList.remove('warning', 'critical');
-                creditsValue.classList.remove('warning', 'critical');
-
-                if (percentage === 0) {
-                    creditsBarFill.classList.add('critical');
-                    creditsValue.classList.add('critical');
-                } else if (percentage <= 20) {
-                    creditsBarFill.classList.add('critical');
-                    creditsValue.classList.add('critical');
-                } else if (percentage <= 50) {
-                    creditsBarFill.classList.add('warning');
-                    creditsValue.classList.add('warning');
+                const setVal = (t) => { if (creditsValue.textContent !== t) creditsValue.textContent = t; };
+                if (unknown) {
+                    setVal('— / —');
+                    creditsBarFill.style.width = '0%';
+                } else if (unlimited) {
+                    setVal('∞ Unlimited');
+                    creditsBarFill.style.width = '100%';
+                } else {
+                    setVal(`${remaining} / ${max}`);
+                    creditsBarFill.style.width = percentage + '%';
+                    if (percentage <= 20) {
+                        creditsBarFill.classList.add('critical');
+                        creditsValue.classList.add('critical');
+                    } else if (percentage <= 50) {
+                        creditsBarFill.classList.add('warning');
+                        creditsValue.classList.add('warning');
+                    }
                 }
             }
 
-            // Sync all studio credit badges
-            const studioText = max === Infinity ? '∞ Unlimited' : `${remaining} / ${max} credits`;
-            document.querySelectorAll('.studio-credits-text').forEach(el => {
-                el.textContent = studioText;
-                el.style.color = (max !== Infinity && percentage <= 20) ? '#FF4444' : (max !== Infinity && percentage <= 50) ? '#FFA500' : 'var(--text-secondary)';
+            const studioText = unknown ? '— credits'
+                             : unlimited ? '∞ Unlimited'
+                             : `${remaining} / ${max} credits`;
+            const badgeColor = (!unlimited && !unknown && percentage <= 20) ? '#FF4444'
+                             : (!unlimited && !unknown && percentage <= 50) ? '#FFA500'
+                             : 'var(--text-secondary)';
+            badges.forEach((el) => {
+                // Only write when the value actually changed. Unconditional textContent
+                // assignment fires DOM mutations on every paint, which the nav-indicator
+                // MutationObserver would pick up and turn into a paint loop.
+                if (el.textContent !== studioText) el.textContent = studioText;
+                if (el.style.color !== badgeColor) el.style.color = badgeColor;
             });
         }
 
-        function checkAndConsumeAICredits(actionType) {
+        // Frontend action keys → the action names public.ai_cost_for() understands.
+        // Unmapped names silently fall through to the DB's `else 1`, so every key in
+        // AICreditCosts must appear here.
+        const AI_DB_ACTION = {
+            shortQuestion:   'agent_chat',
+            mediumResponse:  'agent_chat',
+            longStrategy:    'text_sonnet',
+            creativeGen:     'image',
+            fileReasoning:   'text_opus',
+            songwriting:     'songwriting',
+            artwork:         'image',
+            merchDesign:     'image',
+            mixMedia:        'image',
+            musicProduction: 'music',
+            videoGeneration: 'music',
+        };
 
-            if (AppState.aiCreditsMax === Infinity) {
+        // Single source of truth for credits: the ai_credits table, via spend_ai_credit().
+        // The DB function handles cost lookup, the 30-day period reset, allowance re-sync
+        // and the unlimited (founder) short-circuit, so we do not second-guess it here.
+        async function checkAndConsumeAICredits(actionType) {
+            const getSess = window.__aiadSession;
+            const spend   = window.__aiadSpendCredit;
+            const sess    = (typeof getSess === 'function') ? getSess() : null;
+
+            // Signed out → nothing to meter against. Let the caller proceed; the edge
+            // function still requires auth for anything that costs real money.
+            if (!sess || !sess.user || typeof spend !== 'function') return true;
+
+            const dbAction = AI_DB_ACTION[actionType] || 'agent_chat';
+            let remaining;
+            try {
+                remaining = await spend(sess, dbAction);
+            } catch (e) {
+                console.error('[credits] spend threw:', e);
+                remaining = null;
+            }
+
+            if (remaining === null || remaining === undefined) {
+                // Could not reach the credit service. Fail OPEN rather than block a paying
+                // user on a transient error — the previous phantom-counter bug blocked
+                // everyone, which is the worse failure.
+                console.warn('[credits] balance unavailable, allowing action without charge');
                 return true;
             }
 
-            const cost = AICreditCosts[actionType] || AICreditCosts.mediumResponse;
-
-            if (AppState.aiCreditsRemaining < cost) {
+            if (remaining === -1) {                       // insufficient balance
+                syncCreditState(0);
                 return false;
             }
 
-            AppState.aiCreditsRemaining -= cost;
-            localStorage.setItem('aiad_ai_credits', AppState.aiCreditsRemaining);
+            syncCreditState(remaining);
 
-            updateAICreditsDisplay();
-
-            const percentage = (AppState.aiCreditsRemaining / AppState.aiCreditsMax) * 100;
-            if (percentage === 20) {
-                showToast('⚠️ AI Credits: 80% used', 3000);
-            } else if (percentage === 5) {
-                showToast('⚠️ AI Credits: 95% used', 3000);
+            if (remaining !== 999999 && AppState.aiCreditsMax) {
+                const pct = (remaining / AppState.aiCreditsMax) * 100;
+                if (pct <= 5)       showToast('⚠️ AI Credits: 95% used', 3000);
+                else if (pct <= 20) showToast('⚠️ AI Credits: 80% used', 3000);
             }
-
             return true;
         }
+
+        // Push a freshly-authoritative balance into AppState + every visible counter.
+        function syncCreditState(remaining) {
+            const unlimited = (remaining === 999999);
+            AppState.aiCreditsRemaining = unlimited ? Infinity : remaining;
+            if (unlimited) AppState.aiCreditsMax = Infinity;
+            try { localStorage.setItem('aiad_ai_credits', unlimited ? '999999' : String(remaining)); } catch (e) {}
+            try { updateAICreditsDisplay(); } catch (e) {}
+            try { if (typeof updateCreditsDisplay === 'function') updateCreditsDisplay(remaining); } catch (e) {}
+        }
+        window.syncCreditState = syncCreditState;
 
         function showAICreditUpsell() {
             const currentTier = AppState.subscriptionTier;
@@ -14729,8 +14787,10 @@ Only capture real, meaningful decisions — not questions or general discussion.
 
             AppState.subscriptionTier = tier;
             const tierConfig = SubscriptionTiers[tier];
+            // Optimistic only — reconciled against ai_credits by loadAiCredits().
             AppState.aiCreditsMax = tierConfig.aiCredits;
             AppState.aiCreditsRemaining = tierConfig.aiCredits;
+            if (typeof window.loadAiCredits === 'function') window.loadAiCredits();
 
             localStorage.setItem('aiad_subscription_tier', tier);
             localStorage.setItem('aiad_ai_credits', AppState.aiCreditsRemaining);
@@ -16175,7 +16235,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             const prompt = document.getElementById('merchAIPrompt').value.trim();
             if (!prompt) { showToast('Describe your design first'); return; }
 
-            if (!checkAndConsumeAICredits('merchDesign')) {
+            if (!await checkAndConsumeAICredits('merchDesign')) {
                 showAICreditUpsell();
                 return;
             }
@@ -16212,10 +16272,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     if (designUrl.startsWith('data:')) {
                         _persistDesign = await uploadGeneratedImage(designUrl, 'merch');
                     }
-                    var _mhist2  = _shGet('merch');
-                    _mhist2.unshift({ date: new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'}), label: _mlabel, url: _persistDesign });
-                    _shSet('merch', _mhist2);
-                    renderStudioHistory('merch');
+                    var _mhist2 = _shAdd('merch', { date: new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'}), label: _mlabel, url: _persistDesign });
                     var _mhEmpty = document.getElementById('merchHistoryEmpty');
                     if (_mhEmpty) _mhEmpty.style.display = 'none';
                     console.log('[AIAD] merch history saved, total items:', _mhist2.length, 'url:', _persistDesign.slice(0,60));
@@ -16306,7 +16363,14 @@ Only capture real, meaningful decisions — not questions or general discussion.
             const res = await fetch(`https://uapiytquwuhtewqieegx.supabase.co/functions/v1/music-production?proxy=${encodeURIComponent(url)}`, {
                 headers: { 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
             });
+            // The proxy answers 502 + a JSON error body when the upstream link is dead
+            // (transient CDN URLs expire). Without these guards we wrap that error body
+            // in a blob URL and hand it to <audio>, which then "loads" forever.
+            if (!res.ok) throw new Error('Audio proxy failed (' + res.status + ')');
             const blob = await res.blob();
+            if (!blob || !/^audio\//i.test(blob.type || '')) {
+                throw new Error('Proxy returned non-audio content (' + ((blob && blob.type) || 'unknown') + ')');
+            }
             return URL.createObjectURL(blob);
         }
 
@@ -16800,7 +16864,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             const prompt = document.getElementById('musicPrompt').value.trim();
             if (!prompt) { showToast('Describe your track first'); return; }
 
-            if (!checkAndConsumeAICredits('musicProduction')) {
+            if (!await checkAndConsumeAICredits('musicProduction')) {
                 showAICreditUpsell();
                 return;
             }
@@ -17219,6 +17283,97 @@ Only capture real, meaningful decisions — not questions or general discussion.
         // In-memory history store — no size limits, survives full session
         var _studioHistoryMem = {};
 
+        // ── Collaborators browse ───────────────────────────────────────────────
+        // Uses the list_artists RPC rather than a direct profiles select: profiles RLS
+        // only exposes the current user's own row, so a raw query returns just you.
+        // list_artists is SECURITY DEFINER and returns the public directory.
+        let _collabLoading = false;
+
+        async function loadCollaborators(force) {
+            const grid = document.getElementById('collaboratorsGrid');
+            if (!grid) return;
+            if (_collabLoading) return;
+            if (grid.dataset.loaded === '1' && !force) return;
+            _collabLoading = true;
+            grid.dataset.loaded = '1';
+
+            grid.innerHTML = '<div style="grid-column:1/-1;padding:24px;text-align:center;color:var(--text-muted);font-size:0.875rem;">Loading collaborators…</div>';
+
+            try {
+                const { data, error } = await db.rpc('list_artists', { p_search: null, p_limit: 48 });
+                if (error) throw new Error(error.message || 'list_artists failed');
+
+                const rows = Array.isArray(data) ? data : (data ? JSON.parse(data) : []);
+                if (!rows.length) {
+                    grid.innerHTML = '<div style="grid-column:1/-1;padding:24px;text-align:center;color:var(--text-muted);font-size:0.875rem;">No collaborators yet.</div>';
+                    return;
+                }
+                grid.innerHTML = rows.map(renderCollaboratorCard).join('');
+            } catch (e) {
+                console.warn('[AIAD] loadCollaborators failed:', e);
+                grid.dataset.loaded = '';
+                grid.innerHTML = '<div style="grid-column:1/-1;padding:24px;text-align:center;color:var(--text-muted);font-size:0.875rem;">Could not load collaborators. '
+                    + '<button onclick="loadCollaborators(true)" style="background:none;border:none;color:var(--teal,#06b6d4);cursor:pointer;text-decoration:underline;font:inherit;">Retry</button></div>';
+            } finally {
+                _collabLoading = false;
+            }
+        }
+        window.loadCollaborators = loadCollaborators;
+
+        function _esc(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
+                { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+            ));
+        }
+
+        function renderCollaboratorCard(a) {
+            const name     = _esc(a.name || a.username || 'Unnamed');
+            const username = _esc(a.username || '');
+            const genre    = _esc(a.genre || '');
+            const location = _esc(a.location || '');
+            const initial  = (a.name || a.username || '?').trim().charAt(0).toUpperCase();
+            const avatar = a.avatar
+                ? `<img src="${_esc(a.avatar)}" alt="" style="width:48px;height:48px;border-radius:50%;object-fit:cover;flex:none;">`
+                : `<div style="width:48px;height:48px;border-radius:50%;flex:none;background:linear-gradient(135deg,#00B4D8,#FF00FF);display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;">${_esc(initial)}</div>`;
+            const badge = a.verified
+                ? '<span title="Verified" style="color:#00D4FF;font-size:0.75rem;">✓</span>' : '';
+            const founding = a.founding_number
+                ? `<span style="font-size:0.68rem;color:var(--text-hint);">Founding #${_esc(a.founding_number)}</span>` : '';
+
+            return `
+                <div class="collaborator-card" style="background:var(--bg-card);border:1px solid var(--border-default);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px;">
+                    <div style="display:flex;align-items:center;gap:12px;min-width:0;">
+                        ${avatar}
+                        <div style="min-width:0;">
+                            <div style="font-weight:600;font-size:0.95rem;display:flex;align-items:center;gap:6px;">
+                                <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}</span>${badge}
+                            </div>
+                            <div style="font-size:0.78rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                ${genre || '—'}${location ? ' · ' + location : ''}
+                            </div>
+                            ${founding}
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:8px;">
+                        <button class="artist-action-btn primary" style="flex:1;" onclick="viewCollaboratorProfile('${username}')">View Profile</button>
+                        <button class="artist-action-btn" style="flex:1;" onclick="messageCollaborator('${username}')">Message</button>
+                    </div>
+                </div>`;
+        }
+
+        function viewCollaboratorProfile(username) {
+            if (!username) { showToast('No profile available'); return; }
+            // Public artist pages are served at /artist/:username (see vercel.json rewrite).
+            window.open('/artist/' + encodeURIComponent(username), '_blank', 'noopener');
+        }
+        window.viewCollaboratorProfile = viewCollaboratorProfile;
+
+        function messageCollaborator(username) {
+            // Direct messaging is not built yet — say so plainly rather than pretending.
+            showToast('Messaging isn\'t available yet' + (username ? ' — find @' + username + ' on their profile' : ''));
+        }
+        window.messageCollaborator = messageCollaborator;
+
         function _shGet(key) {
             // 1. Memory first (full data, no size limit)
             if (_studioHistoryMem[key] && _studioHistoryMem[key].length > 0) {
@@ -17252,10 +17407,79 @@ Only capture real, meaningful decisions — not questions or general discussion.
             } catch(e) {}
         }
 
+        // ── Durable generation history (public.creations) ──────────────────────
+        // localStorage is a cache only: it is per-browser, lost on cache clear, and
+        // capped by quota. The creations table is the durable, cross-device record.
+        // RLS on creations is ALL with auth.uid() = user_id, and user_id defaults to
+        // auth.uid(), so we never send it from the client.
+
+        // item shape ↔ creations row
+        function _shToRow(key, item) {
+            if (key === 'songwriting') {
+                return { kind: 'songwriting', title: (item.preview || '').slice(0, 120),
+                         content: item.lyrics || '',
+                         meta: { date: item.date || '', genre: item.genre || '', mood: item.mood || '' } };
+            }
+            return { kind: key, title: item.label || '', url: item.url || '',
+                     meta: { date: item.date || '' } };
+        }
+
+        function _shFromRow(key, row) {
+            const meta = row.meta || {};
+            const date = meta.date || (row.created_at
+                ? new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                : '');
+            if (key === 'songwriting') {
+                return { date, genre: meta.genre || '', mood: meta.mood || '',
+                         preview: (row.content || '').slice(0, 200), lyrics: row.content || '' };
+            }
+            return { date, label: row.title || '', url: row.url || '' };
+        }
+
+        // Best-effort insert. Never blocks or fails the generation itself.
+        async function _shPersist(key, item) {
+            try {
+                if (!AppState.currentUser) return;
+                const { error } = await db.from('creations').insert(_shToRow(key, item));
+                if (error) console.warn('[AIAD] creations insert failed:', error.message);
+            } catch (e) { console.warn('[AIAD] creations insert threw:', e); }
+        }
+
+        // Add one generation: memory + localStorage cache, durable row, re-render.
+        function _shAdd(key, item) {
+            const items = _shGet(key);
+            items.unshift(item);
+            _shSet(key, items);
+            renderStudioHistory(key);
+            _shPersist(key, item);
+            return items;
+        }
+
+        // Load durable history and merge it over the local cache.
+        async function _shLoadFromDb(key) {
+            try {
+                if (!AppState.currentUser) return;
+                const { data, error } = await db
+                    .from('creations')
+                    .select('kind,title,content,url,meta,created_at')
+                    .eq('kind', key)
+                    .order('created_at', { ascending: false })
+                    .limit(30);
+                if (error) { console.warn('[AIAD] creations load failed:', error.message); return; }
+                if (!Array.isArray(data) || !data.length) return;
+                _studioHistoryMem[key] = data.map((r) => _shFromRow(key, r));
+                _shSet(key, _studioHistoryMem[key]);
+                renderStudioHistory(key);
+            } catch (e) { console.warn('[AIAD] creations load threw:', e); }
+        }
+
         function clearStudioHistory(key) {
             localStorage.removeItem('aiad_sh_'+key);
+            _studioHistoryMem[key] = [];
             renderStudioHistory(key);
-            showToast('History cleared');
+            // Local-only clear: the durable rows in creations are intentionally left
+            // alone so history is not destroyed across devices by a cache clear.
+            showToast('History cleared on this device');
         }
 
         function renderStudioHistory(key) {
@@ -17365,6 +17589,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     }
                 } catch(e) {}
                 renderStudioHistory(k);
+                // Then pull the durable rows; they win over the local cache.
+                _shLoadFromDb(k);
             });
         }
 
@@ -17372,7 +17598,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             const prompt = document.getElementById('songwritingInput').value.trim();
             if (!prompt) { showToast('Add a prompt first'); return; }
 
-            if (!checkAndConsumeAICredits('songwriting')) {
+            if (!await checkAndConsumeAICredits('songwriting')) {
                 showAICreditUpsell();
                 return;
             }
@@ -17398,10 +17624,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 if (output) {
                     document.getElementById('songwritingOutput').textContent = output;
                     // auto-save to history
-                    const _sh = _shGet('songwriting');
-                    _sh.unshift({ date: new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'}), genre, mood, preview: output.slice(0,200), lyrics: output });
-                    _shSet('songwriting', _sh);
-                    renderStudioHistory('songwriting');
+                    _shAdd('songwriting', { date: new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'}), genre, mood, preview: output.slice(0,200), lyrics: output });
                 } else {
                     console.error('Songwriting response:', data);
                     showToast('Unexpected response. Check console for details.');
@@ -17490,7 +17713,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             const prompt = document.getElementById('mixmediaInput').value.trim();
             if (!prompt) { showToast('Describe what you want first'); return; }
 
-            if (!checkAndConsumeAICredits('mixMedia')) {
+            if (!await checkAndConsumeAICredits('mixMedia')) {
                 showAICreditUpsell();
                 return;
             }
@@ -17540,10 +17763,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     if (imageUrl.startsWith('data:')) {
                         _persistUrl = await uploadGeneratedImage(imageUrl, 'mixmedia');
                     }
-                    var _mhist = _shGet('mixmedia');
-                    _mhist.unshift({ date: new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'}), label: assetLabel + ' — ' + prompt.slice(0,40), url: _persistUrl });
-                    _shSet('mixmedia', _mhist);
-                    renderStudioHistory('mixmedia');
+                    var _mhist = _shAdd('mixmedia', { date: new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'}), label: assetLabel + ' — ' + prompt.slice(0,40), url: _persistUrl });
                     console.log('[AIAD] mixmedia history saved, total items:', _mhist.length, 'url:', _persistUrl.slice(0,60));
                 } else {
                     console.error('[AIAD] Mix-media: no image URL found in response:', data);
@@ -17604,6 +17824,48 @@ Only capture real, meaningful decisions — not questions or general discussion.
         const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
             auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storage: aiadAuthStorage },
         });
+
+        // Same reason as `window.AppState` above: `const db` at the top level of a
+        // classic <script> lives in the global lexical environment and is NOT a property
+        // of `window`. Anything reading `window.db` (including _client()'s first branch
+        // and the nav credit indicator's auth hook) silently saw undefined.
+        window.db = db;
+
+        // ── Single session resolver ────────────────────────────────────────────────
+        // aiadAuthStorage above puts the token in sessionStorage when "remember me" is
+        // off, so the hand-rolled localStorage.getItem('sb-…-auth-token') readers
+        // scattered through this file silently get null and bail. The async form also
+        // refreshes an expired token, which the raw reads never did.
+        window.__aiadAuthKey = 'sb-uapiytquwuhtewqieegx-auth-token';
+
+        window.__aiadGetSessionSync = function () {
+            var stores = [];
+            try { stores.push(localStorage); } catch (e) {}
+            try { stores.push(sessionStorage); } catch (e) {}
+            for (var i = 0; i < stores.length; i++) {
+                try {
+                    var raw = stores[i].getItem(window.__aiadAuthKey);
+                    if (!raw) continue;
+                    // Newer supabase-js may base64-wrap the stored blob.
+                    if (raw.indexOf('base64-') === 0) {
+                        try { raw = atob(raw.slice(7)); } catch (e) { continue; }
+                    }
+                    var tok = JSON.parse(raw);
+                    var cur = (tok && tok.currentSession) || tok;
+                    if (cur && cur.access_token && cur.user) return cur;
+                } catch (e) {}
+            }
+            return null;
+        };
+
+        window.__aiadGetSession = async function () {
+            try {
+                var r = await db.auth.getSession();
+                var s = r && r.data && r.data.session;
+                if (s && s.access_token && s.user) return s;
+            } catch (e) {}
+            return window.__aiadGetSessionSync();
+        };
 
         window.addEventListener('DOMContentLoaded', async () => {
             const { data: { session } } = await db.auth.getSession();
@@ -20035,7 +20297,14 @@ Only capture real, meaningful decisions — not questions or general discussion.
 
             const player = document.getElementById('globalAudioPlayer');
             player.src = track.audioUrl;
-            player.play();
+            // play() rejects on a dead/expired source; without this the UI sits on
+            // "Loading audio…" forever with nothing in the console.
+            Promise.resolve(player.play()).catch((e) => {
+                console.error('[AIAD] playback failed:', e);
+                showToast('Playback failed — this track link may have expired');
+                if (currentPlayingRowId) setRowPlayState(currentPlayingRowId, false);
+                try { updateBottomPlayBtn(false); } catch (_e) {}
+            });
 
             if (currentPlayingRowId) setRowPlayState(currentPlayingRowId, true);
 
@@ -22477,6 +22746,14 @@ function toggleAgeRange(btn) {
 
         // Read the Supabase session straight from localStorage (where supabase-js stores it).
         function getSession() {
+            // Delegate to the shared resolver — it also checks sessionStorage, which the
+            // client's storage adapter uses when "remember me" is off.
+            try {
+                if (typeof window.__aiadGetSessionSync === 'function') {
+                    const r = window.__aiadGetSessionSync();
+                    if (r) return r;
+                }
+            } catch (e) {}
             try {
                 const tok = JSON.parse(localStorage.getItem('sb-uapiytquwuhtewqieegx-auth-token'));
                 if (tok?.access_token && tok?.user) return tok;
@@ -22630,6 +22907,14 @@ function toggleAgeRange(btn) {
         let activeStage = null;
 
         function getSession() {
+            // Delegate to the shared resolver — it also checks sessionStorage, which the
+            // client's storage adapter uses when "remember me" is off.
+            try {
+                if (typeof window.__aiadGetSessionSync === 'function') {
+                    const r = window.__aiadGetSessionSync();
+                    if (r) return r;
+                }
+            } catch (e) {}
             try {
                 const tok = JSON.parse(localStorage.getItem('sb-uapiytquwuhtewqieegx-auth-token'));
                 if (tok?.access_token && tok?.user) return tok;
@@ -22735,13 +23020,19 @@ function toggleAgeRange(btn) {
             return m ? m[0] : null;
         }
 
-        // Atomically consume one AI credit. Returns remaining (>=0), 999999 for unlimited, -1 if out, or null on error.
-        async function spendAiCredit(sess) {
+        // Atomically consume credits for an action. Returns remaining (>=0), 999999 for
+        // unlimited, -1 if out, or null on error. When `action` is given we call the
+        // cost-aware spend_ai_credit(p_user, p_action) overload; otherwise the 1-credit one.
+        async function spendAiCredit(sess, action) {
             const c = _client();
+            const params = action
+                ? { p_user: sess.user.id, p_action: action }
+                : { p_user: sess.user.id };
             try {
                 if (c) {
-                    const { data, error } = await c.rpc('spend_ai_credit', { p_user: sess.user.id });
+                    const { data, error } = await c.rpc('spend_ai_credit', params);
                     if (!error && typeof data === 'number') return data;
+                    if (error) console.warn('[credits] rpc error:', error.message || error);
                 }
                 // REST fallback
                 const anon = _anonKey();
@@ -22749,12 +23040,18 @@ function toggleAgeRange(btn) {
                 const res = await fetch(`${SU}/rest/v1/rpc/spend_ai_credit`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sess.access_token, 'apikey': anon || '' },
-                    body: JSON.stringify({ p_user: sess.user.id }),
+                    body: JSON.stringify(params),
                 });
+                if (!res.ok) { console.warn('[credits] spend REST failed', res.status); return null; }
                 const val = await res.json();
                 return (typeof val === 'number') ? val : null;
             } catch (e) { console.warn('[credits] spend', e); return null; }
         }
+
+        // The credit gate lives in a different <script> block, so these must be reachable
+        // on window — without the exports it silently fails open and charges nobody.
+        window.__aiadSession     = getSession;
+        window.__aiadSpendCredit = spendAiCredit;
 
         function updateCreditsDisplay(remaining) {
             const val = document.getElementById('creditsValue');
@@ -22771,27 +23068,99 @@ function toggleAgeRange(btn) {
 
         // Load current balance + allowance and paint the indicator.
         async function loadAiCredits() {
-            const sess = getSession();
-            if (!sess) return;
+            // Prefer the supabase client's session: it transparently refreshes an expired
+            // access token. Reading localStorage directly (the old path) hands PostgREST a
+            // stale JWT, which 401s — and a 401 body is not an array, so the old code fell
+            // into the "no row" branch and painted a phantom 20 for everyone.
+            let sess = null;
+            try {
+                if (typeof window.__aiadGetSession === 'function') sess = await window.__aiadGetSession();
+            } catch (e) { /* fall through */ }
+            if (!sess?.access_token) {
+                const c = _client();
+                try { if (c?.auth?.getSession) sess = (await c.auth.getSession())?.data?.session || null; } catch (e) {}
+            }
+            if (!sess?.access_token) sess = getSession();
+            if (!sess?.user) { console.warn('[credits] no session available for balance fetch'); return; }
+
             try {
                 const anon = _anonKey();
                 const SU = (typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL) || 'https://uapiytquwuhtewqieegx.supabase.co';
                 const res = await fetch(`${SU}/rest/v1/ai_credits?select=balance,allowance&user_id=eq.${sess.user.id}`, {
                     headers: { 'Authorization': 'Bearer ' + sess.access_token, 'apikey': anon || '' },
                 });
-                const rows = await res.json();
-                const row = Array.isArray(rows) ? rows[0] : null;
-                if (row) {
-                    window.__aiCreditMax = row.allowance >= 999999 ? null : row.allowance;
-                    updateCreditsDisplay(row.allowance >= 999999 ? 999999 : row.balance);
-                } else {
-                    // No row yet → free tier defaults.
-                    window.__aiCreditMax = 20;
-                    updateCreditsDisplay(20);
+                if (!res.ok) {
+                    // Auth/permission failure — say so instead of inventing a balance.
+                    console.warn('[credits] balance fetch failed:', res.status, await res.text().catch(() => ''));
+                    return;
                 }
-            } catch (e) { /* silent */ }
+                const rows = await res.json();
+                if (!Array.isArray(rows)) { console.warn('[credits] unexpected balance payload:', rows); return; }
+                const row = rows[0];
+                if (!row) {
+                    // RLS filtered everything (returns [] with HTTP 200) or the row is not
+                    // provisioned yet. Either way we do not know the balance — leave the
+                    // counter alone rather than showing a made-up number.
+                    console.warn('[credits] no ai_credits row visible for user');
+                    return;
+                }
+                const unlimited = row.allowance >= 999999;
+                window.__aiCreditMax = unlimited ? null : row.allowance;
+
+                // Seed the gate's state from the same authoritative row, so the counter and
+                // the generation gate can never disagree again. NOT guarded on
+                // `window.AppState` any more — that guard was the render blocker. AppState
+                // is a module-level const in this file's global lexical scope, so reference
+                // it directly and let a genuine ReferenceError surface.
+                AppState.aiCreditsMax       = unlimited ? Infinity : row.allowance;
+                AppState.aiCreditsRemaining = unlimited ? Infinity : row.balance;
+
+                try { localStorage.setItem('aiad_ai_credits', unlimited ? '999999' : String(row.balance)); } catch (e) {}
+
+                console.log('[credits] painting', {
+                    unlimited,
+                    balance: row.balance,
+                    allowance: row.allowance,
+                    appStateMax: AppState.aiCreditsMax,
+                    appStateRemaining: AppState.aiCreditsRemaining,
+                });
+
+                updateCreditsDisplay(unlimited ? 999999 : row.balance);
+                // Not swallowed: if the badge paint throws we need to see it, not inherit
+                // another silent failure.
+                if (typeof updateAICreditsDisplay === 'function') {
+                    updateAICreditsDisplay();
+                } else {
+                    console.error('[credits] updateAICreditsDisplay is not reachable from this scope');
+                }
+
+                console.log('[credits] painted',
+                    document.getElementById('creditsValue')?.textContent,
+                    '| badges:', document.querySelectorAll('.studio-credits-text').length);
+            } catch (e) {
+                // Was `/* silent */`, then console.warn. A throw between fetch-success and
+                // paint is exactly the failure mode we kept missing, so make it loud.
+                console.error('[credits] loadAiCredits failed between fetch and paint:', e);
+            }
         }
         window.loadAiCredits = loadAiCredits;
+
+        // loadAiCredits used to be reachable only from tryRender(), which is gated on
+        // #artistAgentsView — so on every other view the balance was never fetched and
+        // whatever AppState happened to hold stayed on screen. Load it on boot, on auth
+        // change, and when the tab regains focus.
+        (function scheduleCreditLoads() {
+            const run = () => { try { loadAiCredits(); } catch (e) {} };
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
+            else run();
+            try {
+                const c = _client();
+                if (c?.auth?.onAuthStateChange) c.auth.onAuthStateChange((evt) => {
+                    if (evt === 'SIGNED_IN' || evt === 'TOKEN_REFRESHED' || evt === 'INITIAL_SESSION') run();
+                });
+            } catch (e) {}
+            document.addEventListener('visibilitychange', () => { if (!document.hidden) run(); });
+        })();
 
         window.sendStageAgentMessage = async function () {
             if (!activeStage) return;
@@ -23403,15 +23772,22 @@ function toggleAgeRange(btn) {
         window.aiadDecorateBadges = decorateBadges;
 
         // ── Pricing renderer (monthly/annual + founding banner) ──
+        // Prices MUST match stripe-checkout's PLANS map ($29/$59/$99) and credits MUST
+        // match public.ai_allowance_for_plan() (20/150/500/2000). These previously showed
+        // $30/$80/$150 and "Unlimited", none of which was what the customer was charged
+        // or granted.
         const TIERS = [
-            { key:null,              name:'Free',    m:0,   credits:'20 credits/mo' },
-            { key:'artist_starter',  name:'Starter', m:30,  credits:'100 credits/mo' },
-            { key:'artist_pro',      name:'Pro',     m:80,  credits:'500 credits/mo' },
-            { key:'artist_premier',  name:'Premier', m:150, credits:'Unlimited credits' },
+            { key:null,              name:'Free',        m:0,  credits:'20 credits/mo' },
+            { key:'artist_starter',  name:'Starter',     m:29, credits:'150 credits/mo' },
+            { key:'artist_pro',      name:'Pro',         m:59, credits:'500 credits/mo' },
+            { key:'artist_premier',  name:'Established', m:99, credits:'2,000 credits/mo' },
         ];
         async function renderPricing() {
-            const mount = document.getElementById('aiadPricingMount');
-            if (!mount) return;
+            // Two separate mounts (artist settings + onboarding step 2). They used to
+            // share one id, so getElementById always resolved to the settings div and
+            // the onboarding "Choose your plan" step rendered into a hidden element.
+            const mounts = document.querySelectorAll('.aiad-pricing-mount');
+            if (!mounts.length) return;
             const s = sess();
             let currentPlan = 'free', founding = false;
             if (s) {
@@ -23452,7 +23828,7 @@ function toggleAgeRange(btn) {
                 return `<div class="aiad-plan ${isCurrent?'current':''}"><div class="aiad-plan-name">${t.name}</div><div class="aiad-plan-price">${priceHtml}</div><div class="aiad-plan-sub">${sub}</div>${btn}</div>`;
             }).join('');
 
-            mount.innerHTML = `
+            const html = `
                 ${banner}
                 <div class="aiad-price-toggle">
                     <button class="${iv==='month'?'active':''}" onclick="window.__setInterval('month')">Monthly</button>
@@ -23460,6 +23836,7 @@ function toggleAgeRange(btn) {
                 </div>
                 <div class="aiad-plan-grid">${cards}</div>
                 <p style="font-size:0.72rem;color:var(--text-hint);margin-top:10px;">Manage or cancel anytime from <a href="#" onclick="window.openBillingPortal();return false;" style="color:var(--teal,#06b6d4);">the billing portal</a>.</p>`;
+            mounts.forEach((m) => { m.innerHTML = html; });
         }
         window.__setInterval = (iv) => { window.__aiadBillingInterval = iv; renderPricing(); };
         window.aiadRenderPricing = renderPricing;
@@ -24608,7 +24985,7 @@ Be direct and concrete with real industry insight — never generic filler. When
                     </div>
                     <div id="aiadObStep2" style="display:none;background:#0d0f17;border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:20px;">
                         <div style="text-align:center;margin-bottom:8px;"><div style="font-size:1.15rem;font-weight:700;color:#fff;">Choose your plan</div><p style="color:#94a3b8;font-size:0.82rem;margin:4px 0 0;">Start free and upgrade anytime — or unlock the full AI toolkit now.</p></div>
-                        <div id="aiadPricingMount"></div>
+                        <div id="aiadPricingMountOnboarding" class="aiad-pricing-mount"></div>
                         <button onclick="aiadFinishOnboarding('${dash}')" style="width:100%;margin-top:12px;background:transparent;color:#94a3b8;border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:11px;font-size:0.88rem;font-weight:600;cursor:pointer;">Start on Free →</button>
                     </div>
                 </div>`;
@@ -24936,6 +25313,9 @@ Be direct and concrete with real industry insight — never generic filler. When
   var SU='https://uapiytquwuhtewqieegx.supabase.co';
   var ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhcGl5dHF1d3VodGV3cWllZWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NzcwMTksImV4cCI6MjA4OTI1MzAxOX0.BLs2RdStghm0_cF8t70cBTX1GWcowGRwID7TAG8Mg38';
   function sess(){
+    // Must go through the shared resolver: the client's storage adapter can put the
+    // token in sessionStorage ("remember me" off), which a raw localStorage read misses.
+    try{ if(typeof window.__aiadGetSessionSync==='function'){ var r=window.__aiadGetSessionSync(); if(r) return r; } }catch(e){}
     try{ if(typeof getSession==='function'){ var s=getSession(); if(s&&s.access_token&&s.user) return s; } }catch(e){}
     try{ var raw=JSON.parse(localStorage.getItem('sb-uapiytquwuhtewqieegx-auth-token')); var c=raw&&(raw.currentSession||raw); if(c&&c.access_token&&c.user) return c; }catch(e){}
     return null;
@@ -24989,6 +25369,9 @@ Be direct and concrete with real industry insight — never generic filler. When
     }catch(e){}
   }
   function sess(){
+    // Must go through the shared resolver: the client's storage adapter can put the
+    // token in sessionStorage ("remember me" off), which a raw localStorage read misses.
+    try{ if(typeof window.__aiadGetSessionSync==='function'){ var r=window.__aiadGetSessionSync(); if(r) return r; } }catch(e){}
     try{ if(typeof getSession==='function'){ var s=getSession(); if(s&&s.access_token&&s.user) return s; } }catch(e){}
     try{ var raw=JSON.parse(localStorage.getItem('sb-uapiytquwuhtewqieegx-auth-token')); var c=raw&&(raw.currentSession||raw); if(c&&c.access_token&&c.user) return c; }catch(e){}
     return null;
@@ -25410,6 +25793,126 @@ Be direct and concrete with real industry insight — never generic filler. When
       if (tries>600) clearInterval(iv); // ~15 min safety
     }, 1500);
   } catch(e){ console.warn('[AIAD preview] init failed', e); }
+})();
+</script>
+
+<!-- Global AI credit indicator.
+     One indicator injected into every dashboard's nav chrome, so it is present on
+     every in-app view (feed, agents, studios, collaborators, stats, settings, …)
+     rather than only the Agents tab and the studio views.
+
+     The value span carries class="studio-credits-text", which is what
+     updateAICreditsDisplay() already paints — so these are driven by exactly the
+     same loadAiCredits source of truth as the artist panel indicator, with no
+     second paint path to drift out of sync. -->
+<style>
+  .aiad-nav-credits{
+    display:flex; align-items:center; gap:8px;
+    margin:0 0 12px 0; padding:9px 12px;
+    border:1px solid var(--border-default, rgba(255,255,255,0.08));
+    border-radius:10px;
+    background:var(--bg-card, rgba(255,255,255,0.04));
+    font-size:0.74rem; line-height:1.2; white-space:nowrap;
+  }
+  .aiad-nav-credits .aiad-nav-credits-dot{
+    width:6px; height:6px; border-radius:50%; background:#00D4FF; flex:none;
+  }
+  .aiad-nav-credits .aiad-nav-credits-label{
+    color:var(--text-muted, rgba(255,255,255,0.4));
+    text-transform:uppercase; letter-spacing:0.08em; font-size:0.58rem; font-weight:600;
+  }
+  .aiad-nav-credits .studio-credits-text{
+    margin-left:auto; font-weight:700;
+    color:var(--text-secondary, rgba(255,255,255,0.6));
+  }
+</style>
+<script>
+(function () {
+  function ensureIndicator(dash) {
+    try {
+      if (!dash || dash.querySelector('.aiad-nav-credits')) return;
+      // Prefer the nav; fall back to the left sidebar, then the dashboard itself.
+      var host = dash.querySelector('.dash-nav')
+              || dash.querySelector('.dash-sidebar-left')
+              || dash;
+      if (!host) return;
+      var box = document.createElement('div');
+      box.className = 'aiad-nav-credits';
+      box.setAttribute('title', 'AI credits remaining');
+      box.innerHTML =
+        '<span class="aiad-nav-credits-dot"></span>' +
+        '<span class="aiad-nav-credits-label">AI Credits</span>' +
+        '<span class="studio-credits-text">\u2014 credits</span>';
+      host.insertBefore(box, host.firstChild);
+    } catch (e) { /* never let the indicator break a dashboard */ }
+  }
+
+  function ensureAll() {
+    try {
+      var dashes = document.querySelectorAll('[id$="Dashboard"]');
+      for (var i = 0; i < dashes.length; i++) ensureIndicator(dashes[i]);
+      // Repaint from the single source of truth.
+      if (typeof window.updateAICreditsDisplay === 'function') window.updateAICreditsDisplay();
+    } catch (e) {}
+  }
+
+  function refresh() {
+    ensureAll();
+    if (typeof window.loadAiCredits === 'function') {
+      try { window.loadAiCredits(); } catch (e) {}
+    }
+  }
+
+  function start() {
+    ensureAll();
+
+    // View change: dashboards and sub-views toggle the `active` class. Watch only that.
+    //
+    // Deliberately NOT observing childList: painting sets textContent and toggles
+    // classes on the credit elements, which would fire mutations that re-trigger
+    // ensureAll() → paint → mutation … an infinite loop. For the same reason we
+    // ignore any mutation whose target is part of the credit UI. Late-mounted
+    // dashboards are covered by the bounded interval below instead.
+    function isCreditNode(n) {
+      try {
+        if (!n || n.nodeType !== 1) return false;
+        if (n.id === 'creditsValue' || n.id === 'creditsBarFill') return true;
+        if (n.classList && (n.classList.contains('studio-credits-text') ||
+                            n.classList.contains('aiad-nav-credits'))) return true;
+        return !!(n.closest && n.closest('.aiad-nav-credits'));
+      } catch (e) { return false; }
+    }
+
+    try {
+      var mo = new MutationObserver(function (muts) {
+        for (var i = 0; i < muts.length; i++) {
+          if (muts[i].attributeName !== 'class') continue;
+          if (isCreditNode(muts[i].target)) continue;
+          ensureAll();
+          return;
+        }
+      });
+      mo.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'] });
+    } catch (e) {}
+
+    // Auth change → re-pull the balance.
+    try {
+      if (window.db && window.db.auth && window.db.auth.onAuthStateChange) {
+        window.db.auth.onAuthStateChange(function (evt) {
+          if (evt === 'SIGNED_IN' || evt === 'TOKEN_REFRESHED' || evt === 'INITIAL_SESSION') refresh();
+        });
+      }
+    } catch (e) {}
+
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) refresh(); });
+
+    // Safety net: a slow boot can mount a dashboard after our observer is wired.
+    var ticks = 0;
+    var iv = setInterval(function () { ensureAll(); if (++ticks > 20) clearInterval(iv); }, 1000);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
 })();
 </script>
 </body>
