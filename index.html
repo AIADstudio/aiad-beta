@@ -10304,14 +10304,35 @@ html, body {
             return false;
         }
 
-        // Consent columns written onto the profiles row. Timestamped client-side
-        // because these go through a client upsert, not a SQL default.
-        function aiadTermsConsent() {
-            return { terms_accepted_at: new Date().toISOString(), terms_version: AIAD_TERMS_VERSION };
+        // Consent INTENT only — carried through email verification in
+        // aiad_pending_profile. Deliberately carries no timestamp: the authoritative
+        // one is written server-side by record_terms_consent() once a session exists,
+        // so there is a single source of truth for when consent happened.
+        function aiadTermsIntent() {
+            return { terms_version: AIAD_TERMS_VERSION };
         }
-        window.aiadTermsChecked = aiadTermsChecked;
-        window.aiadTermsGuard   = aiadTermsGuard;
-        window.aiadTermsConsent = aiadTermsConsent;
+
+        // Authoritative consent write. record_terms_consent(p_version) is SECURITY
+        // DEFINER and sets terms_accepted_at = now() (server time) for auth.uid().
+        //
+        // It is an UPDATE ... WHERE id = auth.uid(), NOT an upsert — if the profiles
+        // row does not exist yet it matches zero rows and silently succeeds. Always
+        // call this AFTER the row has been created, and only when a session exists.
+        async function aiadRecordTermsConsent() {
+            try {
+                const { error } = await db.rpc('record_terms_consent', { p_version: AIAD_TERMS_VERSION });
+                if (error) { console.error('[terms] record_terms_consent failed:', error.message || error); return false; }
+                return true;
+            } catch (e) {
+                console.error('[terms] record_terms_consent threw:', e);
+                return false;
+            }
+        }
+
+        window.aiadTermsChecked        = aiadTermsChecked;
+        window.aiadTermsGuard          = aiadTermsGuard;
+        window.aiadTermsIntent         = aiadTermsIntent;
+        window.aiadRecordTermsConsent  = aiadRecordTermsConsent;
 
         function getIndustryConfig() {
             return AppState.industryConfig || IndustryConfig.music;
@@ -11763,7 +11784,7 @@ html, body {
                     localStorage.setItem('aiad_pending_profile', JSON.stringify({
                         email, full_name: fullName, username, role: 'artist',
                         industry: AppState.userIndustry || 'music',
-                        ...aiadTermsConsent(),
+                        ...aiadTermsIntent(),
                     }));
                 } catch (e) {}
                 btn.disabled = false; btn.querySelector('span').textContent = 'Continue';
@@ -11781,8 +11802,9 @@ html, body {
                     username,
                     role: 'artist',
                     industry: AppState.userIndustry || 'music',
-                    ...aiadTermsConsent(),
                 }, { onConflict: 'id' });
+                // Server-authoritative consent timestamp; must follow the upsert.
+                await aiadRecordTermsConsent();
             }
 
             AppState.artistProfile.artistName = document.getElementById('artistName').value.trim();
@@ -12191,7 +12213,8 @@ html, body {
                         const u = (await db.auth.getUser()).data?.user;
                         if (u) {
                             AppState.currentUser = u;
-                            await db.from('profiles').upsert({ id: u.id, email, ...profileRow(), ...aiadTermsConsent() }, { onConflict: 'id' });
+                            await db.from('profiles').upsert({ id: u.id, email, ...profileRow() }, { onConflict: 'id' });
+                            await aiadRecordTermsConsent();
                         }
                         if (btn) btn.disabled = false; setLabel('Continue');
                         navigateTo('supervisor-tier');
@@ -12206,7 +12229,7 @@ html, body {
                 // Email confirmation is ON → no session yet. Stash the profile for after verification.
                 if (authData?.user && !authData?.session) {
                     try {
-                        localStorage.setItem('aiad_pending_profile', JSON.stringify({ email, ...profileRow(), ...aiadTermsConsent() }));
+                        localStorage.setItem('aiad_pending_profile', JSON.stringify({ email, ...profileRow(), ...aiadTermsIntent() }));
                     } catch (e) {}
                     if (btn) btn.disabled = false; setLabel('Continue');
                     showVerifyEmailScreen(email);   // on verify → supervisor dashboard
@@ -12217,7 +12240,8 @@ html, body {
                 const user = authData?.user || (await db.auth.getUser()).data?.user;
                 if (user) {
                     AppState.currentUser = user;
-                    await db.from('profiles').upsert({ id: user.id, email, ...profileRow(), ...aiadTermsConsent() }, { onConflict: 'id' });
+                    await db.from('profiles').upsert({ id: user.id, email, ...profileRow() }, { onConflict: 'id' });
+                    await aiadRecordTermsConsent();
                 }
             } catch (e) {
                 console.warn('[AIAD] Supervisor signup error:', e);
@@ -16053,7 +16077,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             try {
                 localStorage.setItem('aiad_pending_profile', JSON.stringify({
                     email, full_name: name, username, role,
-                    ...aiadTermsConsent(),
+                    ...aiadTermsIntent(),
                 }));
             } catch (e) {}
 
@@ -16067,8 +16091,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     await db.from('profiles').upsert({
                         id: data.user.id,
                         email, full_name: name, username, role,
-                        ...aiadTermsConsent(),
                     }, { onConflict: 'id' });
+                    await aiadRecordTermsConsent();
                     AppState.currentUser = data.user;
                 }
                 showToast('Welcome to AIAD, ' + name + '!');
@@ -16094,12 +16118,17 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     if (pending.industry)   row.industry  = pending.industry;
                     if (pending.location)   row.location  = pending.location;
                     if (pending.avatar_url) row.avatar_url = pending.avatar_url;
-                    // Terms consent captured at signup. With email confirmation ON there
-                    // is no session at signup time, so the profiles row is first created
-                    // here — this is where the consent has to land for most users.
-                    if (pending.terms_accepted_at) row.terms_accepted_at = pending.terms_accepted_at;
-                    if (pending.terms_version)     row.terms_version     = pending.terms_version;
                     await db.from('profiles').upsert(row, { onConflict: 'id' });
+
+                    // Terms consent. With email confirmation ON there is no session at
+                    // signup, so the profiles row is first created immediately above —
+                    // this is where consent lands for most users. The timestamp is
+                    // written server-side by the RPC (now()), never by the client, and
+                    // it must run AFTER the upsert because it is an UPDATE that would
+                    // otherwise match zero rows. `pending.terms_version` is the intent
+                    // recorded at signup time.
+                    if (pending.terms_version) await aiadRecordTermsConsent();
+
                     localStorage.removeItem('aiad_pending_profile');
                 }
             } catch (e) { console.warn('[aiad] finalizeVerifiedSignup', e); }
@@ -18813,8 +18842,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
                                 role: 'collaborator', industry: AppState.userIndustry || 'music',
                                 location: AppState.collaborator.profile.location || '',
                                 avatar_url: AppState.collaborator.profile.avatarUrl || '',
-                                ...aiadTermsConsent(),
                             }, { onConflict: 'id' });
+                            await aiadRecordTermsConsent();
                         }
                         btn.disabled = false; btn.querySelector('span').textContent = 'Continue';
                         navigateTo('collaborator-intent');
@@ -18837,7 +18866,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                             industry: AppState.userIndustry || 'music',
                             location: AppState.collaborator.profile.location || '',
                             avatar_url: AppState.collaborator.profile.avatarUrl || '',
-                            ...aiadTermsConsent(),
+                            ...aiadTermsIntent(),
                         }));
                     } catch (e) {}
                     btn.disabled = false; btn.querySelector('span').textContent = 'Continue';
@@ -18855,8 +18884,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
                         role: 'collaborator', industry: AppState.userIndustry || 'music',
                         location: AppState.collaborator.profile.location || '',
                         avatar_url: AppState.collaborator.profile.avatarUrl || '',
-                        ...aiadTermsConsent(),
                     }, { onConflict: 'id' });
+                    await aiadRecordTermsConsent();
                 }
             } catch(e) {
                 console.warn('[AIAD] Collab signup error:', e);
@@ -21460,7 +21489,7 @@ document.addEventListener('keydown', function(e) {
                         email, full_name: name,
                         username: name.toLowerCase().replace(/\s+/g, '_'),
                         role: 'fan', industry: 'music', location,
-                        ...aiadTermsConsent(),
+                        ...aiadTermsIntent(),
                     }));
                 } catch (e) {}
                 btn.disabled = false; btn.querySelector('span').textContent = 'Continue';
@@ -21476,8 +21505,8 @@ document.addEventListener('keydown', function(e) {
                     id: userData.id, email, full_name: name,
                     username: name.toLowerCase().replace(/\s+/g, '_'),
                     role: 'fan', industry: 'music',
-                    ...aiadTermsConsent(),
                 }, { onConflict: 'id' });
+                await aiadRecordTermsConsent();
 
                 AppState.currentUser = userData;
                 AppState.userRole    = 'fan';
