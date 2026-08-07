@@ -3443,6 +3443,8 @@ html, body {
                     <div class="dash-nav-item" onclick="showArtistView('projects')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg><span> Projects</span></div>
                     <div class="dash-nav-item" onclick="showArtistView('schedule')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span> Schedule</span></div>
                     <div class="dash-nav-item" onclick="showArtistView('revenue')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg><span> Revenue</span></div>
+                    <div class="dash-nav-item" onclick="showArtistView('store')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg><span> Store</span></div>
+                    <div class="dash-nav-item" onclick="showArtistView('wallet')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12V7H5a2 2 0 010-4h14v4"/><path d="M3 5v14a2 2 0 002 2h16v-5"/><path d="M18 12a2 2 0 000 4h4v-4z"/></svg><span> Wallet</span></div>
                     <div class="dash-nav-item" onclick="showArtistView('analytics')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span> Analytics</span></div>
                     <div class="dash-nav-item" id="navMyStats" onclick="showArtistView('mystats')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span> My Stats</span></div>
                     <div class="dash-nav-item" onclick="showArtistView('milestones')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span> Milestones</span></div>
@@ -3535,6 +3537,72 @@ html, body {
                 </div>
             </div>
                     </div> <!-- /studio-layout --></div>
+
+                <!-- ── STORE MANAGER ─────────────────────────────────────────── -->
+                <div class="dash-view" id="artistStoreView">
+                    <div class="view-header">
+                        <div>
+                            <h1 class="view-title">Store</h1>
+                            <p class="view-subtitle">Sell digital downloads and physical goods. You keep 90% of every sale.</p>
+                        </div>
+                        <button class="primary-btn" onclick="openProductEditor()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            New product
+                        </button>
+                    </div>
+                    <div id="storeProductsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;"></div>
+                </div>
+
+                <!-- ── WALLET ────────────────────────────────────────────────── -->
+                <div class="dash-view" id="artistWalletView">
+                    <div class="view-header">
+                        <div>
+                            <h1 class="view-title">Wallet</h1>
+                            <p class="view-subtitle">Your earnings from store sales. Artists keep 90%; the platform takes 10%.</p>
+                        </div>
+                    </div>
+
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-bottom:24px;">
+                        <div class="dash-content-card">
+                            <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:8px;">Available balance</div>
+                            <div id="walletBalance" style="font-size:2rem;font-weight:700;">—</div>
+                            <div id="walletPayoutStatus" style="margin-top:12px;font-size:0.8rem;color:var(--text-muted);"></div>
+                            <div id="walletConnectWrap" style="margin-top:12px;display:none;">
+                                <button class="primary-btn" onclick="startConnectOnboarding(this)">Set up payouts</button>
+                            </div>
+                        </div>
+
+                        <div class="dash-content-card" id="walletWithdrawCard">
+                            <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:12px;">Withdraw</div>
+                            <div class="field-group">
+                                <label class="label">Amount (USD)</label>
+                                <input type="number" class="input" id="withdrawAmount" min="1" step="0.01" placeholder="0.00" oninput="updateWithdrawPreview()">
+                            </div>
+                            <div class="field-group">
+                                <label class="label">Speed</label>
+                                <select class="select" id="withdrawMethod" onchange="updateWithdrawPreview()">
+                                    <option value="standard">Standard — free (1–2 business days)</option>
+                                    <option value="instant">Instant — 1.5% fee (min $0.50)</option>
+                                </select>
+                            </div>
+                            <div id="withdrawPreview" style="font-size:0.8rem;color:var(--text-muted);margin:8px 0 12px;line-height:1.6;"></div>
+                            <button class="primary-btn" id="withdrawBtn" onclick="submitWithdrawal(this)" style="width:100%;">Withdraw</button>
+                        </div>
+                    </div>
+
+                    <div class="dash-section">
+                        <div class="dash-section-header"><div class="dash-section-title">Sales</div></div>
+                        <div id="walletOrdersList"></div>
+                    </div>
+                    <div class="dash-section">
+                        <div class="dash-section-header"><div class="dash-section-title">Wallet activity</div></div>
+                        <div id="walletTxList"></div>
+                    </div>
+                    <div class="dash-section">
+                        <div class="dash-section-header"><div class="dash-section-title">Withdrawals</div></div>
+                        <div id="walletWithdrawalsList"></div>
+                    </div>
+                </div>
 
                 <div class="dash-view" id="artistRevenueView">
                     <div class="studio-layout">
@@ -8347,6 +8415,12 @@ html, body {
                             </div>
                         </div>
                         <p id="fanArtistBio" style="font-size:0.88rem;line-height:1.7;color:var(--text-secondary);margin:0;"></p>
+                    </div>
+
+                    <!-- Store (public storefront) — hidden until the artist has active products -->
+                    <div id="fanArtistStoreSection" style="display:none;margin-bottom:28px;">
+                        <div style="margin-bottom:10px;font-size:0.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.07em;">Store</div>
+                        <div id="fanArtistStore" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;"></div>
                     </div>
 
                     <!-- Posts -->
@@ -13572,6 +13646,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 'collaborators': 'artistCollaboratorsView',
                 'schedule': 'artistScheduleView',
                 'revenue': 'artistRevenueView',
+                'store': 'artistStoreView',
+                'wallet': 'artistWalletView',
                 'music': 'artistMusicView',
                 'songwriting': 'artistSongwritingView',
                 'mixmedia': 'artistMixMediaView',
@@ -13618,6 +13694,14 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 viewEl.classList.add('active');
                 navItems[6].classList.add('active');
                 if (typeof loadRevenueData === 'function') setTimeout(() => loadRevenueData(), 100);
+            } else if (view === 'store') {
+                viewEl.classList.add('active');
+                navItems[7].classList.add('active');
+                setTimeout(() => { try { loadMyProducts(); } catch (e) {} }, 60);
+            } else if (view === 'wallet') {
+                viewEl.classList.add('active');
+                navItems[8].classList.add('active');
+                setTimeout(() => { try { loadWallet(); } catch (e) {} }, 60);
             } else if (view === 'music') {
                 viewEl.classList.add('active');
                 if (dropdown) dropdown.classList.add('open');
@@ -13650,18 +13734,20 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 if (submenu) submenu.classList.add('open');
                 subItems[4].classList.add('active');
             } else if (view === 'analytics') {
+                // +2 on every index from here down: Store and Wallet were inserted
+                // into the nav after Revenue, shifting the tail of the list.
                 viewEl.classList.add('active');
-                navItems[7].classList.add('active');
+                if (navItems[9]) navItems[9].classList.add('active');
             } else if (view === 'mystats') {
                 viewEl.classList.add('active');
-                if (navItems[8]) navItems[8].classList.add('active');
+                if (navItems[10]) navItems[10].classList.add('active');
                 setTimeout(() => { if (typeof loadMyStats === 'function') loadMyStats(); }, 60);
             } else if (view === 'milestones') {
                 viewEl.classList.add('active');
-                if (navItems[9]) navItems[9].classList.add('active');
+                if (navItems[11]) navItems[11].classList.add('active');
             } else if (view === 'inbox') {
                 viewEl.classList.add('active');
-                if (navItems[10]) navItems[10].classList.add('active');
+                if (navItems[12]) navItems[12].classList.add('active');
             } else if (view === 'settings') {
                 viewEl.classList.add('active');
                 // Auto-populate settings from AppState first (instant)
@@ -17485,6 +17571,575 @@ Only capture real, meaningful decisions — not questions or general discussion.
             showToast('Messaging isn\'t available yet' + (username ? ' — find @' + username + ' on their profile' : ''));
         }
         window.messageCollaborator = messageCollaborator;
+
+        // ═══════════════════════════════════════════════════════════════════════
+        //  ARTIST STORE — store manager, public storefront, wallet
+        //
+        //  All money logic lives in the deployed edge functions; this file only
+        //  calls them and renders the result. Fee model shown to artists: they
+        //  keep 90%, platform takes 10% (store-checkout PLATFORM_FEE_PCT = 0.10).
+        //  Instant withdrawals cost the artist 1.5%, min $0.50
+        //  (store-withdraw INSTANT_FEE_PCT / INSTANT_FEE_MIN).
+        // ═══════════════════════════════════════════════════════════════════════
+
+        const STORE_PLATFORM_FEE_PCT = 0.10;
+        const STORE_INSTANT_FEE_PCT  = 0.015;
+        const STORE_INSTANT_FEE_MIN  = 0.50;
+        const STORE_BUCKET = 'artist-media';
+
+        function money(n, cur) {
+            const v = Number(n || 0);
+            return (cur && cur.toLowerCase() !== 'usd' ? cur.toUpperCase() + ' ' : '$') + v.toFixed(2);
+        }
+        function storeEsc(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
+                { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+        function myUserId() {
+            return (AppState.currentUser && AppState.currentUser.id) || null;
+        }
+
+        // ── Uploads ────────────────────────────────────────────────────────────
+        // NOTE: 'artist-media' is a PUBLIC bucket. store-webhook copies
+        // products.digital_file_url verbatim into orders.digital_download_url, so
+        // the file has to be fetchable by the buyer without a signed URL. That
+        // means digital goods are protected by URL obscurity only.
+        async function uploadStoreFile(file, folder) {
+            const uid = myUserId();
+            if (!uid) throw new Error('Not signed in');
+            const safe = (file.name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_');
+            const path = `${uid}/store/${folder}/${Date.now()}_${safe}`;
+            const { error } = await db.storage.from(STORE_BUCKET).upload(path, file, {
+                upsert: false, contentType: file.type || 'application/octet-stream',
+            });
+            if (error) throw new Error(error.message);
+            const { data } = db.storage.from(STORE_BUCKET).getPublicUrl(path);
+            return data?.publicUrl || null;
+        }
+
+        // ── Store manager ──────────────────────────────────────────────────────
+        async function loadMyProducts() {
+            const grid = document.getElementById('storeProductsGrid');
+            if (!grid) return;
+            const uid = myUserId();
+            if (!uid) { grid.innerHTML = '<div style="color:var(--text-muted);font-size:0.875rem;">Sign in to manage your store.</div>'; return; }
+            grid.innerHTML = '<div style="color:var(--text-muted);font-size:0.875rem;">Loading products…</div>';
+            try {
+                const { data, error } = await db.from('products')
+                    .select('*').eq('artist_id', uid).order('created_at', { ascending: false });
+                if (error) throw new Error(error.message);
+                if (!data || !data.length) {
+                    grid.innerHTML = '<div style="grid-column:1/-1;padding:28px;text-align:center;color:var(--text-muted);font-size:0.875rem;border:1px dashed var(--border-default);border-radius:12px;">No products yet. Create your first one to start selling.</div>';
+                    return;
+                }
+                grid.innerHTML = data.map(renderProductAdminCard).join('');
+            } catch (e) {
+                console.error('[store] loadMyProducts', e);
+                grid.innerHTML = '<div style="color:#ff6b6b;font-size:0.875rem;">Could not load products: ' + storeEsc(e.message) + '</div>';
+            }
+        }
+        window.loadMyProducts = loadMyProducts;
+
+        function renderProductAdminCard(p) {
+            const img = p.image_url
+                ? `<img src="${storeEsc(p.image_url)}" alt="" style="width:100%;height:140px;object-fit:cover;border-radius:10px 10px 0 0;">`
+                : `<div style="height:140px;border-radius:10px 10px 0 0;background:linear-gradient(135deg,rgba(0,180,216,0.25),rgba(255,0,255,0.2));"></div>`;
+            const kind = p.product_kind === 'physical' ? 'Physical' : 'Digital';
+            const inv = p.product_kind === 'physical'
+                ? (p.inventory == null ? 'Unlimited stock' : p.inventory + ' in stock') : '';
+            const earn = Number(p.price || 0) * (1 - STORE_PLATFORM_FEE_PCT);
+            return `
+            <div style="border:1px solid var(--border-default);border-radius:12px;background:var(--bg-card);overflow:hidden;display:flex;flex-direction:column;">
+                ${img}
+                <div style="padding:14px;display:flex;flex-direction:column;gap:8px;flex:1;">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span style="font-size:0.62rem;text-transform:uppercase;letter-spacing:0.08em;padding:2px 7px;border-radius:99px;background:rgba(255,255,255,0.08);color:var(--text-muted);">${kind}</span>
+                        <span style="font-size:0.62rem;text-transform:uppercase;letter-spacing:0.08em;padding:2px 7px;border-radius:99px;background:${p.is_active ? 'rgba(16,185,129,0.18);color:#10b981' : 'rgba(255,255,255,0.08);color:var(--text-muted)'};">${p.is_active ? 'Live' : 'Hidden'}</span>
+                    </div>
+                    <div style="font-weight:600;font-size:0.95rem;">${storeEsc(p.name)}</div>
+                    <div style="font-size:0.8rem;color:var(--text-muted);">${money(p.price, p.currency)} &middot; you keep ${money(earn, p.currency)}</div>
+                    ${inv ? `<div style="font-size:0.75rem;color:var(--text-hint);">${storeEsc(inv)}</div>` : ''}
+                    <div style="display:flex;gap:8px;margin-top:auto;padding-top:8px;">
+                        <button class="artist-action-btn" style="flex:1;" onclick="openProductEditor('${p.id}')">Edit</button>
+                        <button class="artist-action-btn" style="flex:1;" onclick="toggleProductActive('${p.id}', ${p.is_active ? 'false' : 'true'})">${p.is_active ? 'Hide' : 'Publish'}</button>
+                        <button class="artist-action-btn" onclick="deleteProduct('${p.id}')" title="Delete">&times;</button>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        async function toggleProductActive(id, makeActive) {
+            try {
+                const { error } = await db.from('products')
+                    .update({ is_active: makeActive === true || makeActive === 'true', updated_at: new Date().toISOString() })
+                    .eq('id', id);
+                if (error) throw new Error(error.message);
+                showToast(makeActive === true || makeActive === 'true' ? 'Product published' : 'Product hidden');
+                loadMyProducts();
+            } catch (e) { showToast('Could not update: ' + e.message); }
+        }
+        window.toggleProductActive = toggleProductActive;
+
+        async function deleteProduct(id) {
+            if (!confirm('Delete this product? Existing orders keep their record. This cannot be undone.')) return;
+            try {
+                const { error } = await db.from('products').delete().eq('id', id);
+                if (error) throw new Error(error.message);
+                showToast('Product deleted');
+                loadMyProducts();
+            } catch (e) { showToast('Could not delete: ' + e.message); }
+        }
+        window.deleteProduct = deleteProduct;
+
+        // ── Product editor modal ───────────────────────────────────────────────
+        async function openProductEditor(id) {
+            let p = { name: '', description: '', price: '', product_kind: 'digital', image_url: '', digital_file_url: '', inventory: '', is_active: true };
+            if (id) {
+                try {
+                    const { data } = await db.from('products').select('*').eq('id', id).maybeSingle();
+                    if (data) p = data;
+                } catch (e) {}
+            }
+            const old = document.getElementById('productEditorModal');
+            if (old) old.remove();
+            const m = document.createElement('div');
+            m.id = 'productEditorModal';
+            m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto;';
+            m.innerHTML = `
+                <div style="background:var(--bg-card);border:1px solid var(--border-default);border-radius:16px;padding:24px;max-width:520px;width:100%;max-height:90vh;overflow-y:auto;">
+                    <h2 style="font-size:1.2rem;font-weight:700;margin:0 0 16px;">${id ? 'Edit product' : 'New product'}</h2>
+                    <input type="hidden" id="peId" value="${storeEsc(id || '')}">
+                    <div class="field-group"><label class="label">Name</label>
+                        <input type="text" class="input" id="peName" value="${storeEsc(p.name)}" placeholder="e.g. Unreleased demo pack"></div>
+                    <div class="field-group"><label class="label">Description <span class="label-optional">(optional)</span></label>
+                        <textarea class="input textarea" id="peDesc" rows="3" placeholder="What are they getting?">${storeEsc(p.description)}</textarea></div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                        <div class="field-group"><label class="label">Price (USD)</label>
+                            <input type="number" class="input" id="pePrice" min="0.50" step="0.01" value="${p.price == null ? '' : storeEsc(p.price)}" placeholder="9.99" oninput="updateProductEarnings()"></div>
+                        <div class="field-group"><label class="label">Type</label>
+                            <select class="select" id="peKind" onchange="onProductKindChange()">
+                                <option value="digital" ${p.product_kind !== 'physical' ? 'selected' : ''}>Digital download</option>
+                                <option value="physical" ${p.product_kind === 'physical' ? 'selected' : ''}>Physical item</option>
+                            </select></div>
+                    </div>
+                    <div id="peEarnings" style="font-size:0.78rem;color:var(--text-muted);margin:-4px 0 12px;"></div>
+                    <div class="field-group"><label class="label">Cover image <span class="label-optional">(optional)</span></label>
+                        <input type="file" id="peImage" accept="image/*" class="input">
+                        <div class="helper-text" id="peImageCurrent">${p.image_url ? 'Current image will be kept unless you choose a new one.' : ''}</div></div>
+                    <div class="field-group" id="peDigitalWrap">
+                        <label class="label">Digital file</label>
+                        <input type="file" id="peFile" class="input">
+                        <div class="helper-text">${p.digital_file_url ? 'A file is already attached. Choose a new one to replace it.' : 'Delivered to the buyer after payment.'}</div>
+                        <div class="helper-text" style="color:#ffa940;">Stored in a public bucket — anyone with the link can download it. Don't upload anything you can't afford to leak.</div>
+                    </div>
+                    <div class="field-group" id="pePhysicalWrap" style="display:none;">
+                        <label class="label">Inventory <span class="label-optional">(blank = unlimited)</span></label>
+                        <input type="number" class="input" id="peInventory" min="0" step="1" value="${p.inventory == null ? '' : storeEsc(p.inventory)}" placeholder="Unlimited">
+                        <div class="helper-text">Shipping address is collected by Stripe at checkout.</div>
+                    </div>
+                    <label style="display:flex;align-items:center;gap:8px;font-size:0.85rem;margin:8px 0 18px;cursor:pointer;">
+                        <input type="checkbox" id="peActive" ${p.is_active !== false ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--teal);">
+                        Visible on my public profile
+                    </label>
+                    <div style="display:flex;gap:10px;">
+                        <button class="btn-primary" id="peSaveBtn" style="flex:1;" onclick="saveProduct(this)"><span>${id ? 'Save changes' : 'Create product'}</span></button>
+                        <button class="btn-secondary" onclick="document.getElementById('productEditorModal').remove()">Cancel</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(m);
+            m.onclick = (e) => { if (e.target === m) m.remove(); };
+            onProductKindChange();
+            updateProductEarnings();
+        }
+        window.openProductEditor = openProductEditor;
+
+        function onProductKindChange() {
+            const kind = document.getElementById('peKind')?.value;
+            const dig = document.getElementById('peDigitalWrap');
+            const phy = document.getElementById('pePhysicalWrap');
+            if (dig) dig.style.display = kind === 'physical' ? 'none' : 'block';
+            if (phy) phy.style.display = kind === 'physical' ? 'block' : 'none';
+        }
+        window.onProductKindChange = onProductKindChange;
+
+        function updateProductEarnings() {
+            const el = document.getElementById('peEarnings');
+            if (!el) return;
+            const price = parseFloat(document.getElementById('pePrice')?.value || '0');
+            if (!(price > 0)) { el.textContent = ''; return; }
+            const fee = price * STORE_PLATFORM_FEE_PCT;
+            el.textContent = `You keep ${money(price - fee)} — platform fee ${money(fee)} (10%).`;
+        }
+        window.updateProductEarnings = updateProductEarnings;
+
+        async function saveProduct(btn) {
+            const id    = document.getElementById('peId').value || null;
+            const name  = document.getElementById('peName').value.trim();
+            const desc  = document.getElementById('peDesc').value.trim();
+            const price = parseFloat(document.getElementById('pePrice').value || '0');
+            const kind  = document.getElementById('peKind').value;
+            const active = document.getElementById('peActive').checked;
+            const invRaw = document.getElementById('peInventory')?.value ?? '';
+            const uid = myUserId();
+
+            if (!uid) { showToast('Sign in first'); return; }
+            if (!name) { showToast('Give the product a name'); return; }
+            if (!(price > 0)) { showToast('Set a price above zero'); return; }
+
+            const label = btn.querySelector('span');
+            btn.disabled = true; if (label) label.textContent = 'Saving…';
+            try {
+                const row = {
+                    artist_id: uid,                 // nullable in DB, so set it explicitly
+                    name, description: desc || null,
+                    price, currency: 'usd',
+                    product_kind: kind,
+                    is_active: active,
+                    inventory: kind === 'physical' && invRaw !== '' ? parseInt(invRaw, 10) : null,
+                    updated_at: new Date().toISOString(),
+                };
+
+                const imgFile = document.getElementById('peImage')?.files?.[0];
+                if (imgFile) row.image_url = await uploadStoreFile(imgFile, 'images');
+                const digFile = document.getElementById('peFile')?.files?.[0];
+                if (kind !== 'physical' && digFile) row.digital_file_url = await uploadStoreFile(digFile, 'files');
+
+                let error;
+                if (id) ({ error } = await db.from('products').update(row).eq('id', id));
+                else    ({ error } = await db.from('products').insert(row));
+                if (error) throw new Error(error.message);
+
+                document.getElementById('productEditorModal')?.remove();
+                showToast(id ? 'Product updated' : 'Product created');
+                loadMyProducts();
+            } catch (e) {
+                console.error('[store] saveProduct', e);
+                showToast('Could not save: ' + e.message);
+                btn.disabled = false; if (label) label.textContent = id ? 'Save changes' : 'Create product';
+            }
+        }
+        window.saveProduct = saveProduct;
+
+        // ── Public storefront ──────────────────────────────────────────────────
+        // artistUserId must be the seller's auth.uid (artist_profiles.user_id),
+        // NOT artist_profiles.id — products.artist_id references the auth user.
+        async function loadArtistStorefront(artistUserId) {
+            const wrap = document.getElementById('fanArtistStoreSection');
+            const grid = document.getElementById('fanArtistStore');
+            if (!wrap || !grid) return;
+            wrap.style.display = 'none';
+            if (!artistUserId) return;
+            try {
+                const { data, error } = await db.from('products')
+                    .select('id,name,description,price,currency,product_kind,image_url,inventory,is_active')
+                    .eq('artist_id', artistUserId).eq('is_active', true)
+                    .order('created_at', { ascending: false });
+                if (error) throw new Error(error.message);
+                if (!data || !data.length) return;
+                grid.innerHTML = data.map(renderStorefrontCard).join('');
+                wrap.style.display = 'block';
+            } catch (e) { console.warn('[store] storefront', e); }
+        }
+        window.loadArtistStorefront = loadArtistStorefront;
+
+        function renderStorefrontCard(p) {
+            const soldOut = p.product_kind === 'physical' && p.inventory != null && Number(p.inventory) <= 0;
+            const img = p.image_url
+                ? `<img src="${storeEsc(p.image_url)}" alt="" style="width:100%;aspect-ratio:1;object-fit:cover;">`
+                : `<div style="width:100%;aspect-ratio:1;background:linear-gradient(135deg,rgba(0,180,216,0.25),rgba(255,0,255,0.2));"></div>`;
+            return `
+            <div style="border:1px solid var(--border-default);border-radius:12px;overflow:hidden;background:var(--bg-card);display:flex;flex-direction:column;">
+                ${img}
+                <div style="padding:12px;display:flex;flex-direction:column;gap:6px;flex:1;">
+                    <div style="font-weight:600;font-size:0.85rem;line-height:1.3;">${storeEsc(p.name)}</div>
+                    <div style="font-size:0.78rem;color:var(--text-muted);">${money(p.price, p.currency)}${p.product_kind === 'physical' ? ' · ships' : ' · instant download'}</div>
+                    <button class="artist-action-btn primary" style="margin-top:auto;" ${soldOut ? 'disabled' : ''}
+                        onclick="buyProduct('${p.id}', this)">${soldOut ? 'Sold out' : 'Buy'}</button>
+                </div>
+            </div>`;
+        }
+
+        async function buyProduct(productId, btn) {
+            if (!myUserId()) { showToast('Sign in to buy'); navigateTo('sign-in'); return; }
+            const original = btn ? btn.textContent : '';
+            if (btn) { btn.disabled = true; btn.textContent = 'Opening checkout…'; }
+            try {
+                const { data, error } = await db.functions.invoke('store-checkout', {
+                    body: { product_id: productId, quantity: 1 },
+                });
+                if (error) throw new Error(await readFnError(error));
+                if (data?.error) throw new Error(data.error);
+                if (!data?.url) throw new Error('No checkout URL returned');
+                window.location.href = data.url;
+            } catch (e) {
+                console.error('[store] buyProduct', e);
+                showToast('Checkout failed: ' + e.message);
+                if (btn) { btn.disabled = false; btn.textContent = original || 'Buy'; }
+            }
+        }
+        window.buyProduct = buyProduct;
+
+        // functions.invoke wraps non-2xx in a FunctionsHttpError whose body holds
+        // the real message — surface that instead of "Edge Function returned a
+        // non-2xx status code".
+        async function readFnError(error) {
+            try {
+                if (error?.context && typeof error.context.json === 'function') {
+                    const j = await error.context.json();
+                    if (j?.error) return j.error;
+                }
+            } catch (e) {}
+            return error?.message || 'Request failed';
+        }
+
+        // ── Wallet ─────────────────────────────────────────────────────────────
+        async function loadWallet() {
+            const uid = myUserId();
+            if (!uid) return;
+            loadWalletBalance(uid);
+            loadPayoutStatus(uid);
+            loadWalletOrders(uid);
+            loadWalletTransactions(uid);
+            loadWithdrawals(uid);
+            updateWithdrawPreview();
+        }
+        window.loadWallet = loadWallet;
+
+        async function loadWalletBalance(uid) {
+            const el = document.getElementById('walletBalance');
+            if (!el) return;
+            try {
+                const { data, error } = await db.rpc('wallet_balance', { p_user: uid });
+                if (error) throw new Error(error.message);
+                window.__walletBalance = Number(data || 0);
+                el.textContent = money(window.__walletBalance);
+            } catch (e) {
+                console.error('[store] wallet_balance', e);
+                el.textContent = '—';
+            }
+        }
+
+        async function loadPayoutStatus(uid) {
+            const status = document.getElementById('walletPayoutStatus');
+            const wrap   = document.getElementById('walletConnectWrap');
+            const card   = document.getElementById('walletWithdrawCard');
+            if (!status) return;
+            try {
+                const { data } = await db.from('stripe_accounts')
+                    .select('stripe_account_id,onboarding_complete,payouts_enabled')
+                    .eq('user_id', uid).maybeSingle();
+                const ready = !!(data && data.stripe_account_id && data.payouts_enabled);
+                if (ready) {
+                    status.textContent = 'Payouts enabled.';
+                    if (wrap) wrap.style.display = 'none';
+                    if (card) card.style.opacity = '1';
+                } else if (data && data.stripe_account_id) {
+                    status.textContent = 'Stripe onboarding started but not finished.';
+                    if (wrap) { wrap.style.display = 'block'; wrap.querySelector('button').textContent = 'Finish payout setup'; }
+                    if (card) card.style.opacity = '0.55';
+                } else {
+                    status.textContent = 'Connect a Stripe account to withdraw your earnings.';
+                    if (wrap) wrap.style.display = 'block';
+                    if (card) card.style.opacity = '0.55';
+                }
+            } catch (e) { console.warn('[store] payout status', e); }
+        }
+
+        async function startConnectOnboarding(btn) {
+            const original = btn ? btn.textContent : '';
+            if (btn) { btn.disabled = true; btn.textContent = 'Opening Stripe…'; }
+            try {
+                const { data, error } = await db.functions.invoke('connect-onboard', { body: { country: 'US' } });
+                if (error) throw new Error(await readFnError(error));
+                if (data?.error) throw new Error(data.error);
+                if (!data?.url) throw new Error('No onboarding URL returned');
+                window.location.href = data.url;
+            } catch (e) {
+                console.error('[store] connect-onboard', e);
+                showToast('Could not start payout setup: ' + e.message);
+                if (btn) { btn.disabled = false; btn.textContent = original || 'Set up payouts'; }
+            }
+        }
+        window.startConnectOnboarding = startConnectOnboarding;
+
+        function updateWithdrawPreview() {
+            const el = document.getElementById('withdrawPreview');
+            if (!el) return;
+            const amt = parseFloat(document.getElementById('withdrawAmount')?.value || '0');
+            const method = document.getElementById('withdrawMethod')?.value || 'standard';
+            const bal = Number(window.__walletBalance || 0);
+            if (!(amt > 0)) { el.textContent = `Available: ${money(bal)}`; return; }
+            if (amt > bal) { el.innerHTML = `<span style="color:#ff6b6b;">Amount exceeds your ${money(bal)} balance.</span>`; return; }
+            if (method === 'instant') {
+                const fee = Math.max(STORE_INSTANT_FEE_MIN, amt * STORE_INSTANT_FEE_PCT);
+                el.textContent = `Instant fee ${money(fee)} (1.5%, min $0.50) — you receive ${money(amt - fee)}.`;
+            } else {
+                el.textContent = `Standard payout is free — you receive ${money(amt)} in 1–2 business days.`;
+            }
+        }
+        window.updateWithdrawPreview = updateWithdrawPreview;
+
+        async function submitWithdrawal(btn) {
+            const amt = parseFloat(document.getElementById('withdrawAmount')?.value || '0');
+            const method = document.getElementById('withdrawMethod')?.value || 'standard';
+            if (!(amt > 0)) { showToast('Enter an amount'); return; }
+            if (amt > Number(window.__walletBalance || 0)) { showToast('Amount exceeds your balance'); return; }
+            if (!confirm(`Withdraw ${money(amt)} via ${method} payout?`)) return;
+
+            const original = btn.textContent;
+            btn.disabled = true; btn.textContent = 'Processing…';
+            try {
+                const { data, error } = await db.functions.invoke('store-withdraw', { body: { amount: amt, method } });
+                if (error) throw new Error(await readFnError(error));
+                if (data?.error) throw new Error(data.error);
+                showToast(`Withdrawal sent — ${money(data.net)} after ${money(data.fee)} fee`);
+                document.getElementById('withdrawAmount').value = '';
+                loadWallet();
+            } catch (e) {
+                console.error('[store] withdraw', e);
+                showToast('Withdrawal failed: ' + e.message);
+            } finally {
+                btn.disabled = false; btn.textContent = original;
+            }
+        }
+        window.submitWithdrawal = submitWithdrawal;
+
+        function storeRow(left, right, sub) {
+            return `<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border-default);">
+                <div style="min-width:0;"><div style="font-size:0.875rem;">${left}</div>
+                ${sub ? `<div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">${sub}</div>` : ''}</div>
+                <div style="font-size:0.875rem;font-weight:600;white-space:nowrap;">${right}</div></div>`;
+        }
+        function storeEmpty(msg) {
+            return `<div style="padding:18px 0;color:var(--text-muted);font-size:0.85rem;">${msg}</div>`;
+        }
+
+        async function loadWalletOrders(uid) {
+            const el = document.getElementById('walletOrdersList');
+            if (!el) return;
+            try {
+                const { data, error } = await db.from('orders')
+                    .select('id,product_name,quantity,amount,artist_earnings,currency,status,fulfillment_status,created_at')
+                    .eq('artist_id', uid).order('created_at', { ascending: false }).limit(50);
+                if (error) throw new Error(error.message);
+                if (!data || !data.length) { el.innerHTML = storeEmpty('No sales yet.'); return; }
+                el.innerHTML = data.map((o) => storeRow(
+                    storeEsc(o.product_name || 'Product') + (o.quantity > 1 ? ` ×${o.quantity}` : ''),
+                    '+' + money(o.artist_earnings, o.currency),
+                    `${new Date(o.created_at).toLocaleDateString()} · ${storeEsc(o.status)}`
+                        + (o.fulfillment_status && o.fulfillment_status !== 'n/a' ? ` · ${storeEsc(o.fulfillment_status)}` : '')
+                )).join('');
+            } catch (e) { el.innerHTML = storeEmpty('Could not load sales.'); }
+        }
+
+        async function loadWalletTransactions(uid) {
+            const el = document.getElementById('walletTxList');
+            if (!el) return;
+            try {
+                const { data, error } = await db.from('wallet_transactions')
+                    .select('amount,currency,type,description,created_at')
+                    .eq('user_id', uid).order('created_at', { ascending: false }).limit(50);
+                if (error) throw new Error(error.message);
+                if (!data || !data.length) { el.innerHTML = storeEmpty('No wallet activity yet.'); return; }
+                el.innerHTML = data.map((t) => {
+                    const neg = Number(t.amount) < 0;
+                    return storeRow(
+                        storeEsc(t.description || t.type),
+                        `<span style="color:${neg ? '#ff6b6b' : '#10b981'};">${neg ? '' : '+'}${money(t.amount, t.currency)}</span>`,
+                        new Date(t.created_at).toLocaleString()
+                    );
+                }).join('');
+            } catch (e) { el.innerHTML = storeEmpty('Could not load activity.'); }
+        }
+
+        async function loadWithdrawals(uid) {
+            const el = document.getElementById('walletWithdrawalsList');
+            if (!el) return;
+            try {
+                const { data, error } = await db.from('withdrawals')
+                    .select('amount,method,fee,net,status,created_at')
+                    .eq('user_id', uid).order('created_at', { ascending: false }).limit(50);
+                if (error) throw new Error(error.message);
+                if (!data || !data.length) { el.innerHTML = storeEmpty('No withdrawals yet.'); return; }
+                el.innerHTML = data.map((w) => storeRow(
+                    `${storeEsc(w.method)} payout`,
+                    money(w.net, 'usd'),
+                    `${new Date(w.created_at).toLocaleDateString()} · ${storeEsc(w.status)}`
+                        + (Number(w.fee) > 0 ? ` · fee ${money(w.fee)}` : '')
+                )).join('');
+            } catch (e) { el.innerHTML = storeEmpty('Could not load withdrawals.'); }
+        }
+
+        // ── Stripe return handling ─────────────────────────────────────────────
+        // store-checkout returns to ?store=success&session=<id>; connect-onboard
+        // returns to ?connect=done (or ?connect=refresh if the link expired).
+        async function handleStoreReturn() {
+            const q = new URLSearchParams(location.search);
+
+            if (q.get('connect') === 'done' || q.get('connect') === 'refresh') {
+                if (q.get('connect') === 'refresh') showToast('Payout setup link expired — start again');
+                else showToast('Payout setup complete');
+                const uid = myUserId();
+                if (uid) { loadPayoutStatus(uid); loadWalletBalance(uid); }
+                stripStoreParams(['connect']);
+                return;
+            }
+
+            if (q.get('store') === 'canceled') {
+                showToast('Checkout canceled — you were not charged');
+                stripStoreParams(['store', 'session']);
+                return;
+            }
+
+            if (q.get('store') === 'success') {
+                const sessionId = q.get('session');
+                showStorePurchaseConfirmation(sessionId);
+                stripStoreParams(['store', 'session']);
+            }
+        }
+
+        function stripStoreParams(keys) {
+            try {
+                const url = new URL(location.href);
+                keys.forEach((k) => url.searchParams.delete(k));
+                history.replaceState({}, '', url.toString());
+            } catch (e) {}
+        }
+
+        async function showStorePurchaseConfirmation(sessionId) {
+            // The webhook flips pending → paid and attaches the download URL, so it
+            // may not have landed the instant Stripe redirects us back. Poll briefly.
+            let order = null;
+            for (let i = 0; i < 5 && sessionId; i++) {
+                try {
+                    const { data } = await db.from('orders')
+                        .select('id,product_name,amount,currency,status,digital_download_url,fulfillment_status')
+                        .eq('stripe_session_id', sessionId).maybeSingle();
+                    if (data) { order = data; if (data.status === 'paid') break; }
+                } catch (e) {}
+                await new Promise((r) => setTimeout(r, 1200));
+            }
+
+            const dl = order?.digital_download_url;
+            const pending = order && order.status !== 'paid';
+            const m = document.createElement('div');
+            m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px;';
+            m.innerHTML = `
+                <div style="background:var(--bg-card);border:1px solid var(--border-default);border-radius:16px;padding:28px;max-width:420px;width:100%;text-align:center;">
+                    <div style="font-size:2.4rem;line-height:1;margin-bottom:12px;">${pending ? '⏳' : '✅'}</div>
+                    <h2 style="font-size:1.2rem;font-weight:700;margin:0 0 8px;">${pending ? 'Payment processing' : 'Thank you!'}</h2>
+                    <p style="font-size:0.9rem;color:var(--text-secondary);line-height:1.6;margin:0 0 18px;">
+                        ${order ? storeEsc(order.product_name || 'Your order') : 'Your order'}${order ? ' — ' + money(order.amount, order.currency) : ''}.
+                        ${pending ? 'We are still confirming the payment. Your download will appear in your orders shortly.'
+                                  : (dl ? 'Your download is ready.' : 'The artist has been notified.')}
+                    </p>
+                    ${dl && !pending ? `<a href="${storeEsc(dl)}" target="_blank" rel="noopener" class="btn-primary" style="display:block;text-decoration:none;margin-bottom:10px;">Download now</a>` : ''}
+                    <button class="btn-secondary" style="width:100%;" onclick="this.closest('div[style*=fixed]').remove()">Close</button>
+                </div>`;
+            document.body.appendChild(m);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => { setTimeout(handleStoreReturn, 800); });
 
         function _shGet(key) {
             // 1. Memory first (full data, no size limit)
@@ -22158,6 +22813,9 @@ async function loadArtistPage(artistId) {
     }
     if(!profile){try{const q='%'+artistId+'%';const{data}=await db.from('artist_profiles').select('*').ilike('artist_name',q).limit(1);profile=data?.[0]||null;}catch(e){}}
     if(!profile){if(nameEl)nameEl.textContent='Artist not found';return;}
+    // products.artist_id is the seller's auth.uid — that is artist_profiles.user_id,
+    // NOT artist_profiles.id. Using the wrong one silently returns an empty store.
+    try { loadArtistStorefront(profile.user_id || null); } catch(e) { console.warn('[store] storefront hook', e); }
     const name=profile.artist_name||'Artist';
     const genre=profile.tagline||'';
     const loc=profile.location||'';
