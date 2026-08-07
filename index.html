@@ -11896,8 +11896,10 @@ html, body {
             AppState.subscriptionTier = AppState.selectedTier;
             const tierConfig = SubscriptionTiers[AppState.selectedTier];
             if (tierConfig) {
+                // Optimistic only — reconciled against ai_credits by loadAiCredits().
                 AppState.aiCreditsMax = tierConfig.aiCredits;
                 AppState.aiCreditsRemaining = tierConfig.aiCredits;
+                if (typeof window.loadAiCredits === 'function') window.loadAiCredits();
             }
 
             localStorage.setItem('aiad_subscription_tier', AppState.selectedTier);
@@ -14588,64 +14590,61 @@ Only capture real, meaningful decisions — not questions or general discussion.
         function initializeAICredits() {
             const savedTier = localStorage.getItem('aiad_subscription_tier') || 'free';
             AppState.subscriptionTier = savedTier;
-            const tierConfig = SubscriptionTiers[savedTier] || SubscriptionTiers['free'];
-            if (!tierConfig) return;
-            AppState.aiCreditsMax = tierConfig.aiCredits;
-            AppState.aiCreditsRemaining = tierConfig.aiCredits;
-            localStorage.setItem('aiad_ai_credits', AppState.aiCreditsRemaining);
+
+            // Do NOT seed the balance from the tier config. That guessed the free tier's
+            // 20 from localStorage and wrote it straight into AppState, which is what
+            // #creditsValue and every .studio-credits-text badge render — so the founder
+            // (unlimited) and every paying user saw a hardcoded 20/20 until, and unless,
+            // a DB read happened to overwrite it. The real balance comes from
+            // loadAiCredits() below; leave it unknown until then.
+            if (typeof window.loadAiCredits === 'function') window.loadAiCredits();
             updateAICreditsDisplay();
         }
 
         function updateAICreditsDisplay() {
-            const creditsValue = document.getElementById('creditsValue');
+            const creditsValue   = document.getElementById('creditsValue');
             const creditsBarFill = document.getElementById('creditsBarFill');
-
-            if (!creditsValue || !creditsBarFill) return;
+            const badges         = document.querySelectorAll('.studio-credits-text');
 
             const remaining = AppState.aiCreditsRemaining;
-            const max = AppState.aiCreditsMax;
+            const max       = AppState.aiCreditsMax;
+            const unlimited = (max === Infinity || remaining === Infinity);
+            const unknown   = !unlimited && (remaining === null || remaining === undefined ||
+                                             max === null || max === undefined);
+            const percentage = unlimited ? 100 : (unknown ? 0 : (remaining / max) * 100);
 
-            // Balance not loaded yet — show a neutral placeholder rather than a
-            // fabricated number. loadAiCredits() fills this in from the DB.
-            if (remaining === null || max === null || max === undefined) {
-                creditsValue.textContent = '— / —';
-                creditsBarFill.style.width = '0%';
-                creditsBarFill.classList.remove('warning', 'critical');
+            // The panel indicator only exists inside the artist dashboard. It must not
+            // gate the studio badges, which live on several other views.
+            if (creditsValue && creditsBarFill) {
                 creditsValue.classList.remove('warning', 'critical');
-                return;
-            }
-
-            const percentage = max === Infinity ? 100 : (remaining / max) * 100;
-
-            if (max === Infinity) {
-                creditsValue.textContent = '∞ Unlimited';
-                creditsBarFill.style.width = '100%';
                 creditsBarFill.classList.remove('warning', 'critical');
-                creditsValue.classList.remove('warning', 'critical');
-            } else {
-                creditsValue.textContent = `${remaining} / ${max}`;
-                creditsBarFill.style.width = percentage + '%';
-
-                creditsBarFill.classList.remove('warning', 'critical');
-                creditsValue.classList.remove('warning', 'critical');
-
-                if (percentage === 0) {
-                    creditsBarFill.classList.add('critical');
-                    creditsValue.classList.add('critical');
-                } else if (percentage <= 20) {
-                    creditsBarFill.classList.add('critical');
-                    creditsValue.classList.add('critical');
-                } else if (percentage <= 50) {
-                    creditsBarFill.classList.add('warning');
-                    creditsValue.classList.add('warning');
+                if (unknown) {
+                    creditsValue.textContent = '— / —';
+                    creditsBarFill.style.width = '0%';
+                } else if (unlimited) {
+                    creditsValue.textContent = '∞ Unlimited';
+                    creditsBarFill.style.width = '100%';
+                } else {
+                    creditsValue.textContent = `${remaining} / ${max}`;
+                    creditsBarFill.style.width = percentage + '%';
+                    if (percentage <= 20) {
+                        creditsBarFill.classList.add('critical');
+                        creditsValue.classList.add('critical');
+                    } else if (percentage <= 50) {
+                        creditsBarFill.classList.add('warning');
+                        creditsValue.classList.add('warning');
+                    }
                 }
             }
 
-            // Sync all studio credit badges
-            const studioText = max === Infinity ? '∞ Unlimited' : `${remaining} / ${max} credits`;
-            document.querySelectorAll('.studio-credits-text').forEach(el => {
+            const studioText = unknown ? '— credits'
+                             : unlimited ? '∞ Unlimited'
+                             : `${remaining} / ${max} credits`;
+            badges.forEach((el) => {
                 el.textContent = studioText;
-                el.style.color = (max !== Infinity && percentage <= 20) ? '#FF4444' : (max !== Infinity && percentage <= 50) ? '#FFA500' : 'var(--text-secondary)';
+                el.style.color = (!unlimited && !unknown && percentage <= 20) ? '#FF4444'
+                               : (!unlimited && !unknown && percentage <= 50) ? '#FFA500'
+                               : 'var(--text-secondary)';
             });
         }
 
@@ -14773,8 +14772,10 @@ Only capture real, meaningful decisions — not questions or general discussion.
 
             AppState.subscriptionTier = tier;
             const tierConfig = SubscriptionTiers[tier];
+            // Optimistic only — reconciled against ai_credits by loadAiCredits().
             AppState.aiCreditsMax = tierConfig.aiCredits;
             AppState.aiCreditsRemaining = tierConfig.aiCredits;
+            if (typeof window.loadAiCredits === 'function') window.loadAiCredits();
 
             localStorage.setItem('aiad_subscription_tier', tier);
             localStorage.setItem('aiad_ai_credits', AppState.aiCreditsRemaining);
@@ -17655,6 +17656,42 @@ Only capture real, meaningful decisions — not questions or general discussion.
         const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
             auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storage: aiadAuthStorage },
         });
+
+        // ── Single session resolver ────────────────────────────────────────────────
+        // aiadAuthStorage above puts the token in sessionStorage when "remember me" is
+        // off, so the hand-rolled localStorage.getItem('sb-…-auth-token') readers
+        // scattered through this file silently get null and bail. The async form also
+        // refreshes an expired token, which the raw reads never did.
+        window.__aiadAuthKey = 'sb-uapiytquwuhtewqieegx-auth-token';
+
+        window.__aiadGetSessionSync = function () {
+            var stores = [];
+            try { stores.push(localStorage); } catch (e) {}
+            try { stores.push(sessionStorage); } catch (e) {}
+            for (var i = 0; i < stores.length; i++) {
+                try {
+                    var raw = stores[i].getItem(window.__aiadAuthKey);
+                    if (!raw) continue;
+                    // Newer supabase-js may base64-wrap the stored blob.
+                    if (raw.indexOf('base64-') === 0) {
+                        try { raw = atob(raw.slice(7)); } catch (e) { continue; }
+                    }
+                    var tok = JSON.parse(raw);
+                    var cur = (tok && tok.currentSession) || tok;
+                    if (cur && cur.access_token && cur.user) return cur;
+                } catch (e) {}
+            }
+            return null;
+        };
+
+        window.__aiadGetSession = async function () {
+            try {
+                var r = await db.auth.getSession();
+                var s = r && r.data && r.data.session;
+                if (s && s.access_token && s.user) return s;
+            } catch (e) {}
+            return window.__aiadGetSessionSync();
+        };
 
         window.addEventListener('DOMContentLoaded', async () => {
             const { data: { session } } = await db.auth.getSession();
@@ -22535,6 +22572,14 @@ function toggleAgeRange(btn) {
 
         // Read the Supabase session straight from localStorage (where supabase-js stores it).
         function getSession() {
+            // Delegate to the shared resolver — it also checks sessionStorage, which the
+            // client's storage adapter uses when "remember me" is off.
+            try {
+                if (typeof window.__aiadGetSessionSync === 'function') {
+                    const r = window.__aiadGetSessionSync();
+                    if (r) return r;
+                }
+            } catch (e) {}
             try {
                 const tok = JSON.parse(localStorage.getItem('sb-uapiytquwuhtewqieegx-auth-token'));
                 if (tok?.access_token && tok?.user) return tok;
@@ -22688,6 +22733,14 @@ function toggleAgeRange(btn) {
         let activeStage = null;
 
         function getSession() {
+            // Delegate to the shared resolver — it also checks sessionStorage, which the
+            // client's storage adapter uses when "remember me" is off.
+            try {
+                if (typeof window.__aiadGetSessionSync === 'function') {
+                    const r = window.__aiadGetSessionSync();
+                    if (r) return r;
+                }
+            } catch (e) {}
             try {
                 const tok = JSON.parse(localStorage.getItem('sb-uapiytquwuhtewqieegx-auth-token'));
                 if (tok?.access_token && tok?.user) return tok;
@@ -22846,12 +22899,15 @@ function toggleAgeRange(btn) {
             // stale JWT, which 401s — and a 401 body is not an array, so the old code fell
             // into the "no row" branch and painted a phantom 20 for everyone.
             let sess = null;
-            const c = _client();
             try {
-                if (c?.auth?.getSession) sess = (await c.auth.getSession())?.data?.session || null;
-            } catch (e) { /* fall through to the localStorage read */ }
+                if (typeof window.__aiadGetSession === 'function') sess = await window.__aiadGetSession();
+            } catch (e) { /* fall through */ }
+            if (!sess?.access_token) {
+                const c = _client();
+                try { if (c?.auth?.getSession) sess = (await c.auth.getSession())?.data?.session || null; } catch (e) {}
+            }
             if (!sess?.access_token) sess = getSession();
-            if (!sess?.user) return;
+            if (!sess?.user) { console.warn('[credits] no session available for balance fetch'); return; }
 
             try {
                 const anon = _anonKey();
@@ -22888,6 +22944,23 @@ function toggleAgeRange(btn) {
             } catch (e) { console.warn('[credits] loadAiCredits', e); }
         }
         window.loadAiCredits = loadAiCredits;
+
+        // loadAiCredits used to be reachable only from tryRender(), which is gated on
+        // #artistAgentsView — so on every other view the balance was never fetched and
+        // whatever AppState happened to hold stayed on screen. Load it on boot, on auth
+        // change, and when the tab regains focus.
+        (function scheduleCreditLoads() {
+            const run = () => { try { loadAiCredits(); } catch (e) {} };
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
+            else run();
+            try {
+                const c = _client();
+                if (c?.auth?.onAuthStateChange) c.auth.onAuthStateChange((evt) => {
+                    if (evt === 'SIGNED_IN' || evt === 'TOKEN_REFRESHED' || evt === 'INITIAL_SESSION') run();
+                });
+            } catch (e) {}
+            document.addEventListener('visibilitychange', () => { if (!document.hidden) run(); });
+        })();
 
         window.sendStageAgentMessage = async function () {
             if (!activeStage) return;
@@ -25040,6 +25113,9 @@ Be direct and concrete with real industry insight — never generic filler. When
   var SU='https://uapiytquwuhtewqieegx.supabase.co';
   var ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhcGl5dHF1d3VodGV3cWllZWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NzcwMTksImV4cCI6MjA4OTI1MzAxOX0.BLs2RdStghm0_cF8t70cBTX1GWcowGRwID7TAG8Mg38';
   function sess(){
+    // Must go through the shared resolver: the client's storage adapter can put the
+    // token in sessionStorage ("remember me" off), which a raw localStorage read misses.
+    try{ if(typeof window.__aiadGetSessionSync==='function'){ var r=window.__aiadGetSessionSync(); if(r) return r; } }catch(e){}
     try{ if(typeof getSession==='function'){ var s=getSession(); if(s&&s.access_token&&s.user) return s; } }catch(e){}
     try{ var raw=JSON.parse(localStorage.getItem('sb-uapiytquwuhtewqieegx-auth-token')); var c=raw&&(raw.currentSession||raw); if(c&&c.access_token&&c.user) return c; }catch(e){}
     return null;
@@ -25093,6 +25169,9 @@ Be direct and concrete with real industry insight — never generic filler. When
     }catch(e){}
   }
   function sess(){
+    // Must go through the shared resolver: the client's storage adapter can put the
+    // token in sessionStorage ("remember me" off), which a raw localStorage read misses.
+    try{ if(typeof window.__aiadGetSessionSync==='function'){ var r=window.__aiadGetSessionSync(); if(r) return r; } }catch(e){}
     try{ if(typeof getSession==='function'){ var s=getSession(); if(s&&s.access_token&&s.user) return s; } }catch(e){}
     try{ var raw=JSON.parse(localStorage.getItem('sb-uapiytquwuhtewqieegx-auth-token')); var c=raw&&(raw.currentSession||raw); if(c&&c.access_token&&c.user) return c; }catch(e){}
     return null;
