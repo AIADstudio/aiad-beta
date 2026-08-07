@@ -10233,6 +10233,15 @@ html, body {
             aiCreditsResetDate: null
         };
 
+        // AppState is declared with `const` at the top level of a classic <script>, which
+        // puts it in the global LEXICAL environment — it never becomes a property of
+        // `window`. Twelve places in this file are written as `if (window.AppState) { … }`
+        // (the credit paint path, the 4s sync IIFE, the credit pill, several others); every
+        // one of those guards was silently false, so their bodies never ran. That is why a
+        // perfectly good ai_credits fetch never reached the counter. Exporting it here
+        // repairs all of them at once.
+        window.AppState = AppState;
+
         function getIndustryConfig() {
             return AppState.industryConfig || IndustryConfig.music;
         }
@@ -23086,16 +23095,42 @@ function toggleAgeRange(btn) {
                 }
                 const unlimited = row.allowance >= 999999;
                 window.__aiCreditMax = unlimited ? null : row.allowance;
+
                 // Seed the gate's state from the same authoritative row, so the counter and
-                // the generation gate can never disagree again.
-                if (window.AppState) {
-                    AppState.aiCreditsMax       = unlimited ? Infinity : row.allowance;
-                    AppState.aiCreditsRemaining = unlimited ? Infinity : row.balance;
-                }
+                // the generation gate can never disagree again. NOT guarded on
+                // `window.AppState` any more — that guard was the render blocker. AppState
+                // is a module-level const in this file's global lexical scope, so reference
+                // it directly and let a genuine ReferenceError surface.
+                AppState.aiCreditsMax       = unlimited ? Infinity : row.allowance;
+                AppState.aiCreditsRemaining = unlimited ? Infinity : row.balance;
+
                 try { localStorage.setItem('aiad_ai_credits', unlimited ? '999999' : String(row.balance)); } catch (e) {}
+
+                console.log('[credits] painting', {
+                    unlimited,
+                    balance: row.balance,
+                    allowance: row.allowance,
+                    appStateMax: AppState.aiCreditsMax,
+                    appStateRemaining: AppState.aiCreditsRemaining,
+                });
+
                 updateCreditsDisplay(unlimited ? 999999 : row.balance);
-                try { if (typeof updateAICreditsDisplay === 'function') updateAICreditsDisplay(); } catch (e) {}
-            } catch (e) { console.warn('[credits] loadAiCredits', e); }
+                // Not swallowed: if the badge paint throws we need to see it, not inherit
+                // another silent failure.
+                if (typeof updateAICreditsDisplay === 'function') {
+                    updateAICreditsDisplay();
+                } else {
+                    console.error('[credits] updateAICreditsDisplay is not reachable from this scope');
+                }
+
+                console.log('[credits] painted',
+                    document.getElementById('creditsValue')?.textContent,
+                    '| badges:', document.querySelectorAll('.studio-credits-text').length);
+            } catch (e) {
+                // Was `/* silent */`, then console.warn. A throw between fetch-success and
+                // paint is exactly the failure mode we kept missing, so make it loud.
+                console.error('[credits] loadAiCredits failed between fetch and paint:', e);
+            }
         }
         window.loadAiCredits = loadAiCredits;
 
