@@ -17585,7 +17585,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
         const STORE_PLATFORM_FEE_PCT = 0.10;
         const STORE_INSTANT_FEE_PCT  = 0.015;
         const STORE_INSTANT_FEE_MIN  = 0.50;
-        const STORE_BUCKET = 'artist-media';
+        const STORE_IMAGE_BUCKET   = 'artist-media';   // public — cover art
+        const STORE_DIGITAL_BUCKET = 'store-digital';  // PRIVATE — paid files
 
         function money(n, cur) {
             const v = Number(n || 0);
@@ -17600,21 +17601,37 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
 
         // ── Uploads ────────────────────────────────────────────────────────────
-        // NOTE: 'artist-media' is a PUBLIC bucket. store-webhook copies
-        // products.digital_file_url verbatim into orders.digital_download_url, so
-        // the file has to be fetchable by the buyer without a signed URL. That
-        // means digital goods are protected by URL obscurity only.
-        async function uploadStoreFile(file, folder) {
+        // Cover images go to the public artist-media bucket and we store a public URL.
+        async function uploadStoreImage(file) {
             const uid = myUserId();
             if (!uid) throw new Error('Not signed in');
             const safe = (file.name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_');
-            const path = `${uid}/store/${folder}/${Date.now()}_${safe}`;
-            const { error } = await db.storage.from(STORE_BUCKET).upload(path, file, {
+            const path = `${uid}/store/images/${Date.now()}_${safe}`;
+            const { error } = await db.storage.from(STORE_IMAGE_BUCKET).upload(path, file, {
                 upsert: false, contentType: file.type || 'application/octet-stream',
             });
             if (error) throw new Error(error.message);
-            const { data } = db.storage.from(STORE_BUCKET).getPublicUrl(path);
+            const { data } = db.storage.from(STORE_IMAGE_BUCKET).getPublicUrl(path);
             return data?.publicUrl || null;
+        }
+
+        // Digital goods go to the PRIVATE store-digital bucket and we store the object
+        // PATH (not a URL) in products.digital_file_url — store-download signs that path
+        // for an hour, and only for a buyer with a paid order.
+        //
+        // The path must start with the artist's uid: the bucket's storage policy is
+        // (storage.foldername(name))[1] = auth.uid()::text, so any other prefix is
+        // rejected outright.
+        async function uploadStoreDigital(file) {
+            const uid = myUserId();
+            if (!uid) throw new Error('Not signed in');
+            const safe = (file.name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_');
+            const path = `${uid}/${Date.now()}_${safe}`;
+            const { error } = await db.storage.from(STORE_DIGITAL_BUCKET).upload(path, file, {
+                upsert: false, contentType: file.type || 'application/octet-stream',
+            });
+            if (error) throw new Error(error.message);
+            return path;   // PATH, deliberately not a URL
         }
 
         // ── Store manager ──────────────────────────────────────────────────────
@@ -17730,7 +17747,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                         <label class="label">Digital file</label>
                         <input type="file" id="peFile" class="input">
                         <div class="helper-text">${p.digital_file_url ? 'A file is already attached. Choose a new one to replace it.' : 'Delivered to the buyer after payment.'}</div>
-                        <div class="helper-text" style="color:#ffa940;">Stored in a public bucket — anyone with the link can download it. Don't upload anything you can't afford to leak.</div>
+                        <div class="helper-text">Stored privately. Buyers get a signed link that expires after 1 hour, issued only once they've paid.</div>
                     </div>
                     <div class="field-group" id="pePhysicalWrap" style="display:none;">
                         <label class="label">Inventory <span class="label-optional">(blank = unlimited)</span></label>
@@ -17800,9 +17817,9 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 };
 
                 const imgFile = document.getElementById('peImage')?.files?.[0];
-                if (imgFile) row.image_url = await uploadStoreFile(imgFile, 'images');
+                if (imgFile) row.image_url = await uploadStoreImage(imgFile);
                 const digFile = document.getElementById('peFile')?.files?.[0];
-                if (kind !== 'physical' && digFile) row.digital_file_url = await uploadStoreFile(digFile, 'files');
+                if (kind !== 'physical' && digFile) row.digital_file_url = await uploadStoreDigital(digFile);
 
                 let error;
                 if (id) ({ error } = await db.from('products').update(row).eq('id', id));
@@ -17891,6 +17908,53 @@ Only capture real, meaningful decisions — not questions or general discussion.
             } catch (e) {}
             return error?.message || 'Request failed';
         }
+
+        // ── Buyer download ─────────────────────────────────────────────────────
+        // store-download re-checks that the caller owns a PAID order for the product,
+        // then signs the private-bucket path for 1 hour. The signed URL is never
+        // stored — we request a fresh one each time.
+        async function downloadPurchase(orderId, btn) {
+            if (!orderId) { showToast('Missing order reference'); return; }
+            const original = btn ? btn.textContent : '';
+            if (btn) { btn.disabled = true; btn.textContent = 'Preparing download…'; }
+            try {
+                const { data, error } = await db.functions.invoke('store-download', {
+                    body: { order_id: orderId },
+                });
+                if (error) throw new Error(await readFnError(error));
+                if (data?.error) throw new Error(data.error);
+                if (!data?.url) throw new Error('No download link returned');
+                window.open(data.url, '_blank', 'noopener');
+                if (btn) btn.textContent = 'Link opened — valid 1 hour';
+            } catch (e) {
+                console.error('[store] downloadPurchase', e);
+                showToast('Download failed: ' + e.message);
+                if (btn) { btn.disabled = false; btn.textContent = original || 'Download now'; }
+            }
+        }
+        window.downloadPurchase = downloadPurchase;
+
+        // ── Fulfillment (artist) ───────────────────────────────────────────────
+        // mark_order_fulfillment is SECURITY DEFINER and scopes to
+        // artist_id = auth.uid(), raising if the order is not yours.
+        async function markOrderFulfillment(orderId, status, btn) {
+            const original = btn ? btn.textContent : '';
+            if (btn) { btn.disabled = true; btn.textContent = 'Updating…'; }
+            try {
+                const { error } = await db.rpc('mark_order_fulfillment', {
+                    p_order_id: orderId, p_status: status,
+                });
+                if (error) throw new Error(error.message);
+                showToast('Marked ' + status);
+                const uid = myUserId();
+                if (uid) loadWalletOrders(uid);
+            } catch (e) {
+                console.error('[store] markOrderFulfillment', e);
+                showToast('Could not update: ' + e.message);
+                if (btn) { btn.disabled = false; btn.textContent = original; }
+            }
+        }
+        window.markOrderFulfillment = markOrderFulfillment;
 
         // ── Wallet ─────────────────────────────────────────────────────────────
         async function loadWallet() {
@@ -18023,12 +18087,22 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     .eq('artist_id', uid).order('created_at', { ascending: false }).limit(50);
                 if (error) throw new Error(error.message);
                 if (!data || !data.length) { el.innerHTML = storeEmpty('No sales yet.'); return; }
-                el.innerHTML = data.map((o) => storeRow(
-                    storeEsc(o.product_name || 'Product') + (o.quantity > 1 ? ` ×${o.quantity}` : ''),
-                    '+' + money(o.artist_earnings, o.currency),
-                    `${new Date(o.created_at).toLocaleDateString()} · ${storeEsc(o.status)}`
-                        + (o.fulfillment_status && o.fulfillment_status !== 'n/a' ? ` · ${storeEsc(o.fulfillment_status)}` : '')
-                )).join('');
+                el.innerHTML = data.map((o) => {
+                    const shippable = o.status === 'paid'
+                        && o.fulfillment_status && o.fulfillment_status !== 'n/a';
+                    // Physical orders advance unfulfilled → shipped → delivered.
+                    const next = o.fulfillment_status === 'unfulfilled' ? 'shipped'
+                               : o.fulfillment_status === 'shipped'     ? 'delivered' : null;
+                    const action = (shippable && next)
+                        ? `<button class="artist-action-btn" style="margin-left:10px;" onclick="markOrderFulfillment('${storeEsc(o.id)}','${next}',this)">Mark ${next}</button>`
+                        : '';
+                    return storeRow(
+                        storeEsc(o.product_name || 'Product') + (o.quantity > 1 ? ` ×${o.quantity}` : ''),
+                        '+' + money(o.artist_earnings, o.currency) + action,
+                        `${new Date(o.created_at).toLocaleDateString()} · ${storeEsc(o.status)}`
+                            + (o.fulfillment_status && o.fulfillment_status !== 'n/a' ? ` · ${storeEsc(o.fulfillment_status)}` : '')
+                    );
+                }).join('');
             } catch (e) { el.innerHTML = storeEmpty('Could not load sales.'); }
         }
 
@@ -18120,7 +18194,10 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 await new Promise((r) => setTimeout(r, 1200));
             }
 
-            const dl = order?.digital_download_url;
+            // Whether a download exists is decided by store-download, not by reading
+            // orders.digital_download_url — that column holds a private bucket path and
+            // is not fetchable directly.
+            const hasDownload = !!(order && order.digital_download_url);
             const pending = order && order.status !== 'paid';
             const m = document.createElement('div');
             m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px;';
@@ -18130,10 +18207,10 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     <h2 style="font-size:1.2rem;font-weight:700;margin:0 0 8px;">${pending ? 'Payment processing' : 'Thank you!'}</h2>
                     <p style="font-size:0.9rem;color:var(--text-secondary);line-height:1.6;margin:0 0 18px;">
                         ${order ? storeEsc(order.product_name || 'Your order') : 'Your order'}${order ? ' — ' + money(order.amount, order.currency) : ''}.
-                        ${pending ? 'We are still confirming the payment. Your download will appear in your orders shortly.'
-                                  : (dl ? 'Your download is ready.' : 'The artist has been notified.')}
+                        ${pending ? 'We are still confirming the payment. Your download will be ready shortly.'
+                                  : (hasDownload ? 'Your download is ready.' : 'The artist has been notified.')}
                     </p>
-                    ${dl && !pending ? `<a href="${storeEsc(dl)}" target="_blank" rel="noopener" class="btn-primary" style="display:block;text-decoration:none;margin-bottom:10px;">Download now</a>` : ''}
+                    ${hasDownload && !pending ? `<button class="btn-primary" style="width:100%;margin-bottom:10px;" onclick="downloadPurchase('${storeEsc(order.id)}', this)">Download now</button>` : ''}
                     <button class="btn-secondary" style="width:100%;" onclick="this.closest('div[style*=fixed]').remove()">Close</button>
                 </div>`;
             document.body.appendChild(m);
