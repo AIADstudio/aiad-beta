@@ -3444,7 +3444,7 @@ html, body {
                     <div class="dash-nav-item" onclick="showArtistView('schedule')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span> Schedule</span></div>
                     <div class="dash-nav-item" onclick="showArtistView('revenue')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg><span> Revenue</span></div>
                     <div class="dash-nav-item" onclick="showArtistView('store')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg><span> Store</span></div>
-                    <div class="dash-nav-item" onclick="showArtistView('wallet')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12V7H5a2 2 0 010-4h14v4"/><path d="M3 5v14a2 2 0 002 2h16v-5"/><path d="M18 12a2 2 0 000 4h4v-4z"/></svg><span> Wallet</span></div>
+                    <div class="dash-nav-item" onclick="showArtistView('wallet')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12V7H5a2 2 0 010-4h14v4"/><path d="M3 5v14a2 2 0 002 2h16v-5"/><path d="M18 12a2 2 0 000 4h4v-4z"/></svg><span> Payouts</span></div>
                     <div class="dash-nav-item" onclick="showArtistView('analytics')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span> Analytics</span></div>
                     <div class="dash-nav-item" id="navMyStats" onclick="showArtistView('mystats')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span> My Stats</span></div>
                     <div class="dash-nav-item" onclick="showArtistView('milestones')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span> Milestones</span></div>
@@ -3550,57 +3550,49 @@ html, body {
                             New product
                         </button>
                     </div>
+                    <div id="storeOnboardBanner" style="display:none;align-items:center;gap:14px;flex-wrap:wrap;justify-content:space-between;margin-bottom:18px;padding:14px 16px;border:1px solid rgba(245,158,11,0.35);background:rgba(245,158,11,0.10);border-radius:12px;">
+                        <div style="font-size:0.85rem;color:#fcd34d;line-height:1.5;">
+                            <strong>Set up payouts to start selling.</strong><br>
+                            Buyers can't check out until your Stripe account can accept payments.
+                        </div>
+                        <button class="primary-btn" onclick="startConnectOnboarding(this)">Set up payouts</button>
+                    </div>
                     <div id="storeProductsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;"></div>
                 </div>
 
-                <!-- ── WALLET ────────────────────────────────────────────────── -->
+                <!-- ── PAYOUTS ───────────────────────────────────────────────
+                     Direct charges: Stripe charges on the artist's own connected
+                     account and holds/pays out their funds, so there is no platform
+                     wallet ledger and no withdrawal form. Balance and payouts are
+                     read from Stripe; payout management is Stripe's own dashboard. -->
                 <div class="dash-view" id="artistWalletView">
                     <div class="view-header">
                         <div>
-                            <h1 class="view-title">Wallet</h1>
-                            <p class="view-subtitle">Your earnings from store sales. Artists keep 90%; the platform takes 10%.</p>
+                            <h1 class="view-title">Payouts</h1>
+                            <p class="view-subtitle">Sales are paid to your own Stripe account. You keep 90%; the platform fee is 10%.</p>
                         </div>
                     </div>
 
                     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-bottom:24px;">
                         <div class="dash-content-card">
-                            <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:8px;">Available balance</div>
-                            <div id="walletBalance" style="font-size:2rem;font-weight:700;">—</div>
-                            <div id="walletPayoutStatus" style="margin-top:12px;font-size:0.8rem;color:var(--text-muted);"></div>
-                            <div id="walletConnectWrap" style="margin-top:12px;display:none;">
-                                <button class="primary-btn" onclick="startConnectOnboarding(this)">Set up payouts</button>
-                            </div>
+                            <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:8px;">Available</div>
+                            <div id="payoutAvailable" style="font-size:2rem;font-weight:700;">—</div>
+                            <div id="payoutPending" style="margin-top:6px;font-size:0.8rem;color:var(--text-muted);"></div>
                         </div>
-
-                        <div class="dash-content-card" id="walletWithdrawCard">
-                            <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:12px;">Withdraw</div>
-                            <div class="field-group">
-                                <label class="label">Amount (USD)</label>
-                                <input type="number" class="input" id="withdrawAmount" min="1" step="0.01" placeholder="0.00" oninput="updateWithdrawPreview()">
+                        <div class="dash-content-card">
+                            <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:8px;">Payout account</div>
+                            <div id="payoutStatusText" style="font-size:0.85rem;color:var(--text-muted);line-height:1.6;">Checking…</div>
+                            <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
+                                <button class="primary-btn" id="payoutConnectBtn" style="display:none;" onclick="startConnectOnboarding(this)">Set up payouts</button>
+                                <button class="artist-action-btn" id="payoutDashboardBtn" style="display:none;" onclick="openStripeDashboard(this)">Manage payouts</button>
                             </div>
-                            <div class="field-group">
-                                <label class="label">Speed</label>
-                                <select class="select" id="withdrawMethod" onchange="updateWithdrawPreview()">
-                                    <option value="standard">Standard — free (1–2 business days)</option>
-                                    <option value="instant">Instant — 1.5% fee (min $0.50)</option>
-                                </select>
-                            </div>
-                            <div id="withdrawPreview" style="font-size:0.8rem;color:var(--text-muted);margin:8px 0 12px;line-height:1.6;"></div>
-                            <button class="primary-btn" id="withdrawBtn" onclick="submitWithdrawal(this)" style="width:100%;">Withdraw</button>
+                            <div style="margin-top:10px;font-size:0.72rem;color:var(--text-hint);line-height:1.5;">Stripe handles payout scheduling, bank details and tax forms.</div>
                         </div>
                     </div>
 
                     <div class="dash-section">
                         <div class="dash-section-header"><div class="dash-section-title">Sales</div></div>
                         <div id="walletOrdersList"></div>
-                    </div>
-                    <div class="dash-section">
-                        <div class="dash-section-header"><div class="dash-section-title">Wallet activity</div></div>
-                        <div id="walletTxList"></div>
-                    </div>
-                    <div class="dash-section">
-                        <div class="dash-section-header"><div class="dash-section-title">Withdrawals</div></div>
-                        <div id="walletWithdrawalsList"></div>
                     </div>
                 </div>
 
@@ -17624,14 +17616,15 @@ Only capture real, meaningful decisions — not questions or general discussion.
         //
         //  All money logic lives in the deployed edge functions; this file only
         //  calls them and renders the result. Fee model shown to artists: they
-        //  keep 90%, platform takes 10% (store-checkout PLATFORM_FEE_PCT = 0.10).
-        //  Instant withdrawals cost the artist 1.5%, min $0.50
-        //  (store-withdraw INSTANT_FEE_PCT / INSTANT_FEE_MIN).
+        //  keep 90%, platform takes 10% (store-checkout PLATFORM_FEE_PCT = 0.10,
+        //  taken as a Stripe application_fee_amount on a DIRECT charge).
+        //
+        //  Direct charges mean Stripe charges on the artist's own connected account
+        //  and pays them out — there is no platform-held wallet, no ledger and no
+        //  withdrawal flow.
         // ═══════════════════════════════════════════════════════════════════════
 
         const STORE_PLATFORM_FEE_PCT = 0.10;
-        const STORE_INSTANT_FEE_PCT  = 0.015;
-        const STORE_INSTANT_FEE_MIN  = 0.50;
         const STORE_IMAGE_BUCKET   = 'artist-media';   // public — cover art
         const STORE_DIGITAL_BUCKET = 'store-digital';  // PRIVATE — paid files
 
@@ -17682,9 +17675,23 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
 
         // ── Store manager ──────────────────────────────────────────────────────
+        // Products can be created before onboarding, but nobody can buy them until the
+        // seller's connected account can take charges — so say so up front.
+        async function refreshStoreOnboardBanner() {
+            const banner = document.getElementById('storeOnboardBanner');
+            if (!banner) return;
+            try {
+                const { data, error } = await db.functions.invoke('store-balance', { body: {} });
+                if (error || data?.error) return;          // stay quiet on a lookup failure
+                banner.style.display = data.connected ? 'none' : 'flex';
+            } catch (e) { /* non-blocking */ }
+        }
+        window.refreshStoreOnboardBanner = refreshStoreOnboardBanner;
+
         async function loadMyProducts() {
             const grid = document.getElementById('storeProductsGrid');
             if (!grid) return;
+            refreshStoreOnboardBanner();
             const uid = myUserId();
             if (!uid) { grid.innerHTML = '<div style="color:var(--text-muted);font-size:0.875rem;">Sign in to manage your store.</div>'; return; }
             grid.innerHTML = '<div style="color:var(--text-muted);font-size:0.875rem;">Loading products…</div>';
@@ -17937,7 +17944,14 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 window.location.href = data.url;
             } catch (e) {
                 console.error('[store] buyProduct', e);
-                showToast('Checkout failed: ' + e.message);
+                // store-checkout rejects a sale when the seller's connected account is
+                // missing or can't take charges. Translate those into something a buyer
+                // can act on rather than surfacing Stripe wording.
+                const msg = String(e.message || '');
+                const sellerNotReady = /set up payouts|can't accept payments|cannot accept payments/i.test(msg);
+                showToast(sellerNotReady
+                    ? "This artist isn't set up to sell yet"
+                    : 'Checkout failed: ' + msg);
                 if (btn) { btn.disabled = false; btn.textContent = original || 'Buy'; }
             }
         }
@@ -18003,58 +18017,59 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
         window.markOrderFulfillment = markOrderFulfillment;
 
-        // ── Wallet ─────────────────────────────────────────────────────────────
+        // ── Payouts (direct charges) ───────────────────────────────────────────
+        // No platform wallet: Stripe charges on the artist's connected account, holds
+        // their funds and pays them out. We read the balance and hand off management to
+        // the Stripe Express dashboard. store-withdraw and wallet_balance are retired.
         async function loadWallet() {
             const uid = myUserId();
             if (!uid) return;
-            loadWalletBalance(uid);
-            loadPayoutStatus(uid);
+            loadPayoutBalance();
             loadWalletOrders(uid);
-            loadWalletTransactions(uid);
-            loadWithdrawals(uid);
-            updateWithdrawPreview();
         }
         window.loadWallet = loadWallet;
 
-        async function loadWalletBalance(uid) {
-            const el = document.getElementById('walletBalance');
-            if (!el) return;
+        // store-balance returns { connected, available, pending, currency }. connected:false
+        // simply means no stripe_accounts row yet — it is not an error.
+        async function loadPayoutBalance() {
+            const avail   = document.getElementById('payoutAvailable');
+            const pend    = document.getElementById('payoutPending');
+            const status  = document.getElementById('payoutStatusText');
+            const connect = document.getElementById('payoutConnectBtn');
+            const dash    = document.getElementById('payoutDashboardBtn');
+            if (!avail) return;
             try {
-                const { data, error } = await db.rpc('wallet_balance', { p_user: uid });
-                if (error) throw new Error(error.message);
-                window.__walletBalance = Number(data || 0);
-                el.textContent = money(window.__walletBalance);
+                const { data, error } = await db.functions.invoke('store-balance', { body: {} });
+                if (error) throw new Error(await readFnError(error));
+                if (data?.error) throw new Error(data.error);
+
+                window.__storeConnected = !!data.connected;
+
+                if (!data.connected) {
+                    avail.textContent = money(0);
+                    if (pend)   pend.textContent = '';
+                    if (status) status.textContent = 'Connect a Stripe account to accept payments and get paid.';
+                    if (connect) { connect.style.display = ''; connect.textContent = 'Set up payouts'; }
+                    if (dash)    dash.style.display = 'none';
+                    return;
+                }
+
+                avail.textContent = money(data.available, data.currency);
+                if (pend)   pend.textContent = Number(data.pending) > 0
+                    ? `${money(data.pending, data.currency)} pending — clears once Stripe settles the payment.` : '';
+                if (status) status.textContent = 'Connected to Stripe. Payouts are scheduled by Stripe.';
+                if (connect) connect.style.display = 'none';
+                if (dash)    dash.style.display = '';
             } catch (e) {
-                console.error('[store] wallet_balance', e);
-                el.textContent = '—';
+                console.error('[store] store-balance', e);
+                avail.textContent = '—';
+                if (status) status.textContent = 'Could not load balance: ' + e.message;
+                // Offer the setup path anyway so a brand-new artist is never stuck.
+                if (connect) connect.style.display = '';
+                if (dash)    dash.style.display = 'none';
             }
         }
-
-        async function loadPayoutStatus(uid) {
-            const status = document.getElementById('walletPayoutStatus');
-            const wrap   = document.getElementById('walletConnectWrap');
-            const card   = document.getElementById('walletWithdrawCard');
-            if (!status) return;
-            try {
-                const { data } = await db.from('stripe_accounts')
-                    .select('stripe_account_id,onboarding_complete,payouts_enabled')
-                    .eq('user_id', uid).maybeSingle();
-                const ready = !!(data && data.stripe_account_id && data.payouts_enabled);
-                if (ready) {
-                    status.textContent = 'Payouts enabled.';
-                    if (wrap) wrap.style.display = 'none';
-                    if (card) card.style.opacity = '1';
-                } else if (data && data.stripe_account_id) {
-                    status.textContent = 'Stripe onboarding started but not finished.';
-                    if (wrap) { wrap.style.display = 'block'; wrap.querySelector('button').textContent = 'Finish payout setup'; }
-                    if (card) card.style.opacity = '0.55';
-                } else {
-                    status.textContent = 'Connect a Stripe account to withdraw your earnings.';
-                    if (wrap) wrap.style.display = 'block';
-                    if (card) card.style.opacity = '0.55';
-                }
-            } catch (e) { console.warn('[store] payout status', e); }
-        }
+        window.loadPayoutBalance = loadPayoutBalance;
 
         async function startConnectOnboarding(btn) {
             const original = btn ? btn.textContent : '';
@@ -18073,47 +18088,24 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
         window.startConnectOnboarding = startConnectOnboarding;
 
-        function updateWithdrawPreview() {
-            const el = document.getElementById('withdrawPreview');
-            if (!el) return;
-            const amt = parseFloat(document.getElementById('withdrawAmount')?.value || '0');
-            const method = document.getElementById('withdrawMethod')?.value || 'standard';
-            const bal = Number(window.__walletBalance || 0);
-            if (!(amt > 0)) { el.textContent = `Available: ${money(bal)}`; return; }
-            if (amt > bal) { el.innerHTML = `<span style="color:#ff6b6b;">Amount exceeds your ${money(bal)} balance.</span>`; return; }
-            if (method === 'instant') {
-                const fee = Math.max(STORE_INSTANT_FEE_MIN, amt * STORE_INSTANT_FEE_PCT);
-                el.textContent = `Instant fee ${money(fee)} (1.5%, min $0.50) — you receive ${money(amt - fee)}.`;
-            } else {
-                el.textContent = `Standard payout is free — you receive ${money(amt)} in 1–2 business days.`;
-            }
-        }
-        window.updateWithdrawPreview = updateWithdrawPreview;
-
-        async function submitWithdrawal(btn) {
-            const amt = parseFloat(document.getElementById('withdrawAmount')?.value || '0');
-            const method = document.getElementById('withdrawMethod')?.value || 'standard';
-            if (!(amt > 0)) { showToast('Enter an amount'); return; }
-            if (amt > Number(window.__walletBalance || 0)) { showToast('Amount exceeds your balance'); return; }
-            if (!confirm(`Withdraw ${money(amt)} via ${method} payout?`)) return;
-
-            const original = btn.textContent;
-            btn.disabled = true; btn.textContent = 'Processing…';
+        // Stripe Express dashboard — where the artist manages payouts, bank details and tax.
+        async function openStripeDashboard(btn) {
+            const original = btn ? btn.textContent : '';
+            if (btn) { btn.disabled = true; btn.textContent = 'Opening…'; }
             try {
-                const { data, error } = await db.functions.invoke('store-withdraw', { body: { amount: amt, method } });
+                const { data, error } = await db.functions.invoke('store-dashboard-link', { body: {} });
                 if (error) throw new Error(await readFnError(error));
                 if (data?.error) throw new Error(data.error);
-                showToast(`Withdrawal sent — ${money(data.net)} after ${money(data.fee)} fee`);
-                document.getElementById('withdrawAmount').value = '';
-                loadWallet();
+                if (!data?.url) throw new Error('No dashboard URL returned');
+                window.open(data.url, '_blank', 'noopener');
             } catch (e) {
-                console.error('[store] withdraw', e);
-                showToast('Withdrawal failed: ' + e.message);
+                console.error('[store] store-dashboard-link', e);
+                showToast('Could not open Stripe dashboard: ' + e.message);
             } finally {
-                btn.disabled = false; btn.textContent = original;
+                if (btn) { btn.disabled = false; btn.textContent = original || 'Manage payouts'; }
             }
         }
-        window.submitWithdrawal = submitWithdrawal;
+        window.openStripeDashboard = openStripeDashboard;
 
         function storeRow(left, right, sub) {
             return `<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border-default);">
@@ -18151,44 +18143,6 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     );
                 }).join('');
             } catch (e) { el.innerHTML = storeEmpty('Could not load sales.'); }
-        }
-
-        async function loadWalletTransactions(uid) {
-            const el = document.getElementById('walletTxList');
-            if (!el) return;
-            try {
-                const { data, error } = await db.from('wallet_transactions')
-                    .select('amount,currency,type,description,created_at')
-                    .eq('user_id', uid).order('created_at', { ascending: false }).limit(50);
-                if (error) throw new Error(error.message);
-                if (!data || !data.length) { el.innerHTML = storeEmpty('No wallet activity yet.'); return; }
-                el.innerHTML = data.map((t) => {
-                    const neg = Number(t.amount) < 0;
-                    return storeRow(
-                        storeEsc(t.description || t.type),
-                        `<span style="color:${neg ? '#ff6b6b' : '#10b981'};">${neg ? '' : '+'}${money(t.amount, t.currency)}</span>`,
-                        new Date(t.created_at).toLocaleString()
-                    );
-                }).join('');
-            } catch (e) { el.innerHTML = storeEmpty('Could not load activity.'); }
-        }
-
-        async function loadWithdrawals(uid) {
-            const el = document.getElementById('walletWithdrawalsList');
-            if (!el) return;
-            try {
-                const { data, error } = await db.from('withdrawals')
-                    .select('amount,method,fee,net,status,created_at')
-                    .eq('user_id', uid).order('created_at', { ascending: false }).limit(50);
-                if (error) throw new Error(error.message);
-                if (!data || !data.length) { el.innerHTML = storeEmpty('No withdrawals yet.'); return; }
-                el.innerHTML = data.map((w) => storeRow(
-                    `${storeEsc(w.method)} payout`,
-                    money(w.net, 'usd'),
-                    `${new Date(w.created_at).toLocaleDateString()} · ${storeEsc(w.status)}`
-                        + (Number(w.fee) > 0 ? ` · fee ${money(w.fee)}` : '')
-                )).join('');
-            } catch (e) { el.innerHTML = storeEmpty('Could not load withdrawals.'); }
         }
 
         // ── Stripe return handling ─────────────────────────────────────────────
@@ -26659,7 +26613,8 @@ Be direct and concrete with real industry insight — never generic filler. When
       if (document.getElementById('aiadPreviewPanel')) return;
       var wrap=document.createElement('div');
       wrap.id='aiadPreviewPanel';
-      wrap.style.cssText='position:fixed;left:14px;bottom:14px;z-index:2147483000;background:#12151c;'+
+      // Bottom-right, lifted above the Admin button so it clears sign-out + Sync Library.
+      wrap.style.cssText='position:fixed;right:14px;bottom:80px;z-index:2147483000;background:#12151c;'+
         'border:1px solid #2a2f3a;border-radius:12px;padding:10px 12px;box-shadow:0 8px 30px rgba(0,0,0,.5);'+
         'font-family:system-ui,-apple-system,sans-serif;max-width:250px;';
       var head=document.createElement('div');
