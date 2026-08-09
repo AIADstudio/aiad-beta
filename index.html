@@ -10547,6 +10547,53 @@ html, body {
             handleArrowNavigation(event, card, cards, selectRoleCard);
         }
 
+        // Deep-link entry: /?role=supporter&industry=music
+        // Lets a social link drop someone straight into fan onboarding.
+        //
+        // The alias map targets the app's canonical localStorage vocabulary
+        // (creator / supporter / collaborator / supervisor) — migrateLocalStorage()
+        // normalises artist→creator and fan→supporter, and handleRoleContinue()
+        // branches on those same names.
+        function applyEntryParams() {
+            const p = new URLSearchParams(location.search);
+            const roleParam = (p.get('role') || '').toLowerCase();
+            if (!roleParam) return;
+
+            const ROLE_ALIASES = {
+                fan: 'supporter', supporter: 'supporter',
+                artist: 'creator', creator: 'creator',
+                collab: 'collaborator', collaborator: 'collaborator',
+                supervisor: 'supervisor'
+            };
+            const role = ROLE_ALIASES[roleParam];
+            if (!role) return;
+
+            const industry = (p.get('industry') || 'music').toLowerCase();
+            if (!IndustryConfig[industry]) return;
+
+            AppState.userIndustry   = industry;
+            AppState.industryConfig = IndustryConfig[industry];
+            AppState.userRole       = role;
+            // RolePermissions has no 'supervisor' entry; leave it undefined rather
+            // than writing a bogus one — getRolePermissions() already falls back.
+            if (RolePermissions[role]) AppState.rolePermissions = RolePermissions[role];
+            localStorage.setItem('aiad_user_industry', industry);
+            localStorage.setItem('aiad_user_role', role);
+
+            window.history.replaceState({}, document.title, '/');
+            handleRoleContinue();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Don't hijack a return from an external flow. `store`/`connect` are the
+            // Stripe store returns; applyEntryParams would strip their query params
+            // via replaceState before handleStoreReturn() gets to read them.
+            const p = new URLSearchParams(location.search);
+            if (p.get('code') || p.get('verified') || p.get('billing') ||
+                p.get('store') || p.get('connect')) return;
+            applyEntryParams();
+        });
+
         function handleRoleContinue() {
             if (!AppState.userRole) return;
             localStorage.setItem('aiad_user_role', AppState.userRole);
@@ -18880,7 +18927,16 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 const mr = (data.user && data.user.user_metadata && data.user.user_metadata.role) || localStorage.getItem('aiad_user_role');
                 if (mr) {
                     AppState.userRole = mr;
-                    jumpToDashboard(mr === 'fan' ? 'fan' : mr === 'collaborator' ? 'collab' : mr === 'supervisor' ? 'supervisor' : 'artist');
+                    // Two role vocabularies reach this line: the DB/auth-metadata one
+                    // (artist/fan/...) and the localStorage one, which
+                    // migrateLocalStorage() normalises to creator/supporter. Matching
+                    // only 'fan' meant a stored 'supporter' fell through to the artist
+                    // dashboard — accept both spellings.
+                    const dash = (mr === 'fan' || mr === 'supporter') ? 'fan'
+                               : (mr === 'collaborator' || mr === 'collab') ? 'collab'
+                               : (mr === 'supervisor') ? 'supervisor'
+                               : 'artist';
+                    jumpToDashboard(dash);
                 } else {
                     navigateTo('industry-selection');
                 }
