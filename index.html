@@ -5053,7 +5053,11 @@ html, body {
                         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:14px;">
                             <input id="aiadSpotifyId" placeholder="Spotify artist ID or URL" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-family:var(--font-body);font-size:0.85rem;outline:none;">
                             <input id="aiadYoutubeHandle" placeholder="YouTube @handle or channel ID" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-family:var(--font-body);font-size:0.85rem;outline:none;">
+                            <input id="aiadMonthlyListeners" type="number" min="0" step="1" placeholder="Monthly listeners (self-reported)" title="Spotify's API can't return monthly listeners, so enter it yourself." style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-family:var(--font-body);font-size:0.85rem;outline:none;">
                         </div>
+                        <!-- Inline Spotify feedback: wrong-ID warning, or errors.spotify from the fetch. -->
+                        <div id="aiadSpotifyNotice" style="display:none;margin-top:10px;font-size:0.78rem;line-height:1.55;border-radius:8px;padding:9px 12px;"></div>
+                        <div id="aiadSpotifyConnected" style="display:none;margin-top:10px;align-items:center;gap:10px;font-size:0.82rem;color:var(--text-secondary);"></div>
                         <div style="display:flex;gap:10px;margin-top:12px;">
                             <button id="aiadFetchStatsBtn" onclick="window.fetchArtistStats()" style="background:linear-gradient(135deg,var(--magenta),var(--magenta-dark));border:none;color:#fff;border-radius:10px;padding:10px 18px;font-weight:600;cursor:pointer;font-family:var(--font-body);font-size:0.85rem;">Fetch stats</button>
                             <button onclick="document.getElementById('aiadStatsSummary').style.display = document.getElementById('aiadStatsSummary').style.display === 'none' ? 'block' : 'none';" style="background:transparent;border:1px solid var(--border-default);color:var(--text-secondary);border-radius:10px;padding:10px 16px;font-family:var(--font-body);font-size:0.82rem;cursor:pointer;">Show data</button>
@@ -24176,7 +24180,11 @@ function toggleAgeRange(btn) {
                 if (row.spotify_id)     document.getElementById('aiadSpotifyId').value     = row.spotify_id;
                 if (row.youtube_handle) document.getElementById('aiadYoutubeHandle').value = row.youtube_handle;
                 if (row.lastfm_user)    document.getElementById('aiadLastfmUser').value    = row.lastfm_user;
+                const ml = row.spotify_stats?.self_reported?.monthly_listeners;
+                const mlEl = document.getElementById('aiadMonthlyListeners');
+                if (mlEl && ml != null && ml !== '') mlEl.value = ml;
                 updateStatsStatus(row);
+                renderSpotifyFeedback(row.spotify_stats, null);
             } catch (e) { /* silent */ }
         }
 
@@ -24186,6 +24194,10 @@ function toggleAgeRange(btn) {
             if (!row) { el.textContent = ''; return; }
             const parts = [];
             if (row.spotify_stats?.followers !== undefined) parts.push(`Spotify: ${row.spotify_stats.followers.toLocaleString()} followers`);
+            const _ml = row.spotify_stats?.self_reported?.monthly_listeners;
+            if (_ml != null && _ml !== '' && !isNaN(Number(_ml))) {
+                parts.push(`${Number(_ml).toLocaleString()} monthly listeners (self-reported)`);
+            }
             if (row.youtube_stats?.subscribers !== undefined) parts.push(`YouTube: ${row.youtube_stats.subscribers.toLocaleString()} subs`);
             if (row.lastfm_stats?.playcount !== undefined) parts.push(`Last.fm: ${row.lastfm_stats.playcount.toLocaleString()} plays`);
             const when = row.last_fetched_at ? new Date(row.last_fetched_at).toLocaleString() : 'never';
@@ -24196,6 +24208,68 @@ function toggleAgeRange(btn) {
             if (sum) sum.textContent = JSON.stringify({
                 spotify: row.spotify_stats, youtube: row.youtube_stats, lastfm: row.lastfm_stats,
             }, null, 2);
+        }
+
+        // Inline Spotify feedback under the field.
+        //
+        // Two distinct outcomes to communicate:
+        //  - errors.spotify — the lookup itself failed (bad ID, credentials, rate limit).
+        //  - the lookup succeeded but the profile looks wrong: a name came back with no
+        //    followers AND no top tracks. That is the signature of a username, a podcast
+        //    or someone else's profile rather than the artist's own page. It is a WARNING,
+        //    never a failure: a genuinely new artist can legitimately have 0 followers,
+        //    so we always still show "Connected: NAME" rather than a blank panel.
+        function renderSpotifyFeedback(spotifyStats, errors) {
+            const notice    = document.getElementById('aiadSpotifyNotice');
+            const connected = document.getElementById('aiadSpotifyConnected');
+            if (!notice || !connected) return;
+
+            notice.style.display = 'none';
+            notice.innerHTML = '';
+            connected.style.display = 'none';
+            connected.innerHTML = '';
+
+            const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => (
+                { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+            const spotifyError = errors && errors.spotify;
+            if (spotifyError) {
+                notice.style.display = 'block';
+                notice.style.background = 'rgba(239,68,68,0.10)';
+                notice.style.border = '1px solid rgba(239,68,68,0.35)';
+                notice.style.color = '#fca5a5';
+                notice.innerHTML = `Spotify lookup failed: ${esc(spotifyError)}`;
+                return;
+            }
+
+            // spotify_stats can come back as { self_reported: {...} } only, with no name,
+            // when no Spotify ID is set. Nothing to say in that case.
+            const name = spotifyStats && spotifyStats.name;
+            if (!name) return;
+
+            const followers = Number(spotifyStats.followers || 0);
+            const tracks    = Array.isArray(spotifyStats.top_tracks) ? spotifyStats.top_tracks.length : 0;
+            const popularity = Number(spotifyStats.popularity || 0);
+            const looksWrong = tracks === 0 && (followers === 0 || popularity === 0);
+
+            connected.style.display = 'flex';
+            connected.innerHTML =
+                (spotifyStats.image
+                    ? `<img src="${esc(spotifyStats.image)}" alt="" style="width:34px;height:34px;border-radius:50%;object-fit:cover;flex:none;">`
+                    : '') +
+                `<span><span style="color:var(--teal-light);">●</span> Connected: <strong>${esc(name)}</strong>` +
+                (followers ? ` · ${followers.toLocaleString()} followers` : '') +
+                (tracks ? ` · ${tracks} top tracks` : '') + `</span>`;
+
+            if (looksWrong) {
+                notice.style.display = 'block';
+                notice.style.background = 'rgba(245,158,11,0.10)';
+                notice.style.border = '1px solid rgba(245,158,11,0.35)';
+                notice.style.color = '#fcd34d';
+                notice.innerHTML =
+                    `Connected &ldquo;${esc(name)}&rdquo;, but this profile shows no tracks — double-check you used ` +
+                    `the ID from your artist page (Share &rarr; Copy link to artist), not a username or the wrong profile.`;
+            }
         }
 
         // Extract a Spotify artist ID from either a bare ID, a /artist/... URL, or a spotify: URI.
@@ -24222,6 +24296,14 @@ function toggleAgeRange(btn) {
                     spotify_id:     normalizeSpotifyId(document.getElementById('aiadSpotifyId').value),
                     youtube_handle: document.getElementById('aiadYoutubeHandle').value.trim(),
                 };
+                // Spotify's API cannot return monthly listeners, so the artist supplies it.
+                // The function merges this into spotify_stats.self_reported and preserves
+                // it across later fetches. Only send it when actually filled in — an empty
+                // string would overwrite a previously saved value with nothing.
+                const mlRaw = (document.getElementById('aiadMonthlyListeners')?.value || '').trim();
+                if (mlRaw !== '' && !isNaN(Number(mlRaw))) {
+                    body.self_reported = { monthly_listeners: Number(mlRaw) };
+                }
                 const res = await fetch(`${SUPABASE_URL}/functions/v1/fetch-artist-stats`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sess.access_token },
@@ -24235,8 +24317,12 @@ function toggleAgeRange(btn) {
                     lastfm_stats:  data.lastfm_stats,
                     last_fetched_at: data.fetched_at,
                 });
-                if (data.errors) {
-                    status.innerHTML += `<br><span style="color:#f59e0b;">Some sources failed: ${Object.entries(data.errors).map(([k,v]) => `${k} (${v})`).join('; ')}</span>`;
+                renderSpotifyFeedback(data.spotify_stats, data.errors);
+                // Non-Spotify failures still surface in the status line; Spotify has its
+                // own inline notice under the field.
+                const otherErrors = Object.entries(data.errors || {}).filter(([k]) => k !== 'spotify');
+                if (otherErrors.length) {
+                    status.innerHTML += `<br><span style="color:#f59e0b;">Some sources failed: ${otherErrors.map(([k,v]) => `${k} (${v})`).join('; ')}</span>`;
                 }
                 (window.showToast || alert)('Stats fetched');
             } catch (err) {
