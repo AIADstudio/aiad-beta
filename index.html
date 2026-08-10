@@ -4840,18 +4840,34 @@ html, body {
                          Rendered by the self-reported stats module. -->
                     <div id="srHeadline" style="margin-bottom:16px;"></div>
 
-                    <!-- Edit stats: the same fields as onboarding, same RPC. -->
-                    <div id="srEditor" style="margin-bottom:16px;"></div>
-
+                    <!-- ── 1. Connect. The ONE place to link a platform. Previously this
+                         lived in three other surfaces (the "Connect your socials" modal, the
+                         Analytics connect box, and the Agents-view panel), all writing the
+                         same artist_stats row. Same callFetchStats path as before. ── -->
                     <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:20px 22px;margin-bottom:16px;">
-                        <h3 style="margin:0 0 4px 0;font-size:1rem;font-weight:600;">Public-API connect</h3>
-                        <p style="font-size:0.82rem;color:var(--text-muted);margin:0 0 14px 0;">Spotify (when Premium owner OR Extended Quota) + YouTube — no sign-in required.</p>
+                        <h3 style="margin:0 0 4px 0;font-size:1rem;font-weight:600;">Connect your platforms</h3>
+                        <p style="font-size:0.82rem;color:var(--text-muted);margin:0 0 14px 0;">Paste your profiles and AIAD pulls what each platform makes public — no sign-in needed. Spotify won't release monthly listeners or followers to apps, so those stay yours to enter below.</p>
                         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;">
-                            <input id="myStatsSpotifyId" placeholder="Spotify artist URL or ID" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
-                            <input id="myStatsYoutubeHandle" placeholder="YouTube @handle or UC… channel ID" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
+                            <label style="min-width:0;"><span style="display:block;font-size:0.74rem;color:var(--text-muted);margin-bottom:3px;">Spotify artist link or ID</span>
+                                <input id="myStatsSpotifyId" placeholder="https://open.spotify.com/artist/…" style="width:100%;box-sizing:border-box;background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;"></label>
+                            <label style="min-width:0;"><span style="display:block;font-size:0.74rem;color:var(--text-muted);margin-bottom:3px;">YouTube channel</span>
+                                <input id="myStatsYoutubeHandle" placeholder="@handle or UC… channel ID" style="width:100%;box-sizing:border-box;background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;"></label>
+                            <label style="min-width:0;"><span style="display:block;font-size:0.74rem;color:var(--text-muted);margin-bottom:3px;">Instagram</span>
+                                <input id="myStatsInstagramHandle" placeholder="@yourhandle" style="width:100%;box-sizing:border-box;background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;"></label>
+                            <label style="min-width:0;"><span style="display:block;font-size:0.74rem;color:var(--text-muted);margin-bottom:3px;">TikTok</span>
+                                <input id="myStatsTiktokHandle" placeholder="@yourhandle" style="width:100%;box-sizing:border-box;background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;"></label>
                         </div>
-                        <div id="myStatsApiStatus" style="margin-top:10px;font-size:0.76rem;color:var(--text-muted);"></div>
+                        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px;">
+                            <button onclick="window.saveAndFetchStats()" style="background:linear-gradient(135deg,var(--magenta),var(--magenta-dark));border:none;color:#fff;border-radius:10px;padding:11px 22px;font-weight:600;cursor:pointer;font-size:0.88rem;">Connect &amp; scan</button>
+                            <button onclick="window.saveStatsOnly()" style="background:transparent;border:1px solid var(--border-default);color:var(--text-secondary);border-radius:10px;padding:11px 18px;font-size:0.85rem;cursor:pointer;">Save without scanning</button>
+                        </div>
+                        <div id="myStatsApiStatus" style="margin-top:12px;font-size:0.76rem;color:var(--text-muted);"></div>
+                        <!-- What's actually connected, read back from artist_stats. -->
+                        <div id="myStatsConnected" style="margin-top:12px;"></div>
                     </div>
+
+                    <!-- ── 2. Your numbers. Self-report editor (record_self_reported_stats). ── -->
+                    <div id="srEditor" style="margin-bottom:16px;"></div>
 
                     <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:20px 22px;margin-bottom:16px;">
                         <h3 style="margin:0 0 4px 0;font-size:1rem;font-weight:600;">Extra details</h3>
@@ -4866,8 +4882,6 @@ html, body {
                     </div>
 
                     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
-                        <button onclick="window.saveAndFetchStats()" style="background:linear-gradient(135deg,var(--magenta),var(--magenta-dark));border:none;color:#fff;border-radius:10px;padding:11px 22px;font-weight:600;cursor:pointer;font-size:0.88rem;">Save &amp; fetch</button>
-                        <button onclick="window.saveStatsOnly()" style="background:transparent;border:1px solid var(--border-default);color:var(--text-secondary);border-radius:10px;padding:11px 18px;font-size:0.85rem;cursor:pointer;">Save self-report only</button>
                         <button onclick="document.getElementById('myStatsRaw').style.display = document.getElementById('myStatsRaw').style.display === 'none' ? 'block' : 'none';" style="background:transparent;border:1px solid var(--border-default);color:var(--text-secondary);border-radius:10px;padding:11px 16px;font-size:0.82rem;cursor:pointer;">Show raw data</button>
                     </div>
                     <pre id="myStatsRaw" style="display:none;background:rgba(0,0,0,0.4);border:1px solid var(--border-default);border-radius:10px;padding:12px;font-size:0.74rem;color:var(--text-secondary);overflow-x:auto;white-space:pre-wrap;max-height:340px;overflow-y:auto;"></pre>
@@ -4937,28 +4951,8 @@ html, body {
                         </div>
                     </div>
 
-                    <!-- ──────────────────────────────────────────
-                         CONNECT PLATFORMS — public data, no per-user OAuth
-                         Server pulls Spotify (app-only Client Creds), YouTube (API key), Last.fm.
-                         ────────────────────────────────────────── -->
-                    <div class="specialized-agents-section" id="aiadConnectPanel" style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:18px 20px;margin-bottom:20px;">
-                        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
-                            <div>
-                                <h3 class="specialized-agents-title" style="margin:0 0 4px 0;">Connect Your Platforms</h3>
-                                <p style="font-size:0.82rem;color:var(--text-muted);margin:0;">Public data only — no sign-in to Spotify/YouTube/Last.fm required. AIAD uses this to ground answers in your real stats.</p>
-                            </div>
-                            <div id="aiadStatsStatus" style="font-size:0.74rem;color:var(--text-muted);"></div>
-                        </div>
-                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:14px;">
-                            <input id="aiadSpotifyId" placeholder="Spotify artist ID or URL" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-family:var(--font-body);font-size:0.85rem;outline:none;">
-                            <input id="aiadYoutubeHandle" placeholder="YouTube @handle or channel ID" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-family:var(--font-body);font-size:0.85rem;outline:none;">
-                        </div>
-                        <div style="display:flex;gap:10px;margin-top:12px;">
-                            <button id="aiadFetchStatsBtn" onclick="window.fetchArtistStats()" style="background:linear-gradient(135deg,var(--magenta),var(--magenta-dark));border:none;color:#fff;border-radius:10px;padding:10px 18px;font-weight:600;cursor:pointer;font-family:var(--font-body);font-size:0.85rem;">Fetch stats</button>
-                            <button onclick="document.getElementById('aiadStatsSummary').style.display = document.getElementById('aiadStatsSummary').style.display === 'none' ? 'block' : 'none';" style="background:transparent;border:1px solid var(--border-default);color:var(--text-secondary);border-radius:10px;padding:10px 16px;font-family:var(--font-body);font-size:0.82rem;cursor:pointer;">Show data</button>
-                        </div>
-                        <pre id="aiadStatsSummary" style="display:none;background:rgba(0,0,0,0.4);border:1px solid var(--border-default);border-radius:10px;padding:12px;margin-top:12px;font-size:0.74rem;color:var(--text-secondary);overflow-x:auto;white-space:pre-wrap;max-height:300px;overflow-y:auto;"></pre>
-                    </div>
+                    <!-- A fourth connect panel lived here. Connecting now happens only in
+                         My Stats, so the Agents view just uses the stats it finds. -->
 
                     <!-- ──────────────────────────────────────────
                          AIAD STAGE AGENTS — 8 stages (+ contract review as a cross-stage sub-agent)
@@ -5267,60 +5261,11 @@ html, body {
                         <p class="analytics-page-subtitle">Real data across every platform you're on.</p>
                     </div>
 
-                    <div style="margin-bottom:28px;">
-                        <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:12px;">Connected Platforms</div>
-                        <div id="connectedPlatformsList" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+                    <!-- Connected platforms and every connect control used to live here.
+                         They now live in My Stats, which is the single home for stats:
+                         connect + scan at the top, self-reported numbers below. Analytics
+                         keeps only its charts and AI insights. -->
 
-                            <div id="noPlatformsMsg" style="font-size:0.8rem;color:var(--text-muted);padding:8px 0;">No platforms connected yet.</div>
-
-                            <button onclick="showConnectMore()" style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:transparent;border:1px dashed rgba(255,255,255,0.15);border-radius:8px;color:var(--text-muted);font-size:0.75rem;cursor:pointer;transition:all 0.2s;white-space:nowrap;" onmouseover="this.style.borderColor='rgba(255,255,255,0.3)';this.style.color='var(--text-primary)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.15)';this.style.color='var(--text-muted)'">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                                Connect more
-                            </button>
-                        </div>
-
-                        <div id="connectMorePanel" style="display:none;margin-top:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:20px;">
-                            <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:16px;text-transform:uppercase;letter-spacing:0.08em;">Connect Platforms</div>
-
-                            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;">
-                                <button onclick="connectSpotify()" style="display:flex;align-items:center;gap:8px;padding:8px 14px;background:rgba(29,185,84,0.1);border:1px solid rgba(29,185,84,0.3);border-radius:8px;color:#1db954;font-size:0.8rem;cursor:pointer;">
-                                    <svg viewBox="0 0 24 24" fill="#1db954" style="width:14px;height:14px;"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
-                                    Connect Spotify
-                                </button>
-                                <button onclick="connectYouTube()" style="display:flex;align-items:center;gap:8px;padding:8px 14px;background:rgba(255,0,0,0.1);border:1px solid rgba(255,0,0,0.3);border-radius:8px;color:#ff4444;font-size:0.8rem;cursor:pointer;">
-                                    <svg viewBox="0 0 24 24" fill="#ff0000" style="width:14px;height:14px;"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-2.75 12.27 12.27 0 00-8.45 0A4.83 4.83 0 013.6 6.69 49.92 49.92 0 003 12a49.92 49.92 0 00.6 5.31 4.83 4.83 0 003.77 2.75 12.27 12.27 0 008.45 0 4.83 4.83 0 003.77-2.75A49.92 49.92 0 0021 12a49.92 49.92 0 00-.41-5.31zM9.75 15.02V8.98L15.5 12z"/></svg>
-                                    Connect YouTube
-                                </button>
-                            </div>
-
-                            <div style="font-size:0.65rem;color:var(--text-muted);margin-bottom:12px;">Add your profile links — displayed on your public page</div>
-                            <div style="display:flex;flex-direction:column;gap:10px;">
-                                <div style="display:flex;align-items:center;gap:10px;">
-                                    <div style="width:80px;font-size:0.75rem;color:var(--text-muted);">Instagram</div>
-                                    <input id="linkInstagram" type="url" placeholder="https://instagram.com/yourhandle" style="flex:1;padding:8px 12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text-primary);font-size:0.8rem;outline:none;">
-                                </div>
-                                <div style="display:flex;align-items:center;gap:10px;">
-                                    <div style="width:80px;font-size:0.75rem;color:var(--text-muted);">TikTok</div>
-                                    <input id="linkTikTok" type="url" placeholder="https://tiktok.com/@yourhandle" style="flex:1;padding:8px 12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text-primary);font-size:0.8rem;outline:none;">
-                                </div>
-                                <div style="display:flex;align-items:center;gap:10px;">
-                                    <div style="width:80px;font-size:0.75rem;color:var(--text-muted);">Apple Music</div>
-                                    <input id="linkAppleMusic" type="url" placeholder="https://music.apple.com/..." style="flex:1;padding:8px 12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text-primary);font-size:0.8rem;outline:none;">
-                                </div>
-                                <div style="display:flex;align-items:center;gap:10px;">
-                                    <div style="width:80px;font-size:0.75rem;color:var(--text-muted);">SoundCloud</div>
-                                    <input id="linkSoundCloud" type="url" placeholder="https://soundcloud.com/yourhandle" style="flex:1;padding:8px 12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text-primary);font-size:0.8rem;outline:none;">
-                                </div>
-                                <div style="display:flex;align-items:center;gap:10px;">
-                                    <div style="width:80px;font-size:0.75rem;color:var(--text-muted);">Beatport</div>
-                                    <input id="linkBeatport" type="url" placeholder="https://beatport.com/artist/..." style="flex:1;padding:8px 12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text-primary);font-size:0.8rem;outline:none;">
-                                </div>
-                                <div style="display:flex;justify-content:flex-end;margin-top:4px;">
-                                    <button onclick="savePlatformLinks()" style="padding:8px 20px;background:var(--teal);border:none;border-radius:8px;color:#fff;font-size:0.8rem;font-weight:600;cursor:pointer;">Save Links</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
 
                     <div id="spotifyDataSection" style="display:none;margin-bottom:28px;">
                         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -12794,11 +12739,6 @@ Only capture real, meaningful decisions — not questions or general discussion.
             }
         }
 
-        function showConnectMore() {
-            const panel = document.getElementById('connectMorePanel');
-            if (panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-        }
-
         function disconnectSpotify() {
             localStorage.removeItem('spotify_access_token');
             localStorage.removeItem('spotify_refresh_token');
@@ -15508,43 +15448,6 @@ Only capture real, meaningful decisions — not questions or general discussion.
             document.body.appendChild(modal);
         }
 
-        async function savePlatformLinks() {
-            if (!AppState.currentUser) return;
-            const links = {
-                instagram: document.getElementById('linkInstagram')?.value || '',
-                tiktok: document.getElementById('linkTikTok')?.value || '',
-                apple_music: document.getElementById('linkAppleMusic')?.value || '',
-                soundcloud: document.getElementById('linkSoundCloud')?.value || '',
-                beatport: document.getElementById('linkBeatport')?.value || '',
-            };
-            try {
-                await db.from('artist_platform_links').upsert({
-                    user_id: AppState.currentUser.id,
-                    ...links,
-                    updated_at: new Date().toISOString()
-                }, { onConflict: 'user_id' });
-                showToast('Platform links saved');
-
-                Object.entries(links).forEach(([platform, url]) => {
-                    if (url) addPlatformPill(platform, url);
-                });
-            } catch (err) {
-                showToast('Saved locally — run the SQL to create artist_platform_links table');
-            }
-        }
-
-        function addPlatformPill(platform, url) {
-            const list = document.getElementById('connectedPlatformsList');
-            const existing = document.getElementById('pill-' + platform);
-            if (existing) existing.remove();
-            const pill = document.createElement('a');
-            pill.id = 'pill-' + platform;
-            pill.href = url;
-            pill.target = '_blank';
-            pill.style.cssText = 'display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:var(--text-primary);font-size:0.78rem;font-weight:500;text-decoration:none;cursor:pointer;';
-            pill.textContent = platform.charAt(0).toUpperCase() + platform.slice(1).replace('_', ' ');
-            list.insertBefore(pill, list.lastElementChild);
-        }
 
         async function loadMilestoneSuggestions() {
             const container = document.getElementById('aiMilestoneSuggestions');
@@ -23534,98 +23437,14 @@ function toggleAgeRange(btn) {
             const view = document.getElementById('artistAgentsView');
             if (!view) return;
             renderStageCards();
-            loadStatsIntoForm();
             loadAiCredits();
         }
 
-        // ── Connect Platforms: load saved handles + cached stats into the form on mount ──
-        async function loadStatsIntoForm() {
-            const sess = getSession();
-            if (!sess) return;
-            try {
-                const scripts = [...document.querySelectorAll('script')].map(s => s.innerHTML).join('');
-                const m = scripts.match(/eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+/);
-                const anon = m && m[0];
-                if (!anon) return;
-                const res = await fetch(`${SUPABASE_URL}/rest/v1/artist_stats?select=*&user_id=eq.${sess.user.id}`, {
-                    headers: { 'Authorization': 'Bearer ' + sess.access_token, 'apikey': anon },
-                });
-                const rows = await res.json();
-                const row = Array.isArray(rows) ? rows[0] : null;
-                if (!row) return;
-                if (row.spotify_id)     document.getElementById('aiadSpotifyId').value     = row.spotify_id;
-                if (row.youtube_handle) document.getElementById('aiadYoutubeHandle').value = row.youtube_handle;
-                if (row.lastfm_user)    document.getElementById('aiadLastfmUser').value    = row.lastfm_user;
-                updateStatsStatus(row);
-            } catch (e) { /* silent */ }
-        }
+        // loadStatsIntoForm / updateStatsStatus / fetchArtistStats lived here, serving the
+        // Agents-view connect panel. My Stats owns connecting now, so they are gone along
+        // with it — including loadStatsIntoForm's read of a #aiadLastfmUser input that had
+        // no markup, which threw on any row with a lastfm_user and aborted the status render.
 
-        function updateStatsStatus(row) {
-            const el = document.getElementById('aiadStatsStatus');
-            if (!el) return;
-            if (!row) { el.textContent = ''; return; }
-            const parts = [];
-            if (row.spotify_stats?.followers !== undefined) parts.push(`Spotify: ${row.spotify_stats.followers.toLocaleString()} followers`);
-            if (row.youtube_stats?.subscribers !== undefined) parts.push(`YouTube: ${row.youtube_stats.subscribers.toLocaleString()} subs`);
-            if (row.lastfm_stats?.playcount !== undefined) parts.push(`Last.fm: ${row.lastfm_stats.playcount.toLocaleString()} plays`);
-            const when = row.last_fetched_at ? new Date(row.last_fetched_at).toLocaleString() : 'never';
-            el.innerHTML = parts.length
-                ? `<span style="color:var(--teal-light);">●</span> ${parts.join(' · ')}<br><span style="opacity:0.6;">Last fetched: ${when}</span>`
-                : `<span style="opacity:0.6;">No data yet</span>`;
-            const sum = document.getElementById('aiadStatsSummary');
-            if (sum) sum.textContent = JSON.stringify({
-                spotify: row.spotify_stats, youtube: row.youtube_stats, lastfm: row.lastfm_stats,
-            }, null, 2);
-        }
-
-        // Extract a Spotify artist ID from either a bare ID, a /artist/... URL, or a spotify: URI.
-        function normalizeSpotifyId(input) {
-            if (!input) return '';
-            const trimmed = input.trim();
-            const urlMatch = trimmed.match(/artist\/([A-Za-z0-9]+)/);
-            if (urlMatch) return urlMatch[1];
-            const uriMatch = trimmed.match(/spotify:artist:([A-Za-z0-9]+)/);
-            if (uriMatch) return uriMatch[1];
-            return trimmed;
-        }
-
-        window.fetchArtistStats = async function () {
-            const sess = getSession();
-            if (!sess) { (window.showToast || alert)('Please sign in first'); return; }
-            const btn = document.getElementById('aiadFetchStatsBtn');
-            const status = document.getElementById('aiadStatsStatus');
-            btn.disabled = true; btn.textContent = 'Fetching…';
-            try {
-                const body = {
-                    user_id:        sess.user.id,
-                    action:         'fetch',
-                    spotify_id:     normalizeSpotifyId(document.getElementById('aiadSpotifyId').value),
-                    youtube_handle: document.getElementById('aiadYoutubeHandle').value.trim(),
-                };
-                const res = await fetch(`${SUPABASE_URL}/functions/v1/fetch-artist-stats`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sess.access_token },
-                    body: JSON.stringify(body),
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || `fetch-artist-stats ${res.status}`);
-                updateStatsStatus({
-                    spotify_stats: data.spotify_stats,
-                    youtube_stats: data.youtube_stats,
-                    lastfm_stats:  data.lastfm_stats,
-                    last_fetched_at: data.fetched_at,
-                });
-                if (data.errors) {
-                    status.innerHTML += `<br><span style="color:#f59e0b;">Some sources failed: ${Object.entries(data.errors).map(([k,v]) => `${k} (${v})`).join('; ')}</span>`;
-                }
-                (window.showToast || alert)('Stats fetched');
-            } catch (err) {
-                console.error('[fetchArtistStats]', err);
-                (window.showToast || alert)('Failed: ' + err.message);
-            } finally {
-                btn.disabled = false; btn.textContent = 'Fetch stats';
-            }
-        };
         document.addEventListener('DOMContentLoaded', tryRender);
         // Also render after a brief delay in case the dashboard isn't mounted yet.
         setTimeout(tryRender, 1500);
@@ -23688,11 +23507,18 @@ function toggleAgeRange(btn) {
             Object.keys(obj).forEach(k => obj[k] === undefined && delete obj[k]);
             return obj;
         }
+        // Instagram/TikTok moved here from the retired "Connect your socials" modal, which
+        // was the only surface collecting them. Same normalisation it used.
+        function cleanHandle(v) {
+            return (v || '').replace(/^.*@/, '').replace(/^https?:\/\/[^/]+\//, '').replace(/\/+$/, '').trim();
+        }
         function buildHandles(scope) {
             const prefix = scope === 'onboarding' ? 'ob' : 'myStats';
             return {
                 spotify_id:     normalizeSpotifyId(document.getElementById(prefix + 'SpotifyId')?.value || ''),
                 youtube_handle: (document.getElementById(prefix + 'YoutubeHandle')?.value || '').trim(),
+                instagram_handle: cleanHandle(document.getElementById(prefix + 'InstagramHandle')?.value || ''),
+                tiktok_handle:    cleanHandle(document.getElementById(prefix + 'TiktokHandle')?.value || ''),
             };
         }
 
@@ -23704,8 +23530,10 @@ function toggleAgeRange(btn) {
             const body = {
                 user_id: sess.user.id,
                 action,
-                spotify_id:     handles.spotify_id || undefined,
-                youtube_handle: handles.youtube_handle || undefined,
+                spotify_id:       handles.spotify_id || undefined,
+                youtube_handle:   handles.youtube_handle || undefined,
+                instagram_handle: handles.instagram_handle || undefined,
+                tiktok_handle:    handles.tiktok_handle || undefined,
                 self_reported:  Object.keys(self_reported).length ? self_reported : undefined,
             };
             const SUPABASE_URL_LOCAL = (typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL) || 'https://uapiytquwuhtewqieegx.supabase.co';
@@ -23723,14 +23551,21 @@ function toggleAgeRange(btn) {
             const b = document.getElementById('aiadStatsBanner');
             if (b) b.style.display = 'none';
         }
+        // Re-read the row after writing so "Connected" and the headline reflect what was
+        // actually saved, rather than staying on whatever was rendered at mount.
+        async function refreshStatsSurfaces() {
+            try { await loadMyStats(); } catch (e) {}
+            try { if (window.aiadRefreshSelfReportedStats) await window.aiadRefreshSelfReportedStats(); } catch (e) {}
+        }
         window.saveAndFetchStats = async function () {
             try {
                 const data = await callFetchStats('fetch', 'mystats');
                 if (!data) return;
                 renderMyStatsStatus(data);
-                (window.showToast || alert)('Stats saved & refreshed');
+                (window.showToast || alert)('Connected — stats saved & refreshed');
                 localStorage.setItem('aiad_stats_collected', '1');
                 hideBanner();
+                await refreshStatsSurfaces();
             } catch (e) { (window.showToast || alert)('Failed: ' + e.message); }
         };
         window.saveStatsOnly = async function () {
@@ -23740,21 +23575,109 @@ function toggleAgeRange(btn) {
                 (window.showToast || alert)('Saved.');
                 localStorage.setItem('aiad_stats_collected', '1');
                 hideBanner();
+                await refreshStatsSurfaces();
             } catch (e) { (window.showToast || alert)('Failed: ' + e.message); }
         };
 
+        // The Connected panel below now carries the numbers, so this line only reports what
+        // went wrong. It used to lead with "Spotify API: 0 followers · pop 0" — Spotify
+        // returns 0 to every app, so that read as "your scan found nothing" on a scan that
+        // actually worked.
         function renderMyStatsStatus(data) {
             const el = document.getElementById('myStatsApiStatus');
             const raw = document.getElementById('myStatsRaw');
             if (!el) return;
-            const parts = [];
-            if (data.spotify_stats?.followers !== undefined) parts.push(`Spotify API: ${data.spotify_stats.followers.toLocaleString()} followers · pop ${data.spotify_stats.popularity ?? '?'}`);
-            if (data.youtube_stats?.subscribers !== undefined) parts.push(`YouTube: ${data.youtube_stats.subscribers.toLocaleString()} subs`);
-            if (data.self_reported?.monthly_listeners) parts.push(`Self-reported: ${data.self_reported.monthly_listeners.toLocaleString()} monthly listeners`);
             const errs = data.errors ? Object.entries(data.errors).map(([k, v]) => `${k}: ${v}`).join(' · ') : '';
-            el.innerHTML = (parts.length ? `<span style="color:var(--teal-light);">●</span> ${parts.join(' · ')}` : '<span style="opacity:0.6;">No data yet</span>')
-                + (errs ? `<br><span style="color:#f59e0b;">${errs}</span>` : '');
+            el.innerHTML = errs
+                ? `<span style="color:#f59e0b;">Some sources didn't respond — ${escHtml(errs)}. Anything you entered yourself is still saved.</span>`
+                : '';
             if (raw) raw.textContent = JSON.stringify(data, null, 2);
+        }
+
+        // ── Connected platforms, read back from artist_stats ────────────────────
+        // The old Analytics panel decided "connected" from an OAuth token in
+        // localStorage, so a successful paste-and-scan never registered and the page
+        // claimed "No platforms connected yet" no matter what was saved. Connected now
+        // means what the DB says: a saved handle, and whatever numbers came back with it.
+        const PLATFORMS = [
+            { key: 'spotify',   label: 'Spotify',   colour: '#1db954' },
+            { key: 'youtube',   label: 'YouTube',   colour: '#ff4444' },
+            { key: 'instagram', label: 'Instagram', colour: '#e1306c' },
+            { key: 'tiktok',    label: 'TikTok',    colour: '#25f4ee' },
+        ];
+        function escHtml(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
+                ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+        function fmtNum(n) {
+            return (typeof n === 'number' && Number.isFinite(n)) ? n.toLocaleString() : null;
+        }
+        // Numbers live in two places: the canonical top-level self_reported column that
+        // record_self_reported_stats writes, and the older spotify_stats.self_reported blob
+        // the edge function maintains under different key names. Prefer the canonical one.
+        function mergedSelfReported(row) {
+            const canon = (row && row.self_reported) || {};
+            const legacy = (row && row.spotify_stats && row.spotify_stats.self_reported) || {};
+            const pick = (a, b) => (typeof a === 'number' ? a : (typeof b === 'number' ? b : undefined));
+            return {
+                monthly_listeners:   pick(canon.spotify_monthly_listeners, legacy.monthly_listeners),
+                spotify_followers:   pick(canon.spotify_followers,   legacy.spotify_followers),
+                youtube_subscribers: pick(canon.youtube_subscribers, legacy.youtube_subscribers),
+                instagram_followers: pick(canon.instagram_followers, legacy.instagram_followers),
+                tiktok_followers:    pick(canon.tiktok_followers,    legacy.tiktok_followers),
+            };
+        }
+        function renderConnectedPlatforms(row) {
+            const host = document.getElementById('myStatsConnected');
+            if (!host) return;
+            if (!row) { host.innerHTML = ''; return; }
+            const sr = mergedSelfReported(row);
+            const sp = row.spotify_stats || {};
+            const yt = row.youtube_stats || {};
+
+            const state = {
+                spotify: {
+                    on: !!row.spotify_id,
+                    detail: [fmtNum(sr.monthly_listeners) && fmtNum(sr.monthly_listeners) + ' monthly listeners',
+                             fmtNum(sr.spotify_followers) && fmtNum(sr.spotify_followers) + ' followers',
+                             sp.name && 'as ' + sp.name].filter(Boolean).join(' · '),
+                },
+                youtube: {
+                    on: !!row.youtube_handle,
+                    // Prefer the real API number; fall back to what the artist reported.
+                    detail: [fmtNum(typeof yt.subscribers === 'number' ? yt.subscribers : sr.youtube_subscribers)
+                               && fmtNum(typeof yt.subscribers === 'number' ? yt.subscribers : sr.youtube_subscribers) + ' subscribers',
+                             fmtNum(yt.total_views) && fmtNum(yt.total_views) + ' views'].filter(Boolean).join(' · '),
+                },
+                instagram: {
+                    on: !!row.instagram_handle,
+                    detail: [fmtNum(sr.instagram_followers) && fmtNum(sr.instagram_followers) + ' followers'].filter(Boolean).join(' · '),
+                },
+                tiktok: {
+                    on: !!row.tiktok_handle,
+                    detail: [fmtNum(sr.tiktok_followers) && fmtNum(sr.tiktok_followers) + ' followers'].filter(Boolean).join(' · '),
+                },
+            };
+
+            const connected = PLATFORMS.filter(p => state[p.key].on);
+            if (!connected.length) {
+                host.innerHTML = '<div style="font-size:0.78rem;color:var(--text-muted);">Nothing connected yet — paste a link above and hit Connect &amp; scan.</div>';
+                return;
+            }
+            const when = row.last_fetched_at ? new Date(row.last_fetched_at).toLocaleString() : null;
+            host.innerHTML = `
+                <div style="font-size:0.62rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:8px;">Connected</div>
+                <div style="display:flex;flex-direction:column;gap:8px;">
+                    ${connected.map((p) => {
+                        const d = state[p.key].detail;
+                        return `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:rgba(255,255,255,0.03);border:1px solid ${p.colour}44;border-radius:10px;">
+                            <span style="width:8px;height:8px;border-radius:50%;background:${p.colour};flex-shrink:0;"></span>
+                            <span style="font-size:0.82rem;font-weight:600;color:var(--text-primary);">${escHtml(p.label)}</span>
+                            <span style="font-size:0.76rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${d ? escHtml(d) : 'connected — no numbers yet'}</span>
+                        </div>`;
+                    }).join('')}
+                </div>
+                ${when ? `<div style="font-size:0.68rem;color:var(--text-hint);margin-top:8px;">Last scan ${escHtml(when)}</div>` : ''}`;
         }
 
         async function loadMyStats() {
@@ -23768,22 +23691,22 @@ function toggleAgeRange(btn) {
                 });
                 const rows = await res.json();
                 const row = Array.isArray(rows) ? rows[0] : null;
+                renderConnectedPlatforms(row);
                 if (!row) return;
                 const setVal = (id, v) => { const el = document.getElementById(id); if (el && v !== undefined && v !== null && v !== '') el.value = v; };
-                setVal('myStatsSpotifyId',     row.spotify_id);
-                setVal('myStatsYoutubeHandle', row.youtube_handle);
+                setVal('myStatsSpotifyId',       row.spotify_id);
+                setVal('myStatsYoutubeHandle',   row.youtube_handle);
+                setVal('myStatsInstagramHandle', row.instagram_handle);
+                setVal('myStatsTiktokHandle',    row.tiktok_handle);
+                // Extra details still come from the legacy blob — the RPC doesn't cover them.
                 const sr = row.spotify_stats?.self_reported || {};
-                setVal('srMonthlyListeners',   sr.monthly_listeners);
-                setVal('srSpotifyFollowers',   sr.spotify_followers);
                 setVal('srTotalStreams',      sr.total_streams);
-                setVal('srInstagramFollowers', sr.instagram_followers);
-                setVal('srTiktokFollowers',   sr.tiktok_followers);
                 setVal('srPrimaryGenre',      sr.primary_genre);
                 setVal('srLatestReleaseName', sr.latest_release_name);
                 setVal('srLatestReleaseDate', sr.latest_release_date);
                 setVal('srLocation',          sr.location);
                 renderMyStatsStatus({ spotify_stats: row.spotify_stats, youtube_stats: row.youtube_stats, self_reported: sr });
-                if (sr.monthly_listeners || row.spotify_id || row.youtube_handle) {
+                if (mergedSelfReported(row).monthly_listeners || row.spotify_id || row.youtube_handle) {
                     localStorage.setItem('aiad_stats_collected', '1');
                 }
             } catch (e) { /* silent */ }
@@ -24109,10 +24032,29 @@ function toggleAgeRange(btn) {
             if (!session) return null;
             const { data, error } = await window.db
                 .from('artist_stats')
-                .select('self_reported,spotify_id,youtube_handle,instagram_handle,tiktok_handle,spotify_stats')
+                .select('self_reported,spotify_id,youtube_handle,instagram_handle,tiktok_handle,spotify_stats,youtube_stats,last_fetched_at')
                 .eq('user_id', session.user.id)
                 .maybeSingle();
             return error ? null : data;
+        }
+
+        // Numbers can sit in the canonical top-level self_reported column, in the older
+        // spotify_stats.self_reported blob under different key names, or (for YouTube) in
+        // the real API pull. Resolve all three into one shape the headline can render, so
+        // an artist who connected before this consolidation still sees their figures.
+        function resolvedStats(row) {
+            const canon  = (row && row.self_reported) || {};
+            const legacy = (row && row.spotify_stats && row.spotify_stats.self_reported) || {};
+            const yt     = (row && row.youtube_stats) || {};
+            const pick = (...vals) => vals.find((v) => typeof v === 'number');
+            return {
+                spotify_monthly_listeners: pick(canon.spotify_monthly_listeners, legacy.monthly_listeners),
+                spotify_followers:         pick(canon.spotify_followers,   legacy.spotify_followers),
+                youtube_subscribers:       pick(yt.subscribers, canon.youtube_subscribers, legacy.youtube_subscribers),
+                instagram_followers:       pick(canon.instagram_followers, legacy.instagram_followers),
+                tiktok_followers:          pick(canon.tiktok_followers,    legacy.tiktok_followers),
+                updated_at:                canon.updated_at || legacy._updated_at,
+            };
         }
 
         // ── Headline stats: self-reported numbers are the primary figures.
@@ -24128,7 +24070,7 @@ function toggleAgeRange(btn) {
         ];
 
         function headlineHtml(row) {
-            const sr = (row && row.self_reported) || {};
+            const sr = resolvedStats(row);
             const sp = (row && row.spotify_stats) || {};
             const listeners = sr.spotify_monthly_listeners;
             const secondary = HEADLINE.slice(1)
@@ -24163,7 +24105,7 @@ function toggleAgeRange(btn) {
                     </div>
                 </div>
                 ${secondary ? `<div style="display:flex;gap:22px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.08);">${secondary}</div>` : ''}
-                <div style="font-size:0.68rem;color:#64748b;margin-top:12px;">Self-reported${sr.updated_at ? ' · updated ' + esc(new Date(sr.updated_at).toLocaleDateString()) : ''}</div>
+                <div style="font-size:0.68rem;color:#64748b;margin-top:12px;">Your numbers${typeof (row && row.youtube_stats && row.youtube_stats.subscribers) === 'number' ? ', plus YouTube from the API' : ''}${sr.updated_at ? ' · updated ' + esc(new Date(sr.updated_at).toLocaleDateString()) : ''}</div>
             </div>`;
         }
 
@@ -24185,7 +24127,9 @@ function toggleAgeRange(btn) {
         }
 
         function prefill(prefix, row) {
-            const sr = (row && row.self_reported) || {};
+            // Resolved, so an artist whose numbers only ever reached the legacy blob sees
+            // them in the editor instead of an empty form that looks like nothing saved.
+            const sr = resolvedStats(row);
             const set = (suffix, val) => {
                 const el = document.getElementById(prefix + suffix);
                 if (el && val !== undefined && val !== null && val !== '') el.value = val;
@@ -24510,7 +24454,9 @@ function toggleAgeRange(btn) {
                 if (hasYT || hasSP) return;
                 const ob = await rest(`artist_onboarding?select=data&user_id=eq.${s.user.id}`);
                 const links = Array.isArray(ob) && ob[0] && ob[0].data && ob[0].data.links;
-                if (!links || (!links.spotify && !links.youtube)) { showConnectNudge(); return; }
+                // No links to auto-scan from. The persistent stats banner already points
+                // artists at My Stats, so this no longer raises a second nudge of its own.
+                if (!links || (!links.spotify && !links.youtube)) return;
                 const spId = (links.spotify || '').match(/artist\/([A-Za-z0-9]+)/);
                 const ytRaw = links.youtube || '';
                 const ytAt = ytRaw.match(/@([A-Za-z0-9_.\-]+)/); const ytCh = ytRaw.match(/channel\/([A-Za-z0-9_\-]+)/);
@@ -24592,85 +24538,10 @@ function toggleAgeRange(btn) {
         }
         window.aiadLockIndustries = lockNonMusicIndustries;
 
-        // ── "Connect your socials" nudge + modal (older accounts / missing stats) ──
-        const CS_INPUT = 'width:100%;box-sizing:border-box;background:#12141d;border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:9px 11px;color:#fff;font-size:0.85rem;margin-bottom:10px;';
-        const CS_LABEL = 'display:block;font-size:0.74rem;color:#94a3b8;margin-bottom:3px;';
-        window.aiadConnectSocials = function () {
-            let ov = document.getElementById('aiadConnectOverlay');
-            if (ov) { ov.style.display = 'flex'; return; }
-            ov = document.createElement('div');
-            ov.id = 'aiadConnectOverlay';
-            ov.style.cssText = 'position:fixed;inset:0;background:rgba(3,5,12,0.85);backdrop-filter:blur(6px);z-index:100003;display:flex;align-items:center;justify-content:center;padding:18px;';
-            ov.innerHTML = `<div style="background:#0d0f17;border:1px solid rgba(255,255,255,0.1);border-radius:16px;max-width:460px;width:100%;padding:22px;max-height:90vh;overflow-y:auto;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><h3 style="margin:0;color:#fff;font-size:1.15rem;">🔗 Connect your socials</h3><button onclick="document.getElementById('aiadConnectOverlay').style.display='none'" style="background:none;border:none;color:#94a3b8;font-size:1.4rem;cursor:pointer;">×</button></div>
-                <p style="color:#94a3b8;font-size:0.82rem;margin:0 0 14px;">Paste your profiles — AIAD pulls your real stats automatically so your AI advice is built around your actual numbers.</p>
-                <label style="${CS_LABEL}">Spotify artist link</label><input id="cs_spotify" placeholder="https://open.spotify.com/artist/..." style="${CS_INPUT}">
-                <label style="${CS_LABEL}">YouTube channel</label><input id="cs_youtube" placeholder="https://youtube.com/@..." style="${CS_INPUT}">
-                <label style="${CS_LABEL}">Instagram</label><input id="cs_instagram" placeholder="@handle" style="${CS_INPUT}">
-                <label style="${CS_LABEL}">TikTok</label><input id="cs_tiktok" placeholder="@handle" style="${CS_INPUT}">
-                <div style="background:linear-gradient(90deg,rgba(29,185,84,0.14),rgba(6,182,212,0.10));border:1px solid rgba(29,185,84,0.4);border-radius:10px;padding:11px;margin:4px 0 14px;">
-                    <label style="display:block;font-size:0.8rem;color:#fff;font-weight:700;margin-bottom:2px;">🎧 Spotify monthly listeners</label>
-                    <p style="font-size:0.7rem;color:#94a3b8;margin:0 0 7px;">Spotify doesn't share this with apps — grab it from your Spotify for Artists home page.</p>
-                    <input id="cs_monthly" inputmode="numeric" placeholder="e.g. 2,296" style="width:100%;box-sizing:border-box;background:#0d0f17;border:1px solid rgba(29,185,84,0.5);border-radius:8px;padding:9px 11px;color:#fff;font-size:0.9rem;">
-                </div>
-                <button onclick="aiadSaveSocials(this)" style="width:100%;background:linear-gradient(135deg,#06b6d4,#3b82f6);color:#fff;border:none;border-radius:10px;padding:11px;font-size:0.9rem;font-weight:700;cursor:pointer;">Connect & scan</button>
-                <div id="cs_done" style="color:#22c55e;font-size:0.8rem;margin-top:10px;text-align:center;display:none;">✓ Connected — pulling your stats now.</div>
-            </div>`;
-            document.body.appendChild(ov);
-        };
-        window.aiadSaveSocials = async function (btn) {
-            const g = (id) => (document.getElementById(id) && document.getElementById(id).value || '').trim();
-            const spotify = g('cs_spotify'), youtube = g('cs_youtube'), instagram = g('cs_instagram'), tiktok = g('cs_tiktok'), monthly = g('cs_monthly');
-            if (!spotify && !youtube && !monthly) { (window.showToast || alert)('Add at least one link or your listener count'); return; }
-            btn.disabled = true; btn.textContent = 'Connecting…';
-            try {
-                await rpc('save_artist_socials', { p_spotify: spotify || null, p_youtube: youtube || null, p_instagram: instagram || null, p_tiktok: tiktok || null, p_monthly_listeners: monthly || null });
-                const s = sess();
-                if (s) {
-                    const spId = spotify.match(/artist\/([A-Za-z0-9]+)/);
-                    const ytAt = youtube.match(/@([A-Za-z0-9_.\-]+)/); const ytCh = youtube.match(/channel\/([A-Za-z0-9_\-]+)/);
-                    const yh = ytAt ? '@' + ytAt[1] : (ytCh ? ytCh[1] : '');
-                    const clean = (h) => (h || '').replace(/^.*@/, '').replace(/^https?:\/\/[^/]+\//, '').replace(/\/+$/, '').trim();
-                    fetch(`${SUPA}/functions/v1/fetch-artist-stats`, {
-                        method: 'POST', headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon(), 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ user_id: s.user.id, action: 'fetch', spotify_id: spId ? spId[1] : undefined, youtube_handle: yh || undefined, instagram_handle: clean(instagram) || undefined, tiktok_handle: clean(tiktok) || undefined, self_reported: { monthly_listeners: monthly || undefined } }),
-                    }).catch(() => {});
-                }
-                const done = document.getElementById('cs_done'); if (done) done.style.display = 'block';
-                const nudge = document.getElementById('aiadConnectNudge'); if (nudge) nudge.remove();
-                try { localStorage.setItem('aiad_nudge_dismissed', '1'); } catch (e) {}
-                setTimeout(() => { const ov = document.getElementById('aiadConnectOverlay'); if (ov) ov.style.display = 'none'; }, 1400);
-            } catch (e) { (window.showToast || alert)('Could not save — try again'); }
-            btn.disabled = false; btn.textContent = 'Connect & scan';
-        };
-        function showConnectNudge() {
-            if (document.getElementById('aiadConnectNudge')) return;
-            try { if (localStorage.getItem('aiad_nudge_dismissed') === '1') return; } catch (e) {}
-            const bar = document.createElement('div');
-            bar.id = 'aiadConnectNudge';
-            bar.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:99990;background:linear-gradient(135deg,#7c3aed,#db2777);color:#fff;border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 6px 24px rgba(0,0,0,0.45);max-width:92vw;font-size:0.84rem;';
-            bar.innerHTML = `<span>🔗 Connect your Spotify &amp; YouTube for personalized AI insights</span>
-                <button onclick="window.aiadConnectSocials()" style="background:#fff;color:#111;border:none;border-radius:8px;padding:6px 12px;font-weight:700;font-size:0.8rem;cursor:pointer;white-space:nowrap;">Connect</button>
-                <button onclick="this.parentElement.remove();try{localStorage.setItem('aiad_nudge_dismissed','1')}catch(e){}" style="background:none;border:none;color:rgba(255,255,255,0.85);font-size:1.15rem;cursor:pointer;line-height:1;">×</button>`;
-            document.body.appendChild(bar);
-        }
-        window.aiadShowConnectNudge = showConnectNudge;
-
-        // The analytics/onboarding "Connect Spotify/YouTube" buttons used a broken OAuth
-        // redirect (app not configured for it). Repoint them to the working paste-link
-        // + auto-scan modal so "connect" actually works everywhere.
-        function wireConnectButtons() {
-            if (typeof window.aiadConnectSocials !== 'function') return;
-            if (!window.connectSpotify || !window.connectSpotify.__aiad) {
-                window.connectSpotify = function () { window.aiadConnectSocials(); };
-                window.connectSpotify.__aiad = true;
-            }
-            if (!window.connectYouTube || !window.connectYouTube.__aiad) {
-                window.connectYouTube = function () { window.aiadConnectSocials(); };
-                window.connectYouTube.__aiad = true;
-            }
-        }
-        window.aiadWireConnectButtons = wireConnectButtons;
+        // The "Connect your socials" modal, its top-of-screen nudge, and the shims that
+        // repointed connectSpotify/connectYouTube at that modal all lived here. Connecting
+        // is now done in one place — the Connect panel in My Stats — so a third entry point
+        // that wrote the same artist_stats row through a different code path is gone.
 
         // ══════════════ FASHION: real "Atelier" AI advisor ══════════════
         const FASHION_SYS = `You are AIAD's fashion-industry advisor — a seasoned strategist who combines a creative director, a production/sourcing manager, a wholesale buyer, and a fashion PR/marketing lead in one. You advise independent fashion designers and emerging brands across the ENTIRE fashion business, end to end. You give specific, concrete, current-industry advice on:
@@ -25976,11 +25847,11 @@ Be direct and concrete with real industry insight — never generic filler. When
         window.aiadRenderWsSwitcher = renderWsSwitcher;
 
         document.addEventListener('DOMContentLoaded', () => {
-            lockIndustrySelectFn(); wireCollabPersistence(); wireConnectButtons();
-            setTimeout(() => { hookSettings(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); applyLiveMeta(); ensureArtistStats(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); wireConnectButtons(); wireFashionAgent(); wireAddCategory(); wireFashionDashboardExtras(); wsSync(); loadVerifiedNames().then(() => decorateBadges()); }, 1500);
+            lockIndustrySelectFn(); wireCollabPersistence();
+            setTimeout(() => { hookSettings(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); applyLiveMeta(); ensureArtistStats(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); wireFashionAgent(); wireAddCategory(); wireFashionDashboardExtras(); wsSync(); loadVerifiedNames().then(() => decorateBadges()); }, 1500);
         });
         // Re-decorate + (re)mount buttons/pickers as auth state / views change.
-        setInterval(() => { if (_verifiedNames) decorateBadges(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); wireConnectButtons(); wireFashionAgent(); wireAddCategory(); wireFashionDashboardExtras(); wsSync(); renderWsSwitcher(); }, 2500);
+        setInterval(() => { if (_verifiedNames) decorateBadges(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); wireFashionAgent(); wireAddCategory(); wireFashionDashboardExtras(); wsSync(); renderWsSwitcher(); }, 2500);
     })();
     </script>
 <!-- AIAD usage tracking (self-contained, fail-safe) -->
