@@ -10415,12 +10415,13 @@ html, body {
                     renderCollaboratorRoles();
                 }, 100);
             } else if (role === 'supporter') {
-
-                navigateTo('fan-preferences');
-
-                setTimeout(() => {
-                    renderFanPreferences();
-                }, 100);
+                // Fans go to their signup page first — this used to jump straight to
+                // fan-preferences, skipping the one screen that collects email/password and
+                // calls signUp, so no fan account was ever created. Preferences follow from
+                // handleFanProfileContinue once the account exists. (The renderFanPreferences()
+                // call that used to sit here was never defined and threw; the genre chips are
+                // populated by navigateTo when the preferences page opens.)
+                navigateTo('fan-profile');
             } else if (role === 'supervisor') {
                 navigateTo('supervisor-profile');
             }
@@ -15989,9 +15990,11 @@ Only capture real, meaningful decisions — not questions or general discussion.
             if (!user) return;
             let role = 'artist';
             let industry = null;
+            let isFirstTime = false;
             try {
                 const pending = JSON.parse(localStorage.getItem('aiad_pending_profile') || 'null');
                 if (pending) {
+                    isFirstTime = true;
                     role = pending.role || 'artist';
                     industry = pending.industry || null;
                     // Write every field we have; extra keys (location, avatar_url, industry) are ignored if columns absent.
@@ -16032,7 +16035,18 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 // fall through to the artist dashboard.
                 if (typeof jumpToDashboard === 'function') jumpToDashboard('supervisor'); else navigateTo('supervisor-complete');
             } else if (role === 'fan') {
-                if (typeof jumpToDashboard === 'function') jumpToDashboard('fan'); else navigateTo('industry-selection');
+                // A fan verifying for the first time hasn't picked their genres yet: with
+                // email confirmation on, signup ends at the "check your email" screen, so
+                // handleFanProfileContinue never reaches the preferences step. Send them
+                // there now — it saves preferred_genre (which Discover filters on) and ends
+                // in the fan dashboard anyway. Returning fans go straight to the dashboard.
+                if (isFirstTime && typeof navigateTo === 'function') {
+                    navigateTo('fan-preferences');
+                } else if (typeof jumpToDashboard === 'function') {
+                    jumpToDashboard('fan');
+                } else {
+                    navigateTo('industry-selection');
+                }
             } else if (industry && INDUSTRY_DASH[industry]) {
                 localStorage.setItem('aiad_user_industry', industry);
                 // New artists → tailored AI questionnaire → pricing → dashboard.
@@ -19912,7 +19926,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 AppState.userIndustry = AppState.userIndustry || 'music';
                 localStorage.setItem('aiad_user_industry', AppState.userIndustry);
             } else {
-                AppState.userIndustry = 'music';
+                AppState.userIndustry = AppState.userIndustry || 'music';
                 AppState.industryConfig = IndustryConfig.music;
                 localStorage.setItem('aiad_user_industry', 'music');
             }
@@ -21495,7 +21509,7 @@ document.addEventListener('keydown', function(e) {
                     localStorage.setItem('aiad_pending_profile', JSON.stringify({
                         email, full_name: name,
                         username: fanUsername,
-                        role: 'fan', industry: 'music', location,
+                        role: 'fan', industry: AppState.userIndustry || 'music', location,
                     }));
                 } catch (e) {}
                 btn.disabled = false; btn.querySelector('span').textContent = 'Continue';
@@ -21510,7 +21524,7 @@ document.addEventListener('keydown', function(e) {
                 await db.from('profiles').upsert({
                     id: userData.id, email, full_name: name,
                     username: fanUsername,
-                    role: 'fan', industry: 'music',
+                    role: 'fan', industry: AppState.userIndustry || 'music',
                 }, { onConflict: 'id' });
 
                 AppState.currentUser = userData;
@@ -26334,7 +26348,7 @@ Be direct and concrete with real industry insight — never generic filler. When
       exitToShell();
       if (role === 'artist'){ AppState.userRole='creator'; navigateTo('artist-profile'); }
       else if (role === 'collaborator'){ AppState.userRole='collaborator'; navigateTo('collaborator-roles'); setTimeout(function(){ try{renderCollaboratorRoles();}catch(e){} },100); }
-      else if (role === 'fan'){ AppState.userRole='supporter'; navigateTo('fan-preferences'); setTimeout(function(){ try{renderFanPreferences();}catch(e){} },100); }
+      else if (role === 'fan'){ AppState.userRole='supporter'; navigateTo('fan-profile'); }
       else if (role === 'supervisor'){ AppState.userRole='supervisor'; navigateTo('supervisor-profile'); }
     };
 
