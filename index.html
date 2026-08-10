@@ -18864,7 +18864,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                                 id: u.id, full_name: displayName,
                                 username: collabUsername,
                                 role: 'collaborator', industry: AppState.userIndustry || 'music',
-                                location: AppState.collaborator.profile.location || '',
+                                location: AppState.collaborator.profile.location || null,
                                 avatar_url: AppState.collaborator.profile.avatarUrl || '',
                             }, { onConflict: 'id' });
                         }
@@ -18887,7 +18887,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                             username: collabUsername,
                             role: 'collaborator',
                             industry: AppState.userIndustry || 'music',
-                            location: AppState.collaborator.profile.location || '',
+                            location: AppState.collaborator.profile.location || null,
                             avatar_url: AppState.collaborator.profile.avatarUrl || '',
                         }));
                     } catch (e) {}
@@ -18904,7 +18904,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                         id: user.id, full_name: displayName,
                         username: collabUsername,
                         role: 'collaborator', industry: AppState.userIndustry || 'music',
-                        location: AppState.collaborator.profile.location || '',
+                        location: AppState.collaborator.profile.location || null,
                         avatar_url: AppState.collaborator.profile.avatarUrl || '',
                     }, { onConflict: 'id' });
                 }
