@@ -4829,6 +4829,13 @@ html, body {
                         <p class="agents-page-subtitle">AIAD grounds every recommendation in your real numbers. Connect platforms or self-report — both work.</p>
                     </div>
 
+                    <!-- Headline stats: the artist's own numbers, with name/photo from Spotify.
+                         Rendered by the self-reported stats module. -->
+                    <div id="srHeadline" style="margin-bottom:16px;"></div>
+
+                    <!-- Edit stats: the same fields as onboarding, same RPC. -->
+                    <div id="srEditor" style="margin-bottom:16px;"></div>
+
                     <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:20px 22px;margin-bottom:16px;">
                         <h3 style="margin:0 0 4px 0;font-size:1rem;font-weight:600;">Public-API connect</h3>
                         <p style="font-size:0.82rem;color:var(--text-muted);margin:0 0 14px 0;">Spotify (when Premium owner OR Extended Quota) + YouTube — no sign-in required.</p>
@@ -4840,14 +4847,10 @@ html, body {
                     </div>
 
                     <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:20px 22px;margin-bottom:16px;">
-                        <h3 style="margin:0 0 4px 0;font-size:1rem;font-weight:600;">Self-report numbers</h3>
-                        <p style="font-size:0.82rem;color:var(--text-muted);margin:0 0 14px 0;">Use these any time API data is blocked, missing, or you just know more than the API does (e.g., monthly listeners for Spotify, which the public API doesn't expose).</p>
+                        <h3 style="margin:0 0 4px 0;font-size:1rem;font-weight:600;">Extra details</h3>
+                        <p style="font-size:0.82rem;color:var(--text-muted);margin:0 0 14px 0;">Context AIAD uses alongside your numbers above. Your follower and listener counts live in <strong>Your numbers</strong> — editing them there keeps a single source of truth.</p>
                         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;">
-                            <input id="srMonthlyListeners"   type="number" placeholder="Spotify monthly listeners" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
-                            <input id="srSpotifyFollowers"   type="number" placeholder="Spotify followers" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
                             <input id="srTotalStreams"       type="number" placeholder="Total streams (all-time)" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
-                            <input id="srInstagramFollowers" type="number" placeholder="Instagram followers" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
-                            <input id="srTiktokFollowers"    type="number" placeholder="TikTok followers" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
                             <input id="srPrimaryGenre"       placeholder="Primary genre (e.g., R&amp;B, indie pop)" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
                             <input id="srLatestReleaseName"  placeholder="Latest release title" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
                             <input id="srLatestReleaseDate"  type="date" placeholder="Latest release date" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
@@ -23572,6 +23575,11 @@ function toggleAgeRange(btn) {
             if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
             try {
                 await callFetchStats('fetch', 'onboarding');
+                // Backstop for anyone who skipped the stats step at signup: record the
+                // same numbers through the RPC so artist_stats.self_reported is the one
+                // place the headline figures are read from. This modal's field ids
+                // already follow the `ob<Suffix>` naming the RPC helper expects.
+                try { await window.aiadSaveSelfReportedStats('ob'); } catch (e) { /* non-blocking */ }
                 localStorage.setItem('aiad_stats_collected', '1');
                 const o = document.getElementById('aiadOnboardingOverlay');
                 if (o) o.style.display = 'none';
@@ -23688,6 +23696,268 @@ function toggleAgeRange(btn) {
         window.addEventListener('hashchange', () => {
             setTimeout(maybeShowOnboarding, 600);
             setTimeout(maybeShowBanner, 800);
+        });
+    })();
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Self-reported stats — the artist's own numbers.
+    //
+    // Spotify's API refuses monthly listeners, followers, popularity and
+    // top-tracks to our app (top-tracks 403s; the artist endpoint returns only
+    // name + photo), so the numbers have to come from the artist. Everything
+    // here funnels into one RPC, record_self_reported_stats, which is
+    // SECURITY DEFINER and upserts only the caller's own artist_stats row.
+    //
+    // The RPC merges: it strips nulls before writing, so a blank field never
+    // overwrites a saved value and re-saving a subset is safe. That is why we
+    // send null (not 0, not '') for anything the artist left empty.
+    //
+    // Note this writes the top-level artist_stats.self_reported column, which is
+    // distinct from the older spotify_stats.self_reported blob the
+    // fetch-artist-stats edge function maintains.
+    // ─────────────────────────────────────────────────────────────────────────
+    (function () {
+        const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
+            ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+        // Artists type "12,500" or "12 500". Strip separators, keep an integer,
+        // and treat anything empty or unparseable as "not provided" (null) so the
+        // RPC's null-stripping leaves any existing value alone.
+        function toInt(raw) {
+            const cleaned = String(raw == null ? '' : raw).replace(/[,\s]/g, '');
+            if (!cleaned) return null;
+            const n = parseInt(cleaned, 10);
+            return Number.isFinite(n) && n >= 0 ? n : null;
+        }
+
+        // Accept a pasted profile URL, a spotify: URI, or a bare ID.
+        function toSpotifyId(raw) {
+            const t = String(raw == null ? '' : raw).trim();
+            if (!t) return null;
+            const url = t.match(/artist\/([A-Za-z0-9]+)/); if (url) return url[1];
+            const uri = t.match(/spotify:artist:([A-Za-z0-9]+)/); if (uri) return uri[1];
+            return t;
+        }
+        // YouTube identifies channels either by @handle or by a bare UC… id; keep
+        // whichever the artist gave us rather than forcing an @ onto a channel id.
+        function toYoutubeHandle(raw) {
+            const t = String(raw == null ? '' : raw).trim();
+            if (!t) return null;
+            const ch = t.match(/channel\/(UC[A-Za-z0-9_\-]+)/); if (ch) return ch[1];
+            if (/^UC[A-Za-z0-9_\-]{20,}$/.test(t)) return t;
+            const at = t.match(/@([A-Za-z0-9_.\-]+)/); if (at) return '@' + at[1];
+            const path = t.match(/^https?:\/\/[^/]+\/(?:c\/|user\/)?([A-Za-z0-9_.\-]+)/); if (path) return path[1];
+            return '@' + t.replace(/^@/, '');
+        }
+        function toAtHandle(raw) {
+            const t = String(raw == null ? '' : raw).trim();
+            if (!t) return null;
+            const at = t.match(/@([A-Za-z0-9_.]+)/); if (at) return '@' + at[1];
+            const path = t.match(/^https?:\/\/[^/]+\/([A-Za-z0-9_.]+)/); if (path) return '@' + path[1];
+            return '@' + t.replace(/^@/, '');
+        }
+
+        // suffix → [label, placeholder, inputmode]. Order is the form order.
+        const FIELDS = [
+            ['MonthlyListeners',   'Spotify monthly listeners', 'e.g. 12,500',                 'numeric'],
+            ['SpotifyFollowers',   'Spotify followers',         'e.g. 3,200',                  'numeric'],
+            ['SpotifyId',          'Spotify artist link / ID',  'paste your Spotify artist URL', 'text'],
+            ['YoutubeSubs',        'YouTube subscribers',       'e.g. 8,000',                  'numeric'],
+            ['YoutubeHandle',      'YouTube handle',            '@yourhandle',                 'text'],
+            ['InstagramFollowers', 'Instagram followers',       'e.g. 15,000',                 'numeric'],
+            ['InstagramHandle',    'Instagram handle',          '@yourhandle',                 'text'],
+            ['TiktokFollowers',    'TikTok followers',          'e.g. 22,000',                 'numeric'],
+            ['TiktokHandle',       'TikTok handle',             '@yourhandle',                 'text'],
+        ];
+
+        const INPUT_CSS = 'width:100%;box-sizing:border-box;background:#0d0f17;border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:9px 11px;color:#fff;font-size:0.88rem;outline:none;';
+        const LABEL_CSS = 'display:block;font-size:0.74rem;color:#94a3b8;margin-bottom:3px;';
+
+        // Renders the 9 inputs with ids `<prefix><suffix>` so the onboarding step and
+        // the dashboard editor share one field definition and one save path.
+        function fieldsHtml(prefix) {
+            return `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;">
+                ${FIELDS.map(([suffix, label, ph, mode]) => `<label style="min-width:0;">
+                    <span style="${LABEL_CSS}">${esc(label)}</span>
+                    <input id="${prefix}${suffix}" ${mode === 'numeric' ? 'inputmode="numeric"' : ''} placeholder="${esc(ph)}" style="${INPUT_CSS}">
+                </label>`).join('')}
+            </div>`;
+        }
+
+        window.aiadSelfReportedFieldsHtml = fieldsHtml;
+
+        function readForm(prefix) {
+            const v = (suffix) => {
+                const el = document.getElementById(prefix + suffix);
+                return el ? el.value : '';
+            };
+            return {
+                p_spotify_id:                toSpotifyId(v('SpotifyId')),
+                p_youtube_handle:            toYoutubeHandle(v('YoutubeHandle')),
+                p_instagram_handle:          toAtHandle(v('InstagramHandle')),
+                p_tiktok_handle:             toAtHandle(v('TiktokHandle')),
+                p_spotify_monthly_listeners: toInt(v('MonthlyListeners')),
+                p_spotify_followers:         toInt(v('SpotifyFollowers')),
+                p_youtube_subscribers:       toInt(v('YoutubeSubs')),
+                p_instagram_followers:       toInt(v('InstagramFollowers')),
+                p_tiktok_followers:          toInt(v('TiktokFollowers')),
+            };
+        }
+
+        // Saves whatever the artist filled in. Returns the merged self_reported
+        // jsonb, or null when every field was left blank (nothing worth a round trip).
+        async function saveStats(prefix) {
+            const args = readForm(prefix);
+            if (Object.values(args).every((x) => x === null)) return null;
+            if (!window.db) throw new Error('Not signed in yet');
+            const { data, error } = await window.db.rpc('record_self_reported_stats', args);
+            if (error) throw new Error(error.message || 'Could not save your stats');
+            return data;
+        }
+        window.aiadSaveSelfReportedStats = saveStats;
+
+        async function loadStats() {
+            if (!window.db) return null;
+            const { data: { session } = {} } = await window.db.auth.getSession();
+            if (!session) return null;
+            const { data, error } = await window.db
+                .from('artist_stats')
+                .select('self_reported,spotify_id,youtube_handle,instagram_handle,tiktok_handle,spotify_stats')
+                .eq('user_id', session.user.id)
+                .maybeSingle();
+            return error ? null : data;
+        }
+
+        // ── Headline stats: self-reported numbers are the primary figures.
+        // Name and photo still come from Spotify (via the cached fetch-artist-stats
+        // result) because those are the parts Spotify does give us, and they're
+        // what makes the profile read as authentic.
+        const HEADLINE = [
+            ['spotify_monthly_listeners', 'Monthly listeners'],
+            ['spotify_followers',         'Spotify followers'],
+            ['youtube_subscribers',       'YouTube subscribers'],
+            ['instagram_followers',       'Instagram followers'],
+            ['tiktok_followers',          'TikTok followers'],
+        ];
+
+        function headlineHtml(row) {
+            const sr = (row && row.self_reported) || {};
+            const sp = (row && row.spotify_stats) || {};
+            const listeners = sr.spotify_monthly_listeners;
+            const secondary = HEADLINE.slice(1)
+                .filter(([k]) => typeof sr[k] === 'number')
+                .map(([k, label]) => `<div style="min-width:0;">
+                    <div style="font-size:1.05rem;font-weight:700;color:#fff;">${sr[k].toLocaleString()}</div>
+                    <div style="font-size:0.7rem;color:#94a3b8;">${esc(label)}</div>
+                </div>`).join('');
+
+            if (typeof listeners !== 'number' && !secondary) {
+                return `<div style="background:rgba(255,255,255,0.02);border:1px dashed rgba(255,255,255,0.14);border-radius:14px;padding:18px 20px;color:#94a3b8;font-size:0.85rem;">
+                    Add your numbers below and they'll show up here as your headline stats.
+                </div>`;
+            }
+
+            const photo = sp.image
+                ? `<img src="${esc(sp.image)}" alt="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0;">`
+                : '';
+            const name = sp.name
+                ? `<div style="font-size:0.95rem;font-weight:700;color:#fff;">${esc(sp.name)}</div>
+                   <div style="font-size:0.68rem;color:#64748b;">via Spotify</div>`
+                : '';
+
+            return `<div style="background:linear-gradient(90deg,rgba(29,185,84,0.12),rgba(6,182,212,0.08));border:1px solid rgba(29,185,84,0.35);border-radius:14px;padding:18px 20px;">
+                <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+                    ${photo}
+                    <div style="min-width:0;flex:1;">
+                        ${name}
+                        ${typeof listeners === 'number' ? `
+                            <div style="font-size:2rem;font-weight:800;color:#fff;line-height:1.1;margin-top:${name ? '6px' : '0'};">${listeners.toLocaleString()}</div>
+                            <div style="font-size:0.76rem;color:#94a3b8;">Monthly listeners</div>` : ''}
+                    </div>
+                </div>
+                ${secondary ? `<div style="display:flex;gap:22px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.08);">${secondary}</div>` : ''}
+                <div style="font-size:0.68rem;color:#64748b;margin-top:12px;">Self-reported${sr.updated_at ? ' · updated ' + esc(new Date(sr.updated_at).toLocaleDateString()) : ''}</div>
+            </div>`;
+        }
+
+        // ── Dashboard "Edit stats" panel (same fields, same RPC as onboarding) ──
+        function renderEditor(row) {
+            const host = document.getElementById('srEditor');
+            if (!host) return;
+            host.innerHTML = `<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:20px 22px;">
+                <h3 style="margin:0 0 4px 0;font-size:1rem;font-weight:600;">Your numbers</h3>
+                <p style="font-size:0.82rem;color:var(--text-muted);margin:0 0 14px 0;">Keep these current — they're the figures fans, collaborators and every AIAD recommendation see. Leave anything blank to keep what's already saved.</p>
+                ${fieldsHtml('dashSr')}
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:14px;">
+                    <button id="dashSrSave" style="background:linear-gradient(135deg,var(--magenta,#d946ef),var(--magenta-dark,#a21caf));border:none;color:#fff;border-radius:10px;padding:11px 22px;font-weight:600;cursor:pointer;font-size:0.88rem;">Save stats</button>
+                    <span id="dashSrMsg" style="font-size:0.8rem;color:#94a3b8;"></span>
+                </div>
+            </div>`;
+            prefill('dashSr', row);
+            document.getElementById('dashSrSave').addEventListener('click', onDashSave);
+        }
+
+        function prefill(prefix, row) {
+            const sr = (row && row.self_reported) || {};
+            const set = (suffix, val) => {
+                const el = document.getElementById(prefix + suffix);
+                if (el && val !== undefined && val !== null && val !== '') el.value = val;
+            };
+            set('MonthlyListeners',   sr.spotify_monthly_listeners);
+            set('SpotifyFollowers',   sr.spotify_followers);
+            set('YoutubeSubs',        sr.youtube_subscribers);
+            set('InstagramFollowers', sr.instagram_followers);
+            set('TiktokFollowers',    sr.tiktok_followers);
+            set('SpotifyId',          row && row.spotify_id);
+            set('YoutubeHandle',      row && row.youtube_handle);
+            set('InstagramHandle',    row && row.instagram_handle);
+            set('TiktokHandle',       row && row.tiktok_handle);
+        }
+
+        async function onDashSave() {
+            const btn = document.getElementById('dashSrSave');
+            const msg = document.getElementById('dashSrMsg');
+            btn.disabled = true; btn.textContent = 'Saving…';
+            if (msg) { msg.style.color = '#94a3b8'; msg.textContent = ''; }
+            try {
+                const saved = await saveStats('dashSr');
+                if (saved === null) {
+                    if (msg) msg.textContent = 'Nothing to save — fill in at least one field.';
+                } else {
+                    if (msg) { msg.style.color = '#22c55e'; msg.textContent = '✓ Saved'; }
+                    try { localStorage.setItem('aiad_stats_collected', '1'); } catch (e) {}
+                    await refresh();
+                }
+            } catch (e) {
+                if (msg) { msg.style.color = '#f59e0b'; msg.textContent = e.message; }
+            } finally {
+                btn.disabled = false; btn.textContent = 'Save stats';
+            }
+        }
+
+        async function refresh() {
+            const host = document.getElementById('srHeadline');
+            if (!host && !document.getElementById('srEditor')) return;
+            const row = await loadStats();
+            if (host) host.innerHTML = headlineHtml(row);
+            renderEditor(row);
+        }
+        window.aiadRefreshSelfReportedStats = refresh;
+
+        // Render whenever the My Stats view is opened.
+        function hookView() {
+            const orig = window.showArtistView;
+            if (typeof orig !== 'function' || orig.__srHooked) return;
+            window.showArtistView = function (view) {
+                orig.apply(this, arguments);
+                if (view === 'mystats') setTimeout(refresh, 60);
+            };
+            window.showArtistView.__srHooked = true;
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            hookView();
+            setTimeout(hookView, 1500);
+            setTimeout(() => { if (document.getElementById('srEditor')) refresh(); }, 2500);
         });
     })();
     </script>
@@ -24983,6 +25253,18 @@ Be direct and concrete with real industry insight — never generic filler. When
                         <button onclick="aiadSubmitOnboarding(this,'${dash}')" style="width:100%;margin-top:14px;background:linear-gradient(135deg,#06b6d4,#3b82f6);color:#fff;border:none;border-radius:10px;padding:12px;font-size:0.92rem;font-weight:700;cursor:pointer;">Continue →</button>
                         <p style="text-align:center;font-size:0.72rem;color:#64748b;margin:10px 0 0;">Takes ~2 minutes. You can refine any of this later in your profile.</p>
                     </div>
+                    <!-- Optional stats step. Never blocks account creation: "Skip"
+                         goes straight on to the plan step, and the artist can add
+                         the same numbers later from My Stats. -->
+                    <div id="aiadObStepStats" style="display:none;background:#0d0f17;border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:20px;">
+                        <div style="font-size:0.72rem;color:#38bdf8;font-weight:700;letter-spacing:.05em;margin-bottom:6px;">YOUR NUMBERS</div>
+                        <div style="font-size:1.15rem;font-weight:700;color:#fff;">Add your numbers <span style="font-weight:500;color:#64748b;">(optional)</span></div>
+                        <p style="color:#94a3b8;font-size:0.82rem;margin:6px 0 16px;">Helps fans and collaborators find you. You can update these anytime in your dashboard.</p>
+                        <div id="aiadObStatsFields"></div>
+                        <div id="aiadObStatsMsg" style="font-size:0.8rem;color:#f59e0b;margin-top:10px;min-height:16px;"></div>
+                        <button onclick="aiadSubmitObStats(this,'${dash}')" style="width:100%;margin-top:8px;background:linear-gradient(135deg,#06b6d4,#3b82f6);color:#fff;border:none;border-radius:10px;padding:12px;font-size:0.92rem;font-weight:700;cursor:pointer;">Save &amp; continue →</button>
+                        <button onclick="aiadSkipObStats('${dash}')" style="width:100%;margin-top:8px;background:transparent;color:#94a3b8;border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:11px;font-size:0.88rem;font-weight:600;cursor:pointer;">Skip for now →</button>
+                    </div>
                     <div id="aiadObStep2" style="display:none;background:#0d0f17;border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:20px;">
                         <div style="text-align:center;margin-bottom:8px;"><div style="font-size:1.15rem;font-weight:700;color:#fff;">Choose your plan</div><p style="color:#94a3b8;font-size:0.82rem;margin:4px 0 0;">Start free and upgrade anytime — or unlock the full AI toolkit now.</p></div>
                         <div id="aiadPricingMountOnboarding" class="aiad-pricing-mount"></div>
@@ -25037,9 +25319,51 @@ Be direct and concrete with real industry insight — never generic filler. When
             // Also persist artist_profiles name/genre for the dashboard header.
             try { const s = sess(); if (s && data.artist_name) await rest('artist_profiles?on_conflict=user_id', { method:'POST', headers:{ 'Prefer':'resolution=merge-duplicates' }, body: JSON.stringify({ user_id: s.user.id, artist_name: data.artist_name, primary_genre: data.primary_genre || null, career_stage: data.career_stage || null }) }); } catch (e) {}
             document.getElementById('aiadObStep1').style.display = 'none';
+            // Stats step next. The account already exists and the user is signed in
+            // by this point, which the RPC requires (it reads auth.uid()).
+            const statsStep = document.getElementById('aiadObStepStats');
+            if (statsStep && window.aiadSelfReportedFieldsHtml) {
+                const host = document.getElementById('aiadObStatsFields');
+                if (host && !host.innerHTML) {
+                    host.innerHTML = window.aiadSelfReportedFieldsHtml('obSr');
+                    // Carry over what they already typed on step 1 so nobody is asked twice.
+                    const carry = (suffix, val) => { const el = document.getElementById('obSr' + suffix); if (el && val) el.value = val; };
+                    carry('SpotifyId',       data.links.spotify);
+                    carry('YoutubeHandle',   data.links.youtube);
+                    carry('InstagramHandle', data.links.instagram);
+                    carry('TiktokHandle',    data.links.tiktok);
+                    carry('MonthlyListeners', data.monthly_listeners);
+                }
+                statsStep.style.display = 'block';
+                window.scrollTo(0, 0);
+                return;
+            }
+            // No stats step available — fall through to the plan step.
+            window.aiadShowObPricing(dash);
+        };
+        window.aiadShowObPricing = function (dash) {
+            const stats = document.getElementById('aiadObStepStats'); if (stats) stats.style.display = 'none';
+            const step1 = document.getElementById('aiadObStep1'); if (step1) step1.style.display = 'none';
             document.getElementById('aiadObStep2').style.display = 'block';
             window.scrollTo(0, 0);
             try { if (window.aiadRenderPricing) window.aiadRenderPricing(); } catch (e) {}
+        };
+        window.aiadSkipObStats = function (dash) { window.aiadShowObPricing(dash); };
+        window.aiadSubmitObStats = async function (btn, dash) {
+            const msg = document.getElementById('aiadObStatsMsg');
+            btn.disabled = true; btn.textContent = 'Saving…';
+            if (msg) msg.textContent = '';
+            try {
+                await window.aiadSaveSelfReportedStats('obSr');
+                try { localStorage.setItem('aiad_stats_collected', '1'); } catch (e) {}
+                window.aiadShowObPricing(dash);
+            } catch (e) {
+                // Never block signup on this step — say what happened and let them move on.
+                if (msg) msg.textContent = e.message + ' — you can add these later in My Stats.';
+                btn.disabled = false; btn.textContent = 'Save & continue →';
+                const skip = btn.nextElementSibling;
+                if (skip) skip.textContent = 'Continue without saving →';
+            }
         };
         window.aiadFinishOnboarding = function (dash) {
             const ov = document.getElementById('aiadOnboardOverlay'); if (ov) ov.remove();
