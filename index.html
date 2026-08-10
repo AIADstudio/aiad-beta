@@ -891,6 +891,12 @@ html, body {
                         </div>
                     </div>
 
+                    <!-- Required, same as every other role's signup. -->
+                    <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:14px 16px;">
+                        <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--text-muted);margin-bottom:8px;">Location</div>
+                        <input type="text" id="supervisorLocation" placeholder="City, Country" oninput="validateSupervisorProfile()" style="background:transparent;border:none;outline:none;color:var(--text-primary);font-size:0.95rem;width:100%;font-family:inherit;" onfocus="this.closest('div').style.borderColor='rgba(167,139,250,0.5)'" onblur="this.closest('div').style.borderColor='rgba(255,255,255,0.08)'">
+                    </div>
+
                     <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:14px 16px;">
                         <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--text-muted);margin-bottom:8px;">Your Role</div>
                         <select id="supervisorRole" onchange="validateSupervisorProfile()" style="background:transparent;border:none;outline:none;color:var(--text-primary);font-size:0.95rem;width:100%;cursor:pointer;appearance:none;-webkit-appearance:none;font-family:inherit;" onfocus="this.closest('div').style.borderColor='rgba(167,139,250,0.5)'" onblur="this.closest('div').style.borderColor='rgba(255,255,255,0.08)'">
@@ -1415,8 +1421,8 @@ html, body {
                         <div class="helper-text">Can be your real name or a username.</div>
                     </div>
                     <div class="field-group">
-                        <label class="label">Location <span class="label-optional">(optional)</span></label>
-                        <input type="text" class="input" id="fanLocation" placeholder="City, Country">
+                        <label class="label">Location</label>
+                        <input type="text" class="input" id="fanLocation" placeholder="City, Country" oninput="validateFanProfile()">
                         <div class="helper-text">Helps us suggest local artists and events.</div>
                     </div>
                     <div class="field-group">
@@ -12054,11 +12060,12 @@ html, body {
         function validateSupervisorProfile() {
             const name = (document.getElementById('supervisorName')?.value || '').trim();
             const role = document.getElementById('supervisorRole')?.value || '';
+            const location = (document.getElementById('supervisorLocation')?.value || '').trim();
             const email = (document.getElementById('supervisorEmail')?.value || '').trim();
             const password = document.getElementById('supervisorPassword')?.value || '';
             const btn = document.getElementById('supervisorProfileBtn');
             if (btn) {
-                const ok = !!(name && role && email.includes('@') && password.length >= 6);
+                const ok = !!(name && role && location && email.includes('@') && password.length >= 6);
                 btn.disabled = !ok;
                 btn.style.opacity = ok ? '1' : '0.5';
                 btn.style.cursor = ok ? 'pointer' : 'not-allowed';
@@ -12072,16 +12079,18 @@ html, body {
             const name = document.getElementById('supervisorName').value.trim();
             const company = document.getElementById('supervisorCompany').value.trim();
             const role = document.getElementById('supervisorRole').value;
+            const location = (document.getElementById('supervisorLocation')?.value || '').trim();
             const email = (document.getElementById('supervisorEmail')?.value || '').trim();
             const password = document.getElementById('supervisorPassword')?.value || '';
 
             if (!name || !role) { showToast('Please fill in your name and role'); return; }
+            if (!location) { showToast('Please add your location'); return; }
             if (!email.includes('@')) { showToast('Please enter a valid email'); return; }
             if (password.length < 6) { showToast('Password must be at least 6 characters'); return; }
 
             const preferredGenre = (document.getElementById('supervisorGenre')?.value || '').trim();
 
-            AppState.supervisorProfile = { name, company, role, workTypes: supervisorWorkTypes, email, preferredGenre };
+            AppState.supervisorProfile = { name, company, role, workTypes: supervisorWorkTypes, email, preferredGenre, location };
             localStorage.setItem('aiad_supervisor_profile', JSON.stringify(AppState.supervisorProfile));
 
             if (btn) btn.disabled = true;
@@ -12097,6 +12106,7 @@ html, body {
                 username: supUsername,
                 role: 'supervisor',
                 industry: 'music',
+                location,
             });
 
             try {
@@ -12170,12 +12180,15 @@ html, body {
         function handleSupervisorEnterDashboard() {
 
             if (AppState.currentUser) {
+                // This duplicate literal previously omitted location and so overwrote the
+                // row written at signup with a null one.
                 db.from('profiles').upsert({
                     id: AppState.currentUser.id,
                     email: AppState.currentUser.email,
                     full_name: AppState.supervisorProfile?.name || '',
                     role: 'supervisor',
                     industry: 'music',
+                    location: AppState.supervisorProfile?.location || null,
                 }).then(() => {});
                 // Written here rather than at signup because the RPC reads auth.uid(),
                 // and on the email-confirmation path there is no session until now.
@@ -21458,8 +21471,9 @@ document.addEventListener('keydown', function(e) {
             const name  = (document.getElementById('fanName')?.value || '').trim();
             const email = (document.getElementById('fanEmail')?.value || '').trim();
             const pass  = document.getElementById('fanPassword')?.value || '';
+            const loc   = (document.getElementById('fanLocation')?.value || '').trim();
             const btn   = document.getElementById('fanProfileBtn');
-            if (btn) btn.disabled = !(name.length >= 2 && email.includes('@') && pass.length >= 6);
+            if (btn) btn.disabled = !(name.length >= 2 && loc && email.includes('@') && pass.length >= 6);
         }
 
         // Step 1 → 2: sign up + save to Supabase, then navigate to preferences
@@ -21524,7 +21538,7 @@ document.addEventListener('keydown', function(e) {
                 await db.from('profiles').upsert({
                     id: userData.id, email, full_name: name,
                     username: fanUsername,
-                    role: 'fan', industry: AppState.userIndustry || 'music',
+                    role: 'fan', industry: AppState.userIndustry || 'music', location,
                 }, { onConflict: 'id' });
 
                 AppState.currentUser = userData;
