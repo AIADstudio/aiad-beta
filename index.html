@@ -11899,7 +11899,7 @@ html, body {
             document.getElementById('tierChangeLink').style.display = 'none';
         }
 
-        function handleTierContinue() {
+        async function handleTierContinue() {
             if (!AppState.selectedTier) return;
 
             console.log('[Subscription] Tier selected:', AppState.selectedTier);
@@ -11940,6 +11940,10 @@ html, body {
             } else if (role === 'collaborator') {
                 switchDashboard('collab');
             } else {
+                // This wizard branch used to hand an artist the dashboard with no
+                // questionnaire, no scan and no plan — picking a tier here writes nothing
+                // to the server. Send unfinished artists through onboarding instead.
+                if (window.aiadGateArtistDashboard && await window.aiadGateArtistDashboard()) return;
 
                 if (industry === 'fashion') {
                     switchDashboard('fashion');
@@ -13232,7 +13236,11 @@ Only capture real, meaningful decisions — not questions or general discussion.
             console.log('[AIAD] Dashboard populated for:', name, '| Genre:', genre);
         }
 
-        function handleEnterDashboard() {
+        async function handleEnterDashboard() {
+            // "Enter AIAD Dashboard" on the completion page unlocks by toggling .active
+            // classes directly, bypassing jumpToDashboard/switchDashboard entirely — so it
+            // needs the gate too, or it's a third way past onboarding.
+            if (window.aiadGateArtistDashboard && await window.aiadGateArtistDashboard()) return;
             // Clear previous user's data before entering
             clearPreviousUserData();
             setTimeout(() => { applyFanAvatar(); applyFanGreeting(); loadFanHomeFeed(); }, 200);
@@ -18017,13 +18025,13 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     localStorage.setItem('aiad_user_role', AppState.userRole);
                     const lastDashboard = localStorage.getItem('aiad_last_dashboard');
 
-                    setTimeout(() => {
-                        // New artist who hasn't finished the tailored questionnaire → show it (on top).
-                        if (AppState.userRole === 'artist' && profile && profile.onboarded === false && window.aiadStartOnboarding) {
-                            const IDASH = { music:'artist', fashion:'fashion', streaming:'streamer', visual_arts:'visualarts', writing_publishing:'writing', film_media:'film', games:'games', multi:'multi' };
-                            window.aiadStartOnboarding({ dash: IDASH[profile.industry] || 'artist' });
-                            return;
-                        }
+                    setTimeout(async () => {
+                        // An artist who hasn't finished setup gets the overlay instead of the
+                        // dashboard. The old check here never fired: it compared
+                        // AppState.userRole === 'artist' while every dashboard visit caches
+                        // 'creator', and it tested profiles.onboarded === false, which is null
+                        // on older rows. The gate now asks the DB for both signals.
+                        if (window.aiadGateArtistDashboard && await window.aiadGateArtistDashboard()) return;
                         if (lastDashboard) {
                             jumpToDashboard(lastDashboard);
                         } else if (AppState.userRole === 'artist') {
@@ -18139,6 +18147,9 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 const mr = (data.user && data.user.user_metadata && data.user.user_metadata.role) || localStorage.getItem('aiad_user_role');
                 if (mr) {
                     AppState.userRole = mr;
+                    // This branch defaulted to the artist dashboard for anything it couldn't
+                    // classify, which let an unfinished artist straight in.
+                    if (window.aiadGateArtistDashboard && await window.aiadGateArtistDashboard()) return;
                     jumpToDashboard(mr === 'fan' ? 'fan' : mr === 'collaborator' ? 'collab' : mr === 'supervisor' ? 'supervisor' : 'artist');
                 } else {
                     navigateTo('industry-selection');
@@ -25563,10 +25574,24 @@ Be direct and concrete with real industry insight — never generic filler. When
                         <button onclick="aiadSubmitObStats(this,'${dash}')" style="width:100%;margin-top:8px;background:linear-gradient(135deg,#06b6d4,#3b82f6);color:#fff;border:none;border-radius:10px;padding:12px;font-size:0.92rem;font-weight:700;cursor:pointer;">Save &amp; continue →</button>
                         <button onclick="aiadSkipObStats('${dash}')" style="width:100%;margin-top:8px;background:transparent;color:#94a3b8;border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:11px;font-size:0.88rem;font-weight:600;cursor:pointer;">Skip for now →</button>
                     </div>
+                    <!-- Plan step. This is the gate: the dashboard does not unlock until a
+                         plan is chosen here, so there is deliberately no skip control. -->
                     <div id="aiadObStep2" style="display:none;background:#0d0f17;border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:20px;">
-                        <div style="text-align:center;margin-bottom:8px;"><div style="font-size:1.15rem;font-weight:700;color:#fff;">Choose your plan</div><p style="color:#94a3b8;font-size:0.82rem;margin:4px 0 0;">Start free and upgrade anytime — or unlock the full AI toolkit now.</p></div>
-                        <div id="aiadPricingMountOnboarding" class="aiad-pricing-mount"></div>
-                        <button onclick="aiadFinishOnboarding('${dash}')" style="width:100%;margin-top:12px;background:transparent;color:#94a3b8;border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:11px;font-size:0.88rem;font-weight:600;cursor:pointer;">Start on Free →</button>
+                        <div style="text-align:center;margin-bottom:14px;">
+                            <div style="font-size:1.15rem;font-weight:700;color:#fff;">Choose your plan</div>
+                            <p style="color:#94a3b8;font-size:0.82rem;margin:4px 0 0;">Every paid plan starts with a <strong style="color:#fff;">30-day free trial</strong> — 150 credits to use however you like. No card needed to start.</p>
+                        </div>
+                        <div id="aiadPlanGrid"></div>
+                        <div id="aiadPlanMsg" style="font-size:0.8rem;color:#f59e0b;margin-top:10px;min-height:16px;text-align:center;"></div>
+                    </div>
+                    <!-- Shown after a trial starts: card now, or card later. -->
+                    <div id="aiadObStepCard" style="display:none;background:#0d0f17;border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:22px;text-align:center;">
+                        <div style="font-size:1.6rem;margin-bottom:4px;">🎉</div>
+                        <div style="font-size:1.15rem;font-weight:700;color:#fff;">Your trial is running</div>
+                        <p id="aiadTrialCopy" style="color:#94a3b8;font-size:0.85rem;margin:8px 0 18px;"></p>
+                        <button id="aiadCardNowBtn" onclick="aiadAddCardNow('${dash}')" style="width:100%;background:linear-gradient(135deg,#06b6d4,#3b82f6);color:#fff;border:none;border-radius:10px;padding:12px;font-size:0.92rem;font-weight:700;cursor:pointer;">Add a card now</button>
+                        <button onclick="aiadAddCardLater('${dash}')" style="width:100%;margin-top:8px;background:transparent;color:#94a3b8;border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:11px;font-size:0.88rem;font-weight:600;cursor:pointer;">Add it later →</button>
+                        <p style="color:#64748b;font-size:0.72rem;margin:12px 0 0;">Adding a card now means you keep your plan when the trial ends. Without one, you move to Free (20 credits/mo) — nothing is charged either way.</p>
                     </div>
                 </div>`;
             document.body.appendChild(ov);
@@ -25652,13 +25677,125 @@ Be direct and concrete with real industry insight — never generic filler. When
             // No stats step available — fall through to the plan step.
             window.aiadShowObPricing(dash);
         };
+        // ── Plan step ──────────────────────────────────────────────────────────
+        // Credit costs are real, from ai_cost_for(): a song costs 12 credits and a
+        // standard image 3 (a pro image is 6). The per-tier counts below are derived
+        // from the allowance, not guessed, so they hold up if someone checks.
+        const AIAD_SONG_COST  = 12;
+        const AIAD_IMAGE_COST = 3;
+        const AIAD_PLANS = [
+            { key: 'free',            name: 'Free',        price: 0,  credits: 20 },
+            { key: 'artist_starter',  name: 'Starter',     price: 29, credits: 150 },
+            { key: 'artist_pro',      name: 'Pro',         price: 59, credits: 500, popular: true },
+            { key: 'artist_premier',  name: 'Established', price: 99, credits: 2000 },
+        ];
+        function aiadPlanUsage(credits) {
+            const n = (x, word) => x + ' ' + word + (x === 1 ? '' : 's');
+            return 'up to ' + n(Math.floor(credits / AIAD_SONG_COST), 'song') + ' or '
+                 + n(Math.floor(credits / AIAD_IMAGE_COST), 'image') + ' a month';
+        }
         window.aiadShowObPricing = function (dash) {
             const stats = document.getElementById('aiadObStepStats'); if (stats) stats.style.display = 'none';
             const step1 = document.getElementById('aiadObStep1'); if (step1) step1.style.display = 'none';
             document.getElementById('aiadObStep2').style.display = 'block';
             window.scrollTo(0, 0);
-            try { if (window.aiadRenderPricing) window.aiadRenderPricing(); } catch (e) {}
+            aiadRenderPlanGrid(dash);
         };
+        function aiadRenderPlanGrid(dash) {
+            const host = document.getElementById('aiadPlanGrid');
+            if (!host) return;
+            const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
+                ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+            host.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;">'
+                + AIAD_PLANS.map((p) => {
+                    const paid = p.key !== 'free';
+                    return '<div style="position:relative;background:' + (p.popular ? 'rgba(6,182,212,0.07)' : 'rgba(255,255,255,0.02)')
+                        + ';border:1px solid ' + (p.popular ? 'rgba(6,182,212,0.55)' : 'rgba(255,255,255,0.10)')
+                        + ';border-radius:13px;padding:16px 14px;display:flex;flex-direction:column;">'
+                        + (p.popular ? '<div style="position:absolute;top:-9px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#06b6d4,#3b82f6);color:#fff;font-size:0.6rem;font-weight:800;letter-spacing:.08em;padding:3px 10px;border-radius:999px;white-space:nowrap;">MOST POPULAR</div>' : '')
+                        + '<div style="font-size:0.95rem;font-weight:700;color:#fff;">' + esc(p.name) + '</div>'
+                        + '<div style="font-size:1.5rem;font-weight:800;color:#fff;margin:2px 0 1px;">$' + p.price
+                        + (p.price ? '<span style="font-size:0.75rem;font-weight:500;color:#64748b;">/mo</span>' : '') + '</div>'
+                        + '<div style="font-size:0.8rem;color:#cbd5e1;">' + p.credits.toLocaleString() + ' credits/mo</div>'
+                        + '<div style="font-size:0.72rem;color:#64748b;margin-top:2px;flex:1;">' + esc(aiadPlanUsage(p.credits)) + '</div>'
+                        + '<button data-plan="' + p.key + '" style="width:100%;margin-top:12px;border:none;border-radius:9px;padding:10px;font-size:0.85rem;font-weight:700;cursor:pointer;'
+                        + (paid ? 'background:linear-gradient(135deg,#06b6d4,#3b82f6);color:#fff;' : 'background:transparent;color:#cbd5e1;border:1px solid rgba(255,255,255,0.18);')
+                        + '">' + (paid ? 'Start 30-day trial' : 'Continue on Free') + '</button>'
+                        + '</div>';
+                }).join('')
+                + '</div>'
+                + '<p style="font-size:0.7rem;color:#64748b;text-align:center;margin:12px 0 0;">During any trial you get 150 credits. A song costs 12 credits, an image 3.</p>';
+            host.querySelectorAll('button[data-plan]').forEach((b) => {
+                b.addEventListener('click', () => window.aiadChoosePlan(b.dataset.plan, dash, b));
+            });
+        }
+
+        // subscription_status is the durable record that the plan step was completed:
+        // 'none' (the column default) means it wasn't. start_artist_trial sets 'trialing';
+        // choosing Free writes 'free' here so a reload doesn't re-gate them.
+        window.aiadChoosePlan = async function (planKey, dash, btn) {
+            const msg = document.getElementById('aiadPlanMsg');
+            if (msg) msg.textContent = '';
+            const orig = btn ? btn.textContent : '';
+            if (btn) { btn.disabled = true; btn.textContent = 'Setting up…'; }
+            try {
+                if (planKey === 'free') {
+                    // Never call start_artist_trial for Free — it rejects anything but the
+                    // three paid keys. Free is recorded directly instead.
+                    const s = sess();
+                    if (!s) throw new Error('Please sign in again');
+                    await rest('artist_profiles?on_conflict=user_id', {
+                        method: 'POST',
+                        headers: { 'Prefer': 'resolution=merge-duplicates' },
+                        body: JSON.stringify({ user_id: s.user.id, subscription_status: 'free', updated_at: new Date().toISOString() }),
+                    });
+                    window.aiadFinishOnboarding(dash, true);
+                    return;
+                }
+                const res = await rpc('start_artist_trial', { p_plan: planKey });
+                if (!res || res.error || !res.status) throw new Error((res && (res.message || res.error)) || 'Could not start your trial');
+                const ends = res.trial_ends_at ? new Date(res.trial_ends_at) : null;
+                const plan = AIAD_PLANS.find((p) => p.key === planKey);
+                const copy = document.getElementById('aiadTrialCopy');
+                if (copy) {
+                    copy.innerHTML = '30 days of <strong style="color:#fff;">' + (plan ? plan.name : 'your plan')
+                        + '</strong> with 150 credits'
+                        + (ends ? ', through <strong style="color:#fff;">' + ends.toLocaleDateString() + '</strong>' : '')
+                        + '. After that ' + (plan ? plan.name + ' is $' + plan.price + '/mo' : 'your plan renews') + '.';
+                }
+                document.getElementById('aiadObStep2').style.display = 'none';
+                document.getElementById('aiadObStepCard').style.display = 'block';
+                window.scrollTo(0, 0);
+            } catch (e) {
+                if (msg) msg.textContent = e.message || 'Something went wrong — try again.';
+                if (btn) { btn.disabled = false; btn.textContent = orig; }
+            }
+        };
+
+        window.aiadAddCardNow = async function (dash) {
+            const btn = document.getElementById('aiadCardNowBtn');
+            if (btn) { btn.disabled = true; btn.textContent = 'Opening checkout…'; }
+            try {
+                // The trial is already running, so the plan step is satisfied either way —
+                // mark it done before leaving so a return trip isn't re-gated.
+                try { localStorage.setItem('aiad_plan_chosen', '1'); } catch (e) {}
+                const s = sess();
+                const planKey = (await aiadCurrentPlanKey()) || 'artist_pro';
+                if (window.startCheckout) { await window.startCheckout(planKey, 'monthly'); return; }
+                throw new Error('Checkout unavailable');
+            } catch (e) {
+                (window.showToast || alert)('Could not open checkout: ' + (e.message || e) + ' — you can add a card later in Settings.');
+                if (btn) { btn.disabled = false; btn.textContent = 'Add a card now'; }
+            }
+        };
+        async function aiadCurrentPlanKey() {
+            try {
+                const s = sess(); if (!s) return null;
+                const rows = await rest('profiles?select=plan&id=eq.' + s.user.id);
+                return Array.isArray(rows) && rows[0] ? rows[0].plan : null;
+            } catch (e) { return null; }
+        }
+        window.aiadAddCardLater = function (dash) { window.aiadFinishOnboarding(dash, true); };
         window.aiadSkipObStats = function (dash) { window.aiadShowObPricing(dash); };
         window.aiadSubmitObStats = async function (btn, dash) {
             const msg = document.getElementById('aiadObStatsMsg');
@@ -25676,9 +25813,67 @@ Be direct and concrete with real industry insight — never generic filler. When
                 if (skip) skip.textContent = 'Continue without saving →';
             }
         };
-        window.aiadFinishOnboarding = function (dash) {
+        // `planChosen` is passed only by the two paths that legitimately complete the plan
+        // step. Anything else calling this (older code, a stray handler) is refused rather
+        // than silently unlocking the dashboard — which is exactly how it leaked before.
+        window.aiadFinishOnboarding = function (dash, planChosen) {
+            if (!planChosen) {
+                const step2 = document.getElementById('aiadObStep2');
+                if (step2) {
+                    window.aiadShowObPricing(dash);
+                    const msg = document.getElementById('aiadPlanMsg');
+                    if (msg) msg.textContent = 'Pick a plan to finish setting up — you can start on Free.';
+                    return;
+                }
+            }
+            try { localStorage.setItem('aiad_plan_chosen', '1'); } catch (e) {}
             const ov = document.getElementById('aiadOnboardOverlay'); if (ov) ov.remove();
             try { if (window.jumpToDashboard) window.jumpToDashboard(dash || 'artist'); else location.replace(location.origin + location.pathname); } catch (e) { location.replace(location.origin + location.pathname); }
+        };
+
+        // ── The gate ───────────────────────────────────────────────────────────
+        // An artist has finished setup when the questionnaire is saved (profiles.onboarded,
+        // written server-side by save_artist_onboarding) AND a plan has been chosen
+        // (artist_profiles.subscription_status moved off its 'none' default). Both live in
+        // the DB, so this holds across devices and survives a cleared localStorage.
+        window.aiadArtistSetupState = async function () {
+            const s = sess();
+            if (!s) return { known: false };
+            try {
+                const [pRows, aRows] = await Promise.all([
+                    rest('profiles?select=role,onboarded,industry&id=eq.' + s.user.id),
+                    rest('artist_profiles?select=subscription_status&user_id=eq.' + s.user.id),
+                ]);
+                const prof = Array.isArray(pRows) ? pRows[0] : null;
+                const ap   = Array.isArray(aRows) ? aRows[0] : null;
+                if (!prof) return { known: false };
+                if (prof.role !== 'artist') return { known: true, isArtist: false, complete: true };
+                const status = (ap && ap.subscription_status) || 'none';
+                return {
+                    known: true,
+                    isArtist: true,
+                    industry: prof.industry || 'music',
+                    onboarded: prof.onboarded === true,
+                    planChosen: status !== 'none',
+                    complete: prof.onboarded === true && status !== 'none',
+                };
+            } catch (e) { return { known: false }; }
+        };
+
+        // Called from every artist dashboard entry point. Returns true when it took over.
+        window.aiadGateArtistDashboard = async function () {
+            const st = await window.aiadArtistSetupState();
+            if (!st.known || !st.isArtist || st.complete) return false;
+            const IDASH = { music:'artist', fashion:'fashion', streaming:'streamer', visual_arts:'visualarts',
+                            writing_publishing:'writing', film_media:'film', games:'games', multi:'multi' };
+            const dash = IDASH[st.industry] || 'artist';
+            if (!window.aiadStartOnboarding) return false;
+            window.aiadStartOnboarding({ dash });
+            // Questionnaire already done — drop them straight on the step they still owe.
+            if (st.onboarded && !st.planChosen) {
+                setTimeout(() => { try { window.aiadShowObPricing(dash); } catch (e) {} }, 80);
+            }
+            return true;
         };
 
         // Wire into settings view + boot.
