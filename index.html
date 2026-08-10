@@ -3417,7 +3417,9 @@ html, body {
                     <div class="dash-nav-item" onclick="showArtistView('analytics')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span> Analytics</span></div>
                     <div class="dash-nav-item" id="navMyStats" onclick="showArtistView('mystats')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span> My Stats</span></div>
                     <div class="dash-nav-item" onclick="showArtistView('milestones')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span> Milestones</span></div>
-                    <div class="dash-nav-item" onclick="showArtistView('inbox')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><span> Inbox </div>
+                    <div class="dash-nav-item" onclick="showArtistView('inbox')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><span> Inbox </span></div>
+                    <div class="dash-nav-item" id="navStore" onclick="showArtistView('store')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg><span> Store</span></div>
+                    <div class="dash-nav-item" id="navPayouts" onclick="showArtistView('payouts')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg><span> Payouts</span></div>
                     <div class="dash-nav-item dash-nav-dropdown" onclick="toggleCreativeStudio()">
                         <svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
                         <span>Creative Studio</span>
@@ -4891,6 +4893,41 @@ html, body {
                         <button onclick="document.getElementById('myStatsRaw').style.display = document.getElementById('myStatsRaw').style.display === 'none' ? 'block' : 'none';" style="background:transparent;border:1px solid var(--border-default);color:var(--text-secondary);border-radius:10px;padding:11px 16px;font-size:0.82rem;cursor:pointer;">Show raw data</button>
                     </div>
                     <pre id="myStatsRaw" style="display:none;background:rgba(0,0,0,0.4);border:1px solid var(--border-default);border-radius:10px;padding:12px;font-size:0.74rem;color:var(--text-secondary);overflow-x:auto;white-space:pre-wrap;max-height:340px;overflow-y:auto;"></pre>
+                </div>
+
+                <!-- ── STORE — artist manages their own products ───────────────────────── -->
+                <div class="dash-view" id="artistStoreView">
+                    <div class="view-header">
+                        <div>
+                            <h1 class="view-title">Store</h1>
+                            <p class="view-subtitle">Sell directly to your fans. You're the merchant of record — Stripe pays you out.</p>
+                        </div>
+                        <button class="primary-btn" onclick="openProductEditor()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            Add product
+                        </button>
+                    </div>
+
+                    <!-- Shown only when payouts aren't set up: without Connect, checkout fails. -->
+                    <div id="storeOnboardBanner" style="display:none;margin-bottom:16px;"></div>
+
+                    <div id="storeProductsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;"></div>
+
+                    <div style="margin-top:28px;">
+                        <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:12px;">Recent sales</div>
+                        <div id="storeSalesList"></div>
+                    </div>
+                </div>
+
+                <!-- ── PAYOUTS — Stripe Connect status. No internal wallet, no withdraw. ── -->
+                <div class="dash-view" id="artistPayoutsView">
+                    <div class="view-header">
+                        <div>
+                            <h1 class="view-title">Payouts</h1>
+                            <p class="view-subtitle">Stripe holds your money and pays it out. AIAD takes 10% of each sale and never touches the rest.</p>
+                        </div>
+                    </div>
+                    <div id="payoutsBody"></div>
                 </div>
 
                 <div class="dash-view" id="artistAgentsView">
@@ -7920,6 +7957,10 @@ html, body {
                         <svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
                         <span>Community</span>
                     </div>
+                    <div class="dash-nav-item" onclick="showFanView('orders')">
+                        <svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+                        <span>My Orders</span>
+                    </div>
                 </nav>
                 <div class="dash-sidebar-footer">
                     <div class="dash-user-profile" onclick="showFanView('settings')" style="cursor: pointer;" title="Profile & Settings">
@@ -8267,6 +8308,10 @@ html, body {
                         <p id="fanArtistBio" style="font-size:0.88rem;line-height:1.7;color:var(--text-secondary);margin:0;"></p>
                     </div>
 
+                    <!-- Storefront — filled by loadStorefront(); stays empty when the
+                         artist has no active products, so it costs nothing visually. -->
+                    <div id="fanArtistStore"></div>
+
                     <!-- Posts -->
                     <div style="margin-bottom:8px;font-size:0.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.07em;">Posts</div>
                     <div id="fanArtistPosts" style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;"></div>
@@ -8295,6 +8340,18 @@ html, body {
                         </div>
                     </div>
                     </div><!-- /studio-layout -->
+                </div>
+
+                <!-- What the fan has bought. Digital orders get a signed download via
+                     store-download; physical ones show the artist's fulfillment status. -->
+                <div class="dash-view" id="fanOrdersView">
+                    <div class="view-header">
+                        <div>
+                            <h1 class="view-title">My Orders</h1>
+                            <p class="view-subtitle">Everything you've bought from artists on AIAD.</p>
+                        </div>
+                    </div>
+                    <div id="fanOrdersList"></div>
                 </div>
 
                 <div class="dash-view" id="fanSettingsView">
@@ -13486,7 +13543,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
 
         function showArtistView(view) {
 
-            const allViews = ['artistPostsView', 'artistSupportersView', 'artistProjectsView', 'artistRevenueView', 'artistScheduleView', 'artistCollaboratorsView', 'artistMusicView', 'artistSongwritingView', 'artistMixMediaView', 'artistMerchView', 'artistSyncLibraryView', 'artistMilestonesView', 'artistAnalyticsView', 'artistMyStatsView', 'artistAgentsView', 'artistInboxView', 'artistSettingsView'];
+            const allViews = ['artistPostsView', 'artistSupportersView', 'artistProjectsView', 'artistRevenueView', 'artistScheduleView', 'artistCollaboratorsView', 'artistMusicView', 'artistSongwritingView', 'artistMixMediaView', 'artistMerchView', 'artistSyncLibraryView', 'artistMilestonesView', 'artistAnalyticsView', 'artistMyStatsView', 'artistAgentsView', 'artistInboxView', 'artistSettingsView', 'artistStoreView', 'artistPayoutsView'];
             allViews.forEach(v => {
                 const el = document.getElementById(v);
                 if (el) el.classList.remove('active');
@@ -13518,7 +13575,9 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 'mystats': 'artistMyStatsView',
                 'milestones': 'artistMilestonesView',
                 'inbox': 'artistInboxView',
-                'settings': 'artistSettingsView'
+                'settings': 'artistSettingsView',
+                'store': 'artistStoreView',
+                'payouts': 'artistPayoutsView'
             };
 
             const viewId = viewIdMap[view];
@@ -13599,6 +13658,14 @@ Only capture real, meaningful decisions — not questions or general discussion.
             } else if (view === 'inbox') {
                 viewEl.classList.add('active');
                 if (navItems[10]) navItems[10].classList.add('active');
+            } else if (view === 'store') {
+                viewEl.classList.add('active');
+                if (navItems[11]) navItems[11].classList.add('active');
+                setTimeout(() => { if (window.loadStoreManager) loadStoreManager(); }, 60);
+            } else if (view === 'payouts') {
+                viewEl.classList.add('active');
+                if (navItems[12]) navItems[12].classList.add('active');
+                setTimeout(() => { if (window.loadPayouts) loadPayouts(); }, 60);
             } else if (view === 'settings') {
                 viewEl.classList.add('active');
                 // Auto-populate settings from AppState first (instant)
@@ -21689,7 +21756,7 @@ function showFanView(view) {
         home:'fanHomeView', feed:'fanFeedView', artists:'fanArtistsView',
         myCreators:'fanArtistsView', discover:'fanDiscoverView',
         community:'fanCommunityView', artist:'fanArtistView', settings:'fanSettingsView',
-        mySupport:'fanArtistsView', following:'fanArtistsView',
+        mySupport:'fanArtistsView', following:'fanArtistsView', orders:'fanOrdersView',
     };
     const viewId = viewMap[view] || null;
     const viewEl = viewId ? document.getElementById(viewId) : null;
@@ -21700,13 +21767,14 @@ function showFanView(view) {
     if (rs && view !== 'settings') rs.style.display = 'block';
     const navItems = document.querySelectorAll('#fanDashboard .dash-nav-item');
     navItems.forEach(n => n.classList.remove('active'));
-    const navIdx = { home:0, feed:1, myCreators:2, mySupport:2, following:2, artists:2, discover:3, community:4 };
+    const navIdx = { home:0, feed:1, myCreators:2, mySupport:2, following:2, artists:2, discover:3, community:4, orders:5 };
     if (navIdx[view] !== undefined && navItems[navIdx[view]]) navItems[navIdx[view]].classList.add('active');
     if (view==='home')    setTimeout(() => { loadFanHomeFeed(); loadFanSupportGrid(); loadFanSidebarPledges(); loadFanSidebarDiscovery(); }, 100);
     if (view==='feed')    setTimeout(() => loadFanFeed(), 100);
     if (['artists','myCreators','mySupport','following'].includes(view)) { AppState._fanCreatorsStale=false; setTimeout(() => loadFanCreators(), 100); }
     if (view==='discover') setTimeout(() => _execDiscoverSearch(), 100);
     if (view==='settings') setTimeout(() => applyFanSettingsProfile(), 100);
+    if (view==='orders')  setTimeout(() => { if (window.loadMyOrders) loadMyOrders('fanOrdersList'); }, 100);
 }
 
 // ── Fan home feed ─────────────────────────────────────────────────────────
@@ -22320,6 +22388,8 @@ async function loadArtistPage(artistId) {
         supportBtn.onclick=()=>{AppState._currentArtistId=pid;AppState._currentArtistName=name;fanOpenSupportModal(pid,name);};
     }
     _loadArtistFanPosts(pid,name,av);
+    // pid is the artist's user id, which is what products.artist_id holds.
+    try { if (window.loadStorefront) loadStorefront(pid, 'fanArtistStore'); } catch(e) {}
 }
 
 async function _loadArtistFanPosts(artistId, artistName, artistAv) {
@@ -26548,6 +26618,421 @@ Be direct and concrete with real industry insight — never generic filler. When
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
   else start();
+})();
+</script>
+
+<!-- ══════════════ ARTIST STORE — products, payouts, checkout ══════════════
+     Money model is Stripe Connect DIRECT CHARGES: the artist is merchant of
+     record, the 10% platform fee is applied by the edge function, and Stripe
+     holds and pays out the balance. There is deliberately no internal wallet
+     and no withdraw flow here — store-withdraw is retired, never call it.
+     RLS does the authorisation: products are artist-owned but publicly
+     readable when is_active, and orders are readable by their buyer and their
+     artist. So product/order reads go straight through the supabase client,
+     and only money movement goes through edge functions.                   -->
+<script>
+(function () {
+    const inv = (fn, body) => window.db.functions.invoke(fn, { body: body || {} });
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const toast = (m) => (window.showToast || window.alert)(m);
+    const money = (amt, cur) => {
+        const n = Number(amt);
+        if (!Number.isFinite(n)) return '—';
+        try { return n.toLocaleString(undefined, { style: 'currency', currency: (cur || 'usd').toUpperCase() }); }
+        catch (e) { return '$' + n.toFixed(2); }
+    };
+    // Edge functions return their message in `error.context` (a Response) rather than
+    // error.message, so surface the real text ("Out of stock", "You can't buy your own
+    // product") instead of a generic "Edge Function returned a non-2xx status code".
+    async function invokeMsg(fn, body) {
+        const { data, error } = await inv(fn, body);
+        if (!error) return data;
+        let msg = error.message || (fn + ' failed');
+        try {
+            if (error.context && typeof error.context.json === 'function') {
+                const j = await error.context.json();
+                if (j && j.error) msg = j.error;
+            }
+        } catch (e) {}
+        throw new Error(msg);
+    }
+    async function uid() {
+        const { data: { session } = {} } = await window.db.auth.getSession();
+        return session ? session.user.id : null;
+    }
+
+    // ── Store manager (artist) ─────────────────────────────────────────────
+    async function loadStoreManager() {
+        const grid = document.getElementById('storeProductsGrid');
+        if (!grid) return;
+        grid.innerHTML = '<div style="grid-column:1/-1;color:var(--text-muted);font-size:0.85rem;padding:20px;text-align:center;">Loading your products…</div>';
+        const me = await uid();
+        if (!me) { grid.innerHTML = '<div style="grid-column:1/-1;color:var(--text-muted);font-size:0.85rem;padding:20px;text-align:center;">Sign in to manage your store.</div>'; return; }
+
+        const { data, error } = await window.db.from('products')
+            .select('*').eq('artist_id', me).order('created_at', { ascending: false });
+        if (error) {
+            grid.innerHTML = '<div style="grid-column:1/-1;color:#f59e0b;font-size:0.85rem;padding:20px;text-align:center;">Could not load products: ' + esc(error.message) + '</div>';
+            return;
+        }
+        const rows = data || [];
+        grid.innerHTML = rows.length
+            ? rows.map(renderProductAdminCard).join('')
+            : '<div style="grid-column:1/-1;padding:34px 20px;text-align:center;background:var(--bg-card);border:1px dashed var(--border-default);border-radius:14px;">'
+              + '<div style="font-weight:600;margin-bottom:4px;">No products yet</div>'
+              + '<div style="font-size:0.82rem;color:var(--text-muted);">Add your first one — a beat pack, a track, a shirt.</div></div>';
+
+        renderOnboardBanner();
+        loadRecentSales(me);
+    }
+
+    function renderProductAdminCard(p) {
+        const price = money(p.price, p.currency);
+        const kind  = p.product_kind === 'physical' ? 'Physical' : 'Digital';
+        const stock = p.product_kind === 'physical'
+            ? (p.inventory === null || p.inventory === undefined ? 'Unlimited stock' : p.inventory + ' in stock')
+            : 'Digital file';
+        const img = p.image_url
+            ? '<img src="' + esc(p.image_url) + '" alt="" style="width:100%;height:130px;object-fit:cover;border-radius:10px;margin-bottom:10px;">'
+            : '<div style="width:100%;height:130px;border-radius:10px;margin-bottom:10px;background:linear-gradient(135deg,#0d2f3f,#1a4a5e);"></div>';
+        const live = p.is_active
+            ? '<span style="font-size:0.66rem;color:#22c55e;border:1px solid rgba(34,197,94,0.4);border-radius:999px;padding:2px 8px;">Live</span>'
+            : '<span style="font-size:0.66rem;color:var(--text-muted);border:1px solid var(--border-default);border-radius:999px;padding:2px 8px;">Hidden</span>';
+        return '<div style="background:var(--bg-card);border:1px solid var(--border-default);border-radius:14px;padding:14px;">'
+            + img
+            + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;"><div style="font-weight:600;font-size:0.95rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">' + esc(p.name) + '</div>' + live + '</div>'
+            + '<div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:2px;">' + price + '</div>'
+            + '<div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:12px;">' + kind + ' · ' + esc(stock) + '</div>'
+            + '<div style="display:flex;gap:8px;">'
+            + '<button class="artist-action-btn primary" style="flex:1;" onclick="openProductEditor(\'' + esc(p.id) + '\')">Edit</button>'
+            + '<button class="artist-action-btn" style="flex:1;" onclick="deleteProduct(\'' + esc(p.id) + '\')">Delete</button>'
+            + '</div></div>';
+    }
+
+    async function renderOnboardBanner() {
+        const el = document.getElementById('storeOnboardBanner');
+        if (!el) return;
+        let bal = null;
+        try { bal = await invokeMsg('store-balance', {}); } catch (e) { return; }
+        if (bal && bal.charges_enabled) { el.style.display = 'none'; return; }
+        el.style.display = 'block';
+        el.innerHTML = '<div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.35);border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">'
+            + '<div style="flex:1;min-width:220px;"><div style="font-weight:600;font-size:0.9rem;">Set up payouts before you sell</div>'
+            + '<div style="font-size:0.8rem;color:var(--text-muted);">Fans can browse your products, but checkout stays closed until Stripe is connected.</div></div>'
+            + '<button class="primary-btn" onclick="showArtistView(\'payouts\')">Go to Payouts</button></div>';
+    }
+
+    async function loadRecentSales(me) {
+        const el = document.getElementById('storeSalesList');
+        if (!el) return;
+        const { data, error } = await window.db.from('orders')
+            .select('*').eq('artist_id', me).eq('status', 'paid')
+            .order('created_at', { ascending: false }).limit(15);
+        if (error) { el.innerHTML = '<div style="font-size:0.82rem;color:var(--text-muted);">Could not load sales.</div>'; return; }
+        const rows = data || [];
+        if (!rows.length) { el.innerHTML = '<div style="font-size:0.82rem;color:var(--text-muted);">No sales yet.</div>'; return; }
+        el.innerHTML = rows.map((o) => {
+            const when = o.created_at ? new Date(o.created_at).toLocaleDateString() : '';
+            // Physical orders need fulfilling; digital ones are delivered by store-download.
+            const fulfil = (o.fulfillment_status && o.fulfillment_status !== 'n/a')
+                ? '<select onchange="setFulfillment(\'' + esc(o.id) + '\', this.value)" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:5px 8px;font-size:0.75rem;">'
+                  + ['unfulfilled', 'shipped', 'delivered'].map((s) =>
+                      '<option value="' + s + '"' + (o.fulfillment_status === s ? ' selected' : '') + '>' + s + '</option>').join('')
+                  + '</select>'
+                : '<span style="font-size:0.72rem;color:var(--text-muted);">digital</span>';
+            return '<div style="display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--bg-card);border:1px solid var(--border-default);border-radius:10px;margin-bottom:8px;flex-wrap:wrap;">'
+                + '<div style="flex:1;min-width:150px;"><div style="font-size:0.87rem;font-weight:600;">' + esc(o.product_name || 'Product') + '</div>'
+                + '<div style="font-size:0.72rem;color:var(--text-muted);">' + esc(when) + ' · qty ' + esc(o.quantity) + '</div></div>'
+                + '<div style="text-align:right;"><div style="font-size:0.87rem;font-weight:700;">' + money(o.artist_earnings, o.currency) + '</div>'
+                + '<div style="font-size:0.68rem;color:var(--text-muted);">you keep · fee ' + money(o.platform_fee, o.currency) + '</div></div>'
+                + fulfil + '</div>';
+        }).join('');
+    }
+
+    window.setFulfillment = async function (orderId, status) {
+        try {
+            const { error } = await window.db.rpc('mark_order_fulfillment', { p_order_id: orderId, p_status: status });
+            if (error) throw new Error(error.message);
+            toast('Marked ' + status);
+        } catch (e) { toast('Could not update: ' + e.message); }
+    };
+
+    // ── Product editor ─────────────────────────────────────────────────────
+    window.openProductEditor = async function (productId) {
+        let p = { name: '', description: '', price: '', currency: 'usd', product_kind: 'digital',
+                  image_url: '', digital_file_url: '', inventory: '', is_active: true };
+        if (productId) {
+            const { data } = await window.db.from('products').select('*').eq('id', productId).maybeSingle();
+            if (data) p = data;
+        }
+        const inputCss = 'width:100%;box-sizing:border-box;background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;';
+        const labelCss = 'display:block;font-size:0.74rem;color:var(--text-muted);margin-bottom:3px;margin-top:10px;';
+        document.getElementById('modalBody').innerHTML =
+            '<h2 style="margin-bottom:4px;">' + (productId ? 'Edit product' : 'New product') + '</h2>'
+          + '<p style="color:var(--text-muted);font-size:0.82rem;margin-bottom:6px;">Fans buy through Stripe Checkout. You keep 90%.</p>'
+          + '<input type="hidden" id="prodId" value="' + esc(p.id || '') + '">'
+          + '<label style="' + labelCss + '">Name</label><input id="prodName" style="' + inputCss + '" value="' + esc(p.name) + '" placeholder="Beat pack vol. 1">'
+          + '<label style="' + labelCss + '">Description</label><textarea id="prodDesc" rows="2" style="' + inputCss + '" placeholder="What the fan gets">' + esc(p.description) + '</textarea>'
+          + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
+          + '<div><label style="' + labelCss + '">Price</label><input id="prodPrice" inputmode="decimal" style="' + inputCss + '" value="' + esc(p.price) + '" placeholder="24.99"></div>'
+          + '<div><label style="' + labelCss + '">Type</label><select id="prodKind" style="' + inputCss + '" onchange="onProductKindChange()">'
+          + '<option value="digital"' + (p.product_kind === 'digital' ? ' selected' : '') + '>Digital download</option>'
+          + '<option value="physical"' + (p.product_kind === 'physical' ? ' selected' : '') + '>Physical item</option></select></div></div>'
+          + '<label style="' + labelCss + '">Image URL <span style="opacity:0.7;">(optional)</span></label><input id="prodImage" style="' + inputCss + '" value="' + esc(p.image_url) + '" placeholder="https://…">'
+          + '<div id="prodDigitalWrap"><label style="' + labelCss + '">Digital file</label>'
+          + '<input type="file" id="prodFile" style="' + inputCss + '">'
+          + '<div id="prodFileCurrent" style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;">' + (p.digital_file_url ? 'Current: ' + esc(p.digital_file_url) : 'No file uploaded yet') + '</div></div>'
+          + '<div id="prodStockWrap"><label style="' + labelCss + '">Inventory <span style="opacity:0.7;">(blank = unlimited)</span></label>'
+          + '<input id="prodStock" inputmode="numeric" style="' + inputCss + '" value="' + esc(p.inventory === null || p.inventory === undefined ? '' : p.inventory) + '" placeholder="50"></div>'
+          + '<label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:0.85rem;cursor:pointer;"><input type="checkbox" id="prodActive"' + (p.is_active ? ' checked' : '') + '> Visible in your storefront</label>'
+          + '<div id="prodMsg" style="font-size:0.78rem;color:#f59e0b;min-height:16px;margin-top:8px;"></div>'
+          + '<div class="project-detail-actions" style="margin-top:10px;"><button class="secondary" onclick="closeModal()">Cancel</button>'
+          + '<button class="primary" id="prodSaveBtn" onclick="saveProduct()">Save product</button></div>';
+        document.getElementById('globalModal').classList.add('active');
+        window.onProductKindChange();
+    };
+
+    window.onProductKindChange = function () {
+        const kind = document.getElementById('prodKind')?.value;
+        const dig = document.getElementById('prodDigitalWrap');
+        const stk = document.getElementById('prodStockWrap');
+        if (dig) dig.style.display = kind === 'digital' ? 'block' : 'none';
+        if (stk) stk.style.display = kind === 'physical' ? 'block' : 'none';
+    };
+
+    window.saveProduct = async function () {
+        const btn = document.getElementById('prodSaveBtn');
+        const msg = document.getElementById('prodMsg');
+        const val = (id) => (document.getElementById(id)?.value || '').trim();
+        const id = val('prodId');
+        const name = val('prodName');
+        const kind = val('prodKind') || 'digital';
+        const price = Number(val('prodPrice').replace(/[^0-9.]/g, ''));
+        if (!name) { msg.textContent = 'Give it a name.'; return; }
+        if (!Number.isFinite(price) || price <= 0) { msg.textContent = 'Set a price above zero.'; return; }
+
+        btn.disabled = true; btn.textContent = 'Saving…'; msg.textContent = '';
+        try {
+            const me = await uid();
+            if (!me) throw new Error('Sign in first');
+
+            const row = {
+                name: name,
+                description: val('prodDesc') || null,
+                price: price,
+                product_kind: kind,
+                image_url: val('prodImage') || null,
+                is_active: !!document.getElementById('prodActive')?.checked,
+                // Inventory is meaningless for a digital file; blank means unlimited.
+                inventory: kind === 'physical' && val('prodStock') !== '' ? parseInt(val('prodStock'), 10) : null,
+                updated_at: new Date().toISOString(),
+            };
+
+            const file = document.getElementById('prodFile')?.files?.[0];
+            if (kind === 'digital' && file) {
+                // store-digital is private and its RLS requires the first path segment to
+                // be the uploader's id. Store the PATH — store-download signs it later.
+                const path = me + '/' + file.name.replace(/[^\w.\-]+/g, '_');
+                btn.textContent = 'Uploading…';
+                const { error: upErr } = await window.db.storage.from('store-digital')
+                    .upload(path, file, { upsert: true });
+                if (upErr) throw new Error('Upload failed: ' + upErr.message);
+                row.digital_file_url = path;
+            }
+
+            let error;
+            if (id) ({ error } = await window.db.from('products').update(row).eq('id', id));
+            else    ({ error } = await window.db.from('products').insert({ ...row, artist_id: me }));
+            if (error) throw new Error(error.message);
+
+            window.closeModal();
+            toast(id ? 'Product updated' : 'Product added');
+            loadStoreManager();
+        } catch (e) {
+            msg.textContent = e.message;
+            btn.disabled = false; btn.textContent = 'Save product';
+        }
+    };
+
+    window.deleteProduct = async function (id) {
+        if (!window.confirm('Delete this product? Fans will no longer see it. Past orders are kept.')) return;
+        const { error } = await window.db.from('products').delete().eq('id', id);
+        if (error) { toast('Could not delete: ' + error.message); return; }
+        toast('Product deleted');
+        loadStoreManager();
+    };
+
+    // ── Payouts (Stripe Connect) ───────────────────────────────────────────
+    async function loadPayouts() {
+        const el = document.getElementById('payoutsBody');
+        if (!el) return;
+        el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:20px;">Checking your payout status…</div>';
+        let bal;
+        try { bal = await invokeMsg('store-balance', {}); }
+        catch (e) {
+            el.innerHTML = '<div style="color:#f59e0b;font-size:0.85rem;padding:16px;">Could not reach Stripe: ' + esc(e.message)
+                + ' <button class="artist-action-btn" onclick="loadPayouts()">Retry</button></div>';
+            return;
+        }
+
+        if (!bal || !bal.connected) {
+            el.innerHTML = '<div style="background:var(--bg-card);border:1px solid var(--border-default);border-radius:14px;padding:22px;max-width:560px;">'
+                + '<h3 style="margin:0 0 6px;font-size:1rem;">Set up payouts</h3>'
+                + '<p style="font-size:0.85rem;color:var(--text-muted);margin:0 0 16px;">Stripe verifies your identity and pays you directly. AIAD never holds your money — the 10% platform fee comes off each sale automatically.</p>'
+                + '<button class="primary-btn" id="payoutConnectBtn" onclick="startConnectOnboarding()">Set up payouts</button></div>';
+            return;
+        }
+
+        const dot = (ok) => '<span style="width:8px;height:8px;border-radius:50%;background:' + (ok ? '#22c55e' : '#f59e0b') + ';display:inline-block;margin-right:7px;"></span>';
+        el.innerHTML = '<div style="background:var(--bg-card);border:1px solid var(--border-default);border-radius:14px;padding:22px;max-width:620px;">'
+            + '<div style="display:flex;gap:26px;flex-wrap:wrap;margin-bottom:18px;">'
+            + '<div><div style="font-size:1.6rem;font-weight:800;">' + money(bal.available, bal.currency) + '</div><div style="font-size:0.74rem;color:var(--text-muted);">Available</div></div>'
+            + '<div><div style="font-size:1.6rem;font-weight:800;">' + money(bal.pending, bal.currency) + '</div><div style="font-size:0.74rem;color:var(--text-muted);">Pending</div></div></div>'
+            + '<div id="payoutStatusText" style="font-size:0.84rem;margin-bottom:6px;">' + dot(bal.charges_enabled) + 'Accepting payments' + (bal.charges_enabled ? '' : ' — not yet enabled') + '</div>'
+            + '<div style="font-size:0.84rem;margin-bottom:18px;">' + dot(bal.payouts_enabled) + 'Payouts to your bank' + (bal.payouts_enabled ? '' : ' — Stripe still needs details from you') + '</div>'
+            + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+            + '<button class="primary-btn" id="payoutDashboardBtn" onclick="openStripeDashboard()">Manage payouts</button>'
+            + (bal.payouts_enabled ? '' : '<button class="artist-action-btn" onclick="startConnectOnboarding()">Finish setup</button>')
+            + '</div>'
+            + '<p style="font-size:0.74rem;color:var(--text-hint);margin:16px 0 0;">Stripe pays out on its own schedule — AIAD has no withdraw button because the money is never ours to hold.</p></div>';
+    }
+
+    window.startConnectOnboarding = async function () {
+        const btn = document.getElementById('payoutConnectBtn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Opening Stripe…'; }
+        try {
+            const d = await invokeMsg('connect-onboard', {});
+            if (!d || !d.url) throw new Error('No onboarding link returned');
+            window.location.href = d.url;
+        } catch (e) {
+            toast('Could not start setup: ' + e.message);
+            if (btn) { btn.disabled = false; btn.textContent = 'Set up payouts'; }
+        }
+    };
+
+    window.openStripeDashboard = async function () {
+        try {
+            const d = await invokeMsg('store-dashboard-link', {});
+            if (!d || !d.url) throw new Error('No dashboard link returned');
+            window.open(d.url, '_blank', 'noopener');
+        } catch (e) { toast('Could not open Stripe: ' + e.message); }
+    };
+
+    // ── Public storefront + checkout ───────────────────────────────────────
+    // products is anon-readable when is_active, so this needs no edge function.
+    async function loadStorefront(artistId, hostId) {
+        const host = document.getElementById(hostId);
+        if (!host || !artistId) return;
+        const { data, error } = await window.db.from('products')
+            .select('id,name,description,price,currency,product_kind,image_url,inventory')
+            .eq('artist_id', artistId).eq('is_active', true)
+            .order('created_at', { ascending: false });
+        const rows = (!error && data) || [];
+        if (!rows.length) { host.innerHTML = ''; return; }
+        host.innerHTML = '<div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin:24px 0 12px;">Store</div>'
+            + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;">'
+            + rows.map(renderStorefrontCard).join('') + '</div>';
+    }
+
+    function renderStorefrontCard(p) {
+        const soldOut = p.product_kind === 'physical' && p.inventory !== null && p.inventory !== undefined && p.inventory <= 0;
+        const img = p.image_url
+            ? '<img src="' + esc(p.image_url) + '" alt="" style="width:100%;height:120px;object-fit:cover;border-radius:10px;margin-bottom:9px;">'
+            : '<div style="width:100%;height:120px;border-radius:10px;margin-bottom:9px;background:linear-gradient(135deg,#0d2f3f,#1a4a5e);"></div>';
+        return '<div style="background:var(--bg-card);border:1px solid var(--border-default);border-radius:13px;padding:12px;">'
+            + img
+            + '<div style="font-weight:600;font-size:0.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(p.name) + '</div>'
+            + '<div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:9px;">' + money(p.price, p.currency)
+            + '<span style="color:var(--text-muted);font-size:0.72rem;"> · ' + (p.product_kind === 'physical' ? 'Physical' : 'Digital') + '</span></div>'
+            + (soldOut
+                ? '<button class="artist-action-btn" disabled style="width:100%;opacity:0.6;cursor:not-allowed;">Sold out</button>'
+                : '<button class="artist-action-btn primary" style="width:100%;" onclick="buyProduct(\'' + esc(p.id) + '\')">Buy</button>')
+            + '</div>';
+    }
+
+    window.buyProduct = async function (productId, quantity) {
+        try {
+            const d = await invokeMsg('store-checkout', { product_id: productId, quantity: quantity || 1 });
+            if (!d || !d.url) throw new Error('No checkout link returned');
+            window.location.href = d.url;
+        } catch (e) {
+            // These are the human-readable refusals store-checkout returns.
+            toast(e.message);
+        }
+    };
+
+    // ── Buyer: orders + downloads ──────────────────────────────────────────
+    async function loadMyOrders(hostId) {
+        const host = document.getElementById(hostId);
+        if (!host) return;
+        const me = await uid();
+        if (!me) { host.innerHTML = ''; return; }
+        const { data, error } = await window.db.from('orders')
+            .select('*').eq('buyer_id', me).eq('status', 'paid')
+            .order('created_at', { ascending: false });
+        const rows = (!error && data) || [];
+        if (!rows.length) {
+            host.innerHTML = '<div style="font-size:0.82rem;color:var(--text-muted);padding:16px;">Nothing bought yet.</div>';
+            return;
+        }
+        host.innerHTML = rows.map((o) => {
+            const when = o.created_at ? new Date(o.created_at).toLocaleDateString() : '';
+            const isDigital = !!o.digital_download_url || o.fulfillment_status === 'n/a';
+            const action = isDigital
+                ? '<button class="artist-action-btn primary" onclick="downloadOrder(\'' + esc(o.id) + '\', this)">Download</button>'
+                : '<span style="font-size:0.74rem;color:var(--text-muted);text-transform:capitalize;">' + esc(o.fulfillment_status || 'processing') + '</span>';
+            return '<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg-card);border:1px solid var(--border-default);border-radius:11px;margin-bottom:8px;flex-wrap:wrap;">'
+                + '<div style="flex:1;min-width:150px;"><div style="font-size:0.88rem;font-weight:600;">' + esc(o.product_name || 'Product') + '</div>'
+                + '<div style="font-size:0.72rem;color:var(--text-muted);">' + esc(when) + ' · ' + money(o.amount, o.currency) + '</div></div>'
+                + action + '</div>';
+        }).join('');
+    }
+
+    window.downloadOrder = async function (orderId, btn) {
+        const orig = btn ? btn.textContent : '';
+        if (btn) { btn.disabled = true; btn.textContent = 'Preparing…'; }
+        try {
+            const d = await invokeMsg('store-download', { order_id: orderId });
+            if (!d || !d.url) throw new Error('No download link returned');
+            window.open(d.url, '_blank', 'noopener');
+        } catch (e) { toast('Could not get your download: ' + e.message); }
+        if (btn) { btn.disabled = false; btn.textContent = orig || 'Download'; }
+    };
+
+    // ── Return trips from Stripe ───────────────────────────────────────────
+    function handleReturnParams() {
+        const q = new URLSearchParams(window.location.search);
+        const clean = () => {
+            ['store', 'session', 'connect'].forEach((k) => q.delete(k));
+            const qs = q.toString();
+            window.history.replaceState({}, '', window.location.pathname + (qs ? '?' + qs : ''));
+        };
+        if (q.get('connect') === 'done') {
+            toast('Stripe setup returned — checking your status');
+            clean();
+            setTimeout(() => { if (document.getElementById('payoutsBody')) loadPayouts(); }, 400);
+            return;
+        }
+        const store = q.get('store');
+        if (store === 'success') {
+            // The webhook marks the order paid, so the row may lag a beat behind this redirect.
+            toast('Payment complete — thank you!');
+            clean();
+            setTimeout(() => loadMyOrders('fanOrdersList'), 1200);
+        } else if (store === 'canceled') {
+            toast('Checkout canceled — nothing was charged');
+            clean();
+        }
+    }
+
+    window.loadStoreManager = loadStoreManager;
+    window.loadPayouts      = loadPayouts;
+    window.loadStorefront   = loadStorefront;
+    window.loadMyOrders     = loadMyOrders;
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', handleReturnParams);
+    else handleReturnParams();
 })();
 </script>
 </body>
