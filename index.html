@@ -918,6 +918,14 @@ html, body {
                         </div>
                     </div>
 
+                    <!-- Drives which artists and tracks we surface first. Saved to
+                         profiles.preferred_genre via the set_preferred_genre RPC. -->
+                    <div class="field-group">
+                        <label class="label">Genre you place most</label>
+                        <select class="input" id="supervisorGenre" data-aiad-genres data-aiad-placeholder="No preference — show me everything"></select>
+                        <div class="helper-text">Optional. We'll lead with this genre in your catalogue and artist suggestions.</div>
+                    </div>
+
                 </div>
 
                 <div style="display:flex;align-items:center;justify-content:space-between;">
@@ -1010,8 +1018,8 @@ html, body {
                     </div>
                     <div class="field-group">
                         <label class="label">Primary genre</label>
-                        <input type="text" class="input" id="primaryGenre" placeholder="e.g., R&B, Hip-Hop, Electronic" oninput="validateArtistForm()">
-                        <div class="helper-text">It's okay if this evolves.</div>
+                        <select class="input" id="primaryGenre" data-aiad-genres onchange="validateArtistForm()"></select>
+                        <div class="helper-text">Required — this is how fans and supervisors find you. You can change it later.</div>
                     </div>
                 </div>
 
@@ -4064,9 +4072,17 @@ html, body {
                         </button>
                     </div>
 
+                    <!-- Empty search lists every collaborator; typing filters by
+                         name, username, genre or location (matched server-side). -->
+                    <div style="margin-bottom:16px;">
+                        <input id="collaboratorSearch" type="search" oninput="onCollaboratorSearch()"
+                            placeholder="Search collaborators by name, genre or location…"
+                            style="width:100%;box-sizing:border-box;background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:10px;padding:10px 14px;font-size:0.88rem;outline:none;">
+                    </div>
+
                     <div class="collaborators-grid" id="collaboratorsGrid">
                     </div>
-                
+
                     </div> <!-- /main -->
             <div class="studio-agent-col" id="collaboratorsAiadPanel" style="position:sticky;top:24px;">
                 <div class="studio-agent-header">
@@ -4754,18 +4770,9 @@ html, body {
                             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;">
                                 <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:10px 14px;">
                                     <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:4px;">Genre</div>
-                                    <select id="syncTrackGenre" style="background:transparent;border:none;outline:none;color:var(--text-primary);font-size:0.8rem;width:100%;cursor:pointer;appearance:none;font-family:inherit;">
-                                        <option value="" style="background:#1a1a2e;">Select genre</option>
-                                        <option style="background:#1a1a2e;">Hip-Hop</option>
-                                        <option style="background:#1a1a2e;">R&B</option>
-                                        <option style="background:#1a1a2e;">Afrobeats</option>
-                                        <option style="background:#1a1a2e;">Electronic</option>
-                                        <option style="background:#1a1a2e;">Pop</option>
-                                        <option style="background:#1a1a2e;">Soul</option>
-                                        <option style="background:#1a1a2e;">Jazz</option>
-                                        <option style="background:#1a1a2e;">Cinematic</option>
-                                        <option style="background:#1a1a2e;">Ambient</option>
-                                    </select>
+                                    <!-- Canonical list so a supervisor filtering by their
+                                         preferred genre actually matches listed tracks. -->
+                                    <select id="syncTrackGenre" data-aiad-genres data-aiad-placeholder="Select genre" style="background:transparent;border:none;outline:none;color:var(--text-primary);font-size:0.8rem;width:100%;cursor:pointer;appearance:none;font-family:inherit;"></select>
                                 </div>
                                 <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:10px 14px;">
                                     <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:4px;">Mood</div>
@@ -5498,7 +5505,7 @@ html, body {
                             </div>
                             <div class="settings-field">
                                 <label class="settings-label">Primary Genre</label>
-                                <input type="text" class="settings-input" id="settingsPrimaryGenre" value="" placeholder="e.g., R&B, Hip-Hop, Electronic">
+                                <select class="settings-input" id="settingsPrimaryGenre" data-aiad-genres></select>
                             </div>
                             <div class="settings-field">
                                 <label class="settings-label">Career Stage</label>
@@ -10055,6 +10062,48 @@ html, body {
             }
         };
 
+        // ── Canonical music genres ─────────────────────────────────────────────
+        // ONE list, used by artist onboarding, artist profile edit, and the
+        // fan/supervisor genre pick. Both sides of a match must choose from the same
+        // strings or list_artists' genre filter can't line them up — the free-text
+        // inputs this replaces produced "hip hop / rap", "Hip-Hop, R&B", "R&b & hip hop"
+        // and "Hip Hop" for what is one genre.
+        //
+        // Anything rendering a genre picker should use a <select data-aiad-genres>
+        // and let aiadFillGenreSelects() populate it, so the list stays in one place.
+        const AIAD_GENRES = [
+            'Hip-Hop/Rap', 'R&B/Soul', 'Pop', 'Afrobeats', 'Electronic/Dance', 'Latin',
+            'Rock', 'Alternative/Indie', 'Reggae/Dancehall', 'Gospel', 'Country', 'Jazz', 'Other'
+        ];
+        window.AIAD_GENRES = AIAD_GENRES;
+
+        function aiadGenreOptions(selected, placeholder) {
+            const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
+                ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+            const cur = String(selected == null ? '' : selected).trim();
+            // An existing free-text genre that isn't canonical is kept as a selectable
+            // option so opening the form doesn't silently discard what they had.
+            const extra = cur && !AIAD_GENRES.includes(cur)
+                ? `<option value="${esc(cur)}" selected>${esc(cur)} (current)</option>` : '';
+            return `<option value="">${esc(placeholder || 'Select a genre…')}</option>${extra}`
+                + AIAD_GENRES.map((g) => `<option value="${esc(g)}"${g === cur ? ' selected' : ''}>${esc(g)}</option>`).join('');
+        }
+        window.aiadGenreOptions = aiadGenreOptions;
+
+        // Fills every <select data-aiad-genres> that hasn't been filled yet, preserving
+        // any value already set on it (so DB-hydrated values survive a late fill).
+        function aiadFillGenreSelects(root) {
+            (root || document).querySelectorAll('select[data-aiad-genres]').forEach((sel) => {
+                const want = sel.dataset.aiadValue || sel.value || '';
+                if (sel.dataset.aiadFilled === '1' && !sel.dataset.aiadValue) return;
+                sel.innerHTML = aiadGenreOptions(want, sel.dataset.aiadPlaceholder);
+                sel.dataset.aiadFilled = '1';
+                delete sel.dataset.aiadValue;
+            });
+        }
+        window.aiadFillGenreSelects = aiadFillGenreSelects;
+        document.addEventListener('DOMContentLoaded', () => aiadFillGenreSelects());
+
         const IndustryFanGenres = {
             music: [
                 'Hip-Hop', 'R&B', 'Pop', 'Rock', 'Afro', 'Electronic',
@@ -12084,7 +12133,9 @@ html, body {
             if (!email.includes('@')) { showToast('Please enter a valid email'); return; }
             if (password.length < 6) { showToast('Password must be at least 6 characters'); return; }
 
-            AppState.supervisorProfile = { name, company, role, workTypes: supervisorWorkTypes, email };
+            const preferredGenre = (document.getElementById('supervisorGenre')?.value || '').trim();
+
+            AppState.supervisorProfile = { name, company, role, workTypes: supervisorWorkTypes, email, preferredGenre };
             localStorage.setItem('aiad_supervisor_profile', JSON.stringify(AppState.supervisorProfile));
 
             if (btn) btn.disabled = true;
@@ -12092,9 +12143,12 @@ html, body {
 
             // NOTE: `profiles` has no company column — company lives in auth user metadata
             // and AppState/localStorage only.
+            // Same UNIQUE-index hazard as collaborator signup: two supervisors with the
+            // same name previously generated the same username and the second insert failed.
+            const supUsername = await aiadUniqueUsername(name);
             const profileRow = () => ({
                 full_name: name,
-                username: name.toLowerCase().replace(/\s+/g, '_'),
+                username: supUsername,
                 role: 'supervisor',
                 industry: 'music',
             });
@@ -12177,6 +12231,14 @@ html, body {
                     role: 'supervisor',
                     industry: 'music',
                 }).then(() => {});
+                // Written here rather than at signup because the RPC reads auth.uid(),
+                // and on the email-confirmation path there is no session until now.
+                const g = AppState.supervisorProfile?.preferredGenre || '';
+                if (g) {
+                    db.rpc('set_preferred_genre', { p_genre: g })
+                      .then(() => { if (window.aiadResetPreferredGenre) aiadResetPreferredGenre(); })
+                      .catch((e) => console.warn('[AIAD] set_preferred_genre failed:', e));
+                }
             }
             jumpToDashboard('supervisor');
         }
@@ -12187,6 +12249,7 @@ html, body {
             const viewMap = {
                 'agent': 'supervisorAgentView',
                 'catalog': 'supervisorCatalogView',
+                'artists': 'supervisorArtistsView',
                 'saved': 'supervisorSavedView',
                 'licenses': 'supervisorLicensesView',
                 'settings': 'supervisorSettingsView',
@@ -12195,8 +12258,12 @@ html, body {
             if (el) el.classList.add('active');
 
             const navItems = document.querySelectorAll('#supervisorDashboard .dash-nav-item');
-            const navIndex = ['agent','catalog','saved','licenses'].indexOf(view);
+            // Must stay in the same order as the nav items in the markup.
+            const navIndex = ['agent','catalog','artists','saved','licenses'].indexOf(view);
             if (navIndex >= 0 && navItems[navIndex]) navItems[navIndex].classList.add('active');
+
+            if (view === 'artists') setTimeout(() => { try { loadSupervisorArtists(); } catch (e) {} }, 60);
+            if (view === 'catalog') setTimeout(() => { try { applySupervisorGenreDefault(); } catch (e) {} }, 60);
         }
 
         const SPOTIFY_CLIENT_ID = '78d436e1bd134f9a8d96c6e21695b6ce';
@@ -13132,6 +13199,11 @@ Only capture real, meaningful decisions — not questions or general discussion.
             const genre = AppState.artistProfile?.primaryGenre || '';
             const avatar = '';  // New user has no avatar yet
 
+            // Artists from before genre was required are invisible to fan discovery.
+            // Delayed so it lands after the dashboard paints, and after any signup
+            // onboarding overlay has had a chance to write its own genre.
+            setTimeout(() => { try { if (window.maybePromptArtistGenre) maybePromptArtistGenre(); } catch (e) {} }, 2600);
+
             // Update dashboard header
             document.querySelectorAll('.dash-artist-name').forEach(el => { if (name) el.textContent = name; });
             document.querySelectorAll('.dash-artist-genre').forEach(el => { if (genre) el.textContent = genre; });
@@ -13405,7 +13477,14 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 if (data.goals) { try { AppState.artistGoals = Array.isArray(data.goals) ? data.goals : JSON.parse(data.goals); } catch(e){} }
 
                 // Populate settings fields for new columns
-                if (document.getElementById('settingsPrimaryGenre')) document.getElementById('settingsPrimaryGenre').value = data.primary_genre || '';
+                // Route through the genre populator: setting .value directly on a <select>
+                // silently no-ops when the saved genre isn't one of the canonical options,
+                // which would blank the field and then save the blank back.
+                const _genreSel = document.getElementById('settingsPrimaryGenre');
+                if (_genreSel) {
+                    _genreSel.dataset.aiadValue = data.primary_genre || '';
+                    if (window.aiadFillGenreSelects) aiadFillGenreSelects(_genreSel.parentElement || document);
+                }
                 if (document.getElementById('settingsCareerStage')) document.getElementById('settingsCareerStage').value = data.career_stage || '';
 
                 const nameEl = document.querySelector('.dash-artist-name');
@@ -17287,28 +17366,40 @@ Only capture real, meaningful decisions — not questions or general discussion.
         var _studioHistoryMem = {};
 
         // ── Collaborators browse ───────────────────────────────────────────────
-        // Uses the list_artists RPC rather than a direct profiles select: profiles RLS
+        // Uses the list_collaborators RPC, not a direct profiles select: profiles RLS
         // only exposes the current user's own row, so a raw query returns just you.
-        // list_artists is SECURITY DEFINER and returns the public directory.
+        // list_collaborators is SECURITY DEFINER and returns role='collaborator' rows
+        // only — deduped, verified first, with usernames backfilled from full_name for
+        // the older accounts that never got one. This tab used to call list_artists,
+        // which is why it was showing artists.
         let _collabLoading = false;
+        let _collabSearchTimer = null;
 
-        async function loadCollaborators(force) {
+        async function loadCollaborators(force, search) {
             const grid = document.getElementById('collaboratorsGrid');
             if (!grid) return;
+            const query = (search !== undefined && search !== null)
+                ? String(search).trim()
+                : (document.getElementById('collaboratorSearch')?.value || '').trim();
             if (_collabLoading) return;
-            if (grid.dataset.loaded === '1' && !force) return;
+            // Cache the unfiltered list only; a search always re-queries.
+            if (grid.dataset.loaded === '1' && !force && !query && !grid.dataset.query) return;
             _collabLoading = true;
             grid.dataset.loaded = '1';
+            grid.dataset.query = query;
 
             grid.innerHTML = '<div style="grid-column:1/-1;padding:24px;text-align:center;color:var(--text-muted);font-size:0.875rem;">Loading collaborators…</div>';
 
             try {
-                const { data, error } = await db.rpc('list_artists', { p_search: null, p_limit: 48 });
-                if (error) throw new Error(error.message || 'list_artists failed');
+                // Empty search returns everyone; the RPC matches name/username/genre/location.
+                const { data, error } = await db.rpc('list_collaborators', { p_search: query || '', p_limit: 60 });
+                if (error) throw new Error(error.message || 'list_collaborators failed');
 
                 const rows = Array.isArray(data) ? data : (data ? JSON.parse(data) : []);
                 if (!rows.length) {
-                    grid.innerHTML = '<div style="grid-column:1/-1;padding:24px;text-align:center;color:var(--text-muted);font-size:0.875rem;">No collaborators yet.</div>';
+                    grid.innerHTML = '<div style="grid-column:1/-1;padding:24px;text-align:center;color:var(--text-muted);font-size:0.875rem;">'
+                        + (query ? 'No collaborators match “' + _esc(query) + '”.' : 'No collaborators yet.')
+                        + '</div>';
                     return;
                 }
                 grid.innerHTML = rows.map(renderCollaboratorCard).join('');
@@ -17322,6 +17413,12 @@ Only capture real, meaningful decisions — not questions or general discussion.
             }
         }
         window.loadCollaborators = loadCollaborators;
+
+        // Debounced so typing doesn't fire a request per keystroke.
+        window.onCollaboratorSearch = function () {
+            clearTimeout(_collabSearchTimer);
+            _collabSearchTimer = setTimeout(() => loadCollaborators(true), 250);
+        };
 
         function _esc(s) {
             return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
@@ -17340,8 +17437,10 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 : `<div style="width:48px;height:48px;border-radius:50%;flex:none;background:linear-gradient(135deg,#00B4D8,#FF00FF);display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;">${_esc(initial)}</div>`;
             const badge = a.verified
                 ? '<span title="Verified" style="color:#00D4FF;font-size:0.75rem;">✓</span>' : '';
-            const founding = a.founding_number
-                ? `<span style="font-size:0.68rem;color:var(--text-hint);">Founding #${_esc(a.founding_number)}</span>` : '';
+            // list_collaborators returns `role` (always 'collaborator' here) rather than
+            // the founding_number that list_artists exposed.
+            const roleLabel = a.role
+                ? `<span style="font-size:0.68rem;color:var(--text-hint);text-transform:capitalize;">${_esc(a.role)}</span>` : '';
 
             return `
                 <div class="collaborator-card" style="background:var(--bg-card);border:1px solid var(--border-default);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px;">
@@ -17354,7 +17453,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                             <div style="font-size:0.78rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
                                 ${genre || '—'}${location ? ' · ' + location : ''}
                             </div>
-                            ${founding}
+                            ${roleLabel}
                         </div>
                     </div>
                     <div style="display:flex;gap:8px;">
@@ -17376,6 +17475,77 @@ Only capture real, meaningful decisions — not questions or general discussion.
             showToast('Messaging isn\'t available yet' + (username ? ' — find @' + username + ' on their profile' : ''));
         }
         window.messageCollaborator = messageCollaborator;
+
+        // ── One-time genre prompt for artists who signed up before genre was required ──
+        // list_artists matches fans to artists on primary_genre, so an artist with no
+        // genre (or the placeholder "music" that came from profiles.industry) is
+        // invisible in every fan's suggestions. Ask once, then never again.
+        async function maybePromptArtistGenre() {
+            try {
+                if (localStorage.getItem('aiad_genre_prompt_done') === '1') return;
+                const { data: { session } = {} } = await db.auth.getSession();
+                if (!session) return;
+
+                const { data: prof } = await db.from('profiles').select('role').eq('id', session.user.id).maybeSingle();
+                if (!prof || prof.role !== 'artist') return;
+
+                const { data: ap } = await db.from('artist_profiles')
+                    .select('primary_genre').eq('user_id', session.user.id).maybeSingle();
+                const current = (ap && ap.primary_genre ? String(ap.primary_genre) : '').trim();
+                if (current && current.toLowerCase() !== 'music') {
+                    localStorage.setItem('aiad_genre_prompt_done', '1');
+                    return;
+                }
+                showArtistGenrePrompt();
+            } catch (e) { /* never block the dashboard on this */ }
+        }
+        window.maybePromptArtistGenre = maybePromptArtistGenre;
+
+        function showArtistGenrePrompt() {
+            if (document.getElementById('aiadGenrePromptOverlay')) return;
+            const ov = document.createElement('div');
+            ov.id = 'aiadGenrePromptOverlay';
+            ov.style.cssText = 'position:fixed;inset:0;background:rgba(3,5,12,0.85);backdrop-filter:blur(6px);z-index:100004;display:flex;align-items:center;justify-content:center;padding:18px;';
+            ov.innerHTML = `<div style="background:#0d0f17;border:1px solid rgba(255,255,255,0.1);border-radius:16px;max-width:420px;width:100%;padding:24px;">
+                <h3 style="margin:0 0 6px;color:#fff;font-size:1.15rem;">Pick your genre so fans can find you</h3>
+                <p style="color:#94a3b8;font-size:0.84rem;margin:0 0 16px;">Fans and music supervisors browse by genre. Without one, you don't show up in their suggestions. Takes a second.</p>
+                <select id="aiadGenrePromptSelect" data-aiad-genres style="width:100%;box-sizing:border-box;background:#12141d;border:1px solid rgba(255,255,255,0.14);border-radius:8px;padding:10px 12px;color:#fff;font-size:0.9rem;"></select>
+                <div id="aiadGenrePromptMsg" style="font-size:0.78rem;color:#f59e0b;margin-top:8px;min-height:15px;"></div>
+                <button id="aiadGenrePromptSave" style="width:100%;margin-top:10px;background:linear-gradient(135deg,#06b6d4,#3b82f6);color:#fff;border:none;border-radius:10px;padding:11px;font-size:0.9rem;font-weight:700;cursor:pointer;">Save genre</button>
+                <button id="aiadGenrePromptSkip" style="width:100%;margin-top:8px;background:transparent;color:#94a3b8;border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:10px;font-size:0.85rem;font-weight:600;cursor:pointer;">Not now</button>
+            </div>`;
+            document.body.appendChild(ov);
+            if (window.aiadFillGenreSelects) aiadFillGenreSelects(ov);
+
+            document.getElementById('aiadGenrePromptSkip').addEventListener('click', () => {
+                // One-time means one-time: don't nag on every dashboard load.
+                try { localStorage.setItem('aiad_genre_prompt_done', '1'); } catch (e) {}
+                ov.remove();
+            });
+            document.getElementById('aiadGenrePromptSave').addEventListener('click', async () => {
+                const sel = document.getElementById('aiadGenrePromptSelect');
+                const msg = document.getElementById('aiadGenrePromptMsg');
+                const btn = document.getElementById('aiadGenrePromptSave');
+                const genre = (sel.value || '').trim();
+                if (!genre) { msg.textContent = 'Pick a genre first.'; return; }
+                btn.disabled = true; btn.textContent = 'Saving…';
+                try {
+                    const { data: { session } = {} } = await db.auth.getSession();
+                    if (!session) throw new Error('Not signed in');
+                    const { error } = await db.from('artist_profiles')
+                        .upsert({ user_id: session.user.id, primary_genre: genre, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+                    if (error) throw new Error(error.message);
+                    if (AppState.artistProfile) AppState.artistProfile.primaryGenre = genre;
+                    try { localStorage.setItem('aiad_genre_prompt_done', '1'); } catch (e) {}
+                    showToast('Genre saved — fans can find you now');
+                    ov.remove();
+                } catch (e) {
+                    msg.textContent = e.message;
+                    btn.disabled = false; btn.textContent = 'Save genre';
+                }
+            });
+        }
+        window.showArtistGenrePrompt = showArtistGenrePrompt;
 
         function _shGet(key) {
             // 1. Memory first (full data, no size limit)
@@ -18697,6 +18867,38 @@ Only capture real, meaningful decisions — not questions or general discussion.
             reader.readAsDataURL(file);
         }
 
+        // ── Username generation ────────────────────────────────────────────────
+        // list_collaborators keys its cards off username, and both card actions
+        // (view profile, message) need one. profiles.username also carries a UNIQUE
+        // index, so a collision doesn't just look bad — the insert fails outright.
+        // The old rule here was name.toLowerCase().replace(/\s+/g,'_'), which kept
+        // apostrophes and accents and never checked whether the name was taken.
+        function aiadUsernameSlug(fullName) {
+            return String(fullName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        }
+
+        // Returns slug, or slug2 / slug3 / … if earlier ones are taken. profiles is
+        // world-readable ("Anyone can read profiles"), so one prefix query settles it.
+        async function aiadUniqueUsername(fullName) {
+            let base = aiadUsernameSlug(fullName);
+            // A name with nothing alphanumeric in it (e.g. all emoji) still needs a handle.
+            if (!base) base = 'user';
+            try {
+                const { data, error } = await db.from('profiles').select('username').ilike('username', base + '%');
+                if (error) throw error;
+                const taken = new Set((data || []).map(r => String(r.username || '').toLowerCase()));
+                if (!taken.has(base)) return base;
+                for (let n = 2; n < 1000; n++) {
+                    if (!taken.has(base + n)) return base + n;
+                }
+            } catch (e) {
+                console.warn('[AIAD] username uniqueness check failed:', e);
+            }
+            // Couldn't verify — suffix rather than risk colliding with the unique index.
+            return base + Math.floor(Math.random() * 100000);
+        }
+        window.aiadUniqueUsername = aiadUniqueUsername;
+
         async function handleCollabProfileContinue() {
             const btn = document.getElementById('collabProfileBtn');
             btn.disabled = true;
@@ -18705,6 +18907,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
             const email = (document.getElementById('collabEmail')?.value || '').trim();
             const password = document.getElementById('collabPassword')?.value || '';
             const displayName = AppState.collaborator.profile.displayName;
+            // Resolved once so all three write paths below agree on the same handle.
+            const collabUsername = await aiadUniqueUsername(displayName);
 
             try {
                 const { data: authData, error } = await db.auth.signUp({
@@ -18728,7 +18932,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                             AppState.currentUser = u;
                             await db.from('profiles').upsert({
                                 id: u.id, full_name: displayName,
-                                username: displayName.toLowerCase().replace(/\s+/g, '_'),
+                                username: collabUsername,
                                 role: 'collaborator', industry: AppState.userIndustry || 'music',
                                 location: AppState.collaborator.profile.location || '',
                                 avatar_url: AppState.collaborator.profile.avatarUrl || '',
@@ -18750,7 +18954,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                         localStorage.setItem('aiad_pending_profile', JSON.stringify({
                             email,
                             full_name: displayName,
-                            username: displayName.toLowerCase().replace(/\s+/g, '_'),
+                            username: collabUsername,
                             role: 'collaborator',
                             industry: AppState.userIndustry || 'music',
                             location: AppState.collaborator.profile.location || '',
@@ -18768,7 +18972,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     AppState.currentUser = user;
                     await db.from('profiles').upsert({
                         id: user.id, full_name: displayName,
-                        username: displayName.toLowerCase().replace(/\s+/g, '_'),
+                        username: collabUsername,
                         role: 'collaborator', industry: AppState.userIndustry || 'music',
                         location: AppState.collaborator.profile.location || '',
                         avatar_url: AppState.collaborator.profile.avatarUrl || '',
@@ -20565,6 +20769,10 @@ Only capture real, meaningful decisions — not questions or general discussion.
                         <svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
                         Sync Library
                     </div>
+                    <div class="dash-nav-item" onclick="showSupervisorView('artists')">
+                        <svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+                        Discover Artists
+                    </div>
                     <div class="dash-nav-item" onclick="showSupervisorView('saved')">
                         <svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
                         Saved
@@ -20639,18 +20847,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                             </div>
                             <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:8px 12px;">
                                 <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:4px;">Genre</div>
-                                <select id="filterGenre" style="background:transparent;border:none;outline:none;color:var(--text-primary);font-size:0.8rem;width:100%;cursor:pointer;appearance:none;">
-                                    <option value="">All Genres</option>
-                                    <option>Hip-Hop</option>
-                                    <option>R&B</option>
-                                    <option>Afrobeats</option>
-                                    <option>Electronic</option>
-                                    <option>Pop</option>
-                                    <option>Soul</option>
-                                    <option>Jazz</option>
-                                    <option>Cinematic</option>
-                                    <option>Ambient</option>
-                                </select>
+                                <select id="filterGenre" data-aiad-genres data-aiad-placeholder="All Genres" style="background:transparent;border:none;outline:none;color:var(--text-primary);font-size:0.8rem;width:100%;cursor:pointer;appearance:none;"></select>
                             </div>
                             <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:8px 12px;">
                                 <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:4px;">Use</div>
@@ -20675,6 +20872,24 @@ Only capture real, meaningful decisions — not questions or general discussion.
                                 <div style="font-size:0.75rem;">Artists on Studio plan can list their tracks here for licensing</div>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Artist discovery for supervisors. Backed by list_artists, which is
+                     SECURITY DEFINER and does genre matching server-side. Defaults to the
+                     supervisor's preferred_genre and widens if that finds nobody. -->
+                <div class="dash-view" id="supervisorArtistsView">
+                    <div style="max-width:900px;margin:0 auto;">
+                        <h1 style="font-size:1.3rem;font-weight:700;color:var(--text-primary);margin-bottom:6px;">Discover Artists</h1>
+                        <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:20px;">Artists on AIAD, led by the genre you place most.</p>
+                        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;">
+                            <input id="supArtistSearch" type="search" oninput="onSupervisorArtistSearch()"
+                                placeholder="Search by name, genre or location…"
+                                style="flex:1;min-width:200px;box-sizing:border-box;background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:10px;padding:10px 14px;font-size:0.85rem;outline:none;">
+                            <select id="supArtistGenre" data-aiad-genres data-aiad-placeholder="All genres" onchange="loadSupervisorArtists()"
+                                style="min-width:180px;background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:10px;padding:10px 14px;font-size:0.85rem;outline:none;cursor:pointer;"></select>
+                        </div>
+                        <div id="supervisorArtistsList" style="display:flex;flex-direction:column;gap:10px;"></div>
                     </div>
                 </div>
 
@@ -21341,6 +21556,9 @@ document.addEventListener('keydown', function(e) {
             const password = document.getElementById('fanPassword').value;
             const location = (document.getElementById('fanLocation')?.value || '').trim();
             const ageRange = document.getElementById('fanAgeRange')?.value || '';
+            // profiles.username is UNIQUE — two fans named the same previously collided
+            // and the second signup's profile write failed.
+            const fanUsername = await aiadUniqueUsername(name);
 
             // Try sign up — if already registered, sign in
             let userData = null;
@@ -21373,7 +21591,7 @@ document.addEventListener('keydown', function(e) {
                 try {
                     localStorage.setItem('aiad_pending_profile', JSON.stringify({
                         email, full_name: name,
-                        username: name.toLowerCase().replace(/\s+/g, '_'),
+                        username: fanUsername,
                         role: 'fan', industry: 'music', location,
                     }));
                 } catch (e) {}
@@ -21388,7 +21606,7 @@ document.addEventListener('keydown', function(e) {
                 // Save to profiles table (what restoreUserSession reads for routing)
                 await db.from('profiles').upsert({
                     id: userData.id, email, full_name: name,
-                    username: name.toLowerCase().replace(/\s+/g, '_'),
+                    username: fanUsername,
                     role: 'fan', industry: 'music',
                 }, { onConflict: 'id' });
 
@@ -21417,14 +21635,25 @@ document.addEventListener('keydown', function(e) {
             // Save fan profile to artist_profiles (for feed/discover queries)
             if (AppState.currentUser) {
                 const acc = AppState.fanAccount || {};
+                // artist_profiles.username is UNIQUE too (partial index, where not null),
+                // so this needs the same collision handling as the profiles write.
+                const fanApUsername = await aiadUniqueUsername(acc.name || 'fan');
                 await db.from('artist_profiles').upsert({
                     id: AppState.currentUser.id,
-                    username: (acc.name || 'fan').toLowerCase().replace(/\s+/g, '_'),
+                    username: fanApUsername,
                     artist_name: acc.name || 'Fan',
                     location: acc.location || '',
                     role: 'fan',
                     primary_genre: genres[0] || '',
                 }, { onConflict: 'id' });
+            }
+
+            // Drive artist suggestions off the fan's first pick. profiles.preferred_genre
+            // holds a single genre, so the full multi-select stays in localStorage below;
+            // this is the one the dashboard filters on.
+            if (genres[0]) {
+                try { await db.rpc('set_preferred_genre', { p_genre: genres[0] }); }
+                catch (e) { console.warn('[AIAD] set_preferred_genre failed:', e); }
             }
 
             localStorage.setItem('aiad_fan_preferences', JSON.stringify({ genres, supportMethods, intent }));
@@ -21444,12 +21673,10 @@ document.addEventListener('keydown', function(e) {
             const container = document.getElementById('fanGenreChips');
             if (!container) return;
             container.innerHTML = '';
-            const genres = [
-                'Hip-Hop', 'R&B', 'Afrobeats', 'Pop', 'Electronic', 'Indie', 'Jazz', 'Soul',
-                'Rock', 'Alternative', 'Gospel', 'Neo-Soul', 'Trap', 'Latin', 'Classical',
-                'Film Scores', 'Ambient', 'Punk', 'Country', 'Reggae', 'House', 'Drill',
-                'Singer-Songwriter', 'Dancehall', 'K-Pop', 'Lo-Fi'
-            ];
+            // Canonical list, same strings the artist picks from — the two sides have to
+            // match for list_artists' genre filter to find anyone. The old 26-item list
+            // used names ("Neo-Soul", "Trap", "K-Pop") no artist could ever select.
+            const genres = AIAD_GENRES;
             genres.forEach(g => {
                 const chip = document.createElement('button');
                 chip.type = 'button';
@@ -21951,6 +22178,28 @@ function filterFanArtists(filter, btn) {
 }
 
 // ── Discover ──────────────────────────────────────────────────────────────
+function _escDiscover(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
+}
+
+// The fan's saved genre, read once per session. '' means "show everyone".
+let _fanPreferredGenre = null;
+async function fanPreferredGenre() {
+    if (_fanPreferredGenre !== null) return _fanPreferredGenre;
+    _fanPreferredGenre = '';
+    try {
+        const { data: { session } = {} } = await db.auth.getSession();
+        if (session) {
+            const { data } = await db.from('profiles').select('preferred_genre').eq('id', session.user.id).maybeSingle();
+            _fanPreferredGenre = (data && data.preferred_genre) ? String(data.preferred_genre).trim() : '';
+        }
+    } catch (e) { /* fall back to showing everyone */ }
+    return _fanPreferredGenre;
+}
+window.aiadResetPreferredGenre = () => { _fanPreferredGenre = null; };
+
 async function _execDiscoverSearch() {
     const results=document.getElementById('discoverResults');
     if(!results) return;
@@ -21958,24 +22207,54 @@ async function _execDiscoverSearch() {
     const loc=(document.getElementById('discoverLocationFilter')?.value||'').trim();
     results.innerHTML=`<div style="color:var(--text-muted);font-size:0.85rem;padding:20px;text-align:center;">Searching...</div>`;
     try {
-        let query=db.from('artist_profiles').select('id,user_id,artist_name,tagline,short_bio,location,avatar_url').limit(20);
-        if(q) query=query.ilike('artist_name','%'+q+'%');
-        if(loc) query=query.ilike('location','%'+loc+'%');
-        const {data,error}=await query;
-        if(error) throw error;
-        let artists=(data||[]).filter(a=>a.artist_name);
-        if(!artists.length) { results.innerHTML=`<div style="text-align:center;padding:40px 20px;background:var(--bg-card);border:1px solid var(--border-default);border-radius:14px;"><div style="font-size:0.95rem;font-weight:600;color:var(--text-secondary);">No creators found</div><div style="font-size:0.82rem;color:var(--text-muted);margin-top:4px;">Try a different name or location</div></div>`; return; }
-        // Fetch avatar fallback from profiles table for any artist missing avatar_url
-        const missingAv = artists.filter(a => !a.avatar_url).map(a => a.id || a.user_id).filter(Boolean);
-        if (missingAv.length) {
-            try {
-                const { data: pProfiles } = await db.from('profiles').select('id,avatar_url').in('id', missingAv);
-                const avMap = {};
-                (pProfiles||[]).forEach(p => { if(p.avatar_url) avMap[p.id] = p.avatar_url; });
-                artists = artists.map(a => ({...a, avatar_url: a.avatar_url || avMap[a.id] || avMap[a.user_id] || ''}));
-            } catch(e) {}
+        // list_artists is SECURITY DEFINER and does the genre matching server-side
+        // (normalised, so "Hip-Hop/Rap" still matches an artist stored as "Hip Hop").
+        const genre = await fanPreferredGenre();
+        const fetchArtists = async (g) => {
+            const { data, error } = await db.rpc('list_artists', { p_search: q || '', p_limit: 60, p_genre: g || '' });
+            if (error) throw error;
+            return Array.isArray(data) ? data : (data ? JSON.parse(data) : []);
+        };
+
+        let rows = await fetchArtists(genre);
+        // Most artists still have no genre set, so a strict filter would hand the fan an
+        // empty screen. Fall back to everyone and say why, rather than showing nothing.
+        let widened = false;
+        if (!rows.length && genre) { rows = await fetchArtists(''); widened = true; }
+
+        // list_artists has no location param; p_search already covers it, so this only
+        // narrows further when the fan uses the dedicated location box.
+        if (loc) {
+            const needle = loc.toLowerCase();
+            rows = rows.filter(r => String(r.location || '').toLowerCase().includes(needle));
         }
-        results.innerHTML=artists.map(a=>_buildDiscoverCard(a)).join('');
+
+        if(!rows.length) { results.innerHTML=`<div style="text-align:center;padding:40px 20px;background:var(--bg-card);border:1px solid var(--border-default);border-radius:14px;"><div style="font-size:0.95rem;font-weight:600;color:var(--text-secondary);">No creators found</div><div style="font-size:0.82rem;color:var(--text-muted);margin-top:4px;">Try a different name or location</div></div>`; return; }
+
+        // The RPC returns usernames, not ids, but the cards need a user id to open a
+        // profile and to follow. profiles is publicly readable, so resolve them in one go.
+        const usernames = rows.map(r => r.username).filter(Boolean);
+        const idMap = {};
+        if (usernames.length) {
+            try {
+                const { data: idRows } = await db.from('profiles').select('id,username,avatar_url').in('username', usernames);
+                (idRows||[]).forEach(p => { idMap[p.username] = p; });
+            } catch (e) { /* cards still render; follow just won't wire up */ }
+        }
+        const artists = rows.map(r => ({
+            id:          (idMap[r.username] || {}).id || '',
+            user_id:     (idMap[r.username] || {}).id || '',
+            artist_name: r.name || r.username || 'Artist',
+            tagline:     r.genre || '',
+            short_bio:   '',
+            location:    r.location || '',
+            avatar_url:  r.avatar || (idMap[r.username] || {}).avatar_url || '',
+        }));
+
+        const note = widened
+            ? `<div style="padding:10px 14px;margin-bottom:12px;background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.28);border-radius:10px;font-size:0.8rem;color:var(--text-secondary);">No ${_escDiscover(genre)} artists yet — showing everyone for now.</div>`
+            : '';
+        results.innerHTML = note + artists.map(a=>_buildDiscoverCard(a)).join('');
         // Update follow state for already-followed artists
         if (AppState.currentUser) {
             db.from('fan_support').select('artist_id').eq('fan_id', AppState.currentUser.id).then(({data}) => {
@@ -21992,28 +22271,36 @@ async function _execDiscoverSearch() {
 }
 
 function _buildDiscoverCard(a) {
-    const name     = a.artist_name || 'Artist';
-    const tagline  = a.tagline || a.short_bio || '';
-    const loc      = a.location || '';
+    const rawName  = a.artist_name || 'Artist';
+    const name     = _escDiscover(rawName);
+    const tagline  = _escDiscover(a.tagline || a.short_bio || '');
+    const loc      = _escDiscover(a.location || '');
     const av       = a.avatar_url || '';
-    const artistId = a.id || a.user_id || '';
-    const init     = name.slice(0,1).toUpperCase();
+    const artistId = _escDiscover(a.id || a.user_id || '');
+    const init     = _escDiscover(rawName.slice(0,1).toUpperCase());
+    // Names reach the inline handlers as JS string literals, so a quote or backslash in
+    // one would otherwise break out of the attribute.
+    const jsName   = _escDiscover(JSON.stringify(rawName).slice(1, -1));
     const avatarEl = (av && (av.startsWith('http') || av.startsWith('data:')))
-        ? `<img src="${av}" style="width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0;">`
+        ? `<img src="${_escDiscover(av)}" style="width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0;">`
         : `<div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#0d2f3f,#1a4a5e);display:flex;align-items:center;justify-content:center;font-size:1.4rem;font-weight:700;color:var(--teal-light);flex-shrink:0;">${init}</div>`;
-    return `<div style="display:flex;align-items:center;gap:16px;padding:18px 20px;background:var(--bg-card);border:1px solid var(--border-default);border-radius:14px;cursor:pointer;transition:border-color 0.2s;"
-        onmouseover="this.style.borderColor='var(--teal)'" onmouseout="this.style.borderColor='var(--border-default)'"
-        onclick="loadArtistPage('${artistId}')">
+    // Without a resolved id there is nothing to open or follow, so drop those affordances
+    // rather than wiring up buttons that silently do nothing.
+    const clickAttr = artistId ? ` onclick="loadArtistPage('${artistId}')"` : '';
+    const followBtn = artistId
+        ? `<button id="discBtn_${artistId}" onclick="event.stopPropagation();fanFollowFromDiscover('${artistId}','${jsName}',this)"
+            style="padding:8px 16px;border-radius:9px;border:1px solid var(--border-default);background:transparent;color:var(--text-primary);font-size:0.8rem;cursor:pointer;font-family:var(--font-body);white-space:nowrap;flex-shrink:0;">
+            Follow
+        </button>` : '';
+    return `<div style="display:flex;align-items:center;gap:16px;padding:18px 20px;background:var(--bg-card);border:1px solid var(--border-default);border-radius:14px;cursor:${artistId ? 'pointer' : 'default'};transition:border-color 0.2s;"
+        onmouseover="this.style.borderColor='var(--teal)'" onmouseout="this.style.borderColor='var(--border-default)'"${clickAttr}>
         ${avatarEl}
         <div style="flex:1;min-width:0;">
             <div style="font-weight:600;font-size:0.97rem;margin-bottom:2px;">${name}</div>
             ${loc ? `<div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;">${loc}</div>` : ''}
             ${tagline ? `<div style="font-size:0.8rem;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${tagline}</div>` : ''}
         </div>
-        <button id="discBtn_${artistId}" onclick="event.stopPropagation();fanFollowFromDiscover('${artistId}','${name}',this)"
-            style="padding:8px 16px;border-radius:9px;border:1px solid var(--border-default);background:transparent;color:var(--text-primary);font-size:0.8rem;cursor:pointer;font-family:var(--font-body);white-space:nowrap;flex-shrink:0;">
-            Follow
-        </button>
+        ${followBtn}
     </div>`;
 }
 
@@ -24811,17 +25098,126 @@ Be direct and concrete with real industry insight — never generic filler. When
             _syncCatalog = Array.isArray(rows) ? rows : [];
             if (_syncCatalog.length) el.innerHTML = _syncCatalog.map(t => _syncCard(t, true)).join('');
         }
+        // Same normalisation list_artists uses server-side: strip everything but
+        // alphanumerics and match either direction, so canonical "Hip-Hop/Rap" still
+        // finds tracks listed under the older "Hip-Hop".
+        function _genreKey(s) { return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]/g, ''); }
+        function _genreMatches(want, have) {
+            const w = _genreKey(want), h = _genreKey(have);
+            if (!w) return true;
+            if (!h) return false;
+            return w.indexOf(h) !== -1 || h.indexOf(w) !== -1;
+        }
+        window.aiadGenreMatches = _genreMatches;
+
         window.filterSyncCatalog = function () {
             const mood = (document.getElementById('filterMood') && document.getElementById('filterMood').value || '').toLowerCase();
-            const genre = (document.getElementById('filterGenre') && document.getElementById('filterGenre').value || '').toLowerCase();
+            const genre = (document.getElementById('filterGenre') && document.getElementById('filterGenre').value || '');
             const use = (document.getElementById('filterUse') && document.getElementById('filterUse').value || '').toLowerCase();
             const el = document.getElementById('syncCatalogList'); if (!el) return;
             const filtered = _syncCatalog.filter(t =>
                 (!mood || (t.mood || '').toLowerCase() === mood) &&
-                (!genre || (t.genre || '').toLowerCase() === genre) &&
+                _genreMatches(genre, t.genre) &&
                 (!use || (Array.isArray(t.use_cases) && t.use_cases.some(u => (u || '').toLowerCase() === use))));
             el.innerHTML = filtered.length ? filtered.map(t => _syncCard(t, true)).join('') : '<div style="text-align:center;padding:50px 20px;color:var(--text-muted);font-size:0.85rem;">No tracks match your filters</div>';
         };
+
+        // ── Supervisor: preferred genre applied to the catalogue + artist discovery ──
+        let _supGenreDefaulted = false;
+        async function supervisorPreferredGenre() {
+            try {
+                const { data: { session } = {} } = await db.auth.getSession();
+                if (!session) return '';
+                const { data } = await db.from('profiles').select('preferred_genre').eq('id', session.user.id).maybeSingle();
+                return (data && data.preferred_genre) ? String(data.preferred_genre).trim() : '';
+            } catch (e) { return ''; }
+        }
+
+        // Preselect the catalogue's genre filter once per session — a default, not a lock:
+        // the supervisor can still switch it back to All Genres.
+        window.applySupervisorGenreDefault = async function () {
+            if (_supGenreDefaulted) return;
+            const sel = document.getElementById('filterGenre');
+            if (!sel) return;
+            if (window.aiadFillGenreSelects) aiadFillGenreSelects(sel.parentElement || document);
+            if (sel.value) { _supGenreDefaulted = true; return; }
+            const g = await supervisorPreferredGenre();
+            _supGenreDefaulted = true;
+            if (!g) return;
+            sel.dataset.aiadValue = g;
+            if (window.aiadFillGenreSelects) aiadFillGenreSelects(sel.parentElement || document);
+            if (typeof window.filterSyncCatalog === 'function' && _syncCatalog.length) window.filterSyncCatalog();
+        };
+
+        let _supArtistTimer = null;
+        window.onSupervisorArtistSearch = function () {
+            clearTimeout(_supArtistTimer);
+            _supArtistTimer = setTimeout(() => loadSupervisorArtists(), 250);
+        };
+
+        window.loadSupervisorArtists = async function () {
+            const list = document.getElementById('supervisorArtistsList');
+            if (!list) return;
+            const sel = document.getElementById('supArtistGenre');
+            if (sel && window.aiadFillGenreSelects) aiadFillGenreSelects(sel.parentElement || document);
+            // First open defaults the picker to the genre they said they place most.
+            if (sel && !sel.dataset.aiadSeeded) {
+                sel.dataset.aiadSeeded = '1';
+                const pref = await supervisorPreferredGenre();
+                if (pref) { sel.dataset.aiadValue = pref; aiadFillGenreSelects(sel.parentElement || document); }
+            }
+            const q = (document.getElementById('supArtistSearch')?.value || '').trim();
+            const genre = (sel?.value || '').trim();
+
+            list.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted);font-size:0.85rem;">Loading artists…</div>';
+            try {
+                const fetchArtists = async (g) => {
+                    const { data, error } = await db.rpc('list_artists', { p_search: q || '', p_limit: 60, p_genre: g || '' });
+                    if (error) throw new Error(error.message || 'list_artists failed');
+                    return Array.isArray(data) ? data : (data ? JSON.parse(data) : []);
+                };
+                let rows = await fetchArtists(genre);
+                let widened = false;
+                // Most artists have no genre yet, so widen rather than show an empty page.
+                if (!rows.length && genre) { rows = await fetchArtists(''); widened = true; }
+
+                if (!rows.length) {
+                    list.innerHTML = '<div style="padding:40px 20px;text-align:center;color:var(--text-muted);font-size:0.85rem;">No artists found.</div>';
+                    return;
+                }
+                const note = widened
+                    ? `<div style="padding:10px 14px;background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.28);border-radius:10px;font-size:0.8rem;color:var(--text-secondary);">No ${_escDiscover(genre)} artists yet — showing everyone.</div>`
+                    : '';
+                list.innerHTML = note + rows.map(_supervisorArtistCard).join('');
+            } catch (e) {
+                console.warn('[AIAD] loadSupervisorArtists failed:', e);
+                list.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted);font-size:0.85rem;">Could not load artists. '
+                    + '<button onclick="loadSupervisorArtists()" style="background:none;border:none;color:var(--teal,#06b6d4);cursor:pointer;text-decoration:underline;font:inherit;">Retry</button></div>';
+            }
+        };
+
+        function _supervisorArtistCard(a) {
+            const name = _escDiscover(a.name || a.username || 'Artist');
+            const username = _escDiscover(a.username || '');
+            const genre = _escDiscover(a.genre || '');
+            const loc = _escDiscover(a.location || '');
+            const init = _escDiscover(String(a.name || a.username || '?').trim().charAt(0).toUpperCase());
+            const avatar = a.avatar
+                ? `<img src="${_escDiscover(a.avatar)}" alt="" style="width:48px;height:48px;border-radius:50%;object-fit:cover;flex-shrink:0;">`
+                : `<div style="width:48px;height:48px;border-radius:50%;flex-shrink:0;background:linear-gradient(135deg,#0d2f3f,#1a4a5e);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--teal-light);">${init}</div>`;
+            const badge = a.verified ? '<span title="Verified" style="color:#00D4FF;font-size:0.75rem;">✓</span>' : '';
+            const view = username
+                ? `<button onclick="window.open('/artist/' + encodeURIComponent('${username}'), '_blank', 'noopener')" style="padding:8px 16px;border-radius:9px;border:1px solid var(--border-default);background:transparent;color:var(--text-primary);font-size:0.8rem;cursor:pointer;font-family:var(--font-body);white-space:nowrap;flex-shrink:0;">View Profile</button>`
+                : '';
+            return `<div style="display:flex;align-items:center;gap:16px;padding:16px 18px;background:var(--bg-card);border:1px solid var(--border-default);border-radius:14px;">
+                ${avatar}
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:600;font-size:0.95rem;display:flex;align-items:center;gap:6px;"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}</span>${badge}</div>
+                    <div style="font-size:0.78rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${genre || '—'}${loc ? ' · ' + loc : ''}</div>
+                </div>
+                ${view}
+            </div>`;
+        }
         window.aiadSaveSync = async function (id, btn) {
             const s = sess(); if (!s) return;
             await fetch(`${SUPA}/rest/v1/sync_saves`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon(), 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' }, body: JSON.stringify({ supervisor_id: s.user.id, listing_id: id }) }).catch(() => {});
@@ -25201,10 +25597,13 @@ Be direct and concrete with real industry insight — never generic filler. When
                     ? `<textarea id="${id}" rows="2" placeholder="${ph}" style="width:100%;box-sizing:border-box;background:#12141d;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:9px 11px;color:#fff;font-size:0.85rem;resize:vertical;"></textarea>`
                     : `<input id="${id}" placeholder="${ph}" style="width:100%;box-sizing:border-box;background:#12141d;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:9px 11px;color:#fff;font-size:0.85rem;">`}
             </label>`;
-        const OB_SELECT = (id, label, opts) => `
+        // `placeholder` adds a leading empty option, which makes the select act as a
+        // required pick rather than silently defaulting to the first real option.
+        const OB_SELECT = (id, label, opts, placeholder) => `
             <label style="display:block;margin-bottom:10px;">
                 <span style="display:block;font-size:0.78rem;color:#94a3b8;margin-bottom:4px;">${label}</span>
                 <select id="${id}" style="width:100%;box-sizing:border-box;background:#12141d;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:9px 11px;color:#fff;font-size:0.85rem;">
+                    ${placeholder ? `<option value="">${placeholder}</option>` : ''}
                     ${opts.map(o=>`<option value="${o}">${o}</option>`).join('')}
                 </select>
             </label>`;
@@ -25226,7 +25625,7 @@ Be direct and concrete with real industry insight — never generic filler. When
                     <div id="aiadObStep1" style="background:#0d0f17;border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:20px;">
                         <div style="font-size:0.72rem;color:#38bdf8;font-weight:700;letter-spacing:.05em;margin-bottom:12px;">THE BASICS</div>
                         ${OB_FIELD('ob_artist_name','Artist / stage name','e.g. Rueben')}
-                        ${OB_FIELD('ob_primary_genre','Primary genre','e.g. R&B, Hip-Hop, Afrobeats')}
+                        ${OB_SELECT('ob_primary_genre','Primary genre (required)', AIAD_GENRES, 'Select a genre…')}
                         ${OB_FIELD('ob_substyle','Your sound in a few words','e.g. moody alt-R&B with trap drums')}
                         ${OB_SELECT('ob_career_stage','Where are you in your career?',['Just starting','Emerging','Developing','Established','Professional'])}
                         ${OB_FIELD('ob_city','Home city / main market','e.g. Atlanta, GA')}
@@ -25285,6 +25684,9 @@ Be direct and concrete with real industry insight — never generic filler. When
                 submitted_at: new Date().toISOString(),
             };
             if (!data.city) { try { showToast('Please add your location to continue.'); } catch(_e){ alert('Please add your location to continue.'); } var _c = document.getElementById('ob_city'); if (_c) _c.focus(); return; }
+            // Genre gates discovery — list_artists matches fans to artists on it — so it
+            // is required here the same way it is on the signup form.
+            if (!data.primary_genre) { try { showToast('Please pick your genre so fans can find you.'); } catch(_e){ alert('Please pick your genre so fans can find you.'); } var _g = document.getElementById('ob_primary_genre'); if (_g) _g.focus(); return; }
             btn.disabled = true; btn.textContent = 'Saving…';
             try { await rpc('save_artist_onboarding', { p_data: data }); } catch (e) {}
             // Auto-fetch public stats from the links (no manual numbers). YouTube works now;
@@ -25317,7 +25719,17 @@ Be direct and concrete with real industry insight — never generic filler. When
                 }
             } catch (e) {}
             // Also persist artist_profiles name/genre for the dashboard header.
-            try { const s = sess(); if (s && data.artist_name) await rest('artist_profiles?on_conflict=user_id', { method:'POST', headers:{ 'Prefer':'resolution=merge-duplicates' }, body: JSON.stringify({ user_id: s.user.id, artist_name: data.artist_name, primary_genre: data.primary_genre || null, career_stage: data.career_stage || null }) }); } catch (e) {}
+            // Was gated on artist_name, which meant a blank name also threw away the
+            // genre — the one field discovery depends on. Write whenever we have either.
+            try {
+                const s = sess();
+                if (s && (data.artist_name || data.primary_genre)) {
+                    const row = { user_id: s.user.id, career_stage: data.career_stage || null };
+                    if (data.artist_name)   row.artist_name   = data.artist_name;
+                    if (data.primary_genre) row.primary_genre = data.primary_genre;
+                    await rest('artist_profiles?on_conflict=user_id', { method:'POST', headers:{ 'Prefer':'resolution=merge-duplicates' }, body: JSON.stringify(row) });
+                }
+            } catch (e) {}
             document.getElementById('aiadObStep1').style.display = 'none';
             // Stats step next. The account already exists and the user is signed in
             // by this point, which the RPC requires (it reads auth.uid()).
