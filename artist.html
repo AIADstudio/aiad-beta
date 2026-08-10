@@ -53,6 +53,13 @@
         padding:8px 16px;border-radius:999px}
       .section-title{margin:32px 0 16px;font-size:12px;font-weight:600;letter-spacing:.08em;
         text-transform:uppercase;color:var(--text-muted)}
+      .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+      .stat{background:var(--bg-card,rgba(255,255,255,0.03));border:1px solid var(--border-default);
+        border-radius:12px;padding:14px 16px;min-width:0}
+      .stat-value{font-size:20px;font-weight:700;color:var(--text-primary);line-height:1.2}
+      .stat-label{margin-top:2px;font-size:12px;color:var(--text-muted)}
+      /* The first stat is the headline figure, so give it room to breathe. */
+      .stat:first-child .stat-value{font-size:26px}
       .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
       @media(max-width:520px){.grid{grid-template-columns:repeat(3,1fr);gap:4px}}
       .post{aspect-ratio:1;border-radius:12px;overflow:hidden;border:1px solid var(--border-default);
@@ -184,6 +191,30 @@
           ? `<div class="grid">${POSTS.map((post, i) => tile(post, i)).join('')}</div>`
           : `<div class="empty">No posts yet.</div>`;
 
+        // Stats come from public_artist_profile's `stats` key. artist_stats itself is
+        // readable only by its owner, so the SECURITY DEFINER RPC hands out just these
+        // display numbers — never handles or the raw platform payloads. Spotify won't
+        // release monthly listeners or followers to apps, so those are the artist's own
+        // figures; YouTube subscribers are the real API number when we have it.
+        const stats = (p && typeof p.stats === 'object' && p.stats) || {};
+        const statFields = [
+          ['monthly_listeners',   'Monthly listeners'],
+          ['spotify_followers',   'Spotify followers'],
+          ['youtube_subscribers', 'YouTube subscribers'],
+          ['instagram_followers', 'Instagram followers'],
+          ['tiktok_followers',    'TikTok followers'],
+        ].filter(([k]) => typeof stats[k] === 'number');
+        const statsHtml = statFields.length
+          ? `<div class="section-title">Stats</div>
+             <div class="stats">
+               ${statFields.map(([k, label]) => `
+                 <div class="stat">
+                   <div class="stat-value">${esc(Number(stats[k]).toLocaleString())}</div>
+                   <div class="stat-label">${esc(label)}</div>
+                 </div>`).join('')}
+             </div>`
+          : '';
+
         document.title = `${name} — AIAD`;
         root.innerHTML = `
           <div class="header">
@@ -199,6 +230,7 @@
               </div>
             </div>
           </div>
+          ${statsHtml}
           <div class="gate">
             <p>Follow ${esc(name)} on AIAD to like, comment &amp; get updates.</p>
             <a href="/">Sign up</a>
