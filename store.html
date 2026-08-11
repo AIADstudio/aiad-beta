@@ -123,9 +123,7 @@
         </div>
         <div class="info">
           <h2 id="ovName"></h2>
-          <div class="p-kind" id="ovKind"></div>
           <div class="p-price" id="ovPrice"></div>
-          <div class="p-stock" id="ovStock"></div>
           <div class="p-desc" id="ovDesc"></div>
           <div class="qtyrow" id="ovQtyRow" style="display:none">
             <button class="qbtn" id="qMinus">−</button>
@@ -240,14 +238,12 @@
           const imgs = imagesOf(pr);
           const soldOut = pr.product_kind === 'physical' && pr.inventory !== null && pr.inventory !== undefined && pr.inventory <= 0;
           const cover = imgs.length ? `<img src="${esc(imgs[0])}" alt="${esc(pr.name)}" loading="lazy">` : `<div class="imgempty"></div>`;
-          const kind = pr.product_kind === 'physical' ? 'Physical' : 'Digital';
           return `<div class="card" data-i="${PRODUCTS.indexOf(pr)}">
             <div class="imgwrap">${cover}
               ${imgs.length > 1 ? `<span class="badge">${imgs.length} photos</span>` : ''}
               ${soldOut ? `<div class="soldout">Sold out</div>` : ''}
             </div>
             <div class="nm">${esc(pr.name)}</div>
-            <div class="kd">${kind}</div>
             <div class="pr">${fmtMoney(pr.price, pr.currency)}</div>
           </div>`;
         }).join('')}</div>`;
@@ -260,14 +256,9 @@
         CURRENT = pr; QTY = 1;
         const imgs = imagesOf(pr);
         document.getElementById('ovName').textContent = pr.name || '';
-        document.getElementById('ovKind').textContent = pr.product_kind === 'physical' ? 'Physical item' : 'Digital download';
         document.getElementById('ovPrice').textContent = fmtMoney(pr.price, pr.currency);
         document.getElementById('ovDesc').textContent = pr.description || '';
         const soldOut = pr.product_kind === 'physical' && pr.inventory !== null && pr.inventory !== undefined && pr.inventory <= 0;
-        const stock = document.getElementById('ovStock');
-        stock.textContent = pr.product_kind === 'physical'
-          ? (pr.inventory === null || pr.inventory === undefined ? '' : (soldOut ? 'Sold out' : pr.inventory + ' in stock'))
-          : '';
         const main = document.getElementById('ovMain');
         main.src = imgs[0] || '';
         main.style.display = imgs.length ? 'block' : 'none';
