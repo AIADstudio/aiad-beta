@@ -25131,14 +25131,41 @@ Be direct and concrete with real industry insight — never generic filler. When
                 : 'Tip: select your use cases (Advertising, TV, Film…) for a sharper number. General indie sync fees run ' + money(low) + '–' + money(high) + '; ' + money(rec) + ' is a solid starting ask.';
             return { price: rec, low: low, high: high, rationale: rationale };
         }
-        window.suggestSyncPriceMain = function () {
+        // Calls the AIAD Agent (LLM, factors in the artist's real reach + market rates).
+        // Falls back to the instant local market model if the agent is unreachable.
+        async function aiadSuggestSyncPrice(input) {
+            try {
+                const s = sess();
+                const res = await fetch(`${SUPA}/functions/v1/sync-price-suggest`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (s ? s.access_token : anon()), 'apikey': anon() },
+                    body: JSON.stringify(input),
+                });
+                const d = await res.json();
+                if (res.ok && d && typeof d.recommended === 'number') {
+                    const money = (n) => '$' + Number(n).toLocaleString();
+                    const range = (d.low && d.high) ? ' (range ' + money(d.low) + '–' + money(d.high) + ')' : '';
+                    return { price: d.recommended, rationale: (d.rationale || '') + range, ai: true };
+                }
+            } catch (e) {}
+            const r = computeSyncPrice(input.use_cases, input.genre, input.mood);
+            return { price: r.price, rationale: r.rationale, ai: false };
+        }
+        function _syncHint(r, ai) {
+            const head = ai ? '🤖 <strong style="color:var(--text-primary);">AIAD Agent suggests $' : '✨ <strong style="color:var(--text-primary);">Suggested $';
+            return head + Number(r.price).toLocaleString() + '</strong> — ' + String(r.rationale).replace(/</g, '&lt;') + ' <span style="color:var(--text-muted);">Estimate; you set the final price.</span>';
+        }
+        window.suggestSyncPriceMain = async function () {
             const useCases = Array.from(document.querySelectorAll('#syncUseCases .style-tag-chip.selected')).map((el) => el.textContent.trim());
             const genre = (document.getElementById('syncTrackGenre') || {}).value || '';
             const mood = (document.getElementById('syncTrackMood') || {}).value || '';
-            const r = computeSyncPrice(useCases, genre, mood);
-            const pf = document.getElementById('syncTrackPrice'); if (pf) pf.value = r.price;
+            const bpm = (document.getElementById('syncTrackBpm') || {}).value || '';
+            const title = (document.getElementById('syncTrackTitle') || {}).value || '';
             const hint = document.getElementById('syncPriceHint');
-            if (hint) hint.innerHTML = '✨ <strong style="color:var(--text-primary);">Suggested: $' + Number(r.price).toLocaleString() + '</strong> — ' + r.rationale.replace(/</g, '&lt;') + ' <span style="color:var(--text-muted);">Estimate only; you set the final price.</span>';
+            if (hint) hint.innerHTML = '<span style="color:var(--text-muted);">✨ AIAD Agent is analyzing your reach &amp; market rates…</span>';
+            const r = await aiadSuggestSyncPrice({ title, genre, mood, bpm, use_cases: useCases });
+            const pf = document.getElementById('syncTrackPrice'); if (pf) pf.value = r.price;
+            if (hint) hint.innerHTML = _syncHint(r, r.ai);
         };
         window.handleSyncSubmit = async function () {
             const g = (id) => (document.getElementById(id) && document.getElementById(id).value || '').trim();
@@ -25154,14 +25181,17 @@ Be direct and concrete with real industry insight — never generic filler. When
                 loadMyListings();
             } catch (e) { (window.showToast || alert)('Could not list track — try again'); }
         };
-        window.suggestSyncPriceEdit = function () {
+        window.suggestSyncPriceEdit = async function () {
             const useCases = Array.from(document.querySelectorAll('#editSyncUses .style-tag-chip.selected')).map((el) => el.textContent.trim());
             const genre = (document.getElementById('editSyncGenre') || {}).value || '';
             const mood = (document.getElementById('editSyncMood') || {}).value || '';
-            const r = computeSyncPrice(useCases, genre, mood);
-            const pf = document.getElementById('editSyncPrice'); if (pf) pf.value = r.price;
+            const bpm = (document.getElementById('editSyncBpm') || {}).value || '';
+            const title = (document.getElementById('editSyncTitle') || {}).value || '';
             const hint = document.getElementById('editSyncHint');
-            if (hint) hint.innerHTML = '✨ <strong style="color:var(--text-primary);">Suggested: $' + Number(r.price).toLocaleString() + '</strong> — ' + r.rationale.replace(/</g, '&lt;');
+            if (hint) hint.innerHTML = '<span style="color:var(--text-muted);">✨ AIAD Agent analyzing…</span>';
+            const r = await aiadSuggestSyncPrice({ title, genre, mood, bpm, use_cases: useCases });
+            const pf = document.getElementById('editSyncPrice'); if (pf) pf.value = r.price;
+            if (hint) hint.innerHTML = _syncHint(r, r.ai);
         };
         window.openSyncEdit = function (id) {
             const t = (window._myListings || []).find((x) => x.id === id); if (!t) return;
