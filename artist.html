@@ -61,6 +61,14 @@
       /* The first stat is the headline figure, so give it room to breathe. */
       .stat:first-child .stat-value{font-size:26px}
       /* Storefront */
+      .store-cta{display:flex;align-items:center;justify-content:space-between;gap:16px;text-decoration:none;
+        background:linear-gradient(135deg,rgba(0,180,216,0.12),rgba(217,70,239,0.09));
+        border:1px solid rgba(0,180,216,0.28);border-radius:16px;padding:18px 20px;margin-top:8px;transition:border-color .15s}
+      .store-cta:hover{border-color:rgba(0,180,216,0.55)}
+      .store-cta-eyebrow{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted)}
+      .store-cta-title{font-size:17px;font-weight:700;color:var(--text-primary);margin-top:3px}
+      .store-cta-sub{font-size:13px;color:var(--text-secondary);margin-top:3px}
+      .store-cta-btn{white-space:nowrap;background:var(--text-primary);color:#000;font-weight:600;font-size:13px;padding:9px 16px;border-radius:999px}
       .store-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
       .store-card{background:var(--bg-card);border:1px solid var(--border-default);border-radius:13px;padding:12px}
       .store-img{width:100%;height:120px;object-fit:cover;border-radius:10px;margin-bottom:9px;display:block}
@@ -241,7 +249,6 @@
               </div>
             </div>
           </div>
-          ${statsHtml}
           <div id="storefront"></div>
           <div class="gate">
             <p>Follow ${esc(name)} on AIAD to like, comment &amp; get updates.</p>
@@ -255,53 +262,34 @@
         // Grid is view-only for the public: posts are NOT clickable and do not
         // open. To interact (like/comment/follow), visitors use the Sign up CTA.
 
-        loadStorefront(p.id, p.username);
+        loadStorefront(p.id, p.username, name);
       }
 
       // Products are anon-readable when is_active (RLS "Public can read active
       // products"), so the storefront needs no extra RPC. Buying does need a
       // session — store-checkout reads auth.uid() to block self-purchase — so a
       // signed-out visitor is sent to sign up rather than into a failing checkout.
-      async function loadStorefront(artistId, username) {
+      async function loadStorefront(artistId, username, name) {
         const host = document.getElementById('storefront');
         if (!host || !artistId) return;
-        let rows = [];
+        let count = 0;
         try {
-          const { data, error } = await db
-            .from('products')
-            .select('id,name,description,price,currency,product_kind,image_url,inventory')
-            .eq('artist_id', artistId)
-            .eq('is_active', true)
-            .order('created_at', { ascending: false });
-          if (!error && data) rows = data;
+          const { count: c } = await db.from('products')
+            .select('id', { count: 'exact', head: true })
+            .eq('artist_id', artistId).eq('is_active', true);
+          count = c || 0;
         } catch (e) { return; }
-        if (!rows.length) return;
-
+        if (!count) return;
+        const label = count === 1 ? '1 item' : count + ' items';
         host.innerHTML =
-          `<div class="section-title" style="display:flex;align-items:center;justify-content:space-between"><span>Store</span><a href="/store/${encodeURIComponent(username)}" style="color:var(--teal-light);text-transform:none;letter-spacing:0;font-size:13px;font-weight:600">Visit store \u2192</a></div>
-           <div class="store-grid">
-             ${rows.map((pr) => {
-               const soldOut = pr.product_kind === 'physical'
-                 && pr.inventory !== null && pr.inventory !== undefined && pr.inventory <= 0;
-               const img = pr.image_url
-                 ? `<img class="store-img" src="${esc(pr.image_url)}" alt="">`
-                 : `<div class="store-img store-img-empty"></div>`;
-               return `<div class="store-card">
-                   ${img}
-                   <div class="store-name">${esc(pr.name)}</div>
-                   <div class="store-price">${fmtMoney(pr.price, pr.currency)}
-                     <span class="store-kind">· ${pr.product_kind === 'physical' ? 'Physical' : 'Digital'}</span>
-                   </div>
-                   ${soldOut
-                     ? `<button class="store-buy" disabled>Sold out</button>`
-                     : `<button class="store-buy" data-pid="${esc(pr.id)}">Buy</button>`}
-                 </div>`;
-             }).join('')}
-           </div>`;
-
-        host.querySelectorAll('.store-buy[data-pid]').forEach((btn) => {
-          btn.addEventListener('click', () => buyProduct(btn.dataset.pid, btn));
-        });
+          `<a class="store-cta" href="/store/${encodeURIComponent(username)}">
+             <div>
+               <div class="store-cta-eyebrow">Store</div>
+               <div class="store-cta-title">Shop ${esc(name)}’s store</div>
+               <div class="store-cta-sub">${label} · merch, music &amp; more</div>
+             </div>
+             <span class="store-cta-btn">Visit store →</span>
+           </a>`;
       }
 
       function fmtMoney(amt, cur) {
