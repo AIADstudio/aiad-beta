@@ -26747,9 +26747,10 @@ Be direct and concrete with real industry insight — never generic filler. When
       title.innerHTML='&#128295; Preview role';
       title.style.cssText='color:#fff;font-size:12px;font-weight:700;';
       var min=document.createElement('span');
-      min.textContent='—'; min.style.cssText='cursor:pointer;color:#89f;font-size:14px;user-select:none;';
+      min.textContent='+'; min.style.cssText='cursor:pointer;color:#89f;font-size:15px;font-weight:700;line-height:1;user-select:none;';
       var body=document.createElement('div');
-      min.onclick=function(){ body.style.display = body.style.display==='none'?'':'none'; };
+      body.style.display='none';   // start collapsed so it isn't bulky; founder expands when needed
+      min.onclick=function(){ var hidden=body.style.display==='none'; body.style.display=hidden?'':'none'; min.textContent=hidden?'—':'+'; };
       head.appendChild(title); head.appendChild(min);
       wrap.appendChild(head); wrap.appendChild(body);
 
@@ -27448,6 +27449,7 @@ Be direct and concrete with real industry insight — never generic filler. When
     function reposition() {
         const btn = document.getElementById('aiadBugBtn');
         if (!btn) return;
+<<<<<<< ours
         // Error-only now, so pin it centered just above the error toast rather than
         // hopping between corners as the founder widgets and player bar come and go.
         // Only the full-width player bar needs clearing.
@@ -27456,6 +27458,16 @@ Be direct and concrete with real industry insight — never generic filler. When
         btn.style.transform = 'translateX(-50%)';
         const playerTop = topEdgeFromBottom(document.getElementById('bottomPlayer'));
         const bottom = Math.max(78, playerTop ? playerTop + 12 : 78);
+=======
+        // Always bottom-right; just stack above whatever's parked in that corner
+        // (player bar, founder Admin button / Preview panel). Never flip to the left.
+        const blockers = ['bottomPlayer', 'aiadAdminBtn', 'aiadPreviewPanel']
+            .map((id) => topEdgeFromBottom(document.getElementById(id)))
+            .filter((n) => n > 0);
+        const bottom = blockers.length ? Math.max(14, Math.max.apply(null, blockers) + 10) : 14;
+        btn.style.left = 'auto';
+        btn.style.right = '18px';
+>>>>>>> theirs
         if (btn.style.bottom !== bottom + 'px') btn.style.bottom = bottom + 'px';
     }
 
