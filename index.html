@@ -27570,8 +27570,20 @@ Be direct and concrete with real industry insight — never generic filler. When
 })();
 </script>
 <style id="aiad-site-footer-css">
+<<<<<<< ours
 /* Legal now lives in the site footer, not the sidebar. */
 .dash-sidebar-left .aiad-legal-links{display:none !important;}
+=======
+/* Legal/company links live in the site footer now, not the sidebar. */
+.dash-sidebar-left .aiad-legal-links{display:none !important;}
+/* Compact the account row so more of the nav is visible. */
+@media (min-width:769px){
+  .dash-sidebar-left .dash-sidebar-footer{padding-top:10px !important;border-top:none !important;}
+  .dash-sidebar-left .dash-user-profile{padding:6px 8px !important;}
+  .dash-sidebar-left .dash-user-avatar{width:30px !important;height:30px !important;}
+  .dash-sidebar-left .dash-sidebar-footer > button{padding:6px 10px !important;font-size:0.8rem !important;}
+}
+>>>>>>> theirs
 .aiad-site-footer{border-top:1px solid var(--border-default, rgba(255,255,255,0.08));margin-top:48px;padding:26px 24px 40px;display:flex;flex-wrap:wrap;align-items:center;gap:12px 22px;}
 .aiad-site-footer .aiad-footer-links{display:flex;flex-wrap:wrap;gap:10px 22px;}
 .aiad-site-footer a{color:var(--text-muted, #94a3b8);font-size:0.8rem;font-weight:600;text-decoration:none;font-family:inherit;}
@@ -27580,18 +27592,31 @@ Be direct and concrete with real industry insight — never generic filler. When
 @media (max-width:768px){.aiad-site-footer .aiad-footer-copy{margin-left:0;}}
 </style>
 <!-- ══════════════ SITE FOOTER (Spotify-style) ══════════════
+<<<<<<< ours
      Injected at the bottom of each dashboard's main scroll area. Legal/company
      links live here now instead of cluttering the sidebar. -->
 <script>
 (function(){
   var LINKS = '<div class="aiad-footer-links">'
+=======
+     Injected at the bottom of each dashboard's main scroll area. -->
+<script>
+(function(){
+  var LINKS = '<div class="aiad-footer-links">'
+    + '<a href="/about">About</a>'
+    + '<a href="/contact">Contact Us</a>'
+>>>>>>> theirs
     + '<a href="/privacy">Privacy Policy</a>'
     + '<a href="/terms">Terms</a>'
     + '<a href="/dmca">DMCA</a>'
     + '<a href="/privacy">Cookies</a>'
+<<<<<<< ours
     + '<a href="https://www.aiad.studio">About</a>'
     + '<a href="mailto:founder@aiad.studio">Contact Us</a>'
     + '</div><div class="aiad-footer-copy">\u00a9 2026 AIAD</div>';
+=======
+    + '</div><div class="aiad-footer-copy">\u00a9 2026 AIAD Studio Inc.</div>';
+>>>>>>> theirs
   function inject(){
     document.querySelectorAll('.dash-main').forEach(function(m){
       if (m.getAttribute('data-aiad-footer')) return;
