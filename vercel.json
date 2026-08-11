@@ -18,6 +18,10 @@
       "destination": "/artist"
     },
     {
+      "source": "/store/:username",
+      "destination": "/store"
+    },
+    {
       "source": "/admin",
       "destination": "/admin.html"
     },

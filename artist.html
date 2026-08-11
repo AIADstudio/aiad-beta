@@ -255,14 +255,14 @@
         // Grid is view-only for the public: posts are NOT clickable and do not
         // open. To interact (like/comment/follow), visitors use the Sign up CTA.
 
-        loadStorefront(p.id);
+        loadStorefront(p.id, p.username);
       }
 
       // Products are anon-readable when is_active (RLS "Public can read active
       // products"), so the storefront needs no extra RPC. Buying does need a
       // session — store-checkout reads auth.uid() to block self-purchase — so a
       // signed-out visitor is sent to sign up rather than into a failing checkout.
-      async function loadStorefront(artistId) {
+      async function loadStorefront(artistId, username) {
         const host = document.getElementById('storefront');
         if (!host || !artistId) return;
         let rows = [];
@@ -278,7 +278,7 @@
         if (!rows.length) return;
 
         host.innerHTML =
-          `<div class="section-title">Store</div>
+          `<div class="section-title" style="display:flex;align-items:center;justify-content:space-between"><span>Store</span><a href="/store/${encodeURIComponent(username)}" style="color:var(--teal-light);text-transform:none;letter-spacing:0;font-size:13px;font-weight:600">Visit store \u2192</a></div>
            <div class="store-grid">
              ${rows.map((pr) => {
                const soldOut = pr.product_kind === 'physical'

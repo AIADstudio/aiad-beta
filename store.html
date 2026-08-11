@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    <meta name="theme-color" content="#0A0A0A" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <title>Store — AIAD</title>
+    <meta name="description" content="Shop official merch and releases on AIAD." />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+      :root{
+        --teal-light:#00D4FF;--teal:#00B4D8;--teal-dark:#0077B6;--magenta:#d946ef;
+        --bg:#0A0A0A;--bg-2:#101013;--bg-card:#161616;
+        --text:#FFFFFF;--text-2:rgba(255,255,255,0.62);--text-muted:rgba(255,255,255,0.42);
+        --border:rgba(255,255,255,0.08);--border-2:rgba(255,255,255,0.14);
+        --font:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+      }
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;-webkit-font-smoothing:antialiased}
+      a{color:inherit;text-decoration:none}
+      img{display:block;max-width:100%}
+      /* Nav */
+      .store-nav{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;
+        gap:16px;padding:14px 24px;background:rgba(10,10,10,0.82);backdrop-filter:blur(14px);border-bottom:1px solid var(--border)}
+      .nav-brand{display:flex;align-items:center;gap:11px;font-weight:700;font-size:15px;letter-spacing:.02em;min-width:0}
+      .nav-brand .av{width:30px;height:30px;border-radius:50%;object-fit:cover;background:var(--bg-card);flex-shrink:0;
+        display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text-muted);border:1px solid var(--border)}
+      .nav-brand .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .nav-mid{display:flex;gap:22px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-2)}
+      .nav-mid a:hover{color:var(--text)}
+      .nav-right{display:flex;align-items:center;gap:16px;font-size:13px;color:var(--text-2)}
+      .nav-right a:hover{color:var(--text)}
+      .nav-right .aiad{display:flex;align-items:center;gap:6px;color:var(--text-muted)}
+      @media(max-width:640px){.nav-mid{display:none}.store-nav{padding:12px 16px}}
+      /* Hero */
+      .hero{max-width:1200px;margin:0 auto;padding:56px 24px 30px;text-align:center}
+      .hero .eyebrow{font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--text-muted);margin-bottom:14px}
+      .hero h1{font-size:clamp(2.2rem,6vw,3.4rem);font-weight:800;letter-spacing:-0.02em;line-height:1.02}
+      .hero .tag{margin-top:12px;color:var(--text-2);font-size:15px;max-width:560px;margin-left:auto;margin-right:auto}
+      /* Filters */
+      .filters{display:flex;justify-content:center;flex-wrap:wrap;gap:8px;padding:8px 24px 34px}
+      .filters button{background:transparent;color:var(--text-2);border:1px solid var(--border-2);border-radius:999px;
+        padding:8px 18px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;cursor:pointer;font-family:inherit;transition:.15s}
+      .filters button:hover{color:var(--text)}
+      .filters button.active{background:var(--text);color:#000;border-color:var(--text)}
+      /* Grid */
+      .grid{max-width:1200px;margin:0 auto;padding:0 24px 80px;display:grid;
+        grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:26px 20px}
+      .card{cursor:pointer;display:flex;flex-direction:column}
+      .card .imgwrap{position:relative;aspect-ratio:3/4;border-radius:12px;overflow:hidden;background:var(--bg-card);border:1px solid var(--border)}
+      .card .imgwrap img{width:100%;height:100%;object-fit:cover;transition:transform .5s ease}
+      .card:hover .imgwrap img{transform:scale(1.045)}
+      .card .badge{position:absolute;top:12px;left:12px;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);
+        color:#fff;font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:4px 9px;border-radius:6px;font-weight:600}
+      .card .soldout{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+        background:rgba(10,10,10,0.55);color:#fff;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700}
+      .card .imgempty{width:100%;height:100%;background:linear-gradient(135deg,#0d2f3f,#1a1030)}
+      .card .nm{margin-top:12px;font-size:15px;font-weight:600;letter-spacing:.01em}
+      .card .kd{margin-top:3px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted)}
+      .card .pr{margin-top:6px;font-size:14px;color:var(--text-2)}
+      .empty{max-width:1200px;margin:0 auto;padding:60px 24px 100px;text-align:center;color:var(--text-muted);font-size:15px}
+      /* Footer */
+      .store-foot{border-top:1px solid var(--border);padding:26px 24px 42px;display:flex;flex-wrap:wrap;gap:12px 20px;
+        align-items:center;justify-content:center;color:var(--text-muted);font-size:12.5px}
+      .store-foot a{color:var(--text-2)}.store-foot a:hover{color:var(--text)}
+      /* Product modal */
+      .ov{position:fixed;inset:0;z-index:60;background:rgba(4,4,7,0.82);backdrop-filter:blur(8px);
+        display:none;align-items:center;justify-content:center;padding:20px}
+      .ov.open{display:flex}
+      .sheet{background:var(--bg-2);border:1px solid var(--border);border-radius:18px;width:100%;max-width:920px;
+        max-height:92vh;overflow:auto;display:grid;grid-template-columns:1.1fr 1fr}
+      @media(max-width:760px){.sheet{grid-template-columns:1fr;max-height:94vh}}
+      .sheet .gallery{padding:16px}
+      .sheet .main-img{aspect-ratio:3/4;border-radius:12px;overflow:hidden;background:var(--bg-card);border:1px solid var(--border)}
+      .sheet .main-img img{width:100%;height:100%;object-fit:cover}
+      .sheet .thumbs{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+      .sheet .thumbs img{width:56px;height:70px;object-fit:cover;border-radius:8px;cursor:pointer;border:1px solid var(--border);opacity:.7}
+      .sheet .thumbs img.sel,.sheet .thumbs img:hover{opacity:1;border-color:var(--text)}
+      .sheet .info{padding:26px 26px 26px 8px;display:flex;flex-direction:column}
+      @media(max-width:760px){.sheet .info{padding:6px 20px 24px}}
+      .sheet .cls{position:absolute;top:16px;right:18px;background:none;border:none;color:var(--text-2);font-size:26px;line-height:1;cursor:pointer}
+      .sheet h2{font-size:1.5rem;font-weight:700;letter-spacing:-0.01em}
+      .sheet .p-kind{margin-top:6px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted)}
+      .sheet .p-price{margin-top:14px;font-size:1.35rem;font-weight:700}
+      .sheet .p-desc{margin-top:14px;color:var(--text-2);font-size:14px;line-height:1.6;white-space:pre-wrap}
+      .sheet .p-stock{margin-top:10px;font-size:12px;color:var(--text-muted)}
+      .qtyrow{display:flex;align-items:center;gap:12px;margin-top:20px}
+      .qtyrow .qbtn{width:34px;height:34px;border-radius:8px;border:1px solid var(--border-2);background:transparent;color:#fff;font-size:18px;cursor:pointer}
+      .qtyrow .qv{min-width:26px;text-align:center;font-size:15px}
+      .buy{margin-top:20px;width:100%;background:linear-gradient(135deg,var(--teal-light),var(--teal-dark));color:#001018;
+        border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit}
+      .buy:disabled{opacity:.55;cursor:not-allowed}
+      .buy-note{margin-top:10px;font-size:12px;color:var(--text-muted);text-align:center;min-height:14px}
+      .state{max-width:640px;margin:0 auto;padding:100px 24px;text-align:center;color:var(--text-muted);font-size:15px}
+      .state a{color:var(--teal-light)}
+    </style>
+</head>
+<body>
+    <nav class="store-nav">
+      <a class="nav-brand" id="navBrand" href="#"><span class="av" id="navAv"></span><span class="nm" id="navName">Store</span></a>
+      <div class="nav-mid"><a href="#" id="navShop">Shop</a></div>
+      <div class="nav-right">
+        <a id="navProfile" href="#">Profile</a>
+        <a class="aiad" href="/">Powered by AIAD</a>
+      </div>
+    </nav>
+
+    <div id="root">
+      <div class="state">Loading store…</div>
+    </div>
+
+    <!-- Product quick-view -->
+    <div class="ov" id="ov">
+      <div class="sheet" style="position:relative">
+        <button class="cls" id="ovClose" aria-label="Close">&times;</button>
+        <div class="gallery">
+          <div class="main-img"><img id="ovMain" src="" alt=""></div>
+          <div class="thumbs" id="ovThumbs"></div>
+        </div>
+        <div class="info">
+          <h2 id="ovName"></h2>
+          <div class="p-kind" id="ovKind"></div>
+          <div class="p-price" id="ovPrice"></div>
+          <div class="p-stock" id="ovStock"></div>
+          <div class="p-desc" id="ovDesc"></div>
+          <div class="qtyrow" id="ovQtyRow" style="display:none">
+            <button class="qbtn" id="qMinus">−</button>
+            <span class="qv" id="qVal">1</span>
+            <button class="qbtn" id="qPlus">+</button>
+          </div>
+          <button class="buy" id="ovBuy">Buy now</button>
+          <div class="buy-note" id="ovNote"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const SUPABASE_URL = 'https://uapiytquwuhtewqieegx.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhcGl5dHF1d3VodGV3cWllZWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NzcwMTksImV4cCI6MjA4OTI1MzAxOX0.BLs2RdStghm0_cF8t70cBTX1GWcowGRwID7TAG8Mg38';
+      const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+
+      const esc = (s) => (s == null ? '' : String(s).replace(/[&<>"']/g, c =>
+        ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])));
+
+      function getUsername() {
+        const parts = location.pathname.split('/').filter(Boolean);
+        const i = parts.indexOf('store');
+        if (i !== -1 && parts[i + 1]) return decodeURIComponent(parts[i + 1]);
+        return new URLSearchParams(location.search).get('u') || '';
+      }
+      function fmtMoney(amt, cur) {
+        const n = Number(amt);
+        if (!Number.isFinite(n)) return '';
+        try { return n.toLocaleString(undefined, { style:'currency', currency:(cur||'usd').toUpperCase() }); }
+        catch (e) { return '$' + n.toFixed(2); }
+      }
+      function storedSession() {
+        const key = 'sb-uapiytquwuhtewqieegx-auth-token';
+        for (const store of [window.localStorage, window.sessionStorage]) {
+          try {
+            const raw = store.getItem(key); if (!raw) continue;
+            const p = JSON.parse(raw);
+            const t = p?.access_token || p?.currentSession?.access_token;
+            if (t) return t;
+          } catch (e) {}
+        }
+        return null;
+      }
+      const imagesOf = (pr) => (Array.isArray(pr.images) && pr.images.length) ? pr.images : (pr.image_url ? [pr.image_url] : []);
+
+      let PROFILE = null, PRODUCTS = [], FILTER = 'all', CUR = null, QTY = 1;
+
+      function notFound(u) {
+        document.getElementById('root').innerHTML =
+          `<div class="state">No store found for <strong>@${esc(u)}</strong>.<br/><br/><a href="/">← Back to AIAD</a></div>`;
+      }
+
+      function kindsPresent() {
+        const set = new Set(PRODUCTS.map(p => p.product_kind === 'physical' ? 'merch' : 'digital'));
+        return set;
+      }
+
+      function render() {
+        const p = PROFILE;
+        const name = p.display_name || ('@' + p.username);
+        // nav
+        document.getElementById('navName').textContent = name;
+        const av = document.getElementById('navAv');
+        if (p.avatar_url) { av.innerHTML = `<img src="${esc(p.avatar_url)}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover">`; }
+        else { av.textContent = name.charAt(0).toUpperCase(); }
+        document.getElementById('navBrand').href = '/artist/' + encodeURIComponent(p.username);
+        document.getElementById('navProfile').href = '/artist/' + encodeURIComponent(p.username);
+        document.getElementById('navShop').href = '#';
+        document.title = `${name} — Store`;
+
+        const kinds = kindsPresent();
+        const tabs = ['<button data-f="all" class="active">All</button>'];
+        if (kinds.has('merch')) tabs.push('<button data-f="merch">Merch</button>');
+        if (kinds.has('digital')) tabs.push('<button data-f="digital">Digital</button>');
+        const filtersHtml = (tabs.length > 2) ? `<div class="filters">${tabs.join('')}</div>` : '';
+
+        document.getElementById('root').innerHTML = `
+          <header class="hero">
+            <div class="eyebrow">Official Store</div>
+            <h1>${esc(name)}</h1>
+            ${p.tagline ? `<p class="tag">${esc(p.tagline)}</p>` : ''}
+          </header>
+          ${filtersHtml}
+          <div id="gridHost"></div>
+          <footer class="store-foot">
+            <span>© 2026 AIAD Studio Inc.</span>
+            <a href="/about">About</a><a href="/contact">Contact</a>
+            <a href="/privacy">Privacy</a><a href="/terms">Terms</a>
+            <a href="/artist/${encodeURIComponent(p.username)}">← ${esc(name)} profile</a>
+          </footer>`;
+
+        document.querySelectorAll('.filters button').forEach(b => b.addEventListener('click', () => {
+          FILTER = b.dataset.f;
+          document.querySelectorAll('.filters button').forEach(x => x.classList.toggle('active', x === b));
+          renderGrid();
+        }));
+        renderGrid();
+      }
+
+      function visibleProducts() {
+        if (FILTER === 'all') return PRODUCTS;
+        const want = FILTER === 'merch' ? 'physical' : 'digital';
+        return PRODUCTS.filter(p => (p.product_kind || 'digital') === want);
+      }
+
+      function renderGrid() {
+        const host = document.getElementById('gridHost');
+        const rows = visibleProducts();
+        if (!rows.length) { host.innerHTML = `<div class="empty">Nothing here yet — check back soon.</div>`; return; }
+        host.innerHTML = `<div class="grid">${rows.map((pr, i) => {
+          const imgs = imagesOf(pr);
+          const soldOut = pr.product_kind === 'physical' && pr.inventory !== null && pr.inventory !== undefined && pr.inventory <= 0;
+          const cover = imgs.length ? `<img src="${esc(imgs[0])}" alt="${esc(pr.name)}" loading="lazy">` : `<div class="imgempty"></div>`;
+          const kind = pr.product_kind === 'physical' ? 'Physical' : 'Digital';
+          return `<div class="card" data-i="${PRODUCTS.indexOf(pr)}">
+            <div class="imgwrap">${cover}
+              ${imgs.length > 1 ? `<span class="badge">${imgs.length} photos</span>` : ''}
+              ${soldOut ? `<div class="soldout">Sold out</div>` : ''}
+            </div>
+            <div class="nm">${esc(pr.name)}</div>
+            <div class="kd">${kind}</div>
+            <div class="pr">${fmtMoney(pr.price, pr.currency)}</div>
+          </div>`;
+        }).join('')}</div>`;
+        host.querySelectorAll('.card').forEach(c => c.addEventListener('click', () => openProduct(PRODUCTS[+c.dataset.i])));
+      }
+
+      // ── Product quick-view ──
+      let CURRENT = null;
+      function openProduct(pr) {
+        CURRENT = pr; QTY = 1;
+        const imgs = imagesOf(pr);
+        document.getElementById('ovName').textContent = pr.name || '';
+        document.getElementById('ovKind').textContent = pr.product_kind === 'physical' ? 'Physical item' : 'Digital download';
+        document.getElementById('ovPrice').textContent = fmtMoney(pr.price, pr.currency);
+        document.getElementById('ovDesc').textContent = pr.description || '';
+        const soldOut = pr.product_kind === 'physical' && pr.inventory !== null && pr.inventory !== undefined && pr.inventory <= 0;
+        const stock = document.getElementById('ovStock');
+        stock.textContent = pr.product_kind === 'physical'
+          ? (pr.inventory === null || pr.inventory === undefined ? '' : (soldOut ? 'Sold out' : pr.inventory + ' in stock'))
+          : '';
+        const main = document.getElementById('ovMain');
+        main.src = imgs[0] || '';
+        main.style.display = imgs.length ? 'block' : 'none';
+        const thumbs = document.getElementById('ovThumbs');
+        thumbs.innerHTML = imgs.map((u, i) => `<img src="${esc(u)}" data-u="${esc(u)}" class="${i===0?'sel':''}" alt="">`).join('');
+        thumbs.querySelectorAll('img').forEach(t => t.addEventListener('click', () => {
+          main.src = t.dataset.u;
+          thumbs.querySelectorAll('img').forEach(x => x.classList.toggle('sel', x === t));
+        }));
+        document.getElementById('ovQtyRow').style.display = (pr.product_kind === 'physical' && !soldOut) ? 'flex' : 'none';
+        document.getElementById('qVal').textContent = '1';
+        const buy = document.getElementById('ovBuy');
+        buy.disabled = !!soldOut; buy.textContent = soldOut ? 'Sold out' : 'Buy now';
+        document.getElementById('ovNote').textContent = '';
+        document.getElementById('ov').classList.add('open');
+      }
+      function closeOv(){ document.getElementById('ov').classList.remove('open'); }
+      document.getElementById('ovClose').addEventListener('click', closeOv);
+      document.getElementById('ov').addEventListener('click', e => { if (e.target.id === 'ov') closeOv(); });
+      document.addEventListener('keydown', e => { if (e.key === 'Escape') closeOv(); });
+      document.getElementById('qMinus').addEventListener('click', () => { QTY = Math.max(1, QTY-1); document.getElementById('qVal').textContent = QTY; });
+      document.getElementById('qPlus').addEventListener('click', () => { QTY = QTY+1; document.getElementById('qVal').textContent = QTY; });
+
+      document.getElementById('ovBuy').addEventListener('click', async () => {
+        if (!CURRENT) return;
+        const token = storedSession();
+        const note = document.getElementById('ovNote');
+        if (!token) {
+          note.textContent = 'Sign in to your AIAD account to buy.';
+          setTimeout(() => { window.location.href = '/'; }, 1100);
+          return;
+        }
+        const buy = document.getElementById('ovBuy');
+        buy.disabled = true; buy.textContent = 'Opening checkout…';
+        try {
+          const res = await fetch(`${SUPABASE_URL}/functions/v1/store-checkout`, {
+            method:'POST',
+            headers:{ 'Content-Type':'application/json', 'Authorization':`Bearer ${token}`, 'apikey':SUPABASE_ANON_KEY },
+            body: JSON.stringify({ product_id: CURRENT.id, quantity: QTY }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error || `Checkout failed (${res.status})`);
+          if (!data.url) throw new Error('No checkout link returned');
+          window.location.href = data.url;
+        } catch (e) {
+          note.textContent = e.message;
+          buy.disabled = false; buy.textContent = 'Buy now';
+        }
+      });
+
+      (async function () {
+        const username = getUsername();
+        if (!username) return notFound('');
+        try {
+          const { data, error } = await db.rpc('public_artist_profile', { p_username: username });
+          if (error || !data) return notFound(username);
+          PROFILE = data;
+          const { data: prods } = await db.from('products')
+            .select('id,name,description,price,currency,product_kind,image_url,images,inventory')
+            .eq('artist_id', data.id).eq('is_active', true)
+            .order('created_at', { ascending: false });
+          PRODUCTS = Array.isArray(prods) ? prods : [];
+          render();
+        } catch (e) { notFound(username); }
+      })();
+    </script>
+</body>
+</html>
