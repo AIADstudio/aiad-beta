@@ -4954,6 +4954,14 @@ html, body {
                         </button>
                     </div>
 
+                    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px;">
+                      <div style="flex:1;min-width:200px;">
+                        <label style="display:block;font-size:0.72rem;color:var(--text-muted);margin-bottom:3px;">Store name <span style="opacity:.7;">(shown on your public store)</span></label>
+                        <input id="storeTitleInput" style="width:100%;box-sizing:border-box;background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.9rem;" placeholder="Your store name">
+                      </div>
+                      <button class="artist-action-btn" onclick="saveStoreTitle()">Save name</button>
+                      <a class="artist-action-btn" id="storeViewLink" href="#" target="_blank" rel="noopener">View store ↗</a>
+                    </div>
                     <!-- Shown only when payouts aren't set up: without Connect, checkout fails. -->
                     <div id="storeOnboardBanner" style="display:none;margin-bottom:16px;"></div>
 
@@ -26950,12 +26958,30 @@ Be direct and concrete with real industry insight — never generic filler. When
     }
 
     // ── Store manager (artist) ─────────────────────────────────────────────
+    window.saveStoreTitle = async function () {
+        const me = await uid(); if (!me) return;
+        const v = (document.getElementById('storeTitleInput')?.value || '').trim();
+        const { error } = await window.db.from('artist_profiles').update({ store_title: v || null }).eq('user_id', me);
+        if (error) { toast('Could not save: ' + error.message); return; }
+        toast('Store name saved');
+    };
+
     async function loadStoreManager() {
         const grid = document.getElementById('storeProductsGrid');
         if (!grid) return;
         grid.innerHTML = '<div style="grid-column:1/-1;color:var(--text-muted);font-size:0.85rem;padding:20px;text-align:center;">Loading your products…</div>';
         const me = await uid();
         if (!me) { grid.innerHTML = '<div style="grid-column:1/-1;color:var(--text-muted);font-size:0.85rem;padding:20px;text-align:center;">Sign in to manage your store.</div>'; return; }
+        try {
+            const [{ data: prof }, { data: ap }] = await Promise.all([
+                window.db.from('profiles').select('username').eq('id', me).maybeSingle(),
+                window.db.from('artist_profiles').select('store_title').eq('user_id', me).maybeSingle(),
+            ]);
+            const ti = document.getElementById('storeTitleInput');
+            if (ti) ti.value = (ap && ap.store_title) || '';
+            const link = document.getElementById('storeViewLink');
+            if (link && prof && prof.username) link.href = '/store/' + encodeURIComponent(prof.username);
+        } catch (e) {}
 
         const { data, error } = await window.db.from('products')
             .select('*').eq('artist_id', me).order('created_at', { ascending: false });
@@ -27074,7 +27100,10 @@ Be direct and concrete with real industry insight — never generic filler. When
           + '<input type="file" id="prodFile" style="' + inputCss + '">'
           + '<div id="prodFileCurrent" style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;">' + (p.digital_file_url ? 'Current: ' + esc(p.digital_file_url) : 'No file uploaded yet') + '</div></div>'
           + '<div id="prodStockWrap"><label style="' + labelCss + '">Inventory <span style="opacity:0.7;">(blank = unlimited)</span></label>'
-          + '<input id="prodStock" inputmode="numeric" style="' + inputCss + '" value="' + esc(p.inventory === null || p.inventory === undefined ? '' : p.inventory) + '" placeholder="50"></div>'
+          + '<input id="prodStock" inputmode="numeric" style="' + inputCss + '" value="' + esc(p.inventory === null || p.inventory === undefined ? '' : p.inventory) + '" placeholder="50">'
+          + '<label style="' + labelCss + '">Sizes <span style="opacity:0.7;">(comma-separated, optional)</span></label><input id="prodSizes" style="' + inputCss + '" value="' + esc(Array.isArray(p.sizes) ? p.sizes.join(', ') : '') + '" placeholder="S, M, L, XL">'
+          + '<label style="' + labelCss + '">Colors <span style="opacity:0.7;">(comma-separated, optional)</span></label><input id="prodColors" style="' + inputCss + '" value="' + esc(Array.isArray(p.colors) ? p.colors.join(', ') : '') + '" placeholder="Black, Red, Cream">'
+          + '<label style="' + labelCss + '">Details <span style="opacity:0.7;">(one per line \u2014 Label: Value)</span></label><textarea id="prodDetails" rows="3" style="' + inputCss + '" placeholder="Fabric: 100% nylon">' + esc(Array.isArray(p.details) ? p.details.map(function(d){return (d && d.label ? d.label : '') + ': ' + (d && d.value ? d.value : '');}).join('\n') : '') + '</textarea></div>'
           + '<label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:0.85rem;cursor:pointer;"><input type="checkbox" id="prodActive"' + (p.is_active ? ' checked' : '') + '> Visible in your storefront</label>'
           + '<div id="prodMsg" style="font-size:0.78rem;color:#f59e0b;min-height:16px;margin-top:8px;"></div>'
           + '<div class="project-detail-actions" style="margin-top:10px;"><button class="secondary" onclick="closeModal()">Cancel</button>'
@@ -27141,6 +27170,12 @@ Be direct and concrete with real industry insight — never generic filler. When
         input.value = '';
     };
 
+    const parseList = (s) => (s || '').split(',').map(x => x.trim()).filter(Boolean);
+    const parseDetails = (s) => (s || '').split('\n').map((line) => {
+        const i = line.indexOf(':');
+        if (i === -1) { const t = line.trim(); return t ? { label: '', value: t } : null; }
+        return { label: line.slice(0, i).trim(), value: line.slice(i + 1).trim() };
+    }).filter((d) => d && (d.label || d.value));
     window.saveProduct = async function () {
         const btn = document.getElementById('prodSaveBtn');
         const msg = document.getElementById('prodMsg');
@@ -27168,6 +27203,9 @@ Be direct and concrete with real industry insight — never generic filler. When
                 is_active: !!document.getElementById('prodActive')?.checked,
                 // Inventory is meaningless for a digital file; blank means unlimited.
                 inventory: kind === 'physical' && val('prodStock') !== '' ? parseInt(val('prodStock'), 10) : null,
+                sizes: parseList(val('prodSizes')),
+                colors: parseList(val('prodColors')),
+                details: parseDetails(val('prodDetails')),
                 updated_at: new Date().toISOString(),
             };
 

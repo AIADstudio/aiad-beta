@@ -87,6 +87,16 @@
       .sheet .p-kind{margin-top:6px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted)}
       .sheet .p-price{margin-top:14px;font-size:1.35rem;font-weight:700}
       .sheet .p-desc{margin-top:14px;color:var(--text-2);font-size:14px;line-height:1.6;white-space:pre-wrap}
+      .sheet .p-details{margin-top:14px;display:flex;flex-direction:column;gap:6px}
+      .sheet .p-details .row{display:flex;justify-content:space-between;gap:16px;font-size:13px;border-top:1px solid var(--border);padding-top:6px}
+      .sheet .p-details .row .k{color:var(--text-muted)}
+      .sheet .p-details .row .v{color:var(--text-2);text-align:right}
+      .sheet .p-opts{margin-top:16px}
+      .sheet .p-opt-group{margin-top:12px}
+      .sheet .p-opt-label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:7px}
+      .sheet .chips{display:flex;flex-wrap:wrap;gap:8px}
+      .sheet .chip{border:1px solid var(--border-2);background:transparent;color:var(--text);border-radius:8px;padding:8px 15px;font-size:13px;cursor:pointer;font-family:inherit}
+      .sheet .chip.sel{background:var(--text);color:#000;border-color:var(--text)}
       .sheet .p-stock{margin-top:10px;font-size:12px;color:var(--text-muted)}
       .qtyrow{display:flex;align-items:center;gap:12px;margin-top:20px}
       .qtyrow .qbtn{width:34px;height:34px;border-radius:8px;border:1px solid var(--border-2);background:transparent;color:#fff;font-size:18px;cursor:pointer}
@@ -125,6 +135,8 @@
           <h2 id="ovName"></h2>
           <div class="p-price" id="ovPrice"></div>
           <div class="p-desc" id="ovDesc"></div>
+          <div class="p-details" id="ovDetails"></div>
+          <div class="p-opts" id="ovOptions"></div>
           <div class="qtyrow" id="ovQtyRow" style="display:none">
             <button class="qbtn" id="qMinus">−</button>
             <span class="qv" id="qVal">1</span>
@@ -185,15 +197,16 @@
       function render() {
         const p = PROFILE;
         const name = p.display_name || ('@' + p.username);
+        const storeTitle = (p.store_title && p.store_title.trim()) || name;
         // nav
-        document.getElementById('navName').textContent = name;
+        document.getElementById('navName').textContent = storeTitle;
         const av = document.getElementById('navAv');
         if (p.avatar_url) { av.innerHTML = `<img src="${esc(p.avatar_url)}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover">`; }
         else { av.textContent = name.charAt(0).toUpperCase(); }
         document.getElementById('navBrand').href = '/artist/' + encodeURIComponent(p.username);
         document.getElementById('navProfile').href = '/artist/' + encodeURIComponent(p.username);
         document.getElementById('navShop').href = '#';
-        document.title = `${name} — Store`;
+        document.title = `${storeTitle} — Store`;
 
         const kinds = kindsPresent();
         const tabs = ['<button data-f="all" class="active">All</button>'];
@@ -204,7 +217,7 @@
         document.getElementById('root').innerHTML = `
           <header class="hero">
             <div class="eyebrow">Official Store</div>
-            <h1>${esc(name)}</h1>
+            <h1>${esc(storeTitle)}</h1>
             ${p.tagline ? `<p class="tag">${esc(p.tagline)}</p>` : ''}
           </header>
           ${filtersHtml}
@@ -251,13 +264,31 @@
       }
 
       // ── Product quick-view ──
-      let CURRENT = null;
+      let CURRENT = null, SEL = { size: null, color: null };
       function openProduct(pr) {
         CURRENT = pr; QTY = 1;
         const imgs = imagesOf(pr);
         document.getElementById('ovName').textContent = pr.name || '';
         document.getElementById('ovPrice').textContent = fmtMoney(pr.price, pr.currency);
         document.getElementById('ovDesc').textContent = pr.description || '';
+        SEL = { size: null, color: null };
+        const sizes = Array.isArray(pr.sizes) ? pr.sizes : [];
+        const colors = Array.isArray(pr.colors) ? pr.colors : [];
+        const details = Array.isArray(pr.details) ? pr.details : [];
+        window._selSizes = sizes; window._selColors = colors;
+        document.getElementById('ovDetails').innerHTML = details.filter((d) => d && d.value).map((d) =>
+          `<div class="row"><span class="k">${esc(d.label || '')}</span><span class="v">${esc(d.value)}</span></div>`).join('');
+        const grp = (label, arr, key) => '<div class="p-opt-group"><div class="p-opt-label">' + label + '</div><div class="chips">'
+          + arr.map((v) => `<button type="button" class="chip" data-g="${key}" data-v="${esc(v)}">${esc(v)}</button>`).join('') + '</div></div>';
+        let optsHtml = '';
+        if (sizes.length) optsHtml += grp('Size', sizes, 'size');
+        if (colors.length) optsHtml += grp('Color', colors, 'color');
+        const ovOpts = document.getElementById('ovOptions');
+        ovOpts.innerHTML = optsHtml;
+        ovOpts.querySelectorAll('.chip').forEach((c) => c.addEventListener('click', () => {
+          const g = c.dataset.g; SEL[g] = c.dataset.v;
+          ovOpts.querySelectorAll('.chip[data-g="' + g + '"]').forEach((x) => x.classList.toggle('sel', x === c));
+        }));
         const soldOut = pr.product_kind === 'physical' && pr.inventory !== null && pr.inventory !== undefined && pr.inventory <= 0;
         const main = document.getElementById('ovMain');
         main.src = imgs[0] || '';
@@ -286,6 +317,8 @@
         if (!CURRENT) return;
         const token = storedSession();
         const note = document.getElementById('ovNote');
+        if ((window._selSizes || []).length && !SEL.size) { note.textContent = 'Please select a size.'; return; }
+        if ((window._selColors || []).length && !SEL.color) { note.textContent = 'Please select a color.'; return; }
         if (!token) {
           note.textContent = 'Sign in to your AIAD account to buy.';
           setTimeout(() => { window.location.href = '/'; }, 1100);
@@ -297,7 +330,7 @@
           const res = await fetch(`${SUPABASE_URL}/functions/v1/store-checkout`, {
             method:'POST',
             headers:{ 'Content-Type':'application/json', 'Authorization':`Bearer ${token}`, 'apikey':SUPABASE_ANON_KEY },
-            body: JSON.stringify({ product_id: CURRENT.id, quantity: QTY }),
+            body: JSON.stringify({ product_id: CURRENT.id, quantity: QTY, variant: { size: SEL.size || null, color: SEL.color || null } }),
           });
           const data = await res.json().catch(() => ({}));
           if (!res.ok) throw new Error(data.error || `Checkout failed (${res.status})`);
@@ -317,7 +350,7 @@
           if (error || !data) return notFound(username);
           PROFILE = data;
           const { data: prods } = await db.from('products')
-            .select('id,name,description,price,currency,product_kind,image_url,images,inventory')
+            .select('id,name,description,price,currency,product_kind,image_url,images,inventory,sizes,colors,details')
             .eq('artist_id', data.id).eq('is_active', true)
             .order('created_at', { ascending: false });
           PRODUCTS = Array.isArray(prods) ? prods : [];
