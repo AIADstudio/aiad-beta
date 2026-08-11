@@ -27125,7 +27125,7 @@ Be direct and concrete with real industry insight — never generic filler. When
             try {
                 if (status) status.textContent = 'Uploading ' + file.name + '\u2026';
                 const path = me + '/products/' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '_' + file.name.replace(/[^\w.\-]+/g, '_');
-                const { error: upErr } = await window.db.storage.from('artist-media').upload(path, file, { upsert: true, contentType: file.type });
+                const { error: upErr } = await window.db.storage.from('artist-media').upload(path, file, { upsert: false, contentType: file.type });
                 if (upErr) throw new Error(upErr.message);
                 const { data: urlData } = window.db.storage.from('artist-media').getPublicUrl(path);
                 const url = (urlData && urlData.publicUrl) || '';
