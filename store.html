@@ -189,9 +189,14 @@
           `<div class="state">No store found for <strong>@${esc(u)}</strong>.<br/><br/><a href="/">← Back to AIAD</a></div>`;
       }
 
-      function kindsPresent() {
-        const set = new Set(PRODUCTS.map(p => p.product_kind === 'physical' ? 'merch' : 'digital'));
-        return set;
+      const STORE_CATEGORIES = ['T-Shirts','Hoodies & Sweats','Hats & Beanies','Jackets & Outerwear','Bottoms','Footwear','Accessories','Luxury','Basics','Vinyl & Music','Digital','Other'];
+      function categoriesPresent() {
+        const set = new Set();
+        PRODUCTS.forEach(p => { const c = (p.category || '').trim(); if (c) set.add(c); });
+        return [...set].sort((a, b) => {
+          const ia = STORE_CATEGORIES.indexOf(a), ib = STORE_CATEGORIES.indexOf(b);
+          return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+        });
       }
 
       function render() {
@@ -208,17 +213,14 @@
         document.getElementById('navShop').href = '#';
         document.title = `${storeTitle} — Store`;
 
-        const kinds = kindsPresent();
-        const tabs = ['<button data-f="all" class="active">All</button>'];
-        if (kinds.has('merch')) tabs.push('<button data-f="merch">Merch</button>');
-        if (kinds.has('digital')) tabs.push('<button data-f="digital">Digital</button>');
-        const filtersHtml = (tabs.length > 2) ? `<div class="filters">${tabs.join('')}</div>` : '';
+        const cats = categoriesPresent();
+        const tabs = ['<button data-f="all" class="active">All</button>'].concat(cats.map((c) => `<button data-f="${esc(c)}">${esc(c)}</button>`));
+        const filtersHtml = (cats.length >= 2) ? `<div class="filters">${tabs.join('')}</div>` : '';
 
         document.getElementById('root').innerHTML = `
           <header class="hero">
             <div class="eyebrow">Official Store</div>
             <h1>${esc(storeTitle)}</h1>
-            ${p.tagline ? `<p class="tag">${esc(p.tagline)}</p>` : ''}
           </header>
           ${filtersHtml}
           <div id="gridHost"></div>
@@ -239,8 +241,7 @@
 
       function visibleProducts() {
         if (FILTER === 'all') return PRODUCTS;
-        const want = FILTER === 'merch' ? 'physical' : 'digital';
-        return PRODUCTS.filter(p => (p.product_kind || 'digital') === want);
+        return PRODUCTS.filter(p => (p.category || '') === FILTER);
       }
 
       function renderGrid() {
@@ -350,7 +351,7 @@
           if (error || !data) return notFound(username);
           PROFILE = data;
           const { data: prods } = await db.from('products')
-            .select('id,name,description,price,currency,product_kind,image_url,images,inventory,sizes,colors,details')
+            .select('id,name,description,price,currency,product_kind,image_url,images,inventory,sizes,colors,details,category')
             .eq('artist_id', data.id).eq('is_active', true)
             .order('created_at', { ascending: false });
           PRODUCTS = Array.isArray(prods) ? prods : [];

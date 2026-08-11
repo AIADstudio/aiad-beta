@@ -192,6 +192,7 @@
 
       let POSTS = [];
       let ARTIST_NAME = '';
+      let ARTIST_ID = '', FOLLOWER_COUNT = 0;
       function tile(post, idx) {
         const cap = esc(post.content || '');
         const capBar = cap ? `<div class="cap">${cap}</div>` : '';
@@ -284,6 +285,10 @@
                 ${p.industry ? `<span>· ${esc(p.industry)}</span>` : ''}
                 ${p.founding_number != null ? `<span class="founding">Founding Artist #${esc(p.founding_number)}</span>` : ''}
               </div>
+              <div style="margin-top:12px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+                <button id="followBtn" onclick="toggleFollow(this)" data-following="0" style="background:linear-gradient(135deg,var(--teal-light),var(--teal-dark));color:#001018;font-weight:600;font-size:13px;padding:8px 22px;border-radius:999px;border:none;cursor:pointer;font-family:inherit;">Follow</button>
+                <span id="followerCount" style="color:var(--text-muted);font-size:13px;"></span>
+              </div>
             </div>
           </div>
           <div id="storefront"></div>
@@ -294,6 +299,9 @@
 
         // Instagram-style: clicking any post opens a signup gate.
         ARTIST_NAME = name;
+        ARTIST_ID = p.id;
+        FOLLOWER_COUNT = Number(p.follower_count) || 0;
+        refreshFollow();
         root.querySelectorAll('.post').forEach((el) => el.addEventListener('click', openSignup));
 
         loadStorefront(p.id, p.username, name);
@@ -337,6 +345,42 @@
       // shouldn't own auth state — so db.auth.getSession() is always null here. Read the
       // app's stored session directly instead. The main app keeps it in localStorage or
       // sessionStorage depending on its "remember me" setting, so check both.
+      function fmtFollowers(n) { n = Number(n) || 0; return n === 1 ? '1 follower' : n.toLocaleString() + ' followers'; }
+      function updateFollowerCount() { const el = document.getElementById('followerCount'); if (el) el.textContent = fmtFollowers(FOLLOWER_COUNT); }
+      function setFollowBtn(following) {
+        const b = document.getElementById('followBtn'); if (!b) return;
+        b.dataset.following = following ? '1' : '0';
+        b.textContent = following ? 'Following' : 'Follow';
+        if (following) { b.style.background = 'transparent'; b.style.color = 'var(--text-primary)'; b.style.border = '1px solid var(--border-default)'; }
+        else { b.style.background = 'linear-gradient(135deg,var(--teal-light),var(--teal-dark))'; b.style.color = '#001018'; b.style.border = 'none'; }
+      }
+      function jwtSub(t) { try { return JSON.parse(atob(t.split('.')[1])).sub; } catch (e) { return null; } }
+      async function refreshFollow() {
+        updateFollowerCount();
+        const token = storedSession(); if (!token) { setFollowBtn(false); return; }
+        const me = jwtSub(token); if (!me) { setFollowBtn(false); return; }
+        try {
+          const res = await fetch(`${SUPABASE_URL}/rest/v1/fan_support?select=id&fan_id=eq.${me}&artist_id=eq.${ARTIST_ID}&type=eq.follow`, { headers: { 'Authorization': 'Bearer ' + token, 'apikey': SUPABASE_ANON_KEY } });
+          const rows = await res.json().catch(() => []);
+          setFollowBtn(Array.isArray(rows) && rows.length > 0);
+        } catch (e) { setFollowBtn(false); }
+      }
+      window.toggleFollow = async function (btn) {
+        const token = storedSession(); if (!token) { openSignup(); return; }
+        const me = jwtSub(token); if (!me) { openSignup(); return; }
+        const following = btn.dataset.following === '1';
+        btn.disabled = true;
+        try {
+          if (following) {
+            await fetch(`${SUPABASE_URL}/rest/v1/fan_support?fan_id=eq.${me}&artist_id=eq.${ARTIST_ID}&type=eq.follow`, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token, 'apikey': SUPABASE_ANON_KEY } });
+            setFollowBtn(false); FOLLOWER_COUNT = Math.max(0, FOLLOWER_COUNT - 1); updateFollowerCount();
+          } else {
+            await fetch(`${SUPABASE_URL}/rest/v1/fan_support`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }, body: JSON.stringify({ fan_id: me, artist_id: ARTIST_ID, amount: 0, type: 'follow' }) });
+            setFollowBtn(true); FOLLOWER_COUNT++; updateFollowerCount();
+          }
+        } catch (e) { alert('Could not update follow'); }
+        btn.disabled = false;
+      };
       function storedSession() {
         const key = 'sb-uapiytquwuhtewqieegx-auth-token';
         for (const store of [window.localStorage, window.sessionStorage]) {

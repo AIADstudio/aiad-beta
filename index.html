@@ -22375,6 +22375,84 @@ function _buildDiscoverCard(a) {
 async function loadFanDiscover() { setTimeout(()=>_execDiscoverSearch(),100); }
 
 // ── Artist profile page ───────────────────────────────────────────────────
+        // ── Artist search + follow (dashboard top bar) ─────────────────────────
+        let _artistSearchTimer = null;
+        window.aiadDoArtistSearch = function (q) {
+            clearTimeout(_artistSearchTimer);
+            const box = document.getElementById('aiadArtistSearchResults');
+            q = (q || '').trim();
+            if (!q) { if (box) { box.style.display = 'none'; box.innerHTML = ''; } return; }
+            _artistSearchTimer = setTimeout(async () => {
+                try {
+                    const { data } = await db.rpc('list_artists', { p_search: q, p_limit: 8, p_genre: '' });
+                    const rows = Array.isArray(data) ? data : [];
+                    const unames = rows.map((r) => r.username).filter(Boolean);
+                    const idMap = {};
+                    if (unames.length) { const { data: pr } = await db.from('profiles').select('id,username,avatar_url').in('username', unames); (pr || []).forEach((p) => { idMap[p.username] = p; }); }
+                    const me = (window.AppState && AppState.currentUser) ? AppState.currentUser.id : null;
+                    const following = new Set();
+                    if (me) { try { const { data: fs } = await db.from('fan_support').select('artist_id').eq('fan_id', me); (fs || []).forEach((s) => following.add(s.artist_id)); } catch (e) {} }
+                    _renderArtistSearch(rows, idMap, following, me);
+                } catch (e) {}
+            }, 220);
+        };
+        function _renderArtistSearch(rows, idMap, following, me) {
+            const box = document.getElementById('aiadArtistSearchResults'); if (!box) return;
+            const e = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+            if (!rows.length) { box.innerHTML = '<div style="padding:16px;color:var(--text-muted);font-size:0.85rem;">No artists found</div>'; box.style.display = 'block'; return; }
+            box.innerHTML = rows.map((r) => {
+                const p = idMap[r.username] || {}; const id = p.id || ''; const name = r.name || r.username || 'Artist';
+                const av = r.avatar || p.avatar_url || ''; const isMe = id && id === me; const isF = following.has(id);
+                const jsName = e(JSON.stringify(name).slice(1, -1));
+                const avatar = (av && (av.indexOf('http') === 0 || av.indexOf('data:') === 0))
+                    ? '<img src="' + e(av) + '" style="width:38px;height:38px;border-radius:50%;object-fit:cover;flex-shrink:0;">'
+                    : '<div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#0d2f3f,#1a4a5e);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--teal-light);flex-shrink:0;">' + e(name.slice(0, 1).toUpperCase()) + '</div>';
+                const btn = (!id || isMe) ? '' : '<button id="afollow_' + id + '" onclick="event.stopPropagation();aiadToggleFollow(\'' + id + '\',\'' + jsName + '\',this)" style="padding:6px 14px;border-radius:8px;border:1px solid ' + (isF ? 'var(--teal)' : 'var(--border-default)') + ';background:' + (isF ? 'rgba(0,212,255,0.1)' : 'transparent') + ';color:' + (isF ? 'var(--teal-light)' : 'var(--text-primary)') + ';font-size:0.78rem;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:inherit;">' + (isF ? 'Following' : 'Follow') + '</button>';
+                const openAttr = id ? ' onclick="document.getElementById(\'aiadArtistSearchResults\').style.display=\'none\';loadArtistPage(\'' + id + '\')"' : '';
+                return '<div' + openAttr + ' style="display:flex;align-items:center;gap:12px;padding:11px 14px;cursor:' + (id ? 'pointer' : 'default') + ';border-bottom:1px solid var(--border-default);" onmouseover="this.style.background=\'rgba(255,255,255,0.03)\'" onmouseout="this.style.background=\'transparent\'">' + avatar + '<div style="flex:1;min-width:0;"><div style="font-weight:600;font-size:0.88rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + e(name) + '</div><div style="font-size:0.75rem;color:var(--text-muted);">@' + e(r.username || '') + '</div></div>' + btn + '</div>';
+            }).join('');
+            box.style.display = 'block';
+        }
+        window.aiadToggleFollow = async function (artistId, name, btn) {
+            const me = (window.AppState && AppState.currentUser) ? AppState.currentUser.id : null;
+            if (!me) { (window.showToast || alert)('Sign in to follow'); return; }
+            const isF = btn.textContent.trim() === 'Following';
+            btn.disabled = true;
+            try {
+                if (isF) {
+                    await db.from('fan_support').delete().eq('fan_id', me).eq('artist_id', artistId).eq('type', 'follow');
+                    btn.textContent = 'Follow'; btn.style.background = 'transparent'; btn.style.color = 'var(--text-primary)'; btn.style.borderColor = 'var(--border-default)';
+                } else {
+                    await db.from('fan_support').insert({ fan_id: me, artist_id: artistId, amount: 0, type: 'follow' });
+                    btn.textContent = 'Following'; btn.style.background = 'rgba(0,212,255,0.1)'; btn.style.color = 'var(--teal-light)'; btn.style.borderColor = 'var(--teal)';
+                    (window.showToast || function () {})('Following ' + name);
+                }
+            } catch (e) { (window.showToast || alert)('Could not update follow'); }
+            btn.disabled = false;
+        };
+        (function initArtistSearchBar() {
+            function ensure() {
+                const main = document.querySelector('#artistDashboard .dash-main');
+                if (!main || document.getElementById('aiadArtistSearchWrap')) return;
+                const bar = document.createElement('div');
+                bar.id = 'aiadArtistSearchWrap';
+                bar.style.cssText = 'position:relative;max-width:520px;margin:6px 0 18px;';
+                bar.innerHTML = '<input id="aiadArtistSearchInput" type="text" placeholder="Search artists by name or @username…" autocomplete="off" oninput="aiadDoArtistSearch(this.value)" style="width:100%;box-sizing:border-box;background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:10px;padding:11px 14px 11px 38px;font-size:0.9rem;outline:none;">'
+                    + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute;left:12px;top:12px;width:16px;height:16px;color:var(--text-muted);pointer-events:none;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>'
+                    + '<div id="aiadArtistSearchResults" style="display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:500;background:var(--bg-card);border:1px solid var(--border-default);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,0.5);max-height:420px;overflow-y:auto;"></div>';
+                const stats = main.querySelector('#liveStatsBar');
+                if (stats && stats.parentNode === main) main.insertBefore(bar, stats.nextSibling);
+                else main.insertBefore(bar, main.firstChild);
+            }
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ensure); else ensure();
+            setInterval(ensure, 2500);
+            document.addEventListener('click', function (ev) {
+                const w = document.getElementById('aiadArtistSearchWrap');
+                const box = document.getElementById('aiadArtistSearchResults');
+                if (w && box && !w.contains(ev.target)) box.style.display = 'none';
+            });
+        })();
+
 async function loadArtistPage(artistId) {
     if(!artistId) return;
     showFanView('artist');
@@ -27219,6 +27297,7 @@ Be direct and concrete with real industry insight — never generic filler. When
           + '<div><label style="' + labelCss + '">Type</label><select id="prodKind" style="' + inputCss + '" onchange="onProductKindChange()">'
           + '<option value="digital"' + (p.product_kind === 'digital' ? ' selected' : '') + '>Digital download</option>'
           + '<option value="physical"' + (p.product_kind === 'physical' ? ' selected' : '') + '>Physical item</option></select></div></div>'
+          + '<label style="' + labelCss + '">Category <span style="opacity:0.7;">(required)</span></label><select id="prodCategory" style="' + inputCss + '"><option value="">Select a category\u2026</option>' + ['T-Shirts','Hoodies & Sweats','Hats & Beanies','Jackets & Outerwear','Bottoms','Footwear','Accessories','Luxury','Basics','Vinyl & Music','Digital','Other'].map(function(c){ return '<option' + (p.category === c ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select>'
           + '<label style="' + labelCss + '">Product photos <span style="opacity:0.7;">(upload one or more \u2014 first is the cover)</span></label>'
           + '<input type="file" id="prodImageFiles" accept="image/*" multiple style="' + inputCss + '" onchange="addProductImages(this)">'
           + '<div id="prodImagesWrap" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;"></div>'
@@ -27314,6 +27393,8 @@ Be direct and concrete with real industry insight — never generic filler. When
         const price = Number(val('prodPrice').replace(/[^0-9.]/g, ''));
         if (!name) { msg.textContent = 'Give it a name.'; return; }
         if (!Number.isFinite(price) || price <= 0) { msg.textContent = 'Set a price above zero.'; return; }
+        const category = val('prodCategory');
+        if (!category) { msg.textContent = 'Pick a category.'; return; }
 
         btn.disabled = true; btn.textContent = 'Saving…'; msg.textContent = '';
         try {
@@ -27325,6 +27406,7 @@ Be direct and concrete with real industry insight — never generic filler. When
                 description: val('prodDesc') || null,
                 price: price,
                 product_kind: kind,
+                category: category,
                 image_url: (window._prodImages && window._prodImages[0]) || null,
                 images: window._prodImages || [],
                 is_active: !!document.getElementById('prodActive')?.checked,
