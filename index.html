@@ -4816,11 +4816,15 @@ html, body {
                                     <input type="text" id="syncTrackTitle" placeholder="Track name" style="background:transparent;border:none;outline:none;color:var(--text-primary);font-size:0.875rem;width:100%;font-family:inherit;">
                                 </div>
                                 <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:10px 14px;">
-                                    <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:4px;">License Price (USD)</div>
-                                    <input type="text" id="syncTrackPrice" placeholder="e.g. 299" style="background:transparent;border:none;outline:none;color:var(--text-primary);font-size:0.875rem;width:100%;font-family:inherit;">
+                                    <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:4px;">License Price (USD) <span style="text-transform:none;letter-spacing:0;opacity:0.7;">· optional</span></div>
+                                    <div style="display:flex;align-items:center;gap:8px;">
+                                        <input type="text" id="syncTrackPrice" placeholder="Leave blank or suggest" style="background:transparent;border:none;outline:none;color:var(--text-primary);font-size:0.875rem;flex:1;min-width:0;font-family:inherit;">
+                                        <button type="button" onclick="suggestSyncPriceMain()" style="flex-shrink:0;background:rgba(0,212,255,0.12);color:#00D4FF;border:1px solid rgba(0,212,255,0.3);border-radius:6px;padding:4px 9px;font-size:0.62rem;font-weight:700;cursor:pointer;white-space:nowrap;">✨ Suggest</button>
+                                    </div>
                                 </div>
                             </div>
 
+                            <div id="syncPriceHint" style="font-size:0.68rem;color:var(--text-secondary);line-height:1.5;margin-bottom:12px;"></div>
                             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;">
                                 <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:10px 14px;">
                                     <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:4px;">Genre</div>
@@ -25100,17 +25104,46 @@ Be direct and concrete with real industry insight — never generic filler. When
             const actions = forSupervisor
                 ? `<button onclick="aiadSaveSync('${t.id}',this)" style="padding:7px 12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:#cbd5e1;font-size:0.72rem;cursor:pointer;">Save</button>
                    <button onclick="aiadLicenseSync('${t.id}',${JSON.stringify(t.title||'')},${t.price||0},this)" style="padding:7px 14px;background:var(--teal,#14c5d1);border:none;border-radius:8px;color:#000;font-size:0.72rem;font-weight:700;cursor:pointer;">License</button>`
-                : `<span style="padding:4px 10px;background:rgba(20,197,209,0.1);border:1px solid rgba(20,197,209,0.2);border-radius:4px;font-size:0.65rem;color:var(--teal,#14c5d1);">Listed</span>`;
+                : `<span style="padding:4px 10px;background:rgba(20,197,209,0.1);border:1px solid rgba(20,197,209,0.2);border-radius:4px;font-size:0.65rem;color:var(--teal,#14c5d1);">Listed</span>
+                   <button onclick="openSyncEdit('${t.id}')" style="padding:7px 12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:#cbd5e1;font-size:0.72rem;cursor:pointer;">Edit</button>`;
             return `<div style="display:flex;align-items:center;gap:14px;padding:14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:10px;">
                 <div style="flex:1;min-width:0;"><div style="font-size:0.9rem;font-weight:600;color:var(--text-primary);">${(t.title||'').replace(/</g,'&lt;')}</div>
                 <div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;">${forSupervisor ? ((t.artist_name||'Artist') + (meta?' · '+meta:'')) : meta}</div>
                 ${uses?`<div style="font-size:0.68rem;color:var(--text-hint,#64748b);margin-top:2px;">${uses.replace(/</g,'&lt;')}</div>`:''}</div>
                 <div style="font-size:0.9rem;font-weight:700;color:var(--teal,#14c5d1);">$${t.price||''}</div>${actions}</div>`;
         }
+        // Market-based sync-license price suggester. Uses typical non-exclusive indie
+        // sync fee ranges by use case, anchored to the highest-value use selected.
+        const SYNC_BENCH = {
+            'social / digital': [100, 400], 'documentary': [250, 1000], 'games': [500, 2500],
+            'film': [500, 3000], 'tv / streaming': [1000, 5000], 'advertising': [2000, 10000],
+        };
+        function computeSyncPrice(useCases, genre, mood) {
+            const uc = (useCases || []).map((x) => String(x).toLowerCase());
+            let low = 200, high = 800, best = null, bestHigh = 0;
+            uc.forEach((u) => { const b = SYNC_BENCH[u]; if (b && b[1] > bestHigh) { bestHigh = b[1]; best = u; low = b[0]; high = b[1]; } });
+            let rec = Math.round((low + (high - low) * 0.33) / 10) * 10;
+            if (String(mood || '').toLowerCase() === 'cinematic') rec = Math.round(rec * 1.1 / 10) * 10;
+            const cap = (s) => s.replace(/\b\w/g, (c) => c.toUpperCase());
+            const money = (n) => '$' + Number(n).toLocaleString();
+            const rationale = best
+                ? 'Based on availability for ' + cap(best) + ' (non-exclusive sync). Comparable indie placements run ' + money(low) + '–' + money(high) + ' — ' + money(rec) + ' is a competitive ask you can negotiate up.'
+                : 'Tip: select your use cases (Advertising, TV, Film…) for a sharper number. General indie sync fees run ' + money(low) + '–' + money(high) + '; ' + money(rec) + ' is a solid starting ask.';
+            return { price: rec, low: low, high: high, rationale: rationale };
+        }
+        window.suggestSyncPriceMain = function () {
+            const useCases = Array.from(document.querySelectorAll('#syncUseCases .style-tag-chip.selected')).map((el) => el.textContent.trim());
+            const genre = (document.getElementById('syncTrackGenre') || {}).value || '';
+            const mood = (document.getElementById('syncTrackMood') || {}).value || '';
+            const r = computeSyncPrice(useCases, genre, mood);
+            const pf = document.getElementById('syncTrackPrice'); if (pf) pf.value = r.price;
+            const hint = document.getElementById('syncPriceHint');
+            if (hint) hint.innerHTML = '✨ <strong style="color:var(--text-primary);">Suggested: $' + Number(r.price).toLocaleString() + '</strong> — ' + r.rationale.replace(/</g, '&lt;') + ' <span style="color:var(--text-muted);">Estimate only; you set the final price.</span>';
+        };
         window.handleSyncSubmit = async function () {
             const g = (id) => (document.getElementById(id) && document.getElementById(id).value || '').trim();
             const title = g('syncTrackTitle'), price = g('syncTrackPrice'), genre = g('syncTrackGenre'), mood = g('syncTrackMood'), bpm = g('syncTrackBpm');
-            if (!title || !price) { (window.showToast || alert)('Track title and price are required'); return; }
+            if (!title) { (window.showToast || alert)('Track title is required'); return; }
             const s = sess(); if (!s) { (window.showToast || alert)('Please sign in'); return; }
             const useCases = Array.from(document.querySelectorAll('#syncUseCases .style-tag-chip.selected')).map(el => el.textContent.trim());
             const artistName = (window.AppState && AppState.artistProfile && AppState.artistProfile.artistName) || (s.user.user_metadata && s.user.user_metadata.username) || 'Artist';
@@ -25121,9 +25154,73 @@ Be direct and concrete with real industry insight — never generic filler. When
                 loadMyListings();
             } catch (e) { (window.showToast || alert)('Could not list track — try again'); }
         };
+        window.suggestSyncPriceEdit = function () {
+            const useCases = Array.from(document.querySelectorAll('#editSyncUses .style-tag-chip.selected')).map((el) => el.textContent.trim());
+            const genre = (document.getElementById('editSyncGenre') || {}).value || '';
+            const mood = (document.getElementById('editSyncMood') || {}).value || '';
+            const r = computeSyncPrice(useCases, genre, mood);
+            const pf = document.getElementById('editSyncPrice'); if (pf) pf.value = r.price;
+            const hint = document.getElementById('editSyncHint');
+            if (hint) hint.innerHTML = '✨ <strong style="color:var(--text-primary);">Suggested: $' + Number(r.price).toLocaleString() + '</strong> — ' + r.rationale.replace(/</g, '&lt;');
+        };
+        window.openSyncEdit = function (id) {
+            const t = (window._myListings || []).find((x) => x.id === id); if (!t) return;
+            const e = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+            const inC = 'width:100%;box-sizing:border-box;background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;';
+            const laC = 'display:block;font-size:0.72rem;color:var(--text-muted);margin:12px 0 4px;';
+            const moods = ['Dark','Uplifting','Melancholic','Energetic','Cinematic','Romantic','Tense','Peaceful'];
+            const uses = ['Film','TV / Streaming','Advertising','Games','Documentary','Social / Digital'];
+            const has = (u) => Array.isArray(t.use_cases) && t.use_cases.some((x) => String(x).toLowerCase() === u.toLowerCase());
+            document.getElementById('modalBody').innerHTML =
+                '<h2 style="margin-bottom:6px;">Edit listing</h2>'
+              + '<input type="hidden" id="editSyncId" value="' + e(t.id) + '">'
+              + '<label style="' + laC + '">Title</label><input id="editSyncTitle" style="' + inC + '" value="' + e(t.title) + '">'
+              + '<label style="' + laC + '">License price (USD) <span style="opacity:.7;">· optional</span></label>'
+              + '<div style="display:flex;gap:8px;"><input id="editSyncPrice" style="' + inC + '" value="' + e(t.price == null ? '' : t.price) + '" placeholder="Leave blank or suggest">'
+              + '<button type="button" onclick="suggestSyncPriceEdit()" style="flex-shrink:0;background:rgba(0,212,255,0.12);color:#00D4FF;border:1px solid rgba(0,212,255,0.3);border-radius:8px;padding:0 12px;font-size:0.72rem;font-weight:700;cursor:pointer;">✨ Suggest</button></div>'
+              + '<div id="editSyncHint" style="font-size:0.68rem;color:var(--text-secondary);line-height:1.5;margin-top:6px;"></div>'
+              + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">'
+              + '<div><label style="' + laC + '">Genre</label><select id="editSyncGenre" data-aiad-genres data-aiad-value="' + e(t.genre) + '" style="' + inC + '"></select></div>'
+              + '<div><label style="' + laC + '">Mood</label><select id="editSyncMood" style="' + inC + '"><option value="">Select mood</option>' + moods.map((m) => '<option' + (String(t.mood) === m ? ' selected' : '') + '>' + m + '</option>').join('') + '</select></div>'
+              + '<div><label style="' + laC + '">BPM</label><input id="editSyncBpm" style="' + inC + '" value="' + e(t.bpm == null ? '' : t.bpm) + '"></div></div>'
+              + '<label style="' + laC + '">Available for</label><div id="editSyncUses" style="display:flex;flex-wrap:wrap;gap:6px;">'
+              + uses.map((u) => '<span class="style-tag-chip' + (has(u) ? ' selected' : '') + '" onclick="this.classList.toggle(\'selected\')">' + u + '</span>').join('') + '</div>'
+              + '<div class="project-detail-actions" style="margin-top:16px;display:flex;justify-content:space-between;gap:8px;align-items:center;">'
+              + '<button class="secondary" style="color:#ef4444;" onclick="deleteSyncListing(\'' + e(t.id) + '\')">Delete</button>'
+              + '<div style="display:flex;gap:8px;"><button class="secondary" onclick="closeModal()">Cancel</button>'
+              + '<button class="primary" onclick="saveSyncEdit()">Save changes</button></div></div>';
+            document.getElementById('globalModal').classList.add('active');
+            if (window.aiadFillGenreSelects) window.aiadFillGenreSelects(document.getElementById('modalBody'));
+        };
+        window.saveSyncEdit = async function () {
+            const s = sess(); if (!s) return;
+            const g = (id) => (document.getElementById(id) && document.getElementById(id).value || '').trim();
+            const id = g('editSyncId'); const title = g('editSyncTitle');
+            if (!title) { (window.showToast || alert)('Title is required'); return; }
+            const price = g('editSyncPrice'), genre = g('editSyncGenre'), mood = g('editSyncMood'), bpm = g('editSyncBpm');
+            const useCases = Array.from(document.querySelectorAll('#editSyncUses .style-tag-chip.selected')).map((el) => el.textContent.trim());
+            try {
+                await fetch(`${SUPA}/rest/v1/sync_listings?id=eq.${id}`, { method: 'PATCH', headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon(), 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }, body: JSON.stringify({ title: title, price: price ? (parseFloat(price) || null) : null, genre: genre, mood: mood, bpm: bpm, use_cases: useCases }) });
+                (window.showToast || alert)('Listing updated');
+                closeModal(); loadMyListings();
+            } catch (err) { (window.showToast || alert)('Could not update — try again'); }
+        };
+        window.deleteSyncListing = async function (id) {
+            if (!window.confirm('Remove this listing from the Sync Library?')) return;
+            const s = sess(); if (!s) return;
+            try {
+                await fetch(`${SUPA}/rest/v1/sync_listings?id=eq.${id}`, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon() } });
+                (window.showToast || alert)('Listing removed');
+                closeModal();
+                window._myListings = (window._myListings || []).filter((x) => x.id !== id);
+                const list = document.getElementById('syncListedTracks');
+                if (list) list.innerHTML = window._myListings.length ? window._myListings.map((t) => _syncCard(t, false)).join('') : '<div style="text-align:center;padding:40px;color:var(--text-muted);font-size:0.8rem;">No tracks listed yet — add your first track above</div>';
+            } catch (err) { (window.showToast || alert)('Could not remove — try again'); }
+        };
         async function loadMyListings() {
             const s = sess(); const list = document.getElementById('syncListedTracks'); if (!s || !list) return;
             const rows = await rest(`sync_listings?select=*&artist_id=eq.${s.user.id}&order=created_at.desc`);
+            window._myListings = Array.isArray(rows) ? rows : [];
             if (Array.isArray(rows) && rows.length) list.innerHTML = rows.map(t => _syncCard(t, false)).join('');
         }
         async function loadSyncCatalog() {
