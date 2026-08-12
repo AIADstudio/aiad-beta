@@ -8641,6 +8641,10 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                         Inbox
                         <span class="collab-nav-badge">2</span>
                     </div>
+                    <div class="collab-nav-item" onclick="showCollabView('payouts')">
+                        <svg class="collab-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                        Payouts
+                    </div>
                     <div class="collab-nav-item" onclick="showCollabView('community')">
                         <svg class="collab-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
                         Community
@@ -8902,6 +8906,14 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                         </div>
                         <div style="padding:24px;text-align:center;color:var(--text-muted);font-size:0.85rem;">No active conversations.</div>
                     </div>
+                </div>
+
+                <div class="collab-view" id="collabPayoutsView">
+                    <div class="collab-page-header">
+                        <h1 class="collab-page-title">Payouts</h1>
+                        <p class="collab-page-subtitle">Stripe holds your money and pays it out. AIAD takes 10% of each sale and never touches the rest.</p>
+                    </div>
+                    <div id="collabPayoutsBody"></div>
                 </div>
 
                 <div class="collab-view" id="collabSettingsView">
@@ -13738,7 +13750,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             } else if (view === 'payouts') {
                 viewEl.classList.add('active');
                 if (navItems[13]) navItems[13].classList.add('active');
-                setTimeout(() => { if (window.loadPayouts) loadPayouts(); }, 60);
+                setTimeout(() => { if (window.loadPayouts) loadPayouts('payoutsBody'); }, 60);
             } else if (view === 'settings') {
                 viewEl.classList.add('active');
                 // Auto-populate settings from AppState first (instant)
@@ -19192,6 +19204,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 'community': 'collabCommunityView',
                 'agent': 'collabAgentView',
                 'inbox': 'collabInboxView',
+                'payouts': 'collabPayoutsView',
                 'settings': 'collabSettingsView'
             };
 
@@ -19218,6 +19231,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             // Load data for specific views
             if (viewId === 'artists') setTimeout(loadCollabArtists, 100);
             if (viewId === 'feed') setTimeout(loadCollabFeed, 100);
+            if (viewId === 'payouts') setTimeout(() => { if (window.loadPayouts) loadPayouts('collabPayoutsBody'); }, 60);
             if (viewId === 'settings') setTimeout(populateCollabSettings, 100);
             if (viewId === 'discover') setTimeout(loadCollabDiscover, 100);
         }
@@ -27555,8 +27569,10 @@ Be direct and concrete with real industry insight — never generic filler. When
     };
 
     // ── Payouts (Stripe Connect) ───────────────────────────────────────────
-    async function loadPayouts() {
-        const el = document.getElementById('payoutsBody');
+    let _payoutsTargetId = 'payoutsBody';
+    async function loadPayouts(elId) {
+        if (elId) _payoutsTargetId = elId;
+        const el = document.getElementById(_payoutsTargetId || 'payoutsBody');
         if (!el) return;
         el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:20px;">Checking your payout status…</div>';
         let bal;
