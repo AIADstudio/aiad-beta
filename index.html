@@ -28118,6 +28118,16 @@ Be direct and concrete with real industry insight — never generic filler. When
   var n = 0, iv = setInterval(function(){ inject(); if (++n > 120) clearInterval(iv); }, 1500);
 })();
 </script>
+<style id="aiad-mobile-fab-fix">
+/* Mobile: keep floating buttons clear of the fixed bottom nav so the menu stays tappable. */
+@media (max-width: 768px) {
+  .dash-mobile-nav { z-index: 100000 !important; }
+  #aiadWsSwitcher { bottom: calc(66px + env(safe-area-inset-bottom, 0px)) !important; z-index: 99991 !important; }
+  #aiadHelpBtn    { bottom: calc(68px + env(safe-area-inset-bottom, 0px)) !important; right: 12px !important; }
+  #aiadAdminBtn   { bottom: calc(116px + env(safe-area-inset-bottom, 0px)) !important; right: 12px !important; }
+  #aiadBugBtn     { bottom: calc(164px + env(safe-area-inset-bottom, 0px)) !important; right: 12px !important; }
+}
+</style>
 </body>
 
 
