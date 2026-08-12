@@ -5583,16 +5583,16 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                                 <p class="settings-section-subtitle">Your current AIAD membership.</p>
                             </div>
                             <div class="settings-plan-current">
-                                <div class="settings-plan-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> PRO</div>
-                                <div class="settings-plan-price">$19/month</div>
-                                <div class="settings-plan-renew">Renews Feb 21, 2026</div>
+                                <div class="settings-plan-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> <span id="planBadgeName">—</span></div>
+                                <div class="settings-plan-price" id="planPriceLabel">—</div>
+                                <div class="settings-plan-renew" id="planRenewLine"></div>
                             </div>
                             <h3 style="font-size: 0.9375rem; font-weight: 500; margin-bottom: var(--space-md); color: var(--text-secondary);">Usage This Month</h3>
                             <div class="settings-usage-grid">
-                                <div class="settings-usage-item"><div class="settings-usage-label">AI Guidance queries</div><div class="settings-usage-value">847 / Unlimited</div></div>
-                                <div class="settings-usage-item"><div class="settings-usage-label">Active agents</div><div class="settings-usage-value">3 / 5</div><div class="settings-usage-bar"><div class="settings-usage-fill" style="width: 60%;"></div></div></div>
-                                <div class="settings-usage-item"><div class="settings-usage-label">Storage</div><div class="settings-usage-value">2.1 GB / 10 GB</div><div class="settings-usage-bar"><div class="settings-usage-fill" style="width: 21%;"></div></div></div>
-                                <div class="settings-usage-item"><div class="settings-usage-label">Decision memories</div><div class="settings-usage-value">24 / Unlimited</div></div>
+                                <div class="settings-usage-item"><div class="settings-usage-label">AI Guidance queries (this month)</div><div class="settings-usage-value" id="usageQueries">—</div><div class="settings-usage-bar"><div class="settings-usage-fill" id="usageQueriesBar" style="width: 0%;"></div></div></div>
+                                <div class="settings-usage-item"><div class="settings-usage-label">Posts published</div><div class="settings-usage-value" id="usagePosts">—</div></div>
+                                <div class="settings-usage-item"><div class="settings-usage-label">Storage used</div><div class="settings-usage-value" id="usageStorage">—</div></div>
+                                <div class="settings-usage-item"><div class="settings-usage-label">Decision memories</div><div class="settings-usage-value" id="usageMemories">—</div></div>
                             </div>
                             <h3 style="font-size: 0.9375rem; font-weight: 500; margin-bottom: var(--space-md); color: var(--text-secondary);">Available Plans</h3>
                             <div id="aiadPricingMountSettings" class="aiad-pricing-mount"></div>
@@ -13746,7 +13746,36 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 if (sn) sn.value = AppState.artistProfile?.artistName || '';
                 // Then load fresh from DB
                 setTimeout(() => loadArtistProfile(), 100);
+                loadAccountUsage();
             }
+        }
+
+        function _humanBytes(n) {
+            n = Number(n) || 0;
+            if (n < 1024) return n + ' B';
+            if (n < 1048576) return (n / 1024).toFixed(0) + ' KB';
+            if (n < 1073741824) return (n / 1048576).toFixed(1) + ' MB';
+            return (n / 1073741824).toFixed(2) + ' GB';
+        }
+        async function loadAccountUsage() {
+            const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+            try {
+                const { data, error } = await db.rpc('artist_account_usage');
+                if (error || !data) return;
+                const tier = (typeof SubscriptionTiers !== 'undefined' && SubscriptionTiers[data.plan]) ? SubscriptionTiers[data.plan] : (typeof SubscriptionTiers !== 'undefined' ? SubscriptionTiers.free : { name: 'Free', priceLabel: 'Free', aiCredits: 0 });
+                setTxt('planBadgeName', (tier.name || 'Free').toUpperCase());
+                setTxt('planPriceLabel', tier.priceLabel || 'Free');
+                const ms = data.member_since ? new Date(data.member_since) : null;
+                setTxt('planRenewLine', ms ? ('Member since ' + ms.toLocaleDateString(undefined, { month: 'short', year: 'numeric' })) : '');
+                const credits = Number(tier.aiCredits) || 0;
+                const q = Number(data.ai_queries_month) || 0;
+                setTxt('usageQueries', q.toLocaleString() + ' / ' + (credits ? credits.toLocaleString() : 'Unlimited'));
+                const bar = document.getElementById('usageQueriesBar');
+                if (bar) bar.style.width = (credits ? Math.min(100, Math.round(q / credits * 100)) : 0) + '%';
+                setTxt('usagePosts', (Number(data.posts) || 0).toLocaleString());
+                setTxt('usageStorage', _humanBytes(data.storage_bytes));
+                setTxt('usageMemories', (Number(data.decision_memories) || 0).toLocaleString());
+            } catch (e) { /* leave dashes */ }
         }
 
         let pendingMedia = null;
