@@ -3783,7 +3783,7 @@ html, body {
                 <div class="dash-view" id="artistHomeView"><div style="max-width:600px;margin:0 auto;padding:8px 0 60px"><h2 style="font-size:1.4rem;font-weight:700;margin:4px 4px 4px">Home</h2><p style="color:var(--text-secondary);font-size:0.9rem;margin:0 4px 20px">Latest from artists you follow</p><div id="homeFeedInner"><div style="text-align:center;color:var(--text-muted);padding:40px">Loading feed…</div></div></div></div><div class="dash-view active" id="artistPostsView">
                     <style>
                         /* ── Posts page ── */
-                        .posts-page { display: grid; grid-template-columns: 1fr 260px; gap: 24px; align-items: start; }
+                        .posts-page { display: block; }
                         @media (max-width: 1000px) { .posts-page { grid-template-columns: 1fr; } .posts-stats-col { display: none; } }
 
                         /* Composer */
@@ -4041,26 +4041,7 @@ html, body {
                             </div>
                         </div>
 
-                        <!-- Stats sidebar -->
-                        <div class="posts-stats-col">
-                            <div class="posts-stat-card">
-                                <div class="posts-stat-card-label">Monthly Revenue</div>
-                                <div class="posts-stat-card-value" id="qmRevenue">$0</div>
-                            </div>
-                            <div class="posts-stat-card">
-                                <div class="posts-stat-card-label">Supporters</div>
-                                <div class="posts-stat-card-value" id="qmSupporters">0</div>
-                            </div>
-                            <div class="posts-stat-card">
-                                <div class="posts-stat-card-label">Active Projects</div>
-                                <div class="posts-stat-card-value" id="qmProjects">0</div>
-                            </div>
-                            <div class="posts-stat-card">
-                                <div class="posts-stat-card-label">New Messages</div>
-                                <div class="posts-stat-card-value" id="qmMessages">0</div>
-                                <div class="posts-stat-card-sub">in your inbox</div>
-                            </div>
-                        </div>
+                        
                     </div>
                 </div>
 
