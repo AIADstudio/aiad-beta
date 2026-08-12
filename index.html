@@ -3484,13 +3484,13 @@ html, body {
             <main class="dash-main">
 
                 <!-- Top-right account menu -->
-<div id="acctMenuWrap" style="position:fixed;top:12px;right:18px;z-index:600;">
-  <button id="acctMenuBtn" onclick="toggleAcctMenu(event)" style="display:flex;align-items:center;gap:8px;background:var(--bg-card);border:1px solid var(--border-default);border-radius:10px;padding:4px 12px 4px 4px;cursor:pointer;font-family:var(--font-body);">
-    <img id="sidebarUserAvatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Ccircle cx='20' cy='20' r='20' fill='%23161616'/%3E%3Ctext x='20' y='25' text-anchor='middle' fill='%2300B4D8' font-size='16' font-family='sans-serif' font-weight='600'%3EI%3C/text%3E%3C/svg%3E" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0;">
+<div id="acctMenuWrap" style="display:none;position:relative;z-index:600;">
+  <button id="acctMenuBtn" onclick="toggleAcctMenu(event)" style="display:flex;align-items:center;gap:8px;height:42px;background:var(--bg-secondary);border:1px solid var(--border-default);border-radius:10px;padding:0 12px;cursor:pointer;font-family:var(--font-body);">
+    <img id="sidebarUserAvatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Ccircle cx='20' cy='20' r='20' fill='%23161616'/%3E%3Ctext x='20' y='25' text-anchor='middle' fill='%2300B4D8' font-size='16' font-family='sans-serif' font-weight='600'%3EI%3C/text%3E%3C/svg%3E" style="width:26px;height:26px;border-radius:50%;object-fit:cover;flex-shrink:0;">
     <span class="dash-user-name" style="font-size:0.85rem;color:var(--text-primary);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;color:var(--text-muted);flex-shrink:0;"><polyline points="6 9 12 15 18 9"/></svg>
   </button>
-  <div id="acctMenuDropdown" style="display:none;position:absolute;top:48px;right:0;min-width:190px;background:var(--bg-card);border:1px solid var(--border-default);border-radius:12px;padding:6px;box-shadow:0 10px 34px rgba(0,0,0,0.55);">
+  <div id="acctMenuDropdown" style="display:none;position:absolute;top:50px;right:0;min-width:190px;background:var(--bg-card);border:1px solid var(--border-default);border-radius:12px;padding:6px;box-shadow:0 10px 34px rgba(0,0,0,0.55);">
     <div style="padding:8px 10px;border-bottom:1px solid var(--border-default);margin-bottom:4px;">
       <div class="dash-user-name" style="font-weight:600;font-size:0.9rem;color:var(--text-primary);"></div>
       <div class="dash-user-role" style="font-size:0.75rem;color:var(--text-muted);">Artist</div>
@@ -3509,8 +3509,7 @@ html, body {
 #artistDashboard .dash-nav-item{padding:9px 12px !important;}
 #artistDashboard .dash-nav{gap:2px !important;}
 #artistDashboard .dash-nav-subitem{padding:7px 12px !important;}
-#artistDashboard #liveStatsBar{padding-right:150px;}
-@media(max-width:640px){#acctMenuWrap .dash-user-name{display:none;}#artistDashboard #liveStatsBar{padding-right:60px;}}
+@media(max-width:640px){#acctMenuWrap .dash-user-name{display:none;}}
 </style>
 <script>
 function toggleAcctMenu(e){if(e)e.stopPropagation();var d=document.getElementById("acctMenuDropdown");if(d)d.style.display=(d.style.display==="block"?"none":"block");}
@@ -22444,13 +22443,15 @@ async function loadFanDiscover() { setTimeout(()=>_execDiscoverSearch(),100); }
                 if (!main || document.getElementById('aiadArtistSearchWrap')) return;
                 const bar = document.createElement('div');
                 bar.id = 'aiadArtistSearchWrap';
-                bar.style.cssText = 'position:relative;max-width:520px;margin:6px 0 18px;';
-                bar.innerHTML = '<input id="aiadArtistSearchInput" type="text" placeholder="Search artists by name or @username…" autocomplete="off" oninput="aiadDoArtistSearch(this.value)" style="width:100%;box-sizing:border-box;background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:10px;padding:11px 14px 11px 38px;font-size:0.9rem;outline:none;">'
+                bar.style.cssText = 'display:flex;align-items:center;gap:12px;margin:6px 0 18px;';
+                bar.innerHTML = '<div style="position:relative;flex:1;max-width:520px;"><input id="aiadArtistSearchInput" type="text" placeholder="Search artists by name or @username…" autocomplete="off" oninput="aiadDoArtistSearch(this.value)" style="width:100%;box-sizing:border-box;background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:10px;padding:11px 14px 11px 38px;font-size:0.9rem;outline:none;">'
                     + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute;left:12px;top:12px;width:16px;height:16px;color:var(--text-muted);pointer-events:none;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>'
-                    + '<div id="aiadArtistSearchResults" style="display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:500;background:var(--bg-card);border:1px solid var(--border-default);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,0.5);max-height:420px;overflow-y:auto;"></div>';
+                    + '<div id="aiadArtistSearchResults" style="display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:500;background:var(--bg-card);border:1px solid var(--border-default);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,0.5);max-height:420px;overflow-y:auto;"></div></div>';
                 const stats = main.querySelector('#liveStatsBar');
                 if (stats && stats.parentNode === main) main.insertBefore(bar, stats.nextSibling);
                 else main.insertBefore(bar, main.firstChild);
+                const acctW = document.getElementById('acctMenuWrap');
+                if (acctW) { acctW.style.display='block'; acctW.style.position='relative'; acctW.style.top='auto'; acctW.style.right='auto'; acctW.style.height='auto'; acctW.style.marginLeft='auto'; acctW.style.flexShrink='0'; bar.appendChild(acctW); }
             }
             if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ensure); else ensure();
             setInterval(ensure, 2500);
