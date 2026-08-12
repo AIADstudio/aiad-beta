@@ -23202,7 +23202,7 @@ async function sharePostTo(platform, postId) {
             }
         }
     } catch (e) {}
-    var shareUrl = window.location.origin + (username ? '/artist/' + username : '');
+    var shareUrl = window.location.origin + '/post/' + postId;
     var caps = caption || 'Check out this post on AIAD';
 
     if (platform === 'twitter') {

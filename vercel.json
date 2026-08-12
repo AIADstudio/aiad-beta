@@ -22,6 +22,10 @@
       "destination": "/store"
     },
     {
+      "source": "/post/:id",
+      "destination": "/post"
+    },
+    {
       "source": "/admin",
       "destination": "/admin.html"
     },
