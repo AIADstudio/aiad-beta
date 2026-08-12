@@ -4971,6 +4971,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     <!-- Shown only when payouts aren't set up: without Connect, checkout fails. -->
                     <div id="storeOnboardBanner" style="display:none;margin-bottom:16px;"></div>
 
+                    <div id="storeCatTabs" style="display:none;gap:6px;overflow-x:auto;padding-bottom:2px;margin-bottom:14px;-webkit-overflow-scrolling:touch;"></div>
                     <div id="storeProductsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;"></div>
 
                     <div style="margin-top:28px;">
@@ -23213,8 +23214,13 @@ async function sharePostTo(platform, postId) {
         _shareCopy(shareUrl || caps); showToast('Link copied to clipboard'); return;
     }
 
-    // Instagram / TikTok have no web "compose" URL. The only real path from a web app is the
-    // device share sheet (mobile) with the actual media; otherwise download media + copy caption.
+    // Instagram / TikTok have no web "compose" URL and — on desktop — don't appear in the OS
+    // share sheet at all. So we only use the native sheet on phones; on desktop we go straight
+    // to download-image + copy-caption, which is the only real way to post there.
+    var appName = (platform === 'tiktok' ? 'TikTok' : 'Instagram');
+    var isMobile = (navigator.maxTouchPoints > 1 && /Mac|iPhone|iPad|iPod|Android/i.test(navigator.platform + navigator.userAgent))
+        || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+        || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
     var file = null;
     if (mediaUrl) {
         try {
@@ -23223,7 +23229,10 @@ async function sharePostTo(platform, postId) {
             file = new File([blob], 'aiad-post.' + ext, { type: blob.type });
         } catch (e) {}
     }
-    if (navigator.share) {
+    // Burn the AIAD mark + @handle into the image so the branding travels when reposted (TikTok-style).
+    if (file && /^image\//.test(file.type)) { file = await _watermarkImageFile(file, username); }
+    // Mobile: open the native share sheet (Instagram / TikTok show up there) with the real media.
+    if (isMobile && navigator.share) {
         try {
             if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
                 await navigator.share({ files: [file], text: caption ? (caption + (shareUrl ? '\n' + shareUrl : '')) : shareUrl });
@@ -23233,7 +23242,7 @@ async function sharePostTo(platform, postId) {
             return;
         } catch (e) { if (e && e.name === 'AbortError') return; }
     }
-    // Desktop fallback — download the image and copy the caption so it can be posted manually.
+    // Desktop: download the image + copy the caption so it can be uploaded in the app.
     if (file) {
         var u = URL.createObjectURL(file);
         var a = document.createElement('a'); a.href = u; a.download = file.name;
@@ -23242,14 +23251,74 @@ async function sharePostTo(platform, postId) {
     }
     _shareCopy((caption ? caption + '\n' : '') + (shareUrl || ''));
     showToast(file
-        ? ('Image downloaded + caption copied — open ' + (platform === 'tiktok' ? 'TikTok' : 'Instagram') + ' to post.')
-        : ('Caption copied — open ' + (platform === 'tiktok' ? 'TikTok' : 'Instagram') + ' to post.'));
+        ? (appName + ' doesn\'t allow web posting on desktop — image downloaded + caption copied. Upload it in the ' + appName + ' app.')
+        : ('Caption copied — open ' + appName + ' to post.'));
 }
 
 function _shareCopy(txt) {
     try { if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(txt); } catch (e) {}
     try { var ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); } catch (e) {}
     return Promise.resolve();
+}
+
+async function _watermarkImageFile(file, handle) {
+    try {
+        if (!file || !/^image\//.test(file.type)) return file;
+        var img = await new Promise(function (res, rej) {
+            var im = new Image();
+            im.onload = function () { res(im); };
+            im.onerror = rej;
+            im.src = URL.createObjectURL(file);
+        });
+        var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+        if (!w || !h) return file;
+        var canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+
+        var base = Math.min(w, h);
+        var pad = Math.round(base * 0.045);
+        var fs = Math.max(18, Math.round(base * 0.05));
+        var hfs = Math.round(fs * 0.62);
+        var gap = Math.round(fs * 0.28);
+        var dia = Math.round(fs * 0.82);
+
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.55)';
+        ctx.shadowBlur = Math.round(fs * 0.45);
+        ctx.shadowOffsetY = Math.max(1, Math.round(fs * 0.05));
+
+        // brand row baseline (sits above the handle row)
+        var brandBaseY = h - pad - hfs - gap;
+        // gradient AIAD dot
+        var cx = pad + dia / 2;
+        var cy = brandBaseY - Math.round(fs * 0.52);
+        var grad = ctx.createLinearGradient(cx - dia / 2, cy - dia / 2, cx + dia / 2, cy + dia / 2);
+        grad.addColorStop(0, '#00D4FF');
+        grad.addColorStop(1, '#d946ef');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(cx, cy, dia / 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // AIAD wordmark
+        ctx.textBaseline = 'alphabetic';
+        ctx.textAlign = 'left';
+        ctx.font = '800 ' + fs + 'px Inter, -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.fillStyle = 'rgba(255,255,255,0.97)';
+        ctx.fillText('AIAD', pad + dia + Math.round(fs * 0.25), brandBaseY);
+
+        // @handle row
+        ctx.font = '600 ' + hfs + 'px Inter, -apple-system, sans-serif';
+        ctx.fillStyle = 'rgba(255,255,255,0.92)';
+        ctx.fillText(handle ? ('@' + handle) : 'aiad.studio', pad, h - pad);
+        ctx.restore();
+
+        var outBlob = await new Promise(function (res) { canvas.toBlob(res, 'image/jpeg', 0.92); });
+        if (!outBlob) return file;
+        return new File([outBlob], 'aiad-post.jpg', { type: 'image/jpeg' });
+    } catch (e) { return file; }
 }
 
 
@@ -27350,17 +27419,49 @@ Be direct and concrete with real industry insight — never generic filler. When
             grid.innerHTML = '<div style="grid-column:1/-1;color:#f59e0b;font-size:0.85rem;padding:20px;text-align:center;">Could not load products: ' + esc(error.message) + '</div>';
             return;
         }
-        const rows = data || [];
-        grid.innerHTML = rows.length
-            ? rows.map(renderProductAdminCard).join('')
-            : '<div style="grid-column:1/-1;padding:34px 20px;text-align:center;background:var(--bg-card);border:1px dashed var(--border-default);border-radius:14px;">'
-              + '<div style="font-weight:600;margin-bottom:4px;">No products yet</div>'
-              + '<div style="font-size:0.82rem;color:var(--text-muted);">Add your first one — a beat pack, a track, a shirt.</div></div>';
+        window._storeProducts = data || [];
+        if (!window._storeCatFilter) window._storeCatFilter = 'all';
+        renderStoreCatTabs();
+        renderStoreGrid();
 
         renderOnboardBanner();
         loadRecentSales(me);
     }
 
+    const STORE_CATEGORIES = ['T-Shirts','Hoodies & Sweats','Hats & Beanies','Jackets & Outerwear','Bottoms','Footwear','Accessories','Luxury','Basics','Vinyl & Music','Digital','Other'];
+    function renderStoreCatTabs() {
+        const bar = document.getElementById('storeCatTabs');
+        if (!bar) return;
+        const rows = window._storeProducts || [];
+        const present = STORE_CATEGORIES.filter(c => rows.some(p => (p.category || '') === c));
+        if (!rows.length || present.length < 1) { bar.style.display = 'none'; bar.innerHTML = ''; return; }
+        bar.style.display = 'flex';
+        const cur = window._storeCatFilter || 'all';
+        const tab = (val, label, count) => {
+            const active = cur === val;
+            return '<button onclick="setStoreCatFilter(this.dataset.v)" data-v="' + esc(val) + '" '
+              + 'style="flex:0 0 auto;height:36px;padding:0 16px;border-radius:8px;border:1px solid '
+              + (active ? 'var(--teal)' : 'var(--border-default)') + ';background:' + (active ? 'rgba(0,212,255,0.12)' : 'var(--bg-secondary)')
+              + ';color:' + (active ? 'var(--teal-light)' : 'var(--text-secondary)') + ';font-size:0.8rem;font-weight:600;white-space:nowrap;cursor:pointer;font-family:var(--font-body);">'
+              + esc(label) + ' <span style="opacity:.55;">' + count + '</span></button>';
+        };
+        let html = tab('all', 'All', rows.length);
+        present.forEach(c => { html += tab(c, c, rows.filter(p => (p.category || '') === c).length); });
+        bar.innerHTML = html;
+    }
+    window.setStoreCatFilter = function (v) { window._storeCatFilter = v; renderStoreCatTabs(); renderStoreGrid(); };
+    function renderStoreGrid() {
+        const grid = document.getElementById('storeProductsGrid');
+        if (!grid) return;
+        const rows = window._storeProducts || [];
+        const cur = window._storeCatFilter || 'all';
+        const shown = cur === 'all' ? rows : rows.filter(p => (p.category || '') === cur);
+        grid.innerHTML = shown.length
+            ? shown.map(renderProductAdminCard).join('')
+            : '<div style="grid-column:1/-1;padding:34px 20px;text-align:center;background:var(--bg-card);border:1px dashed var(--border-default);border-radius:14px;">'
+              + '<div style="font-weight:600;margin-bottom:4px;">No products' + (cur === 'all' ? ' yet' : ' in this category') + '</div>'
+              + '<div style="font-size:0.82rem;color:var(--text-muted);">' + (cur === 'all' ? 'Add your first one — a beat pack, a track, a shirt.' : 'Try another category, or add a product in it.') + '</div></div>';
+    }
     function renderProductAdminCard(p) {
         const price = money(p.price, p.currency);
         const kind  = p.product_kind === 'physical' ? 'Physical' : 'Digital';
