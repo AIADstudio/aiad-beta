@@ -3453,6 +3453,7 @@ html, body {
                 </div>
                 <div class="dash-subtitle">Artist Dashboard</div>
                 <nav class="dash-nav">
+                    <div class="dash-nav-item" id="navHome" onclick="showArtistView('home')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span> Home</span></div>
                     <div class="dash-nav-item active" onclick="showArtistView('posts')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/></svg><span> Posts</span></div>
                     <div class="dash-nav-item" onclick="showArtistView('agent')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span> AIAD Agent</span></div>
                     <div class="dash-nav-item" onclick="showArtistView('supporters')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg><span> Supporters</span></div>
@@ -3466,7 +3467,6 @@ html, body {
                     <div class="dash-nav-item" onclick="showArtistView('inbox')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><span> Inbox </span></div>
                     <div class="dash-nav-item" id="navStore" onclick="showArtistView('store')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg><span> Store</span></div>
                     <div class="dash-nav-item" id="navPayouts" onclick="showArtistView('payouts')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg><span> Payouts</span></div>
-                    <div class="dash-nav-item" id="navHome" onclick="showArtistView('home')" style="order:-1"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span> Home</span></div>
                     <div class="dash-nav-item dash-nav-dropdown" onclick="toggleCreativeStudio()">
                         <svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
                         <span>Creative Studio</span>
@@ -13663,29 +13663,29 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 loadHomeFeed();
             } else if (view === 'posts') {
                 viewEl.classList.add('active');
-                navItems[0].classList.add('active');
+                navItems[1].classList.add('active');
             } else if (view === 'agent') {
                 viewEl.classList.add('active');
-                navItems[1].classList.add('active');
+                navItems[2].classList.add('active');
                 setTimeout(() => { renderIndustryAIPrompts(); populateAgentContext(); }, 50);
             } else if (view === 'supporters') {
                 viewEl.classList.add('active');
-                navItems[2].classList.add('active');
+                navItems[3].classList.add('active');
                 setTimeout(() => loadSupportersData(), 100);
                 setTimeout(() => loadSupportersData(), 100);
             } else if (view === 'projects') {
                 viewEl.classList.add('active');
-                navItems[4].classList.add('active');
+                navItems[5].classList.add('active');
             } else if (view === 'collaborators') {
                 viewEl.classList.add('active');
-                navItems[3].classList.add('active');
+                navItems[4].classList.add('active');
                 setTimeout(() => { try { loadCollaborators(); } catch (e) {} }, 100);
             } else if (view === 'schedule') {
                 viewEl.classList.add('active');
-                navItems[5].classList.add('active');
+                navItems[6].classList.add('active');
             } else if (view === 'revenue') {
                 viewEl.classList.add('active');
-                navItems[6].classList.add('active');
+                navItems[7].classList.add('active');
                 if (typeof loadRevenueData === 'function') setTimeout(() => loadRevenueData(), 100);
             } else if (view === 'music') {
                 viewEl.classList.add('active');
@@ -13720,24 +13720,24 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 subItems[4].classList.add('active');
             } else if (view === 'analytics') {
                 viewEl.classList.add('active');
-                navItems[7].classList.add('active');
+                navItems[8].classList.add('active');
             } else if (view === 'mystats') {
                 viewEl.classList.add('active');
-                if (navItems[8]) navItems[8].classList.add('active');
+                if (navItems[9]) navItems[9].classList.add('active');
                 setTimeout(() => { if (typeof loadMyStats === 'function') loadMyStats(); }, 60);
             } else if (view === 'milestones') {
                 viewEl.classList.add('active');
-                if (navItems[9]) navItems[9].classList.add('active');
+                if (navItems[10]) navItems[10].classList.add('active');
             } else if (view === 'inbox') {
                 viewEl.classList.add('active');
-                if (navItems[10]) navItems[10].classList.add('active');
+                if (navItems[11]) navItems[11].classList.add('active');
             } else if (view === 'store') {
                 viewEl.classList.add('active');
-                if (navItems[11]) navItems[11].classList.add('active');
+                if (navItems[12]) navItems[12].classList.add('active');
                 setTimeout(() => { if (window.loadStoreManager) loadStoreManager(); }, 60);
             } else if (view === 'payouts') {
                 viewEl.classList.add('active');
-                if (navItems[12]) navItems[12].classList.add('active');
+                if (navItems[13]) navItems[13].classList.add('active');
                 setTimeout(() => { if (window.loadPayouts) loadPayouts(); }, 60);
             } else if (view === 'settings') {
                 viewEl.classList.add('active');
@@ -22093,11 +22093,11 @@ async function fanToggleFollow(artistId, artistName, btn) {
     const resolvedId = (artistId&&!artistId.includes('-')) ? 'ed9c7f5c-9c3c-4999-8bba-468d5ba9d935' : artistId;
     try {
         if (isFollowing) {
-            await db.from('fan_support').delete().eq('fan_id',AppState.currentUser.id).eq('artist_id',resolvedId);
+            await db.rpc('set_follow',{p_artist:resolvedId,p_state:false});
             btn.textContent='Follow'; btn.style.cssText='padding:9px 20px;border-radius:10px;border:1px solid var(--border-default);background:transparent;color:var(--text-primary);font-size:0.85rem;cursor:pointer;font-family:var(--font-body);min-width:100px;';
             showToast('Unfollowed '+artistName);
         } else {
-            await db.from('fan_support').upsert({fan_id:AppState.currentUser.id,artist_id:resolvedId,status:'following',amount:0},{onConflict:'fan_id,artist_id'});
+            await db.rpc('set_follow',{p_artist:resolvedId,p_state:true});
             btn.textContent='Following ✓'; btn.style.cssText='padding:9px 20px;border-radius:10px;border:1px solid var(--teal);background:rgba(0,212,255,0.1);color:var(--teal-light);font-size:0.85rem;cursor:pointer;font-family:var(--font-body);min-width:100px;';
             showToast('Now following '+artistName+'!');
         }
@@ -22114,11 +22114,11 @@ function fanFollowFromDiscover(artistId, artistName, btn) {
     if (following) {
         btn.textContent='Follow'; btn.style.background='transparent'; btn.style.color='var(--text-primary)'; btn.style.borderColor='var(--border-default)';
         showToast('Unfollowed '+artistName);
-        db.from('fan_support').delete().eq('fan_id',AppState.currentUser.id).eq('artist_id',resolvedId).then(()=>{AppState._fanCreatorsStale=true;});
+        db.rpc('set_follow',{p_artist:resolvedId,p_state:false}).then(()=>{AppState._fanCreatorsStale=true;});
     } else {
         btn.textContent='Following'; btn.style.background='rgba(0,212,255,0.1)'; btn.style.color='var(--teal-light)'; btn.style.borderColor='var(--teal)';
         showToast('Now following '+artistName+'!');
-        db.from('fan_support').upsert({fan_id:AppState.currentUser.id,artist_id:resolvedId,status:'following',amount:0},{onConflict:'fan_id,artist_id'}).then(()=>{
+        db.rpc('set_follow',{p_artist:resolvedId,p_state:true}).then(()=>{
             AppState._fanCreatorsStale=true;
             const mv=document.getElementById('fanArtistsView');
             if(mv&&mv.classList.contains('active')) loadFanCreators();
@@ -22623,10 +22623,12 @@ async function loadArtistPage(artistId) {
     }
     const followBtn=document.getElementById('fanArtistFollowBtn');const supportBtn=document.getElementById('fanArtistSupportBtn');
     if(followBtn&&supportBtn){
-        let rel=null;
-        if(AppState.currentUser){try{const{data}=await db.from('fan_support').select('status,amount').eq('fan_id',AppState.currentUser.id).eq('artist_id',pid).maybeSingle();rel=data;}catch(e){}}
-        const isFollowing=rel&&(rel.status==='following'||rel.status==='active');
-        const isSupporting=rel&&rel.status==='active'&&rel.amount>0;
+        let isFollowing=false,isSupporting=false,_supAmt=0;
+        if(AppState.currentUser){
+            try{const{data:f}=await db.rpc('is_following',{p_artist:pid});isFollowing=!!f;}catch(e){}
+            try{const{data:s}=await db.from('fan_support').select('amount').eq('fan_id',AppState.currentUser.id).eq('artist_id',pid).gt('amount',0).order('amount',{ascending:false}).limit(1);if(Array.isArray(s)&&s.length){isSupporting=true;_supAmt=s[0].amount||0;}}catch(e){}
+        }
+        const rel={amount:_supAmt};
         if(isFollowing){followBtn.textContent='Following ✓';followBtn.style.cssText='padding:9px 20px;border-radius:10px;border:1px solid var(--teal);background:rgba(0,212,255,0.1);color:var(--teal-light);font-size:0.85rem;cursor:pointer;font-family:var(--font-body);min-width:100px;';}
         else{followBtn.textContent='Follow';followBtn.style.cssText='padding:9px 20px;border-radius:10px;border:1px solid var(--border-default);background:transparent;color:var(--text-primary);font-size:0.85rem;cursor:pointer;font-family:var(--font-body);min-width:100px;';}
         followBtn.onclick=()=>fanToggleFollow(pid,name,followBtn);

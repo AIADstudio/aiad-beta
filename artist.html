@@ -177,7 +177,7 @@
     <script>
       const SUPABASE_URL = 'https://uapiytquwuhtewqieegx.supabase.co';
       const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhcGl5dHF1d3VodGV3cWllZWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NzcwMTksImV4cCI6MjA4OTI1MzAxOX0.BLs2RdStghm0_cF8t70cBTX1GWcowGRwID7TAG8Mg38';
-      const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+      const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
 
       const esc = (s) => (s == null ? '' : String(s).replace(/[&<>"']/g, c =>
         ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])));
@@ -357,27 +357,23 @@
       function jwtSub(t) { try { return JSON.parse(atob(t.split('.')[1])).sub; } catch (e) { return null; } }
       async function refreshFollow() {
         updateFollowerCount();
-        const token = storedSession(); if (!token) { setFollowBtn(false); return; }
-        const me = jwtSub(token); if (!me) { setFollowBtn(false); return; }
+        if (!storedSession()) { setFollowBtn(false); return; }
         try {
-          const res = await fetch(`${SUPABASE_URL}/rest/v1/fan_support?select=id&fan_id=eq.${me}&artist_id=eq.${ARTIST_ID}&type=eq.follow`, { headers: { 'Authorization': 'Bearer ' + token, 'apikey': SUPABASE_ANON_KEY } });
-          const rows = await res.json().catch(() => []);
-          setFollowBtn(Array.isArray(rows) && rows.length > 0);
+          const { data } = await db.rpc('is_following', { p_artist: ARTIST_ID });
+          setFollowBtn(!!data);
         } catch (e) { setFollowBtn(false); }
       }
       window.toggleFollow = async function (btn) {
-        const token = storedSession(); if (!token) { openSignup(); return; }
-        const me = jwtSub(token); if (!me) { openSignup(); return; }
+        if (!storedSession()) { openSignup(); return; }
         const following = btn.dataset.following === '1';
         btn.disabled = true;
         try {
-          if (following) {
-            await fetch(`${SUPABASE_URL}/rest/v1/fan_support?fan_id=eq.${me}&artist_id=eq.${ARTIST_ID}&type=eq.follow`, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token, 'apikey': SUPABASE_ANON_KEY } });
-            setFollowBtn(false); FOLLOWER_COUNT = Math.max(0, FOLLOWER_COUNT - 1); updateFollowerCount();
-          } else {
-            await fetch(`${SUPABASE_URL}/rest/v1/fan_support`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }, body: JSON.stringify({ fan_id: me, artist_id: ARTIST_ID, amount: 0, type: 'follow' }) });
-            setFollowBtn(true); FOLLOWER_COUNT++; updateFollowerCount();
-          }
+          const { data, error } = await db.rpc('set_follow', { p_artist: ARTIST_ID, p_state: !following });
+          if (error) throw error;
+          const nowFollowing = !!data;
+          setFollowBtn(nowFollowing);
+          FOLLOWER_COUNT = Math.max(0, FOLLOWER_COUNT + (nowFollowing ? 1 : -1));
+          updateFollowerCount();
         } catch (e) { alert('Could not update follow'); }
         btn.disabled = false;
       };
