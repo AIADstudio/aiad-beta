@@ -16828,13 +16828,29 @@ Only capture real, meaningful decisions — not questions or general discussion.
             }
         }
 
-        function deleteTrack(trackId) {
+        async function deleteTrack(trackId) {
             if (!confirm('Delete this track?')) return;
             const card = document.getElementById('trackCard-' + trackId);
             if (card) { card.style.opacity='0'; setTimeout(() => card.remove(), 300); }
 
             const libCard = document.getElementById('libTrack-' + trackId);
             if (libCard) { libCard.remove(); }
+            const td = window._trackData ? window._trackData[trackId] : null;
+
+            // Remove from the database so it doesn't reappear on refresh.
+            try {
+                const { error } = await db.from('tracks').delete().eq('id', trackId);
+                if (error) { showToast('Delete failed: ' + error.message); }
+                if (td && td.url) { await db.from('tracks').delete().eq('url', td.url); }
+            } catch (e) { showToast('Delete failed: ' + (e.message || e)); }
+
+            // Remove from the local cache too.
+            try {
+                const local = JSON.parse(localStorage.getItem('aiad_tracks') || '[]');
+                const filtered = local.filter(function (t) { return t.id !== trackId && (!td || t.url !== td.url); });
+                localStorage.setItem('aiad_tracks', JSON.stringify(filtered));
+            } catch (e) {}
+
             delete window._trackData?.[trackId];
             showToast('Track deleted');
         }
