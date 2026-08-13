@@ -5617,7 +5617,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                             <div class="settings-actions"><button class="settings-btn secondary">Pause subscription</button><button class="settings-btn danger">Cancel subscription</button></div>
                         </div>
 
-                        <div class="settings-section" id="fanSupportSection">
+                        <div class="settings-section" id="fanSupportSection" style="display:none">
                             <div class="settings-section-header">
                                 <h2 class="settings-section-title">Fan Support &amp; Monetization</h2>
                                 <p class="settings-section-subtitle">Control how fans support your work.</p>
@@ -13823,9 +13823,9 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 setTxt('usageStorage', _humanBytes(data.storage_bytes));
                 setTxt('usageMemories', (Number(data.decision_memories) || 0).toLocaleString());
                 // Per-account: hide fan-support/monetization tiers for these accounts
-                const noFanSupport = ['hardyindiigo'];
+                // Fan pledge tiers are placeholder/unwired — keep hidden for all users until real.
                 const fs = document.getElementById('fanSupportSection');
-                if (fs) fs.style.display = noFanSupport.includes(String(data.username || '').toLowerCase()) ? 'none' : '';
+                if (fs) fs.style.display = 'none';
                 const _founder = ['hardyindiigo'];
                 const fep = document.getElementById('founderEmailPanel');
                 if (fep) fep.style.display = _founder.includes(String(data.username || '').toLowerCase()) ? 'block' : 'none';
