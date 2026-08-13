@@ -1,0 +1,40 @@
+diff --git a/index.html b/index.html
+index 148e2d5..83108ac 100644
+--- a/index.html
++++ b/index.html
+@@ -27448,27 +27448,14 @@ Be direct and concrete with real industry insight — never generic filler. When
+     function reposition() {
+         const btn = document.getElementById('aiadBugBtn');
+         if (!btn) return;
+-        // Everything else parked in this corner: the player bar during playback, and
+-        // the two founder-only widgets. Stack above the tallest of them.
+-        const blockers = ['bottomPlayer', 'aiadAdminBtn', 'aiadPreviewPanel']
+-            .map((id) => topEdgeFromBottom(document.getElementById(id)))
+-            .filter((n) => n > 0);
+-        let bottom = blockers.length ? Math.max(14, Math.max.apply(null, blockers) + 10) : 14;
+-
+-        // For the founder all three stack up, and climbing past them would strand this
+-        // button halfway up the screen. Move to the opposite corner instead, clear of
+-        // the Help button that lives there (18px in, ~42px wide).
+-        const crowded = bottom > 200;
+-        if (crowded) {
+-            btn.style.right = 'auto';
+-            btn.style.left  = (topEdgeFromBottom(document.getElementById('aiadHelpBtn')) ? 70 : 18) + 'px';
+-            // The player bar spans the full width, so it still has to be cleared here.
+-            const playerTop = topEdgeFromBottom(document.getElementById('bottomPlayer'));
+-            bottom = playerTop ? playerTop + 10 : 18;
+-        } else if (btn.style.right === 'auto') {
+-            btn.style.left = 'auto';
+-            btn.style.right = '18px';
+-        }
++        // Error-only now, so pin it centered just above the error toast rather than
++        // hopping between corners as the founder widgets and player bar come and go.
++        // Only the full-width player bar needs clearing.
++        btn.style.right = 'auto';
++        btn.style.left = '50%';
++        btn.style.transform = 'translateX(-50%)';
++        const playerTop = topEdgeFromBottom(document.getElementById('bottomPlayer'));
++        const bottom = Math.max(78, playerTop ? playerTop + 12 : 78);
+         if (btn.style.bottom !== bottom + 'px') btn.style.bottom = bottom + 'px';
+     }
+ 

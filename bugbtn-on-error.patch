@@ -1,0 +1,38 @@
+diff --git a/index.html b/index.html
+index 1c5bfe6..148e2d5 100644
+--- a/index.html
++++ b/index.html
+@@ -27539,11 +27539,32 @@ Be direct and concrete with real industry insight — never generic filler. When
+         }
+     }
+ 
++    // Only surface the button when the user has actually hit an error: a visible
++    // error toast, or a captured JS error / console.error / promise rejection
++    // (window.__aiadLastError). It lingers briefly so they can click it, then hides.
++    const BUG_ERR_RE = /(fail|error|could ?n.?t|couldn'?t|cannot|can'?t|denied|invalid|wrong|unable|try again|not connected|went wrong|problem)/i;
++    const BUG_SHOW_MS = 25000;
++    let bugShowUntil = 0, bugSeenErrAt = 0;
++    function errorActive() {
++        const now = Date.now();
++        const le = window.__aiadLastError;
++        if (le && le.at) {
++            const t = Date.parse(le.at);
++            if (t && t > bugSeenErrAt) { bugSeenErrAt = t; bugShowUntil = now + BUG_SHOW_MS; }
++        }
++        const toast = document.getElementById('globalToast');
++        if (toast && toast.classList.contains('show') && BUG_ERR_RE.test(toast.textContent || '')) {
++            bugShowUntil = now + BUG_SHOW_MS;
++        }
++        return now < bugShowUntil;
++    }
+     function sync() {
+         build();
+         const btn = document.getElementById('aiadBugBtn');
+         if (!btn) return;
+-        const show = anyDashboardVisible();
++        // Keep it visible while the report form itself is open.
++        const formOpen = !!(document.getElementById('aiadBugOverlay') && document.getElementById('aiadBugOverlay').style.display !== 'none');
++        const show = anyDashboardVisible() && (errorActive() || formOpen);
+         btn.style.display = show ? 'inline-flex' : 'none';
+         if (show) reposition();
+     }

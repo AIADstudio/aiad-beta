@@ -1,0 +1,254 @@
+diff --git a/about.html b/about.html
+new file mode 100644
+index 0000000..e9369c7
+--- /dev/null
++++ b/about.html
+@@ -0,0 +1,68 @@
++<!DOCTYPE html>
++<html lang="en">
++<head>
++<meta charset="UTF-8">
++<meta name="viewport" content="width=device-width,initial-scale=1">
++<title>About · AIAD Studio</title>
++<meta name="description" content="About AIAD — Artist Intelligence &amp; Development.">
++<link rel="icon" type="image/png" href="/icon-192.png">
++<link rel="apple-touch-icon" href="/apple-touch-icon.png">
++<style>
++  :root { --bg:#0a0a0f; --bg-card:rgba(255,255,255,0.02); --border:rgba(255,255,255,0.08); --text:#e5e7eb; --text-muted:#94a3b8; --text-hint:#64748b; --magenta:#d946ef; --teal:#06b6d4; --link:#06b6d4; --font-body:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Inter,system-ui,sans-serif; --font-display:-apple-system,BlinkMacSystemFont,"SF Pro Display",Inter,sans-serif; }
++  *,*::before,*::after{ box-sizing:border-box; } html,body{ margin:0;padding:0; }
++  body{ background:var(--bg);color:var(--text);font-family:var(--font-body);line-height:1.65;font-size:15.5px;min-height:100vh; }
++  .topbar{ position:sticky;top:0;z-index:10;background:rgba(10,10,15,0.85);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);padding:14px 22px;display:flex;align-items:center;justify-content:space-between; }
++  .brand{ display:flex;align-items:center;gap:10px;color:#fff;text-decoration:none;font-weight:700;letter-spacing:0.05em;font-family:var(--font-display); }
++  .brand img{ width:30px;height:30px; }
++  .topbar a.back{ color:var(--text-muted);text-decoration:none;font-size:0.88rem; }
++  .topbar a.back:hover{ color:var(--text); }
++  main{ max-width:820px;margin:0 auto;padding:40px 24px 80px; }
++  h1{ font-family:var(--font-display);font-size:2rem;font-weight:700;color:#fff;letter-spacing:-0.01em;margin:0 0 8px 0; }
++  h1 + p{ color:var(--text-muted);font-size:0.92rem;margin:0 0 32px 0; }
++  h2{ font-family:var(--font-display);font-size:1.45rem;font-weight:700;color:#fff;margin:38px 0 14px 0;padding-top:14px;border-top:1px solid var(--border); }
++  h3{ font-size:1.05rem;font-weight:600;color:#fff;margin:26px 0 10px 0; }
++  h4{ font-size:0.95rem;font-weight:600;color:var(--text);margin:20px 0 8px 0; }
++  p{ margin:0 0 14px 0;color:var(--text); }
++  a{ color:var(--link);text-decoration:underline;text-underline-offset:2px; } a:hover{ color:#fff; }
++  ul,ol{ padding-left:24px;margin:8px 0 16px 0; } li{ margin-bottom:6px; }
++  strong,b{ color:#fff;font-weight:600; } em,i{ color:var(--text); }
++  blockquote{ border-left:3px solid var(--border);padding:4px 0 4px 18px;margin:12px 0 16px 12px;color:var(--text-muted); }
++  table{ border-collapse:collapse;width:100%;margin:14px 0;font-size:0.92rem; }
++  th,td{ border:1px solid var(--border);padding:10px 12px;vertical-align:top;text-align:left; }
++  th{ background:rgba(255,255,255,0.04);color:#fff;font-weight:600; }
++  footer{ border-top:1px solid var(--border);margin-top:60px;padding:24px 22px;text-align:center;color:var(--text-hint);font-size:0.82rem; }
++  footer a{ color:var(--text-muted);margin:0 10px;text-decoration:none; } footer a:hover{ color:#fff; }
++</style>
++</head>
++<body>
++<div class="topbar">
++  <a class="brand" href="/">
++    <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiBmaWxsPSJub25lIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NCIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiIG9wYWNpdHk9IjAuOTUiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzNCIgZmlsbD0iI2ZmZmZmZiIvPjxyZWN0IHg9IjE4IiB5PSI0MSIgd2lkdGg9IjY0IiBoZWlnaHQ9IjE4IiByeD0iOSIgZmlsbD0iIzBhMGEwZiIvPjxjaXJjbGUgY3g9IjM2IiBjeT0iNTAiIHI9IjMuMiIgZmlsbD0iI2ZmZmZmZiIvPjxjaXJjbGUgY3g9IjY0IiBjeT0iNTAiIHI9IjMuMiIgZmlsbD0iI2ZmZmZmZiIvPjwvc3ZnPg==" alt="AIAD">
++    <span>AIAD</span>
++  </a>
++  <a class="back" href="/">← Back to app</a>
++</div>
++<main>
++<h1>About AIAD</h1><p>Artist Intelligence &amp; Development</p>
++<p>AIAD is a platform built to give independent artists the kind of tools that used to belong only to major labels — powered by AI, and priced for people building their careers on their own terms.</p>
++<h2>What we do</h2>
++<p>We put an artist's whole operation in one place, with an AI layer on top that actually helps:</p>
++<ul>
++<li><strong>AIAD Agent</strong> — an AI career partner that reads your real numbers and gives specific, strategic advice: what to release, how to price, where to focus.</li>
++<li><strong>Analytics &amp; Stats</strong> — your streaming, social and audience data pulled together and made legible, so you can see what's working without a spreadsheet.</li>
++<li><strong>Store &amp; Payouts</strong> — sell music, merch and digital goods directly to fans, keep the vast majority of every sale, and get paid out cleanly.</li>
++<li><strong>Supporters</strong> — a direct line to the fans who back you, without an algorithm deciding who hears from you.</li>
++<li><strong>Collaborators</strong> — find and work with other artists, producers and creatives by genre and fit.</li>
++</ul>
++<h2>Who it's for</h2>
++<p>Independent musicians and creators who are serious about their craft and tired of guessing. Whether you're just starting or already touring, AIAD meets you where you are and grows with you.</p>
++<h2>Our mission</h2>
++<p>To level the playing field. Great artists shouldn't need a label's back office to make smart decisions — they need clear information and honest tools. That's what we're building.</p>
++<p style="margin-top:28px;"><a href="/">← Back to AIAD</a> &nbsp;·&nbsp; <a href="/contact">Contact us</a></p>
++</main>
++<footer>
++  AIAD Studio Inc. · 3500 South DuPont Highway, Dover, DE 19901<br>
++  <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/dmca">DMCA</a> · <a href="mailto:support@aiad.studio">support@aiad.studio</a>
++</footer>
++</body>
++</html>
+diff --git a/contact.html b/contact.html
+new file mode 100644
+index 0000000..319a6c6
+--- /dev/null
++++ b/contact.html
+@@ -0,0 +1,77 @@
++<!DOCTYPE html>
++<html lang="en">
++<head>
++<meta charset="UTF-8">
++<meta name="viewport" content="width=device-width,initial-scale=1">
++<title>Contact · AIAD Studio</title>
++<meta name="description" content="Get in touch with the AIAD team.">
++<link rel="icon" type="image/png" href="/icon-192.png">
++<link rel="apple-touch-icon" href="/apple-touch-icon.png">
++<style>
++  :root { --bg:#0a0a0f; --bg-card:rgba(255,255,255,0.02); --border:rgba(255,255,255,0.08); --text:#e5e7eb; --text-muted:#94a3b8; --text-hint:#64748b; --magenta:#d946ef; --teal:#06b6d4; --link:#06b6d4; --font-body:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Inter,system-ui,sans-serif; --font-display:-apple-system,BlinkMacSystemFont,"SF Pro Display",Inter,sans-serif; }
++  *,*::before,*::after{ box-sizing:border-box; } html,body{ margin:0;padding:0; }
++  body{ background:var(--bg);color:var(--text);font-family:var(--font-body);line-height:1.65;font-size:15.5px;min-height:100vh; }
++  .topbar{ position:sticky;top:0;z-index:10;background:rgba(10,10,15,0.85);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);padding:14px 22px;display:flex;align-items:center;justify-content:space-between; }
++  .brand{ display:flex;align-items:center;gap:10px;color:#fff;text-decoration:none;font-weight:700;letter-spacing:0.05em;font-family:var(--font-display); }
++  .brand img{ width:30px;height:30px; }
++  .topbar a.back{ color:var(--text-muted);text-decoration:none;font-size:0.88rem; }
++  .topbar a.back:hover{ color:var(--text); }
++  main{ max-width:820px;margin:0 auto;padding:40px 24px 80px; }
++  h1{ font-family:var(--font-display);font-size:2rem;font-weight:700;color:#fff;letter-spacing:-0.01em;margin:0 0 8px 0; }
++  h1 + p{ color:var(--text-muted);font-size:0.92rem;margin:0 0 32px 0; }
++  h2{ font-family:var(--font-display);font-size:1.45rem;font-weight:700;color:#fff;margin:38px 0 14px 0;padding-top:14px;border-top:1px solid var(--border); }
++  h3{ font-size:1.05rem;font-weight:600;color:#fff;margin:26px 0 10px 0; }
++  h4{ font-size:0.95rem;font-weight:600;color:var(--text);margin:20px 0 8px 0; }
++  p{ margin:0 0 14px 0;color:var(--text); }
++  a{ color:var(--link);text-decoration:underline;text-underline-offset:2px; } a:hover{ color:#fff; }
++  ul,ol{ padding-left:24px;margin:8px 0 16px 0; } li{ margin-bottom:6px; }
++  strong,b{ color:#fff;font-weight:600; } em,i{ color:var(--text); }
++  blockquote{ border-left:3px solid var(--border);padding:4px 0 4px 18px;margin:12px 0 16px 12px;color:var(--text-muted); }
++  table{ border-collapse:collapse;width:100%;margin:14px 0;font-size:0.92rem; }
++  th,td{ border:1px solid var(--border);padding:10px 12px;vertical-align:top;text-align:left; }
++  th{ background:rgba(255,255,255,0.04);color:#fff;font-weight:600; }
++  footer{ border-top:1px solid var(--border);margin-top:60px;padding:24px 22px;text-align:center;color:var(--text-hint);font-size:0.82rem; }
++  footer a{ color:var(--text-muted);margin:0 10px;text-decoration:none; } footer a:hover{ color:#fff; }
++</style>
++</head>
++<body>
++<div class="topbar">
++  <a class="brand" href="/">
++    <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiBmaWxsPSJub25lIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NCIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiIG9wYWNpdHk9IjAuOTUiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzNCIgZmlsbD0iI2ZmZmZmZiIvPjxyZWN0IHg9IjE4IiB5PSI0MSIgd2lkdGg9IjY0IiBoZWlnaHQ9IjE4IiByeD0iOSIgZmlsbD0iIzBhMGEwZiIvPjxjaXJjbGUgY3g9IjM2IiBjeT0iNTAiIHI9IjMuMiIgZmlsbD0iI2ZmZmZmZiIvPjxjaXJjbGUgY3g9IjY0IiBjeT0iNTAiIHI9IjMuMiIgZmlsbD0iI2ZmZmZmZiIvPjwvc3ZnPg==" alt="AIAD">
++    <span>AIAD</span>
++  </a>
++  <a class="back" href="/">← Back to app</a>
++</div>
++<main>
++<h1>Contact Us</h1><p>We'd love to hear from you.</p>
++<p>Questions, feedback, press, partnerships, or a problem you hit — reach us directly and a real person will get back to you, usually within 1–2 business days.</p>
++<h2>Email</h2>
++<p><strong>General &amp; support:</strong> <a href="mailto:founder@aiad.studio">founder@aiad.studio</a></p>
++<h2>Send a message</h2>
++<p style="color:var(--text-muted);font-size:0.92rem;">Fill this in and it'll open your email app with everything ready to send.</p>
++<form id="contactForm" onsubmit="return sendContact(event)" style="display:flex;flex-direction:column;gap:12px;max-width:520px;">
++  <input id="cName" placeholder="Your name" required style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:11px 13px;color:var(--text);font-size:0.95rem;font-family:inherit;">
++  <input id="cEmail" type="email" placeholder="Your email" required style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:11px 13px;color:var(--text);font-size:0.95rem;font-family:inherit;">
++  <textarea id="cMsg" rows="5" placeholder="How can we help?" required style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:11px 13px;color:var(--text);font-size:0.95rem;font-family:inherit;resize:vertical;"></textarea>
++  <button type="submit" style="align-self:flex-start;background:linear-gradient(135deg,var(--teal),var(--magenta));color:#fff;border:none;border-radius:9px;padding:11px 20px;font-size:0.95rem;font-weight:700;cursor:pointer;font-family:inherit;">Send message</button>
++</form>
++<script>
++function sendContact(e){
++  e.preventDefault();
++  var name=document.getElementById('cName').value.trim();
++  var email=document.getElementById('cEmail').value.trim();
++  var msg=document.getElementById('cMsg').value.trim();
++  var subject=encodeURIComponent('AIAD contact — '+name);
++  var body=encodeURIComponent(msg+'\n\n— '+name+' ('+email+')');
++  window.location.href='mailto:founder@aiad.studio?subject='+subject+'&body='+body;
++  return false;
++}
++</script>
++<p style="margin-top:28px;"><a href="/">← Back to AIAD</a> &nbsp;·&nbsp; <a href="/about">About us</a></p>
++</main>
++<footer>
++  AIAD Studio Inc. · 3500 South DuPont Highway, Dover, DE 19901<br>
++  <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/dmca">DMCA</a> · <a href="mailto:support@aiad.studio">support@aiad.studio</a>
++</footer>
++</body>
++</html>
+diff --git a/index.html b/index.html
+index c28a701..266afc1 100644
+--- a/index.html
++++ b/index.html
+@@ -27569,6 +27569,49 @@ Be direct and concrete with real industry insight — never generic filler. When
+     window.addEventListener('resize', reposition);
+ })();
+ </script>
++<style id="aiad-site-footer-css">
++/* Legal/company links live in the site footer now, not the sidebar. */
++.dash-sidebar-left .aiad-legal-links{display:none !important;}
++/* Compact the account row so more of the nav is visible. */
++@media (min-width:769px){
++  .dash-sidebar-left .dash-sidebar-footer{padding-top:10px !important;border-top:none !important;}
++  .dash-sidebar-left .dash-user-profile{padding:6px 8px !important;}
++  .dash-sidebar-left .dash-user-avatar{width:30px !important;height:30px !important;}
++  .dash-sidebar-left .dash-sidebar-footer > button{padding:6px 10px !important;font-size:0.8rem !important;}
++}
++.aiad-site-footer{border-top:1px solid var(--border-default, rgba(255,255,255,0.08));margin-top:48px;padding:26px 24px 40px;display:flex;flex-wrap:wrap;align-items:center;gap:12px 22px;}
++.aiad-site-footer .aiad-footer-links{display:flex;flex-wrap:wrap;gap:10px 22px;}
++.aiad-site-footer a{color:var(--text-muted, #94a3b8);font-size:0.8rem;font-weight:600;text-decoration:none;font-family:inherit;}
++.aiad-site-footer a:hover{color:var(--text-primary, #fff);text-decoration:underline;}
++.aiad-site-footer .aiad-footer-copy{color:var(--text-hint, #64748b);font-size:0.8rem;margin-left:auto;}
++@media (max-width:768px){.aiad-site-footer .aiad-footer-copy{margin-left:0;}}
++</style>
++<!-- ══════════════ SITE FOOTER (Spotify-style) ══════════════
++     Injected at the bottom of each dashboard's main scroll area. -->
++<script>
++(function(){
++  var LINKS = '<div class="aiad-footer-links">'
++    + '<a href="/about">About</a>'
++    + '<a href="/contact">Contact Us</a>'
++    + '<a href="/privacy">Privacy Policy</a>'
++    + '<a href="/terms">Terms</a>'
++    + '<a href="/dmca">DMCA</a>'
++    + '<a href="/privacy">Cookies</a>'
++    + '</div><div class="aiad-footer-copy">\u00a9 2026 AIAD Studio Inc.</div>';
++  function inject(){
++    document.querySelectorAll('.dash-main').forEach(function(m){
++      if (m.getAttribute('data-aiad-footer')) return;
++      m.setAttribute('data-aiad-footer','1');
++      var f = document.createElement('footer');
++      f.className = 'aiad-site-footer';
++      f.innerHTML = LINKS;
++      m.appendChild(f);
++    });
++  }
++  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', inject); else inject();
++  var n = 0, iv = setInterval(function(){ inject(); if (++n > 120) clearInterval(iv); }, 1500);
++})();
++</script>
+ </body>
+ 
+ 
+diff --git a/vercel.json b/vercel.json
+index 772f175..98df54f 100644
+--- a/vercel.json
++++ b/vercel.json
+@@ -1,10 +1,33 @@
+ {
+   "cleanUrls": true,
+   "rewrites": [
+-    { "source": "/terms",   "destination": "/terms.html" },
+-    { "source": "/privacy", "destination": "/privacy.html" },
+-    { "source": "/dmca",    "destination": "/dmca.html" },
+-    { "source": "/artist/:username", "destination": "/artist" },
+-    { "source": "/admin", "destination": "/admin.html" }
++    {
++      "source": "/terms",
++      "destination": "/terms.html"
++    },
++    {
++      "source": "/privacy",
++      "destination": "/privacy.html"
++    },
++    {
++      "source": "/dmca",
++      "destination": "/dmca.html"
++    },
++    {
++      "source": "/artist/:username",
++      "destination": "/artist"
++    },
++    {
++      "source": "/admin",
++      "destination": "/admin.html"
++    },
++    {
++      "source": "/about",
++      "destination": "/about.html"
++    },
++    {
++      "source": "/contact",
++      "destination": "/contact.html"
++    }
+   ]
+ }

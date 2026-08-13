@@ -1,0 +1,29 @@
+diff --git a/index.html b/index.html
+index def7357..25f8037 100644
+--- a/index.html
++++ b/index.html
+@@ -27449,16 +27449,6 @@ Be direct and concrete with real industry insight — never generic filler. When
+     function reposition() {
+         const btn = document.getElementById('aiadBugBtn');
+         if (!btn) return;
+-<<<<<<< ours
+-        // Error-only now, so pin it centered just above the error toast rather than
+-        // hopping between corners as the founder widgets and player bar come and go.
+-        // Only the full-width player bar needs clearing.
+-        btn.style.right = 'auto';
+-        btn.style.left = '50%';
+-        btn.style.transform = 'translateX(-50%)';
+-        const playerTop = topEdgeFromBottom(document.getElementById('bottomPlayer'));
+-        const bottom = Math.max(78, playerTop ? playerTop + 12 : 78);
+-=======
+         // Always bottom-right; just stack above whatever's parked in that corner
+         // (player bar, founder Admin button / Preview panel). Never flip to the left.
+         const blockers = ['bottomPlayer', 'aiadAdminBtn', 'aiadPreviewPanel']
+@@ -27467,7 +27457,6 @@ Be direct and concrete with real industry insight — never generic filler. When
+         const bottom = blockers.length ? Math.max(14, Math.max.apply(null, blockers) + 10) : 14;
+         btn.style.left = 'auto';
+         btn.style.right = '18px';
+->>>>>>> theirs
+         if (btn.style.bottom !== bottom + 'px') btn.style.bottom = bottom + 'px';
+     }
+ 

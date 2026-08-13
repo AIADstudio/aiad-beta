@@ -1,0 +1,50 @@
+diff --git a/index.html b/index.html
+index d241883..59bf97f 100644
+--- a/index.html
++++ b/index.html
+@@ -26779,7 +26779,11 @@ Be direct and concrete with real industry insight — never generic filler. When
+           + '<div><label style="' + labelCss + '">Type</label><select id="prodKind" style="' + inputCss + '" onchange="onProductKindChange()">'
+           + '<option value="digital"' + (p.product_kind === 'digital' ? ' selected' : '') + '>Digital download</option>'
+           + '<option value="physical"' + (p.product_kind === 'physical' ? ' selected' : '') + '>Physical item</option></select></div></div>'
+-          + '<label style="' + labelCss + '">Image URL <span style="opacity:0.7;">(optional)</span></label><input id="prodImage" style="' + inputCss + '" value="' + esc(p.image_url) + '" placeholder="https://…">'
++          + '<label style="' + labelCss + '">Product photo <span style="opacity:0.7;">(optional)</span></label>'
++          + '<input type="file" id="prodImageFile" accept="image/*" style="' + inputCss + '" onchange="uploadProductImage()">'
++          + '<img id="prodImagePreview" src="' + esc(p.image_url) + '" alt="" style="' + (p.image_url ? '' : 'display:none;') + 'margin-top:8px;max-width:160px;border-radius:8px;">'
++          + '<div id="prodImageStatus" style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;"></div>'
++          + '<label style="' + labelCss + '">or paste an image URL <span style="opacity:0.7;">(optional)</span></label><input id="prodImage" style="' + inputCss + '" value="' + esc(p.image_url) + '" placeholder="https://...">'
+           + '<div id="prodDigitalWrap"><label style="' + labelCss + '">Digital file</label>'
+           + '<input type="file" id="prodFile" style="' + inputCss + '">'
+           + '<div id="prodFileCurrent" style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;">' + (p.digital_file_url ? 'Current: ' + esc(p.digital_file_url) : 'No file uploaded yet') + '</div></div>'
+@@ -26801,6 +26805,32 @@ Be direct and concrete with real industry insight — never generic filler. When
+         if (stk) stk.style.display = kind === 'physical' ? 'block' : 'none';
+     };
+ 
++    window.uploadProductImage = async function () {
++        const fileEl = document.getElementById('prodImageFile');
++        const file = fileEl && fileEl.files ? fileEl.files[0] : null;
++        const status = document.getElementById('prodImageStatus');
++        if (!file) return;
++        if (!/^image\//.test(file.type)) { if (status) status.textContent = 'Choose an image file.'; return; }
++        try {
++            if (status) status.textContent = 'Uploading...';
++            const me = await uid();
++            if (!me) throw new Error('Sign in first');
++            const path = me + '/products/' + Date.now() + '_' + file.name.replace(/[^\w.\-]+/g, '_');
++            const { error: upErr } = await window.db.storage.from('artist-media')
++                .upload(path, file, { upsert: true, contentType: file.type });
++            if (upErr) throw new Error(upErr.message);
++            const { data: urlData } = window.db.storage.from('artist-media').getPublicUrl(path);
++            const url = (urlData && urlData.publicUrl) || '';
++            const urlInput = document.getElementById('prodImage');
++            if (urlInput) urlInput.value = url;
++            const prev = document.getElementById('prodImagePreview');
++            if (prev && url) { prev.src = url; prev.style.display = 'block'; }
++            if (status) status.textContent = 'Photo uploaded';
++        } catch (e) {
++            if (status) status.textContent = 'Upload failed: ' + e.message;
++        }
++    };
++
+     window.saveProduct = async function () {
+         const btn = document.getElementById('prodSaveBtn');
+         const msg = document.getElementById('prodMsg');

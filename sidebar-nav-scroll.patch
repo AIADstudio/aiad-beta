@@ -1,0 +1,22 @@
+diff --git a/index.html b/index.html
+index 25f8037..c28a701 100644
+--- a/index.html
++++ b/index.html
+@@ -580,11 +580,13 @@ html, body {
+ .live-stat-item .stat-change.new  { color: var(--teal-light); background: rgba(0,212,255,0.1); }
+ </style>
+ <style id="aiad-sidebar-footer-fix">
+-/* Keep the sidebar account row (Settings / Sign out) reachable on desktop: bound the
+-   sidebar to the viewport height, let the nav scroll, and pin the footer to the bottom. */
++/* Desktop: bound the sidebar to the viewport and scroll the NAV itself, so every item
++   (Store, Payouts, Creative Studio, Sync Library) is reachable, while the account-row
++   footer keeps its own space at the bottom and never overlaps the nav. */
+ @media (min-width:769px){
+-  .dash-sidebar-left{height:100vh !important;max-height:100vh !important;overflow-y:auto !important;position:sticky !important;top:0 !important;}
+-  .dash-sidebar-left .dash-sidebar-footer{position:sticky !important;bottom:0 !important;background:var(--bg-secondary);}
++  .dash-sidebar-left{height:100vh !important;max-height:100vh !important;overflow:hidden !important;position:sticky !important;top:0 !important;}
++  .dash-sidebar-left .dash-nav{flex:1 1 auto !important;min-height:0 !important;overflow-y:auto !important;}
++  .dash-sidebar-left .dash-sidebar-footer{flex-shrink:0 !important;margin-top:0 !important;}
+ }
+ </style>
+ </head>

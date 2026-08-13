@@ -1,0 +1,50 @@
+diff --git a/index.html b/index.html
+index 148e2d5..25f8037 100644
+--- a/index.html
++++ b/index.html
+@@ -26747,9 +26747,10 @@ Be direct and concrete with real industry insight — never generic filler. When
+       title.innerHTML='&#128295; Preview role';
+       title.style.cssText='color:#fff;font-size:12px;font-weight:700;';
+       var min=document.createElement('span');
+-      min.textContent='—'; min.style.cssText='cursor:pointer;color:#89f;font-size:14px;user-select:none;';
++      min.textContent='+'; min.style.cssText='cursor:pointer;color:#89f;font-size:15px;font-weight:700;line-height:1;user-select:none;';
+       var body=document.createElement('div');
+-      min.onclick=function(){ body.style.display = body.style.display==='none'?'':'none'; };
++      body.style.display='none';   // start collapsed so it isn't bulky; founder expands when needed
++      min.onclick=function(){ var hidden=body.style.display==='none'; body.style.display=hidden?'':'none'; min.textContent=hidden?'—':'+'; };
+       head.appendChild(title); head.appendChild(min);
+       wrap.appendChild(head); wrap.appendChild(body);
+ 
+@@ -27448,27 +27449,14 @@ Be direct and concrete with real industry insight — never generic filler. When
+     function reposition() {
+         const btn = document.getElementById('aiadBugBtn');
+         if (!btn) return;
+-        // Everything else parked in this corner: the player bar during playback, and
+-        // the two founder-only widgets. Stack above the tallest of them.
++        // Always bottom-right; just stack above whatever's parked in that corner
++        // (player bar, founder Admin button / Preview panel). Never flip to the left.
+         const blockers = ['bottomPlayer', 'aiadAdminBtn', 'aiadPreviewPanel']
+             .map((id) => topEdgeFromBottom(document.getElementById(id)))
+             .filter((n) => n > 0);
+-        let bottom = blockers.length ? Math.max(14, Math.max.apply(null, blockers) + 10) : 14;
+-
+-        // For the founder all three stack up, and climbing past them would strand this
+-        // button halfway up the screen. Move to the opposite corner instead, clear of
+-        // the Help button that lives there (18px in, ~42px wide).
+-        const crowded = bottom > 200;
+-        if (crowded) {
+-            btn.style.right = 'auto';
+-            btn.style.left  = (topEdgeFromBottom(document.getElementById('aiadHelpBtn')) ? 70 : 18) + 'px';
+-            // The player bar spans the full width, so it still has to be cleared here.
+-            const playerTop = topEdgeFromBottom(document.getElementById('bottomPlayer'));
+-            bottom = playerTop ? playerTop + 10 : 18;
+-        } else if (btn.style.right === 'auto') {
+-            btn.style.left = 'auto';
+-            btn.style.right = '18px';
+-        }
++        const bottom = blockers.length ? Math.max(14, Math.max.apply(null, blockers) + 10) : 14;
++        btn.style.left = 'auto';
++        btn.style.right = '18px';
+         if (btn.style.bottom !== bottom + 'px') btn.style.bottom = bottom + 'px';
+     }
+ 

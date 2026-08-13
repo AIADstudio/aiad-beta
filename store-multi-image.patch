@@ -1,0 +1,149 @@
+diff --git a/index.html b/index.html
+index 59bf97f..23cf772 100644
+--- a/index.html
++++ b/index.html
+@@ -26779,11 +26779,10 @@ Be direct and concrete with real industry insight — never generic filler. When
+           + '<div><label style="' + labelCss + '">Type</label><select id="prodKind" style="' + inputCss + '" onchange="onProductKindChange()">'
+           + '<option value="digital"' + (p.product_kind === 'digital' ? ' selected' : '') + '>Digital download</option>'
+           + '<option value="physical"' + (p.product_kind === 'physical' ? ' selected' : '') + '>Physical item</option></select></div></div>'
+-          + '<label style="' + labelCss + '">Product photo <span style="opacity:0.7;">(optional)</span></label>'
+-          + '<input type="file" id="prodImageFile" accept="image/*" style="' + inputCss + '" onchange="uploadProductImage()">'
+-          + '<img id="prodImagePreview" src="' + esc(p.image_url) + '" alt="" style="' + (p.image_url ? '' : 'display:none;') + 'margin-top:8px;max-width:160px;border-radius:8px;">'
++          + '<label style="' + labelCss + '">Product photos <span style="opacity:0.7;">(upload one or more \u2014 first is the cover)</span></label>'
++          + '<input type="file" id="prodImageFiles" accept="image/*" multiple style="' + inputCss + '" onchange="addProductImages(this)">'
++          + '<div id="prodImagesWrap" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;"></div>'
+           + '<div id="prodImageStatus" style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;"></div>'
+-          + '<label style="' + labelCss + '">or paste an image URL <span style="opacity:0.7;">(optional)</span></label><input id="prodImage" style="' + inputCss + '" value="' + esc(p.image_url) + '" placeholder="https://...">'
+           + '<div id="prodDigitalWrap"><label style="' + labelCss + '">Digital file</label>'
+           + '<input type="file" id="prodFile" style="' + inputCss + '">'
+           + '<div id="prodFileCurrent" style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;">' + (p.digital_file_url ? 'Current: ' + esc(p.digital_file_url) : 'No file uploaded yet') + '</div></div>'
+@@ -26793,6 +26792,8 @@ Be direct and concrete with real industry insight — never generic filler. When
+           + '<div id="prodMsg" style="font-size:0.78rem;color:#f59e0b;min-height:16px;margin-top:8px;"></div>'
+           + '<div class="project-detail-actions" style="margin-top:10px;"><button class="secondary" onclick="closeModal()">Cancel</button>'
+           + '<button class="primary" id="prodSaveBtn" onclick="saveProduct()">Save product</button></div>';
++        window._prodImages = Array.isArray(p.images) ? p.images.slice() : (p.image_url ? [p.image_url] : []);
++        window.renderProdImages();
+         document.getElementById('globalModal').classList.add('active');
+         window.onProductKindChange();
+     };
+@@ -26805,36 +26806,59 @@ Be direct and concrete with real industry insight — never generic filler. When
+         if (stk) stk.style.display = kind === 'physical' ? 'block' : 'none';
+     };
+ 
+-    window.uploadProductImage = async function () {
+-        const fileEl = document.getElementById('prodImageFile');
+-        const file = fileEl && fileEl.files ? fileEl.files[0] : null;
++    window._prodImages = window._prodImages || [];
++    window._prodUploading = 0;
++    window.renderProdImages = function () {
++        const wrap = document.getElementById('prodImagesWrap');
++        if (!wrap) return;
++        const e = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
++        wrap.innerHTML = (window._prodImages || []).map((u, i) =>
++            '<div style="position:relative;width:66px;height:66px;">'
++          + '<img src="' + e(u) + '" alt="" style="width:66px;height:66px;object-fit:cover;border-radius:8px;border:1px solid var(--border-default);">'
++          + '<button type="button" onclick="removeProdImage(' + i + ')" title="Remove" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:none;background:#ef4444;color:#fff;font-size:12px;line-height:1;cursor:pointer;">\u00d7</button>'
++          + (i === 0 ? '<span style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.6);color:#fff;font-size:0.58rem;text-align:center;border-radius:0 0 8px 8px;">Cover</span>' : '')
++          + '</div>').join('');
++    };
++    window.removeProdImage = function (i) {
++        (window._prodImages || []).splice(i, 1);
++        window.renderProdImages();
++    };
++    window.addProductImages = async function (input) {
++        const files = input && input.files ? Array.from(input.files) : [];
++        if (!files.length) return;
+         const status = document.getElementById('prodImageStatus');
+-        if (!file) return;
+-        if (!/^image\//.test(file.type)) { if (status) status.textContent = 'Choose an image file.'; return; }
+-        try {
+-            if (status) status.textContent = 'Uploading...';
+-            const me = await uid();
+-            if (!me) throw new Error('Sign in first');
+-            const path = me + '/products/' + Date.now() + '_' + file.name.replace(/[^\w.\-]+/g, '_');
+-            const { error: upErr } = await window.db.storage.from('artist-media')
+-                .upload(path, file, { upsert: true, contentType: file.type });
+-            if (upErr) throw new Error(upErr.message);
+-            const { data: urlData } = window.db.storage.from('artist-media').getPublicUrl(path);
+-            const url = (urlData && urlData.publicUrl) || '';
+-            const urlInput = document.getElementById('prodImage');
+-            if (urlInput) urlInput.value = url;
+-            const prev = document.getElementById('prodImagePreview');
+-            if (prev && url) { prev.src = url; prev.style.display = 'block'; }
+-            if (status) status.textContent = 'Photo uploaded';
+-        } catch (e) {
+-            if (status) status.textContent = 'Upload failed: ' + e.message;
++        const saveBtn = document.getElementById('prodSaveBtn');
++        const me = await uid();
++        if (!me) { if (status) status.textContent = 'Sign in first'; return; }
++        window._prodImages = window._prodImages || [];
++        window._prodUploading += files.length;
++        if (saveBtn) saveBtn.disabled = true;
++        for (const file of files) {
++            if (!/^image\//.test(file.type)) { window._prodUploading--; continue; }
++            try {
++                if (status) status.textContent = 'Uploading ' + file.name + '\u2026';
++                const path = me + '/products/' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '_' + file.name.replace(/[^\w.\-]+/g, '_');
++                const { error: upErr } = await window.db.storage.from('artist-media').upload(path, file, { upsert: true, contentType: file.type });
++                if (upErr) throw new Error(upErr.message);
++                const { data: urlData } = window.db.storage.from('artist-media').getPublicUrl(path);
++                const url = (urlData && urlData.publicUrl) || '';
++                if (url) { window._prodImages.push(url); window.renderProdImages(); }
++            } catch (err) {
++                if (status) status.textContent = 'Upload failed: ' + err.message;
++            } finally {
++                window._prodUploading = Math.max(0, window._prodUploading - 1);
++            }
+         }
++        if (status) status.textContent = window._prodImages.length + ' photo' + (window._prodImages.length === 1 ? '' : 's') + ' added';
++        if (saveBtn && window._prodUploading === 0) saveBtn.disabled = false;
++        input.value = '';
+     };
+ 
+     window.saveProduct = async function () {
+         const btn = document.getElementById('prodSaveBtn');
+         const msg = document.getElementById('prodMsg');
+         const val = (id) => (document.getElementById(id)?.value || '').trim();
++        if (window._prodUploading > 0) { if (msg) msg.textContent = 'Photos still uploading \u2014 one sec\u2026'; return; }
+         const id = val('prodId');
+         const name = val('prodName');
+         const kind = val('prodKind') || 'digital';
+@@ -26852,7 +26876,8 @@ Be direct and concrete with real industry insight — never generic filler. When
+                 description: val('prodDesc') || null,
+                 price: price,
+                 product_kind: kind,
+-                image_url: val('prodImage') || null,
++                image_url: (window._prodImages && window._prodImages[0]) || null,
++                images: window._prodImages || [],
+                 is_active: !!document.getElementById('prodActive')?.checked,
+                 // Inventory is meaningless for a digital file; blank means unlimited.
+                 inventory: kind === 'physical' && val('prodStock') !== '' ? parseInt(val('prodStock'), 10) : null,
+@@ -26955,7 +26980,7 @@ Be direct and concrete with real industry insight — never generic filler. When
+         const host = document.getElementById(hostId);
+         if (!host || !artistId) return;
+         const { data, error } = await window.db.from('products')
+-            .select('id,name,description,price,currency,product_kind,image_url,inventory')
++            .select('id,name,description,price,currency,product_kind,image_url,images,inventory')
+             .eq('artist_id', artistId).eq('is_active', true)
+             .order('created_at', { ascending: false });
+         const rows = (!error && data) || [];
+@@ -26967,9 +26992,16 @@ Be direct and concrete with real industry insight — never generic filler. When
+ 
+     function renderStorefrontCard(p) {
+         const soldOut = p.product_kind === 'physical' && p.inventory !== null && p.inventory !== undefined && p.inventory <= 0;
+-        const img = p.image_url
+-            ? '<img src="' + esc(p.image_url) + '" alt="" style="width:100%;height:120px;object-fit:cover;border-radius:10px;margin-bottom:9px;">'
+-            : '<div style="width:100%;height:120px;border-radius:10px;margin-bottom:9px;background:linear-gradient(135deg,#0d2f3f,#1a4a5e);"></div>';
++        const _imgs = (Array.isArray(p.images) && p.images.length) ? p.images : (p.image_url ? [p.image_url] : []);
++        const _mid = 'pmain_' + p.id;
++        const img = (_imgs.length
++            ? '<img id="' + _mid + '" src="' + esc(_imgs[0]) + '" alt="" style="width:100%;height:120px;object-fit:cover;border-radius:10px;margin-bottom:6px;">'
++              + (_imgs.length > 1
++                 ? '<div style="display:flex;gap:5px;margin-bottom:9px;overflow-x:auto;">'
++                   + _imgs.map((u) => '<img src="' + esc(u) + '" alt="" onclick="var m=document.getElementById(\'' + _mid + '\');if(m)m.src=this.src;" style="width:32px;height:32px;object-fit:cover;border-radius:6px;cursor:pointer;flex:0 0 auto;border:1px solid var(--border-default);">').join('')
++                   + '</div>'
++                 : '<div style="margin-bottom:3px;"></div>')
++            : '<div style="width:100%;height:120px;border-radius:10px;margin-bottom:9px;background:linear-gradient(135deg,#0d2f3f,#1a4a5e);"></div>');
+         return '<div style="background:var(--bg-card);border:1px solid var(--border-default);border-radius:13px;padding:12px;">'
+             + img
+             + '<div style="font-weight:600;font-size:0.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(p.name) + '</div>'
