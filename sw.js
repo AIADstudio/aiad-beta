@@ -1,7 +1,7 @@
 // AIAD Service Worker — network-first for HTML/JS/CSS, cache-first for static assets.
 // Goal: every deploy reaches users immediately; the PWA still works offline by falling back to cache.
 
-const VERSION       = "aiad-" + (self.AIAD_BUILD || "20260619");
+const VERSION       = "aiad-" + (self.AIAD_BUILD || "20260812b");
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const ASSET_CACHE   = `${VERSION}-assets`;
 
