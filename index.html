@@ -3464,7 +3464,7 @@ html, body {
                     <div class="dash-nav-item" onclick="showArtistView('analytics')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span> Analytics</span></div>
                     <div class="dash-nav-item" id="navMyStats" onclick="showArtistView('mystats')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span> My Stats</span></div>
                     <div class="dash-nav-item" onclick="showArtistView('milestones')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span> Milestones</span></div>
-                    <div class="dash-nav-item" onclick="showArtistView('inbox')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><span> Inbox </span></div>
+                    <div class="dash-nav-item" onclick="showArtistView('inbox')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><span> Inbox </span><span id="artistInboxBadge" style="display:none;margin-left:auto;background:#f59e0b;color:#111;font-size:0.6rem;font-weight:700;min-width:16px;height:16px;border-radius:999px;display:none;align-items:center;justify-content:center;padding:0 5px;">0</span></div>
                     <div class="dash-nav-item" id="navStore" onclick="showArtistView('store')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg><span> Store</span></div>
                     <div class="dash-nav-item" id="navPayouts" onclick="showArtistView('payouts')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg><span> Payouts</span></div>
                     <div class="dash-nav-item dash-nav-dropdown" onclick="toggleCreativeStudio()">
@@ -5140,6 +5140,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                         <button class="inbox-filter" onclick="filterInbox('listener', this)">Listeners</button>
                     </div>
 
+                    <div id="artistSystemInbox"></div>
                     <div class="message-list" id="artistInboxList">
 
                         <div style="padding:40px;text-align:center;color:var(--text-muted);font-size:0.875rem;">Loading messages...</div>
@@ -5594,6 +5595,15 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                                 <div class="settings-usage-item"><div class="settings-usage-label">Posts published</div><div class="settings-usage-value" id="usagePosts">—</div></div>
                                 <div class="settings-usage-item"><div class="settings-usage-label">Storage used</div><div class="settings-usage-value" id="usageStorage">—</div></div>
                                 <div class="settings-usage-item"><div class="settings-usage-label">Decision memories</div><div class="settings-usage-value" id="usageMemories">—</div></div>
+                            </div>
+                            <div id="founderEmailPanel" style="display:none;margin:8px 0 22px;padding:16px;border:1px solid var(--border-default);border-radius:12px;background:var(--bg-card);">
+                                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><div style="width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,#FF3DDB,#7C3AED);"></div><strong style="font-size:0.9rem;">PULSE welcome email <span style="color:var(--text-muted);font-weight:500;">(admin)</span></strong></div>
+                                <p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 12px;">Send the founding-member welcome email to users via Resend. Test on yourself first.</p>
+                                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                                  <button class="settings-btn secondary" onclick="sendWelcomeTest(this)">Send test to me</button>
+                                  <button class="settings-btn primary" onclick="sendWelcomeAll(this)">Send to ALL users</button>
+                                  <span id="welcomeSendStatus" style="font-size:0.8rem;color:var(--text-secondary);"></span>
+                                </div>
                             </div>
                             <h3 style="font-size: 0.9375rem; font-weight: 500; margin-bottom: var(--space-md); color: var(--text-secondary);">Available Plans</h3>
                             <div id="aiadPricingMountSettings" class="aiad-pricing-mount"></div>
@@ -8619,7 +8629,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     <div class="collab-nav-item" onclick="showCollabView('collaborations')">
                         <svg class="collab-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
                         My Collaborations
-                        <span class="collab-nav-badge">3</span>
+                        
                     </div>
                     <div class="collab-nav-item" onclick="showCollabView('discover')">
                         <svg class="collab-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
@@ -8640,7 +8650,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     <div class="collab-nav-item" onclick="showCollabView('inbox')">
                         <svg class="collab-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                         Inbox
-                        <span class="collab-nav-badge">2</span>
+                        <span class="collab-nav-badge" id="collabInboxBadge" style="display:none;">0</span>
                     </div>
                     <div class="collab-nav-item" onclick="showCollabView('payouts')">
                         <svg class="collab-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
@@ -8888,6 +8898,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                         <h1 class="collab-page-title">Inbox</h1>
                         <p class="collab-page-subtitle">Messages and collaboration requests</p>
                     </div>
+                    <div id="collabSystemInbox"></div>
 
                     <div class="collab-section">
                         <div class="collab-section-header">
@@ -13744,6 +13755,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             } else if (view === 'inbox') {
                 viewEl.classList.add('active');
                 if (navItems[11]) navItems[11].classList.add('active');
+                setTimeout(function () { _loadSystemInbox('artistSystemInbox', { replace: true }); }, 50);
             } else if (view === 'store') {
                 viewEl.classList.add('active');
                 if (navItems[12]) navItems[12].classList.add('active');
@@ -13770,6 +13782,27 @@ Only capture real, meaningful decisions — not questions or general discussion.
             if (n < 1073741824) return (n / 1048576).toFixed(1) + ' MB';
             return (n / 1073741824).toFixed(2) + ' GB';
         }
+        async function sendWelcomeTest(btn) {
+            var st = document.getElementById('welcomeSendStatus'); if (btn) btn.disabled = true; if (st) st.textContent = 'Sending test…';
+            try {
+                var u = await db.auth.getUser(); var email = u && u.data && u.data.user ? u.data.user.email : null;
+                var r = await db.functions.invoke('send-welcome', { body: { email: email } });
+                if (r.error) throw r.error;
+                if (st) st.textContent = 'Test sent to ' + (email || 'you') + ' (' + ((r.data && r.data.sent) || 0) + ' ok, ' + ((r.data && r.data.failed) || 0) + ' failed).';
+            } catch (e) { if (st) st.textContent = 'Failed: ' + (e.message || e); }
+            if (btn) btn.disabled = false;
+        }
+        async function sendWelcomeAll(btn) {
+            if (!confirm('Send the PULSE welcome email to ALL users? This cannot be undone.')) return;
+            var st = document.getElementById('welcomeSendStatus'); if (btn) btn.disabled = true; if (st) st.textContent = 'Sending to everyone…';
+            try {
+                var r = await db.functions.invoke('send-welcome', { body: {} });
+                if (r.error) throw r.error;
+                var d = r.data || {};
+                if (st) st.textContent = 'Sent ' + (d.sent || 0) + '/' + (d.total || 0) + (d.failed ? (' · ' + d.failed + ' failed (check Resend domain).') : ' · all delivered.');
+            } catch (e) { if (st) st.textContent = 'Failed: ' + (e.message || e); }
+            if (btn) btn.disabled = false;
+        }
         async function loadAccountUsage() {
             const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
             try {
@@ -13792,6 +13825,9 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 const noFanSupport = ['hardyindiigo'];
                 const fs = document.getElementById('fanSupportSection');
                 if (fs) fs.style.display = noFanSupport.includes(String(data.username || '').toLowerCase()) ? 'none' : '';
+                const _founder = ['hardyindiigo'];
+                const fep = document.getElementById('founderEmailPanel');
+                if (fep) fep.style.display = _founder.includes(String(data.username || '').toLowerCase()) ? 'block' : 'none';
             } catch (e) { /* leave dashes */ }
         }
 
@@ -19233,6 +19269,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             if (viewId === 'artists') setTimeout(loadCollabArtists, 100);
             if (viewId === 'feed') setTimeout(loadCollabFeed, 100);
             if (viewId === 'payouts') setTimeout(() => { if (window.loadPayouts) loadPayouts('collabPayoutsBody'); }, 60);
+            if (viewId === 'inbox') setTimeout(() => _loadSystemInbox('collabSystemInbox', { replace: true }), 60);
             if (viewId === 'settings') setTimeout(populateCollabSettings, 100);
             if (viewId === 'discover') setTimeout(loadCollabDiscover, 100);
         }
@@ -23603,6 +23640,56 @@ function toggleAgeRange(btn) {
         function escapeHtml(s) {
             return String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
         }
+
+        // ── PULSE system inbox (welcome + AIAD team messages) ──
+        const PULSE_AVATAR = 'data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%20100%20100%27%3E%3Cdefs%3E%3ClinearGradient%20id%3D%27g%27%20x1%3D%270%27%20y1%3D%270%27%20x2%3D%271%27%20y2%3D%271%27%3E%3Cstop%20offset%3D%270%27%20stop-color%3D%27%23FF3DDB%27%2F%3E%3Cstop%20offset%3D%271%27%20stop-color%3D%27%237C3AED%27%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Ccircle%20cx%3D%2750%27%20cy%3D%2750%27%20r%3D%2747%27%20fill%3D%27url%28%23g%29%27%2F%3E%3Cpath%20d%3D%27M16%2052%20h13%20l6%20-17%20l10%2032%20l7%20-21%20l5%206%20h21%27%20fill%3D%27none%27%20stroke%3D%27%23ffffff%27%20stroke-width%3D%276%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%2F%3E%3C%2Fsvg%3E';
+        function _inboxTimeAgo(iso) {
+            try { var d = new Date(iso), s = Math.floor((Date.now() - d) / 1000);
+                if (s < 60) return 'just now'; var m = Math.floor(s/60); if (m<60) return m+'m';
+                var h = Math.floor(m/60); if (h<24) return h+'h'; var dd = Math.floor(h/24); if (dd<7) return dd+'d';
+                return d.toLocaleDateString(undefined,{month:'short',day:'numeric'}); } catch(e){ return ''; }
+        }
+        function _systemMsgCard(m) {
+            var av = (m.sender_avatar && /^data:|^http/.test(m.sender_avatar)) ? m.sender_avatar : PULSE_AVATAR;
+            return '<div style="display:flex;gap:12px;padding:16px;background:var(--bg-card);border:1px solid ' + (m.read ? 'var(--border-default)' : 'var(--teal)') + ';border-radius:14px;margin-bottom:12px;">'
+              + '<img src="' + av + '" alt="" style="width:42px;height:42px;border-radius:50%;flex-shrink:0;">'
+              + '<div style="min-width:0;flex:1;">'
+              + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
+              + '<span style="font-weight:700;font-size:0.9rem;">' + escapeHtml(m.sender_name || 'PULSE') + '</span>'
+              + '<span style="font-size:0.6rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--teal-light);border:1px solid var(--teal);border-radius:999px;padding:1px 7px;">AIAD Team</span>'
+              + '<span style="color:var(--text-muted);font-size:0.74rem;margin-left:auto;">' + _inboxTimeAgo(m.created_at) + '</span></div>'
+              + (m.subject ? '<div style="font-weight:600;margin-top:6px;font-size:0.95rem;">' + escapeHtml(m.subject) + '</div>' : '')
+              + '<div style="margin-top:6px;color:var(--text-secondary);font-size:0.88rem;line-height:1.55;white-space:pre-wrap;">' + escapeHtml(m.body || '') + '</div>'
+              + '</div></div>';
+        }
+        async function _loadSystemInbox(mountId, opts) {
+            opts = opts || {};
+            var el = document.getElementById(mountId);
+            if (!el) return;
+            var me = (window.AppState && AppState.currentUser) ? AppState.currentUser.id : null;
+            if (!me) return;
+            var msgs = [];
+            try { var r = await db.from('messages').select('*').eq('recipient_id', me).order('created_at', { ascending: false }); msgs = r.data || []; } catch (e) { return; }
+            var cards = msgs.map(_systemMsgCard).join('');
+            if (opts.replace) el.innerHTML = cards;
+            else el.insertAdjacentHTML('afterbegin', cards);
+            try { await db.from('messages').update({ read: true }).eq('recipient_id', me).eq('read', false); } catch (e) {}
+            setTimeout(_refreshInboxBadge, 400);
+        }
+        async function _refreshInboxBadge() {
+            var me = (window.AppState && AppState.currentUser) ? AppState.currentUser.id : null;
+            if (!me) return;
+            var n = 0;
+            try { var r = await db.from('messages').select('id', { count: 'exact', head: true }).eq('recipient_id', me).eq('read', false); n = r.count || 0; } catch (e) { return; }
+            ['artistInboxBadge', 'collabInboxBadge'].forEach(function (id) {
+                var b = document.getElementById(id);
+                if (!b) return;
+                if (n > 0) { b.textContent = n; b.style.display = (id === 'artistInboxBadge') ? 'inline-flex' : 'inline-block'; }
+                else { b.style.display = 'none'; }
+            });
+        }
+        setInterval(function () { if (window.AppState && AppState.currentUser) _refreshInboxBadge(); }, 8000);
+        setTimeout(function () { if (window.AppState && AppState.currentUser) _refreshInboxBadge(); }, 2500);
 
         // Tiny markdown-ish renderer: ## headings, **bold**, lists, line breaks.
         function renderMarkdown(text) {
