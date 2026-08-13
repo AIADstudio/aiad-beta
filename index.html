@@ -18203,6 +18203,44 @@ Only capture real, meaningful decisions — not questions or general discussion.
         // and the nav credit indicator's auth hook) silently saw undefined.
         window.db = db;
 
+        // ── Error logging: make silent failures loud (writes to bug_reports) ────────
+        window.reportError = function (message, detail, context) {
+            try {
+                var u = (window.AppState && AppState.currentUser) ? AppState.currentUser : null;
+                var payload = {
+                    user_id: u ? u.id : null,
+                    user_email: u ? (u.email || null) : null,
+                    role: (window.AppState && AppState.userRole) ? AppState.userRole : null,
+                    page: (window.AppState && AppState.currentPage) ? AppState.currentPage : null,
+                    message: String(message == null ? '' : message).slice(0, 500),
+                    error_detail: detail ? String(detail).slice(0, 2000) : null,
+                    url: (location && location.href) || null,
+                    user_agent: (navigator && navigator.userAgent) || null,
+                    app_version: (window.AIAD_BUILD || null),
+                    context: context || {},
+                    status: 'open'
+                };
+                if (window.db) window.db.from('bug_reports').insert(payload).then(function () {}, function () {});
+            } catch (e) { /* never let logging throw */ }
+        };
+        // Report a failed Supabase write (call in the `if (error)` branch of any write).
+        window.reportDbError = function (table, op, error, context) {
+            if (!error) return error;
+            try {
+                console.error('[AIAD db ' + op + ' ' + table + ']', error.message, error.code, error.details);
+                window.reportError('db_' + op + '_failed:' + table,
+                    (error.message || '') + ' | code=' + (error.code || '') + ' | ' + (error.details || ''),
+                    Object.assign({ table: table, op: op }, context || {}));
+            } catch (e) {}
+            return error;
+        };
+        window.addEventListener('error', function (ev) {
+            try { window.reportError('js_error: ' + (ev.message || ''), (ev.error && ev.error.stack) || '', { src: ev.filename, line: ev.lineno }); } catch (e) {}
+        });
+        window.addEventListener('unhandledrejection', function (ev) {
+            try { var r = ev.reason; window.reportError('unhandled_rejection', (r && (r.stack || r.message)) || String(r), {}); } catch (e) {}
+        });
+
         // ── Single session resolver ────────────────────────────────────────────────
         // aiadAuthStorage above puts the token in sessionStorage when "remember me" is
         // off, so the hand-rolled localStorage.getItem('sb-…-auth-token') readers
