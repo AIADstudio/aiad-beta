@@ -14074,7 +14074,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                             }
                         } catch(e) { console.warn('[AIAD] Storage upload exception:', e); }
                     }
-                    const { data: insertedPost } = await db.from('artist_posts').insert({
+                    const { data: insertedPost, error: _postErr } = await db.from('artist_posts').insert({
                         user_id: AppState.currentUser.id,
                         content: text,
                         visibility,
@@ -14083,6 +14083,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                         media_name: _mediaName || null,
                         created_at: new Date().toISOString()
                     }).select('id').single();
+                    if (_postErr) { window.reportDbError('artist_posts', 'insert', _postErr); showToast('Post failed to save: ' + _postErr.message); }
                     // Tag the card with the DB id so delete/archive works immediately
                     if (insertedPost?.id) newPost.dataset.postId = insertedPost.id;
                     // Refresh grid to show new post as thumbnail
@@ -27881,6 +27882,7 @@ Be direct and concrete with real industry insight — never generic filler. When
             toast(id ? 'Product updated' : 'Product added');
             loadStoreManager();
         } catch (e) {
+            window.reportError('product_save_failed', (e && e.message) || String(e), {});
             msg.textContent = e.message;
             btn.disabled = false; btn.textContent = 'Save product';
         }
