@@ -10427,6 +10427,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             if (targetPage) {
                 targetPage.classList.add('active');
                 AppState.currentPage = pageId;
+                try { window.__aiadTrack && window.__aiadTrack('tool_open', pageId); } catch (e) {}
                 const mainContainer = document.getElementById('mainContainer');
                 const formPages = ['artist-profile', 'artist-goals', 'reality-check', 'subjects', 'agent', 'subscription-tier', 'fan-profile', 'fan-identity', 'fan-discovery'];
                 mainContainer.classList.toggle('main-form', formPages.includes(pageId));
@@ -20124,7 +20125,16 @@ Only capture real, meaningful decisions — not questions or general discussion.
                                         }
                                         // Load this user's tracks only
                                         const { data: tracks } = await db.from('tracks').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(50);
-                                        if (tracks) localStorage.setItem('aiad_tracks', JSON.stringify(tracks));
+                                        if (tracks) {
+                                          try {
+                                            const local = JSON.parse(localStorage.getItem('aiad_tracks') || '[]');
+                                            const dbUrls = new Set(tracks.map(t => t.url));
+                                            const localOnly = local.filter(t => t.url && !dbUrls.has(t.url));
+                                            localStorage.setItem('aiad_tracks', JSON.stringify([...localOnly, ...tracks].slice(0, 50)));
+                                          } catch (e) {
+                                            localStorage.setItem('aiad_tracks', JSON.stringify(tracks));
+                                          }
+                                        }
                                     }
                                 } catch(e) { console.log('[AIAD] Profile fetch on restore:', e); }
                             })();
@@ -21832,7 +21842,6 @@ document.addEventListener('keydown', function(e) {
                     username: fanApUsername,
                     artist_name: acc.name || 'Fan',
                     location: acc.location || '',
-                    role: 'fan',
                     primary_genre: genres[0] || '',
                 }, { onConflict: 'id' });
             }
@@ -26825,7 +26834,10 @@ Be direct and concrete with real industry insight — never generic filler. When
     try { client.auth.onAuthStateChange(function (_e, s) { userId = (s && s.user) ? s.user.id : null; }); } catch (e) {}
     function currentTool() {
       try {
+        if (window.AppState && AppState.currentPage) return AppState.currentPage;
         var h = (location.hash || '').replace(/^#\/?/, '').split('?')[0];
+        // Ignore OAuth/error fragments — they are not tool names.
+        if (h && /[=&]/.test(h)) h = '';
         return h || (location.pathname.replace(/^\//, '') || 'home');
       } catch (e) { return 'unknown'; }
     }
@@ -26838,6 +26850,7 @@ Be direct and concrete with real industry insight — never generic filler. When
         }).then(function () {}, function () {});
       } catch (e) {}
     }
+    window.__aiadTrack = track;
     (function fireStart(n) {
       if (userId) return track('session_start', null, { path: location.pathname });
       if (n > 0) setTimeout(function () { fireStart(n - 1); }, 1000);
