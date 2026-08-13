@@ -13496,7 +13496,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 const { error } = await db.from('artist_profiles')
                     .upsert({ user_id: AppState.currentUser.id, ...updates }, { onConflict: 'user_id' });
 
-                if (error) { showToast('Error saving — try again'); return; }
+                if (error) { window.reportDbError('artist_profiles', 'upsert', error, { section: 'profile' }); showToast('Error saving — try again'); return; }
 
                 if (updates.artist_name) AppState.artistProfile.artistName = updates.artist_name;
                 if (updates.location) AppState.artistProfile.location = updates.location;
@@ -17394,6 +17394,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 const { data, error } = await db.from('tracks').insert(payload).select();
                 if (error) {
                     console.error('Track save error:', error.message, error.code, error.details);
+                    window.reportDbError('tracks', 'insert', error);
                     showToast('DB save failed: ' + error.message);
                 } else {
                     console.log('Track saved to DB:', data);
