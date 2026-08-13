@@ -13755,7 +13755,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             } else if (view === 'inbox') {
                 viewEl.classList.add('active');
                 if (navItems[11]) navItems[11].classList.add('active');
-                setTimeout(function () { _loadSystemInbox('artistSystemInbox', { replace: true }); }, 50);
+                setTimeout(function () { if (window.loadArtistInbox) loadArtistInbox(); }, 50);
             } else if (view === 'store') {
                 viewEl.classList.add('active');
                 if (navItems[12]) navItems[12].classList.add('active');
@@ -14130,6 +14130,36 @@ Only capture real, meaningful decisions — not questions or general discussion.
             } catch (err) {
                 list.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted);">Error loading messages.</div>';
             }
+        }
+
+        // Winning definition: PULSE/AIAD-team messages + fan questions in one list.
+        async function loadArtistInbox() {
+            if (!AppState.currentUser) return;
+            const list = document.getElementById('artistInboxList');
+            if (!list) return;
+            let pulseHtml = '';
+            try {
+                const { data: sys } = await db.from('messages').select('*').eq('recipient_id', AppState.currentUser.id).order('created_at', { ascending: false });
+                pulseHtml = (sys || []).map(_systemMsgCard).join('');
+            } catch (e) {}
+            let fanHtml = '';
+            try {
+                const { data } = await db.from('fan_questions').select('*').eq('artist_id', AppState.currentUser.id).order('created_at', { ascending: false }).limit(30);
+                if (data && data.length) {
+                    fanHtml = data.map(function (msg) {
+                        const name = msg.fan_name || 'A fan';
+                        const initials = name.split(' ').map(function (n) { return n[0]; }).join('').toUpperCase().substring(0, 2);
+                        const answered = msg.status === 'Answered';
+                        return '<div class="message-item" style="cursor:pointer;" data-id="' + escapeHtml(msg.id) + '" data-n="' + escapeHtml(name) + '" data-q="' + escapeHtml(msg.question || '') + '" data-a="' + escapeHtml(msg.answer || '') + '" onclick="openInboxMessage(this.dataset.id, this.dataset.n, this.dataset.q, this.dataset.a)">'
+                          + '<div class="message-avatar" style="background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-weight:600;">' + initials + '</div>'
+                          + '<div class="message-content"><div class="message-sender">' + escapeHtml(name) + '</div><div class="message-preview">' + escapeHtml(msg.question || '') + '</div>'
+                          + (answered ? '<div style="font-size:0.7rem;color:var(--teal);margin-top:4px;">\u2713 Answered by AIAD</div>' : '') + '</div></div>';
+                    }).join('');
+                }
+            } catch (e) {}
+            list.innerHTML = pulseHtml + fanHtml + ((!pulseHtml && !fanHtml) ? '<div style="padding:40px;text-align:center;color:var(--text-muted);font-size:0.875rem;">No messages yet. When fans reach out, they\'ll appear here.</div>' : '');
+            try { await db.from('messages').update({ read: true }).eq('recipient_id', AppState.currentUser.id).eq('read', false); } catch (e) {}
+            setTimeout(_refreshInboxBadge, 400);
         }
 
         function openInboxMessage(id, name, question, answer) {
