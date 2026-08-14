@@ -24872,6 +24872,14 @@ function toggleAgeRange(btn) {
             try { return await r.json(); } catch (e) { return null; }
         }
         async function rpc(fn, args) {
+            // Prefer the SDK so the access token auto-refreshes; raw fetch replays dead tokens -> 401/400.
+            try {
+                if (window.db) {
+                    const { data, error } = await window.db.rpc(fn, args || {});
+                    if (error) { try { window.reportError && window.reportError('rpc_failed:' + fn, error.message + ' | ' + (error.code || ''), { fn: fn }); } catch (_) {} return null; }
+                    return data;
+                }
+            } catch (e) { try { window.reportError && window.reportError('rpc_threw:' + fn, (e && e.message) || String(e), { fn: fn }); } catch (_) {} return null; }
             const s = sess(); if (!s) return null;
             const r = await fetch(`${SUPA}/rest/v1/rpc/${fn}`, { method:'POST', headers:{'Authorization':'Bearer '+s.access_token,'apikey':anon(),'Content-Type':'application/json'}, body: JSON.stringify(args||{}) });
             try { return await r.json(); } catch (e) { return null; }
@@ -26721,7 +26729,7 @@ Be direct and concrete with real industry insight — never generic filler. When
                 await rpc('ensure_workspace', { p_industry: ind, p_role: wsRole() });
                 await rpc('set_active_industry', { p_industry: ind });
                 _wsList = null; // force refresh
-            } catch (e) {}
+            } catch (e) { try { window.reportError && window.reportError('workspace_sync_failed', (e && e.message) || String(e), { industry: ind }); } catch (_) {} }
             renderWsSwitcher();
         }
 
