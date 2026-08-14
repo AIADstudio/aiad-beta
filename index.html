@@ -14083,15 +14083,27 @@ Only capture real, meaningful decisions — not questions or general discussion.
                         media_name: _mediaName || null,
                         created_at: new Date().toISOString()
                     }).select('id').single();
-                    if (_postErr) { window.reportDbError('artist_posts', 'insert', _postErr); showToast('Post failed to save: ' + _postErr.message); }
+                    if (_postErr) {
+                        // Real failure: don't leave the user believing it posted.
+                        window.reportDbError('artist_posts', 'insert', _postErr);
+                        showToast('Post failed to save: ' + _postErr.message);
+                        // Pull the optimistic card back out of the feed.
+                        if (newPost && newPost.parentNode) newPost.parentNode.removeChild(newPost);
+                        const _emptyEl = document.getElementById('postsFeedEmpty');
+                        const _feed = document.getElementById('postsFeed');
+                        if (_emptyEl && _feed && !_feed.querySelector('.post-card')) _emptyEl.style.display = '';
+                        return;
+                    }
                     // Tag the card with the DB id so delete/archive works immediately
                     if (insertedPost?.id) newPost.dataset.postId = insertedPost.id;
+                    showToast('Post published successfully!');
                     // Refresh grid to show new post as thumbnail
                     setTimeout(function() { loadArtistPosts(); }, 500);
                 })();
+            } else {
+                // Not signed in — this is a local preview only.
+                showToast('Preview added (sign in to publish)');
             }
-
-            showToast('Post published successfully!');
         }
 
         async function loadArtistInbox() {
