@@ -25960,9 +25960,16 @@ Be direct and concrete with real industry insight — never generic filler. When
             const project = prompt('What project is this license for? (optional)') || null;
             if (btn) { btn.disabled = true; btn.textContent = 'Licensing…'; }
             const supName = (s.user.user_metadata && (s.user.user_metadata.full_name || s.user.user_metadata.username)) || 'Supervisor';
-            await fetch(`${SUPA}/rest/v1/sync_licenses`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon(), 'Content-Type': 'application/json' }, body: JSON.stringify({ listing_id: id, supervisor_id: s.user.id, supervisor_name: supName, title, price: price || null, project, status: 'requested' }) }).catch(() => {});
-            if (btn) { btn.textContent = 'Requested ✓'; btn.style.background = '#22c55e'; }
-            (window.showToast || alert)(`License requested for "${title}" — the artist has been notified.`);
+            try {
+                const r = await fetch(`${SUPA}/rest/v1/sync_licenses`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon(), 'Content-Type': 'application/json' }, body: JSON.stringify({ listing_id: id, supervisor_id: s.user.id, supervisor_name: supName, title, price: price || null, project, status: 'requested' }) });
+                if (!r.ok) throw new Error('license request failed (' + r.status + '): ' + (await r.text().catch(() => '')).slice(0, 140));
+                if (btn) { btn.textContent = 'Requested ✓'; btn.style.background = '#22c55e'; }
+                (window.showToast || alert)(`License requested for "${title}" — the artist has been notified.`);
+            } catch (e) {
+                window.__aiadReportError && window.__aiadReportError('insert', 'sync_licenses', e);
+                if (btn) { btn.disabled = false; btn.textContent = 'License'; }
+                (window.showToast || alert)(`Couldn't send the license request for "${title}" — nothing was charged or sent. Please try again.`);
+            }
         };
         window.handleLicenseTrack = function (trackId, title, price) { window.aiadLicenseSync(trackId, title, price, null); };
         async function loadSupervisorLicenses() {
