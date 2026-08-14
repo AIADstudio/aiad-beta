@@ -18243,6 +18243,71 @@ Only capture real, meaningful decisions — not questions or general discussion.
             try { var r = ev.reason; window.reportError('unhandled_rejection', (r && (r.stack || r.message)) || String(r), {}); } catch (e) {}
         });
 
+        /* ── Global silent-failure reporter ─────────────────────────────────────────
+           Wraps db.from() and db.rpc() so EVERY PostgREST error lands in bug_reports
+           (via submit_bug_report, SECURITY DEFINER). Purely additive — callers keep
+           their behaviour, errors just stop vanishing. De-duped per error/60s, ≤10/min. */
+        (function () {
+            if (!window.db || window.__aiadErrHooked) return;
+            window.__aiadErrHooked = true;
+            var recent = {}, MAX_PER_MIN = 10, sentThisMin = 0, minuteStart = Date.now();
+            function report(op, table, err) {
+                try {
+                    if (!err || !err.message) return;
+                    var key = op + ':' + table + ':' + (err.code || '') + ':' + err.message;
+                    var now = Date.now();
+                    if (recent[key] && now - recent[key] < 60000) return;
+                    recent[key] = now;
+                    if (now - minuteStart > 60000) { minuteStart = now; sentThisMin = 0; }
+                    if (sentThisMin >= MAX_PER_MIN) return;
+                    sentThisMin++;
+                    window.db.rpc('submit_bug_report', {
+                        p_message: 'auto: ' + op + ' failed on ' + table,
+                        p_page: (window.AppState && AppState.currentPage) || 'unknown',
+                        p_error_detail: [err.code, err.message, err.details, err.hint].filter(Boolean).join(' | '),
+                        p_url: location.href,
+                        p_user_agent: navigator.userAgent,
+                        p_app_version: (window.AIAD_BUILD || window.APP_VERSION || 'unknown'),
+                        p_context: { op: op, table: table, code: err.code || null, auto: true }
+                    }).then(function () {}, function () {});
+                    console.error('[aiad] ' + op + ' ' + table + ':', err);
+                } catch (e) {}
+            }
+            // Exposed for storage / raw-fetch sites (Step 2).
+            window.__aiadReportError = function (op, target, err) { report(op, target, err); };
+            function wrapThenable(builder, op, table) {
+                var origThen = builder.then.bind(builder);
+                builder.then = function (onOk, onErr) {
+                    return origThen(function (res) {
+                        if (res && res.error) report(op, table, res.error);
+                        return onOk ? onOk(res) : res;
+                    }, onErr);
+                };
+                return builder;
+            }
+            var origFrom = window.db.from.bind(window.db);
+            window.db.from = function (table) {
+                var qb = origFrom(table);
+                ['select', 'insert', 'update', 'upsert', 'delete'].forEach(function (verb) {
+                    if (typeof qb[verb] !== 'function') return;
+                    var orig = qb[verb].bind(qb);
+                    qb[verb] = function () {
+                        var out = orig.apply(null, arguments);
+                        if (out && typeof out.then === 'function') wrapThenable(out, verb, table);
+                        return out;
+                    };
+                });
+                return qb;
+            };
+            var origRpc = window.db.rpc.bind(window.db);
+            window.db.rpc = function (fn) {
+                var out = origRpc.apply(null, arguments);
+                if (fn === 'submit_bug_report') return out;   // never recurse
+                if (out && typeof out.then === 'function') wrapThenable(out, 'rpc', fn);
+                return out;
+            };
+        })();
+
         // ── Single session resolver ────────────────────────────────────────────────
         // aiadAuthStorage above puts the token in sessionStorage when "remember me" is
         // off, so the hand-rolled localStorage.getItem('sb-…-auth-token') readers
