@@ -26267,6 +26267,54 @@ Be direct and concrete with real industry insight — never generic filler. When
                 </div>`).join('');
         }
 
+        async function renderAdminHealth() {
+            adminLoading('Scanning for silent failures…');
+            const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+            const d = await rpc('admin_recent_failures', { p_hours: 24 });
+            if (!d || d.message) { adminBody().innerHTML = `<div style="color:#f87171;">Could not load health data${d && d.message ? ': ' + d.message : ''}.</div>`; return; }
+            const rows = Array.isArray(d.rows) ? d.rows : [];
+            const top = Array.isArray(d.top) ? d.top : [];
+            const total = d.total || 0, auto = d.auto_total || 0;
+            const accent = total === 0 ? '#22c55e' : (auto > 0 ? '#f87171' : '#f59e0b');
+
+            if (total === 0) {
+                adminBody().innerHTML = `
+                    <div style="display:flex;align-items:center;gap:10px;background:#0d1f16;border:1px solid rgba(34,197,94,0.3);border-radius:12px;padding:18px 20px;">
+                        <span style="font-size:1.4rem;">✅</span>
+                        <div><div style="color:#22c55e;font-weight:700;font-size:0.98rem;">All clear</div>
+                        <div style="color:#94a3b8;font-size:0.82rem;margin-top:2px;">No errors or silent failures logged in the last 24 hours.</div></div>
+                    </div>`;
+                return;
+            }
+
+            const topHtml = top.map(t => `<span style="font-size:0.72rem;color:#cbd5e1;background:#1a1d28;border-radius:999px;padding:3px 10px;margin:0 6px 6px 0;display:inline-block;">${esc(t.message)} <b style="color:${accent};">×${t.n}</b></span>`).join('');
+            const rowHtml = rows.map(r => {
+                const when = r.created_at ? new Date(r.created_at).toLocaleString() : '';
+                const tag = r.auto ? '<span style="font-size:0.62rem;color:#f87171;background:rgba(248,113,113,0.12);border:1px solid rgba(248,113,113,0.3);border-radius:4px;padding:1px 6px;text-transform:uppercase;letter-spacing:0.04em;">auto</span>'
+                                   : '<span style="font-size:0.62rem;color:#94a3b8;background:rgba(148,163,184,0.12);border:1px solid rgba(148,163,184,0.25);border-radius:4px;padding:1px 6px;text-transform:uppercase;letter-spacing:0.04em;">reported</span>';
+                const where = [r.op && ('op ' + r.op), r.target, r.page].filter(Boolean).map(esc).join(' · ');
+                return `<div style="background:#12141d;border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:11px 13px;margin-bottom:8px;">
+                    <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline;"><span style="color:#e2e8f0;font-size:0.84rem;font-weight:600;">${esc(r.message)}</span><span style="color:#64748b;font-size:0.68rem;white-space:nowrap;">${esc(when)}</span></div>
+                    ${r.error_detail ? `<div style="color:#f8b4b4;font-size:0.75rem;margin-top:5px;font-family:ui-monospace,monospace;line-height:1.4;">${esc(r.error_detail)}</div>` : ''}
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;gap:10px;"><span style="color:#64748b;font-size:0.7rem;">${where}</span>${tag}</div>
+                </div>`;
+            }).join('');
+
+            adminBody().innerHTML = `
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:14px;">
+                    ${metricCard('Failures (24h)', total, accent)}
+                    ${metricCard('Silent / auto-caught', auto, auto > 0 ? '#f87171' : '#22c55e')}
+                    ${metricCard('Distinct issues', top.length, '#38bdf8')}
+                </div>
+                ${topHtml ? `<div style="margin-bottom:14px;">${topHtml}</div>` : ''}
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                    <h3 style="margin:0;color:#fff;font-size:0.98rem;">Recent failures</h3>
+                    <button onclick="renderAdminHealth()" style="background:transparent;color:#94a3b8;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:6px 12px;font-size:0.76rem;font-weight:600;cursor:pointer;">↻ Refresh</button>
+                </div>
+                ${rowHtml}
+                <div style="color:#64748b;font-size:0.72rem;margin-top:10px;">“Auto” = a database write or RPC that failed and was caught by the silent-failure net, even if the UI showed success.</div>`;
+        }
+
         async function renderAdminLog() {
             adminLoading('Loading agent runs…');
             const rows = await rest('admin_agent_runs?select=agent,summary,triggered_by,created_at&order=created_at.desc&limit=30');
