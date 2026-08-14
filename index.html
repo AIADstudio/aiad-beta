@@ -27170,14 +27170,18 @@ Be direct and concrete with real industry insight — never generic filler. When
     try{ var r=JSON.parse(localStorage.getItem('sb-uapiytquwuhtewqieegx-auth-token')); var c=r&&(r.currentSession||r); if(c&&c.access_token&&c.user) return c; }catch(e){}
     return null;
   }
+  var _pullFails = 0;
   async function pull(){
+    if(_pullFails >= 3) return;
     try{
-      var s=sess(); if(!s) return;
-      var r=await fetch(SU+'/rest/v1/ai_credits?select=balance,allowance&user_id=eq.'+s.user.id,{headers:{apikey:ANON,Authorization:'Bearer '+s.access_token}});
-      if(!r.ok) return; var rows=await r.json(); var row=rows&&rows[0]; if(!row) return;
+      if(!window.db || !(window.AppState && AppState.currentUser)) return;
+      var resp = await window.db.from('ai_credits').select('balance,allowance').eq('user_id', AppState.currentUser.id).limit(1);
+      if(resp.error){ _pullFails++; return; }
+      _pullFails = 0;
+      var row = resp.data && resp.data[0]; if(!row) return;
       if(row.allowance>=999999){ MAX=Infinity; BAL=Infinity; } else { MAX=row.allowance; BAL=row.balance; }
       enforce();
-    }catch(e){}
+    }catch(e){ _pullFails++; }
   }
   function enforce(){
     try{ if(MAX===undefined) return; if(window.AppState){ AppState.aiCreditsMax=MAX; AppState.aiCreditsRemaining=BAL; } }catch(e){}
@@ -27198,7 +27202,8 @@ Be direct and concrete with real industry insight — never generic filler. When
     }catch(e){}
   }
   setInterval(function(){ wrap(); enforce(); }, 700);
-  setInterval(pull, 5000);
+  setInterval(pull, 60000);
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden){ _pullFails = 0; pull(); } });
   pull();
 })();
 </script>
