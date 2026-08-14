@@ -20315,8 +20315,10 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 role: role,
                 industry: industry,
             }, { onConflict: 'id' });
-            if (error) console.error('[Supabase] Profile save error:', error.message);
-            else console.log('[Supabase] Profile saved:', industry, role);
+            if (error) {
+                console.error('[Supabase] Profile save error:', error.message);
+                window.reportDbError && window.reportDbError('profiles', 'upsert', error, { where: 'saveProfileToSupabase', industry: industry, role: role });
+            } else console.log('[Supabase] Profile saved:', industry, role);
         }
 
         function jumpToDashboard(dashboard) {
