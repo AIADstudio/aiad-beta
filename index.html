@@ -17119,7 +17119,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 if (!blob || blob.size < 1000) return tempUrl;
                 const fileName = AppState.currentUser.id + '/track_' + Date.now() + '.mp3';
                 const { error } = await db.storage.from('music-references').upload(fileName, blob, { contentType: blob.type || 'audio/mpeg', upsert: true });
-                if (error) throw new Error(error.message);
+                if (error) { window.__aiadReportError && window.__aiadReportError('storage.upload', 'music-references', error); throw new Error(error.message); }
                 const { data } = db.storage.from('music-references').getPublicUrl(fileName);
                 return (data && data.publicUrl) || tempUrl;
             } catch (e) { console.warn('[AIAD] Audio persist failed, using temp url:', e.message); return tempUrl; }
@@ -17554,7 +17554,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 var userId = AppState.currentUser?.id || AppState.user?.id || 'anon';
                 var path = folder + '/' + userId + '/' + Date.now() + '.' + ext;
                 var { error } = await db.storage.from('artist-media').upload(path, blob, { upsert: false, contentType: mime });
-                if (error) { console.warn('[AIAD] Upload error:', error.message); return base64DataUrl; }
+                if (error) { window.__aiadReportError && window.__aiadReportError('storage.upload', 'artist-media', error); console.warn('[AIAD] Upload error:', error.message); return base64DataUrl; }
                 var { data: urlData } = db.storage.from('artist-media').getPublicUrl(path);
                 console.log('[AIAD] Uploaded to storage:', urlData.publicUrl);
                 return urlData.publicUrl;
@@ -27944,7 +27944,7 @@ Be direct and concrete with real industry insight — never generic filler. When
                 btn.textContent = 'Uploading…';
                 const { error: upErr } = await window.db.storage.from('store-digital')
                     .upload(path, file, { upsert: true });
-                if (upErr) throw new Error('Upload failed: ' + upErr.message);
+                if (upErr) { window.__aiadReportError && window.__aiadReportError('storage.upload', 'store-digital', upErr); } if (upErr) throw new Error('Upload failed: ' + upErr.message);
                 row.digital_file_url = path;
             }
 
