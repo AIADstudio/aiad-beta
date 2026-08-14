@@ -25944,8 +25944,16 @@ Be direct and concrete with real industry insight — never generic filler. When
         }
         window.aiadSaveSync = async function (id, btn) {
             const s = sess(); if (!s) return;
-            await fetch(`${SUPA}/rest/v1/sync_saves`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon(), 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' }, body: JSON.stringify({ supervisor_id: s.user.id, listing_id: id }) }).catch(() => {});
-            btn.textContent = 'Saved ✓'; btn.disabled = true;
+            const _orig = btn ? btn.textContent : '';
+            try {
+                const r = await fetch(`${SUPA}/rest/v1/sync_saves`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon(), 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' }, body: JSON.stringify({ supervisor_id: s.user.id, listing_id: id }) });
+                if (!r.ok) throw new Error('save failed (' + r.status + '): ' + (await r.text().catch(() => '')).slice(0, 140));
+                if (btn) { btn.textContent = 'Saved ✓'; btn.disabled = true; }
+            } catch (e) {
+                window.__aiadReportError && window.__aiadReportError('insert', 'sync_saves', e);
+                if (btn) { btn.textContent = _orig || 'Save'; btn.disabled = false; }
+                (window.showToast || (() => {}))('Could not save — try again');
+            }
         };
         window.aiadLicenseSync = async function (id, title, price, btn) {
             const s = sess(); if (!s) return;
