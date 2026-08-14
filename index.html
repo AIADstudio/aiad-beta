@@ -17419,7 +17419,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 // Fallback: try via artists table (old schema)
                 if (!tracks || tracks.length === 0) {
                     const { data: artist } = await db.from('artists')
-                        .select('id').eq('user_id', AppState.currentUser.id).single();
+                        .select('id').eq('user_id', AppState.currentUser.id).maybeSingle();
                     if (artist) {
                         const { data: oldTracks } = await db.from('tracks')
                             .select('*').eq('artist_id', artist.id)
@@ -18288,14 +18288,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             }
             checkSpotifyCallback();
             setTimeout(() => { applyStoredAvatar(); initStudioHistory(); populateLiveStatsBar(); }, 300);
-            // Ensure artist_posts has media columns (safe to run repeatedly)
-            try {
-                await db.rpc('exec_sql', { sql: "ALTER TABLE artist_posts ADD COLUMN IF NOT EXISTS media_url text; ALTER TABLE artist_posts ADD COLUMN IF NOT EXISTS media_name text;" });
-            } catch(e) {}
-            // Create post_likes and post_comments tables
-            try {
-                await db.rpc('exec_sql', { sql: "CREATE TABLE IF NOT EXISTS post_likes (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, post_id uuid NOT NULL, user_id uuid NOT NULL, created_at timestamptz DEFAULT now(), UNIQUE(post_id, user_id)); CREATE TABLE IF NOT EXISTS post_comments (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, post_id uuid NOT NULL, user_id uuid NOT NULL, user_name text, user_avatar text, content text NOT NULL, parent_id uuid, created_at timestamptz DEFAULT now()); ALTER TABLE artist_posts ADD COLUMN IF NOT EXISTS hide_likes boolean DEFAULT false; ALTER TABLE artist_posts ADD COLUMN IF NOT EXISTS hide_comments boolean DEFAULT false;" });
-            } catch(e) {}
+            // (removed dead exec_sql bootstrap calls — those columns/tables already exist; exec_sql RPC does not exist and must not, it would be arbitrary SQL over the anon key)
         });
 
         async function restoreUserSession() {
@@ -26935,11 +26928,15 @@ Be direct and concrete with real industry insight — never generic filler. When
     try{ var raw=JSON.parse(localStorage.getItem('sb-uapiytquwuhtewqieegx-auth-token')); var c=raw&&(raw.currentSession||raw); if(c&&c.access_token&&c.user) return c; }catch(e){}
     return null;
   }
+  var _syncFails = 0;
   async function sync(){
+    if(_syncFails >= 3) return;   // stop hammering once auth is dead; resumes on visibilitychange
     try{
-      var s=sess(); if(!s) return;
-      var r=await fetch(SU+'/rest/v1/ai_credits?select=balance,allowance&user_id=eq.'+s.user.id,{headers:{apikey:ANON,Authorization:'Bearer '+s.access_token}});
-      if(!r.ok) return; var rows=await r.json(); var row=rows&&rows[0]; if(!row) return;
+      if(!window.db || !(window.AppState && AppState.currentUser)) return;
+      var resp=await window.db.from('ai_credits').select('balance,allowance').eq('user_id', AppState.currentUser.id).limit(1);
+      if(resp.error){ _syncFails++; return; }
+      _syncFails = 0;
+      var rows=resp.data; var row=rows&&rows[0]; if(!row) return;
       var unlimited=row.allowance>=999999;
       if(window.AppState){
         AppState.aiCreditsMax = unlimited?Infinity:row.allowance;
@@ -26948,7 +26945,7 @@ Be direct and concrete with real industry insight — never generic filler. When
       try{ localStorage.setItem('aiad_ai_credits', unlimited?'999999':String(row.balance)); }catch(e){}
       try{ if(typeof updateAICreditsDisplay==='function') updateAICreditsDisplay(); }catch(e){}
       try{ if(typeof updateCreditsDisplay==='function') updateCreditsDisplay(unlimited?999999:row.balance); }catch(e){}
-    }catch(e){}
+    }catch(e){ _syncFails++; }
   }
   try{ if(typeof SubscriptionTiers!=='undefined'){
     SubscriptionTiers.artist_starter = SubscriptionTiers.artist_starter || SubscriptionTiers.starter;
@@ -26956,8 +26953,8 @@ Be direct and concrete with real industry insight — never generic filler. When
     SubscriptionTiers.artist_premier = SubscriptionTiers.artist_premier || Object.assign({}, SubscriptionTiers.pro, {aiCredits: Infinity});
   }}catch(e){}
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', sync); else sync();
-  setInterval(sync, 4000);
-  document.addEventListener('visibilitychange', function(){ if(!document.hidden) sync(); });
+  setInterval(sync, 60000);
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden){ _syncFails = 0; sync(); } });
 })();
 </script>
 <script>
