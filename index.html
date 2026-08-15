@@ -17703,6 +17703,12 @@ Only capture real, meaningful decisions — not questions or general discussion.
                         source: track.source || 'generated',
                         imageUrl: track.cover_url || '',
                         lyrics: track.lyrics || '',
+                        // Raw fields so the Edit-details modal can prefill + save.
+                        dbId: track.id,
+                        tempo: track.tempo || null,
+                        key_sig: track.key_sig || null,
+                        genre: track.genre || null,
+                        cover_url: track.cover_url || null,
                         tags, blobUrl: null
                     };
 
