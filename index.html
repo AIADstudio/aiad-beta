@@ -21111,6 +21111,22 @@ Only capture real, meaningful decisions — not questions or general discussion.
             if (player) player.currentTime = Math.max(0, Math.min(player.duration || 0, player.currentTime + seconds));
         }
 
+        // Keyboard transport for the library player — only while the bottom bar is up.
+        if (!window.__aiadGlobalKeys) {
+            window.__aiadGlobalKeys = true;
+            document.addEventListener('keydown', function (e) {
+                const bp = document.getElementById('bottomPlayer');
+                if (!bp || bp.style.display === 'none') return;
+                const p = document.getElementById('globalAudioPlayer');
+                if (!p || !p.src) return;
+                const tag = (e.target && e.target.tagName) || '';
+                if (/INPUT|TEXTAREA|SELECT/.test(tag) || (e.target && e.target.isContentEditable)) return;
+                if (e.key === 'ArrowLeft') { e.preventDefault(); globalSeekRelative(-10); }
+                else if (e.key === 'ArrowRight') { e.preventDefault(); globalSeekRelative(10); }
+                else if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); globalTogglePlay(); }
+            });
+        }
+
         function seekGlobalTrack(event) {
             const player = document.getElementById('globalAudioPlayer');
             const bar = event.currentTarget;
