@@ -17098,6 +17098,97 @@ Only capture real, meaningful decisions — not questions or general discussion.
             showToast('Prompt loaded — adjust and hit Create');
         }
 
+        window.previewTrackEditCover = function (el) {
+            const f = el.files[0], img = document.getElementById('editTrackCoverPrev');
+            if (!f || !img) return;
+            img.src = URL.createObjectURL(f); img.style.display = 'block';
+        };
+        window.openTrackEdit = function (trackId) {
+            const t = window._trackData && window._trackData[trackId];
+            if (!t) { showToast('Track not found'); return; }
+            const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+            const keys = ['C', 'C#/Db', 'D', 'D#/Eb', 'E', 'F', 'F#/Gb', 'G', 'G#/Ab', 'A', 'A#/Bb', 'B'];
+            const keyOpts = ['<option value="">Key (optional)</option>'].concat(
+                [].concat.apply([], keys.map(k => [k + ' major', k + ' minor']))
+                    .map(k => '<option value="' + esc(k) + '"' + (String(t.key_sig) === k ? ' selected' : '') + '>' + esc(k) + '</option>')
+            ).join('');
+            const inp = 'width:100%;background:#0f0f0f;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:10px 12px;color:#fff;margin-bottom:10px;font-size:.9rem;box-sizing:border-box;';
+            const ov = document.createElement('div');
+            ov.id = 'aiadTrackEditModal';
+            ov.style.cssText = 'position:fixed;inset:0;z-index:100001;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:20px;';
+            ov.innerHTML = '<div style="background:#141414;border:1px solid rgba(255,255,255,.1);border-radius:16px;max-width:440px;width:100%;padding:22px;color:#fff;font-family:Inter,-apple-system,sans-serif;">'
+                + '<div style="font-weight:700;font-size:1.1rem;margin-bottom:14px;">Edit details</div>'
+                + '<label style="display:block;font-size:.75rem;color:#aaa;margin-bottom:4px;">Title</label>'
+                + '<input id="editTrackTitle" style="' + inp + '" value="' + esc(t.title) + '"/>'
+                + '<div style="display:flex;gap:10px;">'
+                + '<div style="flex:1;"><label style="display:block;font-size:.75rem;color:#aaa;margin-bottom:4px;">BPM</label><input id="editTrackBpm" type="number" min="1" max="400" style="' + inp + '" value="' + esc(t.tempo == null ? '' : t.tempo) + '"/></div>'
+                + '<div style="flex:1;"><label style="display:block;font-size:.75rem;color:#aaa;margin-bottom:4px;">Key</label><select id="editTrackKey" style="' + inp + '">' + keyOpts + '</select></div>'
+                + '</div>'
+                + '<label style="display:block;font-size:.75rem;color:#aaa;margin-bottom:4px;">Genre</label>'
+                + '<input id="editTrackGenre" style="' + inp + '" value="' + esc(t.genre || '') + '"/>'
+                + '<label style="display:block;font-size:.75rem;color:#aaa;margin-bottom:6px;">Cover art</label>'
+                + '<img id="editTrackCoverPrev"' + (t.imageUrl ? ' src="' + esc(t.imageUrl) + '"' : '') + ' style="' + (t.imageUrl ? '' : 'display:none;') + 'width:80px;height:80px;object-fit:cover;border-radius:8px;margin-bottom:8px;"/>'
+                + '<input id="editTrackCover" type="file" accept="image/*" onchange="previewTrackEditCover(this)" style="width:100%;color:#ccc;font-size:.82rem;margin-bottom:12px;"/>'
+                + '<div id="editTrackMsg" style="font-size:.78rem;color:#f88;margin-bottom:8px;"></div>'
+                + '<div style="display:flex;gap:10px;justify-content:flex-end;">'
+                + '<button onclick="document.getElementById(\'aiadTrackEditModal\').remove()" style="background:transparent;border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer;">Cancel</button>'
+                + '<button id="editTrackSaveBtn" onclick="saveTrackEdit(\'' + trackId + '\')" style="background:linear-gradient(135deg,#00D4FF,#0077B6);color:#001018;font-weight:700;border:none;border-radius:999px;padding:8px 18px;cursor:pointer;">Save</button>'
+                + '</div></div>';
+            ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove(); });
+            document.body.appendChild(ov);
+        };
+        window.saveTrackEdit = async function (trackId) {
+            const t = window._trackData && window._trackData[trackId];
+            if (!t) return;
+            const msg = document.getElementById('editTrackMsg');
+            const btn = document.getElementById('editTrackSaveBtn');
+            const val = (id) => (document.getElementById(id) && document.getElementById(id).value || '').trim();
+            const dbId = t.dbId || (String(trackId).indexOf('track-db-') === 0 ? String(trackId).slice(9) : null);
+            if (!dbId) { if (msg) msg.textContent = 'This track isn’t saved to your library yet.'; return; }
+            if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+            const stop = () => { if (btn) { btn.disabled = false; btn.textContent = 'Save'; } };
+            let coverUrl; // undefined = leave unchanged
+            const cf = document.getElementById('editTrackCover') && document.getElementById('editTrackCover').files[0];
+            if (cf) {
+                if (!/^image\//.test(cf.type || '')) { if (msg) msg.textContent = 'Cover must be an image.'; stop(); return; }
+                if (cf.size > 2 * 1024 * 1024) { if (msg) msg.textContent = 'Cover must be under 2MB.'; stop(); return; }
+                const ext = (cf.name.split('.').pop() || 'jpg').toLowerCase();
+                const path = AppState.currentUser.id + '/covers/' + Date.now() + '.' + ext;
+                const { error: upErr } = await db.storage.from('artist-media').upload(path, cf, { upsert: true, contentType: cf.type });
+                if (upErr) { window.__aiadReportError && window.__aiadReportError('storage.upload', 'artist-media', upErr); if (msg) msg.textContent = 'Cover upload failed — try again.'; stop(); return; }
+                const { data: ud } = db.storage.from('artist-media').getPublicUrl(path);
+                coverUrl = (ud && ud.publicUrl) || null;
+            }
+            const patch = {
+                title: val('editTrackTitle') || t.title || 'Untitled',
+                tempo: parseInt(val('editTrackBpm'), 10) || null,
+                key_sig: val('editTrackKey') || null,
+                genre: val('editTrackGenre') || null,
+            };
+            if (coverUrl !== undefined) patch.cover_url = coverUrl;
+            const { error } = await db.from('tracks').update(patch).eq('id', dbId);
+            if (error) {
+                window.__aiadReportError && window.__aiadReportError('update', 'tracks', error, { trackId: dbId });
+                if (msg) msg.textContent = 'Could not save — logged it. Try again.';
+                stop();
+                return; // keep modal open on failure
+            }
+            Object.assign(t, { title: patch.title, tempo: patch.tempo, key_sig: patch.key_sig, genre: patch.genre });
+            if (coverUrl !== undefined && coverUrl) { t.cover_url = coverUrl; t.imageUrl = coverUrl; }
+            refreshLibraryRow(trackId);
+            const m = document.getElementById('aiadTrackEditModal'); if (m) m.remove();
+            showToast('Track updated');
+        };
+        function refreshLibraryRow(trackId) {
+            const t = window._trackData && window._trackData[trackId];
+            if (!t) return;
+            t.tags = [t.tempo ? t.tempo + ' BPM' : null, t.key_sig || null, t.genre || null].filter(Boolean);
+            const existing = document.getElementById('libTrack-' + trackId);
+            if (existing) existing.remove();
+            addTrackToLibrary(t);
+        }
+        window.refreshLibraryRow = refreshLibraryRow;
+
         function generateTrackCover(trackId) {
             showArtistView('mixmedia');
             document.getElementById('mixmediaInput').value = 'Album cover art for track: ' + (window._trackData?.[trackId]?.title || 'untitled');
