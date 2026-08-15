@@ -27575,6 +27575,11 @@ Be direct and concrete with real industry insight — never generic filler. When
     ov.addEventListener('click',function(e){ if(e.target===ov) ov.remove(); });
     document.getElementById('aiadUpCancel').onclick=function(){ ov.remove(); };
     document.getElementById('aiadUpGo').onclick=doUpload;
+    document.getElementById('aiadUpCover').onchange=function(){
+      var f=this.files[0], img=document.getElementById('aiadUpCoverPrev');
+      if(!f){ img.style.display='none'; return; }
+      img.src=URL.createObjectURL(f); img.style.display='block';
+    };
   }
   async function doUpload(){
     var msg=document.getElementById('aiadUpMsg');
