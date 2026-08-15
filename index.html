@@ -27399,11 +27399,24 @@ Be direct and concrete with real industry insight — never generic filler. When
       var AC=window.AudioContext||window.webkitAudioContext; if(!AC) return null;
       var ab=await file.arrayBuffer();
       var actx=new AC(); var dec=await actx.decodeAudioData(ab); try{actx.close();}catch(e){}
-      var sr=22050, dur=Math.min(dec.duration, 240); // cap preview at 4 min
+      var sr=22050;
+      var PREVIEW=20;                                   // seconds — a hook, not the whole song
+      var dur=Math.min(dec.duration, PREVIEW);
+      // Start ~25% in — supervisors want the hook, not the intro.
+      var start=dec.duration > PREVIEW*1.5 ? dec.duration*0.25 : 0;
+      if(start + dur > dec.duration) start = Math.max(0, dec.duration - dur);
       var off=new OfflineAudioContext(1, Math.ceil(dur*sr), sr);
-      var src=off.createBufferSource(); src.buffer=dec; src.connect(off.destination); src.start(0);
-      // periodic double-blip watermark every ~12s
-      for(var t=4; t<dur-1; t+=12){
+      var src=off.createBufferSource(); src.buffer=dec;
+      // 0.5s fade in / out so the excerpt doesn't clip mid-waveform.
+      var env=off.createGain();
+      env.gain.setValueAtTime(0, 0);
+      env.gain.linearRampToValueAtTime(1, 0.5);
+      env.gain.setValueAtTime(1, dur-0.5);
+      env.gain.linearRampToValueAtTime(0, dur);
+      src.connect(env).connect(off.destination);
+      src.start(0, start, dur);                          // offset + duration
+      // Watermark at 3s and 13s — two marks inside a 20s window.
+      for(var t=3; t<dur-1; t+=10){
         [0,0.35].forEach(function(dt){
           var osc=off.createOscillator(), g=off.createGain();
           osc.type='sine'; osc.frequency.value=1150;
