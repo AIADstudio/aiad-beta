@@ -20861,6 +20861,18 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     applyStoredAvatar();
                 }
                 initStudioHistory(); populateLiveStatsBar(); }, 150);
+
+            // Deep-link restore: if the URL hash names a view for THIS dashboard, open it
+            // instead of the default — so a refresh keeps you on the tab you were on.
+            try {
+                const _h = (location.hash || '').replace(/^#/, '').split('/');
+                const _fn = { artist: window.showArtistView, fan: window.showFanView, collab: window.showCollabView, supervisor: window.showSupervisorView };
+                const _want = (dashboard === 'fan') ? 'fan' : (dashboard === 'collab') ? 'collab' : (dashboard === 'supervisor') ? 'supervisor' : (dashboard === 'artist') ? 'artist' : null;
+                if (_want && _h[0] === _want && _h[1] && typeof _fn[_want] === 'function') {
+                    const _view = _h[1];
+                    setTimeout(function () { try { _fn[_want](_view); } catch (e) {} }, 300);
+                }
+            } catch (e) {}
         }
 
         function runDemoScenario(type) {
