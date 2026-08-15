@@ -25951,6 +25951,7 @@ Be direct and concrete with real industry insight — never generic filler. When
             // This form only captures commercial terms — it never attaches audio. Without a
             // master, supervisors can't preview the track. Warn before creating a silent listing.
             if (!window.confirm('This listing won’t have any audio for supervisors to preview.\n\nTo attach a track, use the "Upload" button (it adds the master + a 20-second preview automatically). \n\nList "' + title + '" without audio anyway?')) return;
+            const useCases = Array.from(document.querySelectorAll('#syncUseCases .style-tag-chip.selected')).map(el => el.textContent.trim());
             const artistName = (window.AppState && AppState.artistProfile && AppState.artistProfile.artistName) || (s.user.user_metadata && s.user.user_metadata.username) || 'Artist';
             try {
                 await fetch(`${SUPA}/rest/v1/sync_listings`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon(), 'Content-Type': 'application/json' }, body: JSON.stringify({ artist_id: s.user.id, artist_name: artistName, title, price: parseFloat(price) || null, genre, mood, bpm, use_cases: useCases }) });
