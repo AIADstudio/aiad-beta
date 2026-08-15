@@ -17721,7 +17721,10 @@ Only capture real, meaningful decisions — not questions or general discussion.
                                 </div>
                                 <div style="flex:1;min-width:0;cursor:pointer;" onclick="openTrackDetail(window._trackData['${trackId}'])">
                                     <div style="font-size:0.875rem;font-weight:500;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${t.title}</div>
-                                    <div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px;">${t.source === 'uploaded' ? 'Uploaded' : 'Generated'}${tags.length ? ' · ' + tags.slice(0,2).join(', ') : ''}</div>
+                                    <div style="font-size:0.7rem;color:var(--text-muted);display:flex;align-items:center;gap:6px;margin-top:2px;">
+                                        <span style="padding:1px 7px;border-radius:4px;font-size:0.62rem;font-weight:600;letter-spacing:0.03em;color:${t.source === 'uploaded' ? '#a78bfa' : 'var(--teal)'};background:${t.source === 'uploaded' ? 'rgba(167,139,250,0.12)' : 'rgba(0,180,216,0.12)'};">${t.source === 'uploaded' ? 'Uploaded' : 'Generated'}</span>
+                                        ${tags.length ? `<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${tags.slice(0,2).join(' · ')}</span>` : ''}
+                                    </div>
                                 </div>
                                 <div style="display:flex;align-items:center;gap:6px;">
                                     <button id="playBtn-${trackId}" onclick="playTrackById('${trackId}')" style="width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,0.15);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-primary);">
