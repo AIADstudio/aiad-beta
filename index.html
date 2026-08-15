@@ -25849,9 +25849,11 @@ Be direct and concrete with real industry insight — never generic filler. When
             // The artist who owns the listing hears their master; everyone else gets the
             // watermarked preview only — the master never leaves before a license is signed.
             const s = (typeof sess === 'function') ? sess() : null;
-            const isOwner = !!(s && s.user && t.artist_id && s.user.id === t.artist_id);
+            const meId = (window.AppState && AppState.currentUser && AppState.currentUser.id) || (s && s.user && s.user.id) || null;
+            const isOwner = !!(meId && t.artist_id && meId === t.artist_id);
+            // Non-owners get the preview ONLY — never fall back to the master.
             const path = isOwner ? (t.master_path || t.preview_path) : t.preview_path;
-            if (!path) { (window.showToast || (() => {}))(isOwner ? 'No audio uploaded for this track' : 'Preview unavailable'); return; }
+            if (!path) { (window.showToast || (() => {}))(isOwner ? 'No audio uploaded yet' : 'Preview not available'); return; }
             const url = await window.trackAudioUrl({ bucket: 'sync-masters', storage_path: path });
             if (!url) { (window.showToast || (() => {}))('Audio unavailable'); return; }
             window._syncAudio = window._syncAudio || new Audio();
