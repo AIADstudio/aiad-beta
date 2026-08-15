@@ -17638,7 +17638,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                                 </div>
                                 <div style="flex:1;min-width:0;cursor:pointer;" onclick="openTrackDetail(window._trackData['${trackId}'])">
                                     <div style="font-size:0.875rem;font-weight:500;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${t.title}</div>
-                                    <div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px;">MiniMax Music${tags.length ? ' · ' + tags.slice(0,2).join(', ') : ''}</div>
+                                    <div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px;">${t.source === 'uploaded' ? 'Uploaded' : 'Generated'}${tags.length ? ' · ' + tags.slice(0,2).join(', ') : ''}</div>
                                 </div>
                                 <div style="display:flex;align-items:center;gap:6px;">
                                     <button id="playBtn-${trackId}" onclick="playTrackById('${trackId}')" style="width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,0.15);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-primary);">
@@ -20937,6 +20937,11 @@ Only capture real, meaningful decisions — not questions or general discussion.
             var url = track.blobUrl;
             if (!url) {
                 var raw = track.audioUrl || '';
+                // Uploaded tracks in a private bucket have no public url — sign one now.
+                if (!raw && track.storage_path && window.trackAudioUrl) {
+                    showToast('Loading audio...');
+                    raw = (await window.trackAudioUrl(track)) || '';
+                }
                 if (!raw) { showToast('No audio URL available'); return; }
                 if (raw.startsWith('http') && !raw.includes('supabase.co')) {
                     // External URL (Suno etc) — must proxy with auth to get blob
