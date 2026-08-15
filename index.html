@@ -25871,25 +25871,85 @@ Be direct and concrete with real industry insight — never generic filler. When
             });
         };
 
+        function _fmt(s) { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+        window.seekSync = function (id, delta) {
+            const a = window._syncAudio;
+            if (!a || a.dataset.listing !== id) return;
+            a.currentTime = Math.min(a.duration || 0, Math.max(0, a.currentTime + delta));
+        };
+        window.scrubSync = function (id, pct) {
+            const a = window._syncAudio;
+            if (!a || a.dataset.listing !== id || !a.duration) return;
+            a.currentTime = (pct / 100) * a.duration;
+        };
+        function _bindTransport(id) {
+            const a = window._syncAudio;
+            const strip = document.getElementById('xport-' + id);
+            const seek = document.getElementById('seek-' + id);
+            const cur = document.getElementById('cur-' + id);
+            const dur = document.getElementById('dur-' + id);
+            if (!a || !strip) return;
+            document.querySelectorAll('[id^="xport-"]').forEach((el) => { el.style.display = 'none'; });
+            strip.style.display = 'flex';
+            a.onloadedmetadata = () => { if (dur) dur.textContent = _fmt(a.duration); };
+            if (a.duration && dur) dur.textContent = _fmt(a.duration);
+            a.ontimeupdate = () => {
+                if (cur) cur.textContent = _fmt(a.currentTime);
+                if (seek && a.duration) seek.value = (a.currentTime / a.duration) * 100;
+            };
+        }
+        // Keyboard transport: supervisors audition dozens of tracks — arrows seek ±10s, space toggles.
+        if (!window.__aiadSyncKeys) {
+            window.__aiadSyncKeys = true;
+            document.addEventListener('keydown', function (e) {
+                const a = window._syncAudio; if (!a || !a.src) return;
+                const tag = (e.target && e.target.tagName) || '';
+                if (/INPUT|TEXTAREA|SELECT/.test(tag) || (e.target && e.target.isContentEditable)) return;
+                const lid = a.dataset.listing;
+                if (e.key === 'ArrowLeft') { e.preventDefault(); window.seekSync(lid, -10); }
+                else if (e.key === 'ArrowRight') { e.preventDefault(); window.seekSync(lid, 10); }
+                else if (e.key === ' ' || e.code === 'Space') {
+                    e.preventDefault();
+                    const btn = document.querySelector('[data-play="' + lid + '"]');
+                    if (a.paused) { a.play(); if (btn) { btn.innerHTML = '&#10073;&#10073;'; btn.dataset.playing = '1'; } }
+                    else { a.pause(); if (btn) { btn.innerHTML = '&#9654;'; btn.removeAttribute('data-playing'); } }
+                }
+            });
+        }
         function _syncCard(t, forSupervisor) {
             const uses = Array.isArray(t.use_cases) ? t.use_cases.join(', ') : '';
             const meta = [t.genre, t.mood, t.bpm ? t.bpm + ' BPM' : ''].filter(Boolean).join(' · ');
+            const isSaved = forSupervisor && window._savedListingIds && window._savedListingIds.has(t.id);
+            const saveBtn = `<button onclick="aiadSaveSync('${t.id}',this)" style="padding:7px 12px;background:${isSaved ? 'rgba(20,197,209,0.18)' : 'rgba(255,255,255,0.06)'};border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:${isSaved ? 'var(--teal,#14c5d1)' : '#cbd5e1'};font-size:0.72rem;cursor:pointer;">${isSaved ? 'Saved ✓' : 'Save'}</button>`;
             const actions = forSupervisor
-                ? `<button onclick="aiadSaveSync('${t.id}',this)" style="padding:7px 12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:#cbd5e1;font-size:0.72rem;cursor:pointer;">Save</button>
+                ? `${saveBtn}
                    <button onclick="aiadLicenseSync('${t.id}',${JSON.stringify(t.title||'')},${t.price||0},this)" style="padding:7px 14px;background:var(--teal,#14c5d1);border:none;border-radius:8px;color:#000;font-size:0.72rem;font-weight:700;cursor:pointer;">License</button>`
                 : `<span style="padding:4px 10px;background:rgba(20,197,209,0.1);border:1px solid rgba(20,197,209,0.2);border-radius:4px;font-size:0.65rem;color:var(--teal,#14c5d1);">Listed</span>
                    <button onclick="openSyncEdit('${t.id}')" style="padding:7px 12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:#cbd5e1;font-size:0.72rem;cursor:pointer;">Edit</button>`;
-            // Supervisors can only ever play the preview, so only show a button when one exists.
+            // Supervisors can only ever play the preview, so only show a control when one exists.
             const playable = forSupervisor ? t.preview_path : (t.preview_path || t.master_path);
-            const playBtn = playable
-                ? `<button onclick="playSyncTrack('${t.id}',this)" aria-label="Play ${(t.title||'track').replace(/"/g,'').replace(/</g,'')}" style="width:36px;height:36px;flex:0 0 36px;border-radius:50%;border:1px solid rgba(20,197,209,0.35);background:rgba(20,197,209,0.12);color:var(--teal,#14c5d1);cursor:pointer;font-size:0.8rem;display:flex;align-items:center;justify-content:center;">&#9654;</button>`
-                : `<div title="No audio uploaded" style="width:36px;height:36px;flex:0 0 36px;border-radius:50%;border:1px dashed rgba(255,255,255,0.15);opacity:0.4;"></div>`;
-            return `<div style="display:flex;align-items:center;gap:14px;padding:14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:10px;">
-                ${playBtn}
+            const coverBg = t.cover_url
+                ? `background:url('${String(t.cover_url).replace(/'/g, '%27')}') center/cover no-repeat;`
+                : 'background:linear-gradient(135deg,#0d2f3f,#12303a);';
+            const note = t.cover_url ? '' : '<svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="1.5" style="width:20px;height:20px;"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
+            const overlay = playable
+                ? `<button onclick="playSyncTrack('${t.id}',this)" data-play="${t.id}" aria-label="Play ${(t.title||'track').replace(/"/g,'').replace(/</g,'')}" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;border:none;background:rgba(0,0,0,0.32);color:#fff;cursor:pointer;font-size:0.85rem;">&#9654;</button>`
+                : `<div title="No audio uploaded" style="position:absolute;inset:0;border:1px dashed rgba(255,255,255,0.18);"></div>`;
+            const thumb = `<div style="position:relative;width:56px;height:56px;flex:0 0 56px;border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;${coverBg}">${note}${overlay}</div>`;
+            const transport = `<div id="xport-${t.id}" style="display:none;align-items:center;gap:8px;margin-top:10px;width:100%;">
+                <button onclick="seekSync('${t.id}',-10)" title="Back 10s" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:0.72rem;padding:2px 6px;">&#8630; 10</button>
+                <span id="cur-${t.id}" style="font-size:0.66rem;color:#94a3b8;min-width:30px;">0:00</span>
+                <input id="seek-${t.id}" type="range" min="0" max="100" value="0" step="0.1" oninput="scrubSync('${t.id}',this.value)" style="flex:1;height:3px;accent-color:var(--teal,#14c5d1);cursor:pointer;">
+                <span id="dur-${t.id}" style="font-size:0.66rem;color:#94a3b8;min-width:30px;">0:00</span>
+                <button onclick="seekSync('${t.id}',10)" title="Forward 10s" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:0.72rem;padding:2px 6px;">10 &#8631;</button>
+            </div>`;
+            return `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:14px;padding:14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:10px;">
+                ${thumb}
                 <div style="flex:1;min-width:0;"><div style="font-size:0.9rem;font-weight:600;color:var(--text-primary);">${(t.title||'').replace(/</g,'&lt;')}</div>
                 <div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;">${forSupervisor ? ((t.artist_name||'Artist') + (meta?' · '+meta:'')) : meta}</div>
                 ${uses?`<div style="font-size:0.68rem;color:var(--text-hint,#64748b);margin-top:2px;">${uses.replace(/</g,'&lt;')}</div>`:''}</div>
-                <div style="font-size:0.9rem;font-weight:700;color:var(--teal,#14c5d1);">$${t.price||''}</div>${actions}</div>`;
+                <div style="font-size:0.9rem;font-weight:700;color:var(--teal,#14c5d1);">$${t.price||''}</div>${actions}
+                ${transport}</div>`;
         }
         // Market-based sync-license price suggester. Uses typical non-exclusive indie
         // sync fee ranges by use case, anchored to the highest-value use selected.
