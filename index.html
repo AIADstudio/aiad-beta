@@ -17232,10 +17232,17 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 }
                 const ext = (cf.name.split('.').pop() || 'jpg').toLowerCase();
                 const path = AppState.currentUser.id + '/covers/' + Date.now() + '.' + ext;
-                const { error: upErr } = await db.storage.from('artist-media').upload(path, cf, { upsert: true, contentType: cf.type });
-                if (upErr) { window.__aiadReportError && window.__aiadReportError('storage.upload', 'artist-media', upErr); if (msg) msg.textContent = 'Cover upload failed — try again.'; stop(); return; }
-                const { data: ud } = db.storage.from('artist-media').getPublicUrl(path);
-                coverUrl = (ud && ud.publicUrl) || null;
+                // artist-media INSERT is authenticated-only, so send the session token explicitly
+                // (db.storage's implicit auth was going out as anon here).
+                let token = SUPABASE_ANON_KEY;
+                try { const gs = await db.auth.getSession(); token = (gs && gs.data && gs.data.session && gs.data.session.access_token) || token; } catch (e) {}
+                const upc = await fetch('https://uapiytquwuhtewqieegx.supabase.co/storage/v1/object/artist-media/' + path, {
+                    method: 'POST',
+                    headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + token, 'Content-Type': cf.type || 'image/jpeg', 'x-upsert': 'true' },
+                    body: cf
+                });
+                if (!upc.ok) { window.__aiadReportError && window.__aiadReportError('storage.upload', 'artist-media', new Error('cover ' + upc.status), { path }); if (msg) msg.textContent = 'Cover upload failed — try again.'; stop(); return; }
+                coverUrl = 'https://uapiytquwuhtewqieegx.supabase.co/storage/v1/object/public/artist-media/' + path;
             }
             const patch = {
                 title: val('editTrackTitle') || t.title || 'Untitled',
