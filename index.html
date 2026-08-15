@@ -26097,6 +26097,7 @@ Be direct and concrete with real industry insight — never generic filler. When
         }
         async function loadSyncCatalog() {
             const el = document.getElementById('syncCatalogList'); if (!el) return;
+            await loadSavedListingIds();   // so each card knows if it's already saved
             const rows = await rest('sync_listings?select=*&order=created_at.desc&limit=200');
             _syncCatalog = Array.isArray(rows) ? rows : [];
             if (_syncCatalog.length) el.innerHTML = _syncCatalog.map(t => _syncCard(t, true)).join('');
