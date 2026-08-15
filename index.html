@@ -15787,13 +15787,16 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     comments = cm.count || 0;
                 }
                 const prod = await db.from('products').select('id', { count: 'exact', head: true }).eq('artist_id', uid).eq('is_active', true);
-                const cell = (label, val) => '<div style="flex:1;min-width:88px;text-align:center;padding:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:10px;"><div style="font-size:1.25rem;font-weight:700;color:var(--text-primary);">' + val + '</div><div style="font-size:0.66rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.03em;margin-top:2px;">' + label + '</div></div>';
+                // Followers = total audience connected via fan_support (cumulative, not period-bound).
+                const foll = await db.from('fan_support').select('id', { count: 'exact', head: true }).eq('artist_id', uid);
+                const cell = (label, val) => '<div style="flex:1;min-width:80px;text-align:center;padding:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:10px;"><div style="font-size:1.25rem;font-weight:700;color:var(--text-primary);">' + val + '</div><div style="font-size:0.66rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.03em;margin-top:2px;">' + label + '</div></div>';
                 if (act) act.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px;">'
+                    + cell('Followers', (foll.count || 0))
                     + cell('Posts', (postsInPeriod.count || 0))
                     + cell('Likes', likes)
                     + cell('Comments', comments)
                     + cell('Products', (prod.count || 0))
-                    + '</div><div style="font-size:0.72rem;color:var(--text-muted);margin-top:10px;">' + periodLabel + ' — engagement counts activity in this window; Products is your current live listings.</div>';
+                    + '</div><div style="font-size:0.72rem;color:var(--text-muted);margin-top:10px;">' + periodLabel + ' — Likes, Comments and Posts count activity in this window. Followers and Products are current totals.</div>';
             } catch (e) { window.reportDbError && window.reportDbError('select', 'artist_posts', e, { where: 'analytics' }); }
         }
         window.loadArtistAnalytics = loadArtistAnalytics;
