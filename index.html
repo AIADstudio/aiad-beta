@@ -28664,10 +28664,9 @@ Be direct and concrete with real industry insight — never generic filler. When
                 catch (ce) { window.__aiadReportError && window.__aiadReportError('image.compress', 'product', ce, { size: file.size, type: file.type }); if (status) status.textContent = ce.message; continue; }
                 if (status) status.textContent = 'Uploading ' + file.name + '\u2026';
                 const path = me + '/products/' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '_' + img.name.replace(/[^\w.\-]+/g, '_');
-                const { error: upErr } = await window.db.storage.from('artist-media').upload(path, img, { upsert: false, contentType: img.type });
-                if (upErr) { window.__aiadReportError && window.__aiadReportError('storage.upload', 'artist-media', upErr); throw new Error(upErr.message); }
-                const { data: urlData } = window.db.storage.from('artist-media').getPublicUrl(path);
-                const url = (urlData && urlData.publicUrl) || '';
+                const up = await window.aiadStorageUpload('artist-media', path, img, img.type);
+                if (!up.ok) { window.__aiadReportError && window.__aiadReportError('storage.upload', 'artist-media', new Error('product ' + up.status), { path }); throw new Error('upload ' + up.status); }
+                const url = up.publicUrl || '';
                 if (url) { window._prodImages.push(url); window.renderProdImages(); }
             } catch (err) {
                 if (status) status.textContent = 'Upload failed: ' + err.message;
