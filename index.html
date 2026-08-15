@@ -27873,7 +27873,8 @@ Be direct and concrete with real industry insight — never generic filler. When
       +'<input id="aiadUpGenre" placeholder="Genre (optional)" style="'+inp+'"/>'
       +'<label style="display:block;font-size:.82rem;color:#cfcfcf;margin-bottom:6px">Cover art (optional)</label>'
       +'<input id="aiadUpCover" type="file" accept="image/*" style="width:100%;margin-bottom:12px;color:#ccc;font-size:.82rem"/>'
-      +'<img id="aiadUpCoverPrev" alt="" style="display:none;width:96px;height:96px;object-fit:cover;border-radius:8px;margin-bottom:12px"/>'
+      +'<img id="aiadUpCoverPrev" alt="" style="display:none;width:96px;height:96px;object-fit:cover;border-radius:8px;margin-bottom:6px"/>'
+      +'<div id="aiadUpCoverInfo" style="font-size:.72rem;color:#8a8a8a;margin-bottom:12px"></div>'
       +'<label style="display:flex;gap:8px;align-items:center;font-size:.85rem;margin-bottom:8px;color:#cfcfcf"><input id="aiadUpPublic" type="checkbox" checked/> Public — visible to everyone (off = private, only you)</label>'
       +'<label style="display:flex;gap:8px;align-items:center;font-size:.85rem;margin-bottom:4px;color:#cfcfcf"><input id="aiadUpSync" type="checkbox"/> Also list in the Sync Library (for music supervisors)</label>'
       +'<div style="font-size:.72rem;color:#8a8a8a;margin:0 0 16px 24px;line-height:1.45">Supervisors hear a 20-second watermarked preview. Your full master stays private and license-gated — it never leaves until a license is signed.</div>'
@@ -27885,9 +27886,10 @@ Be direct and concrete with real industry insight — never generic filler. When
     document.getElementById('aiadUpCancel').onclick=function(){ ov.remove(); };
     document.getElementById('aiadUpGo').onclick=doUpload;
     document.getElementById('aiadUpCover').onchange=function(){
-      var f=this.files[0], img=document.getElementById('aiadUpCoverPrev');
-      if(!f){ img.style.display='none'; return; }
+      var f=this.files[0], img=document.getElementById('aiadUpCoverPrev'), info=document.getElementById('aiadUpCoverInfo');
+      if(!f){ img.style.display='none'; if(info)info.textContent=''; return; }
       img.src=URL.createObjectURL(f); img.style.display='block';
+      if(info){ var mb=(f.size/1048576).toFixed(1); info.textContent = f.size>2*1024*1024 ? (mb+'MB — will be optimised on upload') : (mb+'MB'); }
     };
   }
   async function doUpload(){
