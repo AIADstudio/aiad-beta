@@ -13776,6 +13776,11 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
 
         function showArtistView(view) {
+            // Markup calls a couple of aliases that aren't real keys. Normalize them
+            // before anything else so both the id map AND the branch chain resolve —
+            // 'agents' is the 6 specialized-agent "Ask" buttons; 'feed' is the settings back-button.
+            if (view === 'agents') view = 'agent';
+            if (view === 'feed') view = 'posts';
 
             const allViews = ['artistHomeView', 'artistPostsView', 'artistSupportersView', 'artistProjectsView', 'artistRevenueView', 'artistScheduleView', 'artistCollaboratorsView', 'artistMusicView', 'artistSongwritingView', 'artistMixMediaView', 'artistMerchView', 'artistSyncLibraryView', 'artistMilestonesView', 'artistAnalyticsView', 'artistMyStatsView', 'artistAgentsView', 'artistInboxView', 'artistSettingsView', 'artistStoreView', 'artistPayoutsView'];
             allViews.forEach(v => {
