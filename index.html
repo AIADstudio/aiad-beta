@@ -26160,17 +26160,41 @@ Be direct and concrete with real industry insight — never generic filler. When
                 ${view}
             </div>`;
         }
+        // Set of listing ids the current supervisor has saved — kept in sync so the
+        // catalogue card can show what's already bookmarked and Save can toggle off.
+        window._savedListingIds = window._savedListingIds || new Set();
+        async function loadSavedListingIds() {
+            const s = sess(); if (!s) return;
+            const rows = await rest(`sync_saves?select=listing_id&supervisor_id=eq.${s.user.id}`);
+            window._savedListingIds = new Set((Array.isArray(rows) ? rows : []).map((r) => r.listing_id));
+        }
         window.aiadSaveSync = async function (id, btn) {
             const s = sess(); if (!s) return;
+            const saved = window._savedListingIds.has(id);
             const _orig = btn ? btn.textContent : '';
+            if (btn) btn.disabled = true;
             try {
-                const r = await fetch(`${SUPA}/rest/v1/sync_saves`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon(), 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' }, body: JSON.stringify({ supervisor_id: s.user.id, listing_id: id }) });
-                if (!r.ok) throw new Error('save failed (' + r.status + '): ' + (await r.text().catch(() => '')).slice(0, 140));
-                if (btn) { btn.textContent = 'Saved ✓'; btn.disabled = true; }
+                if (saved) {
+                    const r = await fetch(`${SUPA}/rest/v1/sync_saves?supervisor_id=eq.${s.user.id}&listing_id=eq.${id}`, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon() } });
+                    if (!r.ok) throw new Error('unsave failed (' + r.status + ')');
+                    window._savedListingIds.delete(id);
+                    if (btn) { btn.textContent = 'Save'; btn.style.background = 'rgba(255,255,255,0.06)'; btn.style.color = '#cbd5e1'; }
+                    // If we're on the Saved view, drop the card out immediately.
+                    if (btn && document.getElementById('supervisorSavedView') && document.getElementById('supervisorSavedView').classList.contains('active')) {
+                        const card = btn.closest('div[style*="border-radius:10px"]'); if (card) card.remove();
+                    }
+                } else {
+                    const r = await fetch(`${SUPA}/rest/v1/sync_saves`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon(), 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' }, body: JSON.stringify({ supervisor_id: s.user.id, listing_id: id }) });
+                    if (!r.ok) throw new Error('save failed (' + r.status + '): ' + (await r.text().catch(() => '')).slice(0, 140));
+                    window._savedListingIds.add(id);
+                    if (btn) { btn.textContent = 'Saved ✓'; btn.style.background = 'rgba(20,197,209,0.18)'; btn.style.color = 'var(--teal,#14c5d1)'; }
+                }
             } catch (e) {
-                window.__aiadReportError && window.__aiadReportError('insert', 'sync_saves', e);
-                if (btn) { btn.textContent = _orig || 'Save'; btn.disabled = false; }
-                (window.showToast || (() => {}))('Could not save — try again');
+                window.__aiadReportError && window.__aiadReportError(saved ? 'delete' : 'insert', 'sync_saves', e);
+                if (btn) btn.textContent = _orig || 'Save';
+                (window.showToast || (() => {}))('Could not update — try again');
+            } finally {
+                if (btn) btn.disabled = false;
             }
         };
         window.aiadLicenseSync = async function (id, title, price, btn) {
