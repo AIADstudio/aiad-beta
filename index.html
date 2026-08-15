@@ -16968,6 +16968,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 { icon: '📚', label: 'Save to Library', action: `addTrackToLibrary(window._trackData['${trackId}']); showToast('Saved to library')` },
                 { divider: true },
                 { icon: '🌐', label: 'Publish', action: `showToast('Publishing coming soon — connects to distribution')` },
+                { icon: '✏️', label: 'Edit details', action: `openTrackEdit('${trackId}')` },
                 { icon: 'ℹ️', label: 'Song Details', action: `openTrackDetail(window._trackData['${trackId}'])` },
                 { icon: '🎨', label: 'Generate Cover Art', action: `generateTrackCover('${trackId}')` },
                 { icon: '👁️', label: 'Visibility', sub: true, action: `showToast('Visibility controls coming soon')` },
