@@ -26068,6 +26068,11 @@ Be direct and concrete with real industry insight — never generic filler. When
             document.getElementById('globalModal').classList.add('active');
             if (window.aiadFillGenreSelects) window.aiadFillGenreSelects(document.getElementById('modalBody'));
         };
+        window.previewEditCover = function (el) {
+            const f = el.files[0], img = document.getElementById('editSyncCoverPrev');
+            if (!f || !img) return;
+            img.src = URL.createObjectURL(f); img.style.display = 'block';
+        };
         window.saveSyncEdit = async function () {
             const s = sess(); if (!s) return;
             const g = (id) => (document.getElementById(id) && document.getElementById(id).value || '').trim();
@@ -26075,8 +26080,27 @@ Be direct and concrete with real industry insight — never generic filler. When
             if (!title) { (window.showToast || alert)('Title is required'); return; }
             const price = g('editSyncPrice'), genre = g('editSyncGenre'), mood = g('editSyncMood'), bpm = g('editSyncBpm');
             const useCases = Array.from(document.querySelectorAll('#editSyncUses .style-tag-chip.selected')).map((el) => el.textContent.trim());
+            // Optional new cover art (existing artwork stays if none chosen).
+            let coverUrl; // undefined = leave unchanged
+            const cf = document.getElementById('editSyncCover') && document.getElementById('editSyncCover').files[0];
+            if (cf) {
+                if (!/^image\//.test(cf.type || '')) { (window.showToast || alert)('Cover must be an image file'); return; }
+                if (cf.size > 2 * 1024 * 1024) { (window.showToast || alert)('Cover art must be under 2MB'); return; }
+                const cext = (cf.name.split('.').pop() || 'jpg').toLowerCase();
+                const cpath = s.user.id + '/covers/' + Date.now() + '.' + cext;
+                const upc = await fetch(`${SUPA}/storage/v1/object/artist-media/${cpath}`, { method: 'POST', headers: { apikey: anon(), Authorization: 'Bearer ' + s.access_token, 'Content-Type': (cf.type || 'image/jpeg'), 'x-upsert': 'true' }, body: cf });
+                if (upc.ok) coverUrl = `${SUPA}/storage/v1/object/public/artist-media/${cpath}`;
+                else { window.__aiadReportError && window.__aiadReportError('storage.upload', 'artist-media', new Error('cover ' + upc.status)); (window.showToast || alert)('Cover upload failed — other changes not saved'); return; }
+            }
             try {
-                await fetch(`${SUPA}/rest/v1/sync_listings?id=eq.${id}`, { method: 'PATCH', headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon(), 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }, body: JSON.stringify({ title: title, price: price ? (parseFloat(price) || null) : null, genre: genre, mood: mood, bpm: bpm, use_cases: useCases }) });
+                const patch = { title: title, price: price ? (parseFloat(price) || null) : null, genre: genre, mood: mood, bpm: bpm, use_cases: useCases };
+                if (coverUrl !== undefined) patch.cover_url = coverUrl;
+                await fetch(`${SUPA}/rest/v1/sync_listings?id=eq.${id}`, { method: 'PATCH', headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon(), 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }, body: JSON.stringify(patch) });
+                // Mirror the cover onto the linked library track so it shows there too.
+                const trackId = g('editSyncTrackId');
+                if (coverUrl !== undefined && trackId) {
+                    await fetch(`${SUPA}/rest/v1/tracks?id=eq.${trackId}`, { method: 'PATCH', headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon(), 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }, body: JSON.stringify({ cover_url: coverUrl, cover_updated_at: new Date().toISOString() }) });
+                }
                 (window.showToast || alert)('Listing updated');
                 closeModal(); loadMyListings();
             } catch (err) { (window.showToast || alert)('Could not update — try again'); }
