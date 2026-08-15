@@ -17277,6 +17277,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
             Object.assign(t, { title: patch.title, tempo: patch.tempo, key_sig: patch.key_sig, genre: patch.genre });
             if (coverUrl !== undefined && coverUrl) { t.cover_url = coverUrl; t.imageUrl = coverUrl; }
             refreshLibraryRow(trackId);
+            // Re-render both lists from the DB so the new cover shows on the main card too, not just after a manual refresh.
+            if (typeof loadTracksFromDb === 'function') loadTracksFromDb();
             const m = document.getElementById('aiadTrackEditModal'); if (m) m.remove();
             showToast('Track updated');
         };
