@@ -13902,6 +13902,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             } else if (view === 'milestones') {
                 viewEl.classList.add('active');
                 if (navItems[10]) navItems[10].classList.add('active');
+                setTimeout(() => { try { loadArtistMilestones(); } catch (e) {} }, 100);
             } else if (view === 'inbox') {
                 viewEl.classList.add('active');
                 if (navItems[11]) navItems[11].classList.add('active');
