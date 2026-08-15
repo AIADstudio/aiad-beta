@@ -17131,7 +17131,10 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 <div style="width:40px;height:40px;border-radius:5px;flex-shrink:0;${coverBg}"></div>
                 <div style="flex:1;min-width:0;">
                     <div style="font-size:0.85rem;font-weight:500;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${track.title}</div>
-                    <div style="font-size:0.7rem;color:var(--text-muted);">${track.tags?.slice(0,2).join(' · ') || (track.source === 'uploaded' ? 'Uploaded' : 'Generated')}</div>
+                    <div style="font-size:0.7rem;color:var(--text-muted);display:flex;align-items:center;gap:6px;margin-top:2px;">
+                        <span style="padding:1px 7px;border-radius:4px;font-size:0.62rem;font-weight:600;letter-spacing:0.03em;color:${track.source === 'uploaded' ? '#a78bfa' : 'var(--teal)'};background:${track.source === 'uploaded' ? 'rgba(167,139,250,0.12)' : 'rgba(0,180,216,0.12)'};">${track.source === 'uploaded' ? 'Uploaded' : 'Generated'}</span>
+                        ${track.tags?.length ? `<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${track.tags.slice(0,2).join(' · ')}</span>` : ''}
+                    </div>
                 </div>
                 <div style="display:flex;gap:6px;">
                     <button onclick="playTrackById('${track.trackId}')" style="width:28px;height:28px;border-radius:50%;border:1px solid rgba(255,255,255,0.15);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-primary);">
