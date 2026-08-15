@@ -27628,12 +27628,12 @@ Be direct and concrete with real industry insight — never generic filler. When
         msg.textContent='Saving to your library…';
         var trackId=null;
         try{
-          var trk=await fetch(SU+'/rest/v1/tracks',{method:'POST',headers:Object.assign(jh(s.access_token),{Prefer:'return=representation'}),body:JSON.stringify({user_id:s.user.id,title:title,genre:(genre||null),source:'uploaded',bucket:'sync-masters',storage_path:mpath,is_public:false})});
+          var trk=await fetch(SU+'/rest/v1/tracks',{method:'POST',headers:Object.assign(jh(s.access_token),{Prefer:'return=representation'}),body:JSON.stringify({user_id:s.user.id,title:title,genre:(genre||null),source:'uploaded',bucket:'sync-masters',storage_path:mpath,is_public:false,cover_url:coverUrl})});
           if(trk.ok){ var trows=await trk.json(); trackId=(Array.isArray(trows)&&trows[0]&&trows[0].id)||null; }
           else if(window.__aiadReportError){ window.__aiadReportError('insert','tracks',new Error('track create '+trk.status)); }
         }catch(e){ if(window.__aiadReportError) window.__aiadReportError('insert','tracks',e); }
         msg.textContent='Listing in Sync Library…';
-        var slBody={artist_id:s.user.id,artist_name:name,title:title,genre:(genre||null),master_path:mpath,preview_path:ppath};
+        var slBody={artist_id:s.user.id,artist_name:name,title:title,genre:(genre||null),master_path:mpath,preview_path:ppath,cover_url:coverUrl};
         if(trackId) slBody.track_id=trackId;
         var sl=await fetch(SU+'/rest/v1/sync_listings',{method:'POST',headers:Object.assign(jh(s.access_token),{Prefer:'return=minimal'}),body:JSON.stringify(slBody)});
         if(!sl.ok){ msg.textContent='Could not list ('+sl.status+').'; return; }
@@ -27646,7 +27646,7 @@ Be direct and concrete with real industry insight — never generic filler. When
         if(!up.ok){ msg.textContent='Upload failed ('+up.status+').'; return; }
         var url=SU+'/storage/v1/object/public/artist-media/'+path;
         msg.textContent='Saving to your library…';
-        var tr=await fetch(SU+'/rest/v1/tracks',{method:'POST',headers:Object.assign(jh(s.access_token),{Prefer:'return=minimal'}),body:JSON.stringify({user_id:s.user.id,title:title,url:url,genre:(genre||null),is_public:isPublic,source:'uploaded',bucket:'artist-media',storage_path:path})});
+        var tr=await fetch(SU+'/rest/v1/tracks',{method:'POST',headers:Object.assign(jh(s.access_token),{Prefer:'return=minimal'}),body:JSON.stringify({user_id:s.user.id,title:title,url:url,genre:(genre||null),is_public:isPublic,source:'uploaded',bucket:'artist-media',storage_path:path,cover_url:coverUrl})});
         if(!tr.ok){ msg.textContent='Could not save track ('+tr.status+').'; return; }
         msg.textContent='Done! Added to your library.';
       }
