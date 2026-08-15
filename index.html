@@ -13506,8 +13506,154 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 }
             }
 
+            if (section === 'monetization' || section === 'guidance' || section === 'notifications') {
+                const payload = collectSettings(section);
+                const { error } = await db.from('user_settings')
+                    .upsert({ user_id: AppState.currentUser.id, [section]: payload, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+                if (error) {
+                    window.reportDbError && window.reportDbError('user_settings', 'upsert', error, { section });
+                    showSettingsToast('Could not save — we’ve logged it. Try again.');
+                    return; // do NOT fall through to the success toast
+                }
+                // Keep a local copy so agent prompts can read guidance without a round-trip.
+                try {
+                    const cache = JSON.parse(localStorage.getItem('aiad_user_settings') || '{}');
+                    cache[section] = payload;
+                    localStorage.setItem('aiad_user_settings', JSON.stringify(cache));
+                } catch (e) {}
+            }
+
             showSettingsToast('Changes saved successfully');
         }
+
+        // Read the current state of a settings section from the DOM into a JSON payload.
+        function collectSettings(section) {
+            const isOn = (id) => { const el = document.getElementById(id); return !!(el && el.classList.contains('active')); };
+            if (section === 'monetization') {
+                return {
+                    pledges_enabled: isOn('setPledgesEnabled'),
+                    one_time_contributions: isOn('setOneTimeContrib'),
+                };
+            }
+            if (section === 'guidance') {
+                const sel = document.querySelector('.settings-mode-card.selected');
+                return {
+                    mode: (sel && sel.dataset.mode) || 'strategic',
+                    never_tell_me_what_to_do: isOn('setGuidanceNeverTell'),
+                    challenge_my_assumptions: isOn('setGuidanceChallenge'),
+                    push_me_when_stuck: isOn('setGuidancePush'),
+                    decision_memory_enabled: isOn('setDecisionMemoryEnabled'),
+                };
+            }
+            if (section === 'notifications') {
+                const channels = {};
+                document.querySelectorAll('.settings-notif-toggle[data-key]').forEach((t) => {
+                    const k = t.dataset.key, ch = t.dataset.ch;
+                    if (!k || !ch) return;
+                    channels[k] = channels[k] || {};
+                    channels[k][ch] = t.classList.contains('active');
+                });
+                // Account-security email can never be switched off.
+                channels.security_alerts = channels.security_alerts || {};
+                channels.security_alerts.email = true;
+                const digestEl = document.getElementById('setNotifDigest');
+                return { digest: (digestEl && digestEl.value) || 'daily', channels };
+            }
+            return {};
+        }
+
+        // Apply a saved user_settings row back onto the settings controls.
+        function applyUserSettings(row) {
+            if (!row) return;
+            const setToggle = (id, on) => { const el = document.getElementById(id); if (el) el.classList.toggle('active', !!on); };
+            const m = row.monetization || {};
+            if ('pledges_enabled' in m) setToggle('setPledgesEnabled', m.pledges_enabled);
+            if ('one_time_contributions' in m) setToggle('setOneTimeContrib', m.one_time_contributions);
+
+            const g = row.guidance || {};
+            if (g.mode) {
+                document.querySelectorAll('.settings-mode-card').forEach((c) => c.classList.toggle('selected', c.dataset.mode === g.mode));
+            }
+            if ('never_tell_me_what_to_do' in g) setToggle('setGuidanceNeverTell', g.never_tell_me_what_to_do);
+            if ('challenge_my_assumptions' in g) setToggle('setGuidanceChallenge', g.challenge_my_assumptions);
+            if ('push_me_when_stuck' in g) setToggle('setGuidancePush', g.push_me_when_stuck);
+            if ('decision_memory_enabled' in g) setToggle('setDecisionMemoryEnabled', g.decision_memory_enabled);
+
+            const n = row.notifications || {};
+            if (n.digest) { const s = document.getElementById('setNotifDigest'); if (s) s.value = n.digest; }
+            const ch = n.channels || {};
+            document.querySelectorAll('.settings-notif-toggle[data-key]').forEach((t) => {
+                const k = t.dataset.key, c = t.dataset.ch;
+                if (ch[k] && typeof ch[k][c] === 'boolean') t.classList.toggle('active', ch[k][c]);
+            });
+            // Security email stays visibly on no matter what was stored.
+            const secEmail = document.querySelector('.settings-notif-toggle[data-key="security_alerts"][data-ch="email"]');
+            if (secEmail) secEmail.classList.add('active');
+        }
+
+        // Load the signed-in user's settings when the Settings screen opens.
+        async function loadUserSettings() {
+            if (!AppState.currentUser) return;
+            // Real account email — never a placeholder.
+            const emailEl = document.getElementById('setAccountEmail');
+            if (emailEl) emailEl.value = AppState.currentUser.email || '';
+            loadDecisionMemories();
+            try {
+                const { data, error } = await db.from('user_settings')
+                    .select('monetization,guidance,notifications')
+                    .eq('user_id', AppState.currentUser.id)
+                    .maybeSingle();
+                if (error) { window.reportDbError && window.reportDbError('user_settings', 'select', error, { where: 'loadUserSettings' }); return; }
+                if (data) {
+                    applyUserSettings(data);
+                    try { localStorage.setItem('aiad_user_settings', JSON.stringify(data)); } catch (e) {}
+                }
+                // A missing row is normal for existing users — the on-page defaults stand.
+            } catch (e) { /* defaults stand */ }
+        }
+
+        // Real Decision Memory list (empty for everyone today — no fabricated entries).
+        async function loadDecisionMemories() {
+            const list = document.getElementById('decisionMemoryList');
+            const countEl = document.getElementById('decisionMemoryCount');
+            if (!AppState.currentUser || !list) return;
+            try {
+                const { data, error } = await db.from('decision_memories')
+                    .select('id,category,reasoning,tradeoff,created_at')
+                    .eq('user_id', AppState.currentUser.id)
+                    .order('created_at', { ascending: false })
+                    .limit(50);
+                if (error) { window.reportDbError && window.reportDbError('decision_memories', 'select', error, { where: 'loadDecisionMemories' }); return; }
+                const rows = data || [];
+                if (countEl) countEl.textContent = rows.length;
+                if (!rows.length) return; // keep the empty-state message already in the DOM
+                const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+                list.innerHTML = rows.map((r) => {
+                    const when = r.created_at ? new Date(r.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+                    return '<div class="settings-memory-item"><div class="settings-memory-content"><div class="settings-memory-date">' + esc(when) + '</div><div class="settings-memory-text">' + esc(r.reasoning || '') + '</div>' + (r.tradeoff ? '<div class="settings-memory-context">' + esc(r.tradeoff) + '</div>' : '') + '</div><button class="settings-memory-clear" onclick="clearDecisionMemory(\'' + esc(r.id) + '\', this)">Clear</button></div>';
+                }).join('');
+            } catch (e) { /* leave empty state */ }
+        }
+
+        async function clearDecisionMemory(id, btn) {
+            if (!id) return;
+            const { error } = await db.from('decision_memories').delete().eq('id', id);
+            if (error) { window.reportDbError && window.reportDbError('decision_memories', 'delete', error); showToast('Could not clear — try again'); return; }
+            if (btn && btn.closest('.settings-memory-item')) btn.closest('.settings-memory-item').remove();
+            const countEl = document.getElementById('decisionMemoryCount');
+            if (countEl) countEl.textContent = Math.max(0, (parseInt(countEl.textContent, 10) || 1) - 1);
+        }
+
+        async function resetDecisionMemory() {
+            if (!AppState.currentUser) return;
+            if (!window.confirm('Reset all decision memory? This permanently clears what AIAD remembers about your decisions.')) return;
+            const { error } = await db.from('decision_memories').delete().eq('user_id', AppState.currentUser.id);
+            if (error) { window.reportDbError && window.reportDbError('decision_memories', 'delete', error, { reset: true }); showToast('Could not reset — try again'); return; }
+            showToast('Decision memory cleared');
+            loadDecisionMemories();
+        }
+        window.resetDecisionMemory = resetDecisionMemory;
+        window.clearDecisionMemory = clearDecisionMemory;
 
         async function loadArtistInbox() {
             if (!AppState.currentUser) return;
