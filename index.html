@@ -27503,7 +27503,7 @@ Be direct and concrete with real industry insight — never generic filler. When
         if(!up.ok){ msg.textContent='Upload failed ('+up.status+').'; return; }
         var url=SU+'/storage/v1/object/public/artist-media/'+path;
         msg.textContent='Saving to your library…';
-        var tr=await fetch(SU+'/rest/v1/tracks',{method:'POST',headers:Object.assign(jh(s.access_token),{Prefer:'return=minimal'}),body:JSON.stringify({user_id:s.user.id,title:title,url:url,genre:(genre||null),is_public:isPublic})});
+        var tr=await fetch(SU+'/rest/v1/tracks',{method:'POST',headers:Object.assign(jh(s.access_token),{Prefer:'return=minimal'}),body:JSON.stringify({user_id:s.user.id,title:title,url:url,genre:(genre||null),is_public:isPublic,source:'uploaded',bucket:'artist-media',storage_path:path})});
         if(!tr.ok){ msg.textContent='Could not save track ('+tr.status+').'; return; }
         msg.textContent='Done! Added to your library.';
       }
