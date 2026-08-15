@@ -16939,6 +16939,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 player.src = audioUrl;
                 player.pause();
                 document.getElementById('bottomPlayer').style.display = 'block';
+            document.body.classList.add('aiad-player-active');
                 document.getElementById('bottomPlayerTitle').textContent = title;
                 const bc = document.getElementById('bottomPlayerCover');
                 bc.src = imageUrl || '';
@@ -21078,6 +21079,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             if (currentPlayingRowId) setRowPlayState(currentPlayingRowId, true);
 
             document.getElementById('bottomPlayer').style.display = 'block';
+            document.body.classList.add('aiad-player-active');
             document.getElementById('bottomPlayerTitle').textContent = track.title;
             const cover = document.getElementById('bottomPlayerCover');
             cover.src = track.imageUrl || '';
@@ -21247,13 +21249,13 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 <div style="display:flex;align-items:center;justify-content:center;gap:24px;">
                     <button onclick="globalSeekRelative(-10)" style="background:transparent;border:none;color:var(--text-secondary);cursor:pointer;font-size:0.75rem;display:flex;align-items:center;gap:4px;padding:0;">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg>
-                        15s
+                        10s
                     </button>
                     <button onclick="trackDetailTogglePlay()" id="trackDetailBigPlayBtn" style="width:52px;height:52px;border-radius:50%;background:var(--teal);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#000;">
                         <svg viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                     </button>
                     <button onclick="globalSeekRelative(10)" style="background:transparent;border:none;color:var(--text-secondary);cursor:pointer;font-size:0.75rem;display:flex;align-items:center;gap:4px;padding:0;">
-                        15s
+                        10s
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
                     </button>
                 </div>
