@@ -12356,12 +12356,14 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             if (el) el.classList.add('active');
 
             const navItems = document.querySelectorAll('#supervisorDashboard .dash-nav-item');
-            // Must stay in the same order as the nav items in the markup.
-            const navIndex = ['agent','catalog','artists','saved','licenses'].indexOf(view);
+            // Must stay in the same order as the nav items in the markup (Settings is index 5).
+            const navIndex = ['agent','catalog','artists','saved','licenses','settings'].indexOf(view);
             if (navIndex >= 0 && navItems[navIndex]) navItems[navIndex].classList.add('active');
 
             if (view === 'artists') setTimeout(() => { try { loadSupervisorArtists(); } catch (e) {} }, 60);
             if (view === 'catalog') setTimeout(() => { try { applySupervisorGenreDefault(); } catch (e) {} }, 60);
+            if (view === 'saved') setTimeout(() => { try { loadSupervisorSaved(); } catch (e) {} }, 60);
+            if (view === 'licenses') setTimeout(() => { try { loadSupervisorLicenses(); } catch (e) {} }, 60);
         }
 
         const SPOTIFY_CLIENT_ID = '78d436e1bd134f9a8d96c6e21695b6ce';
