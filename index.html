@@ -13916,6 +13916,78 @@ Only capture real, meaningful decisions — not questions or general discussion.
             }
         }
 
+        /* AIAD image compressor — canvas-based, no dependencies.
+           Downscales and re-encodes until the file fits under maxBytes.
+           Returns a File (not a Blob) so it drops straight into existing upload code. */
+        window.compressImage = async function (file, opts) {
+            opts = opts || {};
+            const maxBytes = opts.maxBytes || 2 * 1024 * 1024;   // 2MB
+            const maxDim = opts.maxDim || 1600;                  // longest edge
+            const minQuality = opts.minQuality || 0.5;
+            const mime = 'image/jpeg';
+
+            if (!file || !file.type || !file.type.startsWith('image/')) {
+                throw new Error('Not an image file');
+            }
+
+            let bitmap;
+            try {
+                bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+            } catch (e) {
+                throw new Error(
+                    /heic|heif/i.test(file.type || file.name)
+                        ? 'HEIC images aren’t supported — export as JPEG or PNG first'
+                        : 'Could not read that image file'
+                );
+            }
+
+            // Already small enough and not oversized — leave it alone.
+            if (file.size <= maxBytes && bitmap.width <= maxDim && bitmap.height <= maxDim) {
+                bitmap.close && bitmap.close();
+                return file;
+            }
+
+            const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
+            let w = Math.round(bitmap.width * scale);
+            let h = Math.round(bitmap.height * scale);
+
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+
+            async function encode(width, height, quality) {
+                canvas.width = width; canvas.height = height;
+                ctx.clearRect(0, 0, width, height);
+                // White matte — JPEG has no alpha, transparent PNGs would go black.
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, width, height);
+                ctx.drawImage(bitmap, 0, 0, width, height);
+                return await new Promise(res => canvas.toBlob(res, mime, quality));
+            }
+
+            // Step quality down first — cheaper visually than losing resolution.
+            let blob = null;
+            for (let q = 0.85; q >= minQuality; q -= 0.1) {
+                blob = await encode(w, h, q);
+                if (blob && blob.size <= maxBytes) break;
+            }
+            // Still too big: shrink dimensions and retry, up to 3 times.
+            let guard = 0;
+            while (blob && blob.size > maxBytes && guard < 3) {
+                w = Math.round(w * 0.75);
+                h = Math.round(h * 0.75);
+                blob = await encode(w, h, 0.8);
+                guard++;
+            }
+
+            bitmap.close && bitmap.close();
+
+            if (!blob) throw new Error('Could not compress that image');
+            if (blob.size > maxBytes) throw new Error('Image is too large even after compression — try a smaller file');
+
+            const base = (file.name || 'cover').replace(/\.[^.]+$/, '');
+            return new File([blob], base + '.jpg', { type: mime, lastModified: Date.now() });
+        };
+
         function _humanBytes(n) {
             n = Number(n) || 0;
             if (n < 1024) return n + ' B';
