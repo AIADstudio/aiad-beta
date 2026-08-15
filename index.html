@@ -12330,6 +12330,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         }
 
         function showSupervisorView(view) {
+            try { history.replaceState(null, '', '#supervisor/' + view); } catch (e) {}
             document.querySelectorAll('#supervisorDashboard .dash-view').forEach(v => v.classList.remove('active'));
             document.querySelectorAll('#supervisorDashboard .dash-nav-item').forEach(n => n.classList.remove('active'));
             const viewMap = {
@@ -19832,6 +19833,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
 
         function showCollabView(viewId) {
+            try { history.replaceState(null, '', '#collab/' + viewId); } catch (e) {}
 
             const viewMap = {
                 'home': 'collabHomeView',
