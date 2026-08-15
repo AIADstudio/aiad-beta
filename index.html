@@ -22552,6 +22552,7 @@ document.addEventListener('keydown', function(e) {
 
 // ── Fan view routing ──────────────────────────────────────────────────────
 function showFanView(view) {
+    try { history.replaceState(null, '', '#fan/' + view); } catch (e) {}
     const viewMap = {
         home:'fanHomeView', feed:'fanFeedView', artists:'fanArtistsView',
         myCreators:'fanArtistsView', discover:'fanDiscoverView',
