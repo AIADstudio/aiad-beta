@@ -14385,7 +14385,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             } catch (e) {}
             list.innerHTML = pulseHtml + fanHtml + ((!pulseHtml && !fanHtml) ? '<div style="padding:40px;text-align:center;color:var(--text-muted);font-size:0.875rem;">No messages yet. When fans reach out, they\'ll appear here.</div>' : '');
             try { await db.from('messages').update({ read: true }).eq('recipient_id', AppState.currentUser.id).eq('read', false); } catch (e) {}
-            setTimeout(_refreshInboxBadge, 400);
+            setTimeout(function () { if (window._refreshInboxBadge) window._refreshInboxBadge(); }, 400);
         }
 
         function openInboxMessage(id, name, question, answer) {
@@ -24283,6 +24283,7 @@ function toggleAgeRange(btn) {
             try { await db.from('messages').update({ read: true }).eq('recipient_id', me).eq('read', false); } catch (e) {}
             setTimeout(_refreshInboxBadge, 400);
         }
+        window._refreshInboxBadge = _refreshInboxBadge;
         async function _refreshInboxBadge() {
             var me = (window.AppState && AppState.currentUser) ? AppState.currentUser.id : null;
             if (!me) return;
