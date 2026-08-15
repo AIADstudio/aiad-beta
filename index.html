@@ -13999,14 +13999,19 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 const s = raw ? JSON.parse(raw) : null;
                 token = (s && s.access_token) || (s && s.currentSession && s.currentSession.access_token) || token;
             } catch (e) {}
+            let tinfo = 'no-decode';
+            try {
+                const p = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+                tinfo = 'role=' + p.role + ' sub=' + String(p.sub || '').slice(0, 8) + ' exp=' + p.exp + ' now=' + Math.floor(Date.now() / 1000) + ' anon=' + (p.is_anonymous || false);
+            } catch (e) { tinfo = 'decode-fail'; }
             const r = await fetch('https://uapiytquwuhtewqieegx.supabase.co/storage/v1/object/' + bucket + '/' + path, {
                 method: 'POST',
                 headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + token, 'Content-Type': contentType || (file && file.type) || 'application/octet-stream', 'x-upsert': 'true' },
                 body: file
             });
             let body = '';
-            if (!r.ok) { try { body = (await r.text() || '').slice(0, 300); } catch (e) {} }
-            return { ok: r.ok, status: r.status, body: body, authed: token !== SUPABASE_ANON_KEY, publicUrl: 'https://uapiytquwuhtewqieegx.supabase.co/storage/v1/object/public/' + bucket + '/' + path };
+            if (!r.ok) { try { body = (await r.text() || '').slice(0, 200); } catch (e) {} }
+            return { ok: r.ok, status: r.status, body: body, tinfo: tinfo, authed: token !== SUPABASE_ANON_KEY, publicUrl: 'https://uapiytquwuhtewqieegx.supabase.co/storage/v1/object/public/' + bucket + '/' + path };
         };
 
         function _humanBytes(n) {
