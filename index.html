@@ -13769,6 +13769,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             // 'agents' is the 6 specialized-agent "Ask" buttons; 'feed' is the settings back-button.
             if (view === 'agents') view = 'agent';
             if (view === 'feed') view = 'posts';
+            try { history.replaceState(null, '', '#artist/' + view); } catch (e) {}
 
             const allViews = ['artistHomeView', 'artistPostsView', 'artistSupportersView', 'artistProjectsView', 'artistRevenueView', 'artistScheduleView', 'artistCollaboratorsView', 'artistMusicView', 'artistSongwritingView', 'artistMixMediaView', 'artistMerchView', 'artistSyncLibraryView', 'artistMilestonesView', 'artistAnalyticsView', 'artistMyStatsView', 'artistAgentsView', 'artistInboxView', 'artistSettingsView', 'artistStoreView', 'artistPayoutsView'];
             allViews.forEach(v => {
