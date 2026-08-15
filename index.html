@@ -5648,17 +5648,17 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                             </div>
                             <p style="font-size: 0.9375rem; color: var(--text-muted); margin-bottom: var(--space-lg); line-height: 1.6;">AIAD adapts to how you think. This isn't about intelligence—it's about communication style. You can change this anytime.</p>
                             <div class="settings-mode-cards">
-                                <div class="settings-mode-card" onclick="selectGuidanceMode(this, 'reflective')">
+                                <div class="settings-mode-card" data-mode="reflective" onclick="selectGuidanceMode(this, 'reflective')">
                                     <div class="settings-mode-header"><div class="settings-mode-radio"></div><span class="settings-mode-icon">🧠</span><span class="settings-mode-name">Reflective</span></div>
                                     <p class="settings-mode-desc">AIAD asks questions and mirrors your thinking back to you. Best for processing decisions and clarifying your own ideas.</p>
                                     <div class="settings-mode-examples"><p class="settings-mode-example">"What's driving that instinct?"</p><p class="settings-mode-example">"What would need to be true for that to work?"</p></div>
                                 </div>
-                                <div class="settings-mode-card selected" onclick="selectGuidanceMode(this, 'strategic')">
+                                <div class="settings-mode-card selected" data-mode="strategic" onclick="selectGuidanceMode(this, 'strategic')">
                                     <div class="settings-mode-header"><div class="settings-mode-radio"></div><span class="settings-mode-icon">🧭</span><span class="settings-mode-name">Strategic</span></div>
                                     <p class="settings-mode-desc">AIAD offers structured options with trade-offs explained. Best for weighing paths and understanding consequences.</p>
                                     <div class="settings-mode-examples"><p class="settings-mode-example">"Option A gets you X but costs Y. Option B..."</p><p class="settings-mode-example">"Here's what each path looks like in 6 months."</p></div>
                                 </div>
-                                <div class="settings-mode-card" onclick="selectGuidanceMode(this, 'direct')">
+                                <div class="settings-mode-card" data-mode="direct" onclick="selectGuidanceMode(this, 'direct')">
                                     <div class="settings-mode-header"><div class="settings-mode-radio"></div><span class="settings-mode-icon">⚡</span><span class="settings-mode-name">Direct</span></div>
                                     <p class="settings-mode-desc">AIAD gives clear recommendations with less back-and-forth. Best for moving fast and execution mode.</p>
                                     <div class="settings-mode-examples"><p class="settings-mode-example">"Based on your situation, I'd prioritize X."</p><p class="settings-mode-example">"Skip that. Here's what matters right now."</p></div>
