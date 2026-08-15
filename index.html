@@ -17992,11 +17992,10 @@ Only capture real, meaningful decisions — not questions or general discussion.
 
                 var userId = AppState.currentUser?.id || AppState.user?.id || 'anon';
                 var path = folder + '/' + userId + '/' + Date.now() + '.' + ext;
-                var { error } = await db.storage.from('artist-media').upload(path, blob, { upsert: false, contentType: mime });
-                if (error) { window.__aiadReportError && window.__aiadReportError('storage.upload', 'artist-media', error); console.warn('[AIAD] Upload error:', error.message); return base64DataUrl; }
-                var { data: urlData } = db.storage.from('artist-media').getPublicUrl(path);
-                console.log('[AIAD] Uploaded to storage:', urlData.publicUrl);
-                return urlData.publicUrl;
+                var up = await window.aiadStorageUpload('artist-media', path, blob, mime);
+                if (!up.ok) { window.__aiadReportError && window.__aiadReportError('storage.upload', 'artist-media', new Error('genimg ' + up.status), { path }); console.warn('[AIAD] Upload error:', up.status); return base64DataUrl; }
+                console.log('[AIAD] Uploaded to storage:', up.publicUrl);
+                return up.publicUrl;
             } catch(e) {
                 console.warn('[AIAD] uploadGeneratedImage failed:', e);
                 return base64DataUrl; // fallback: keep base64 in memory
