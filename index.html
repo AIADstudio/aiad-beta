@@ -28726,9 +28726,8 @@ Be direct and concrete with real industry insight — never generic filler. When
                 // be the uploader's id. Store the PATH — store-download signs it later.
                 const path = me + '/' + file.name.replace(/[^\w.\-]+/g, '_');
                 btn.textContent = 'Uploading…';
-                const { error: upErr } = await window.db.storage.from('store-digital')
-                    .upload(path, file, { upsert: true });
-                if (upErr) { window.__aiadReportError && window.__aiadReportError('storage.upload', 'store-digital', upErr); } if (upErr) throw new Error('Upload failed: ' + upErr.message);
+                const up = await window.aiadStorageUpload('store-digital', path, file, file.type);
+                if (!up.ok) { window.__aiadReportError && window.__aiadReportError('storage.upload', 'store-digital', new Error('digital ' + up.status), { path }); throw new Error('Upload failed: ' + up.status); }
                 row.digital_file_url = path;
             }
 
