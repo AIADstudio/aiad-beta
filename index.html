@@ -25803,6 +25803,59 @@ Be direct and concrete with real industry insight — never generic filler. When
 
         // ══════════════ SYNC LICENSING MARKETPLACE (artist ↔ supervisor) ══════════════
         let _syncCatalog = [];
+        // One resolver for every audio URL in the app. Never build a storage URL by hand.
+        window.trackAudioUrl = async function (track) {
+            if (!track) return null;
+            // Legacy rows still carry an absolute public URL.
+            if (track.url && /^https?:\/\//.test(track.url) && !track.storage_path) return track.url;
+            const bucket = track.bucket || 'music-references';
+            const path = track.storage_path;
+            if (!path) return null;
+            // Public bucket: direct URL, no round trip.
+            if (bucket === 'music-references') {
+                return `${SUPA}/storage/v1/object/public/${bucket}/${path}`;
+            }
+            // Private bucket: signed URL, 1 hour.
+            const { data, error } = await db.storage.from(bucket).createSignedUrl(path, 3600);
+            if (error) {
+                if (window.reportDbError) window.reportDbError('storage.sign', bucket, error, { path });
+                return null;
+            }
+            return data.signedUrl;
+        };
+
+        // Shared audio element so two sync tracks can't play at once.
+        window._syncAudio = null;
+        window.playSyncTrack = async function (listingId, btn) {
+            const t = (window._myListings || []).concat(_syncCatalog || []).find((x) => x.id === listingId);
+            if (!t) return;
+            // Toggle: if this one is already playing, pause and reset.
+            if (window._syncAudio && !window._syncAudio.paused) {
+                const wasThis = window._syncAudio.dataset.listing === listingId;
+                window._syncAudio.pause();
+                document.querySelectorAll('[data-playing="1"]').forEach((b) => { b.innerHTML = '&#9654;'; b.removeAttribute('data-playing'); });
+                if (wasThis) return;
+            }
+            // The artist who owns the listing hears their master; everyone else gets the
+            // watermarked preview only — the master never leaves before a license is signed.
+            const s = (typeof sess === 'function') ? sess() : null;
+            const isOwner = !!(s && s.user && t.artist_id && s.user.id === t.artist_id);
+            const path = isOwner ? (t.master_path || t.preview_path) : t.preview_path;
+            if (!path) { (window.showToast || (() => {}))(isOwner ? 'No audio uploaded for this track' : 'Preview unavailable'); return; }
+            const url = await window.trackAudioUrl({ bucket: 'sync-masters', storage_path: path });
+            if (!url) { (window.showToast || (() => {}))('Audio unavailable'); return; }
+            window._syncAudio = window._syncAudio || new Audio();
+            window._syncAudio.src = url;
+            window._syncAudio.dataset.listing = listingId;
+            btn.innerHTML = '&#10073;&#10073;'; btn.dataset.playing = '1';
+            window._syncAudio.onended = () => { btn.innerHTML = '&#9654;'; btn.removeAttribute('data-playing'); };
+            window._syncAudio.play().catch((e) => {
+                (window.showToast || (() => {}))('Could not play');
+                btn.innerHTML = '&#9654;'; btn.removeAttribute('data-playing');
+                if (window.reportDbError) window.reportDbError('audio.play', 'sync-masters', e, { listingId });
+            });
+        };
+
         function _syncCard(t, forSupervisor) {
             const uses = Array.isArray(t.use_cases) ? t.use_cases.join(', ') : '';
             const meta = [t.genre, t.mood, t.bpm ? t.bpm + ' BPM' : ''].filter(Boolean).join(' · ');
