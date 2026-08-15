@@ -13993,12 +13993,24 @@ Only capture real, meaningful decisions — not questions or general discussion.
            authenticated-only artist-media INSERT policy then rejects. Raw fetch avoids that. */
         window.aiadStorageUpload = async function (bucket, path, file, contentType) {
             // Read the token from localStorage — the source the working uploads use.
-            let token = SUPABASE_ANON_KEY;
-            try {
-                const raw = localStorage.getItem('sb-uapiytquwuhtewqieegx-auth-token');
-                const s = raw ? JSON.parse(raw) : null;
-                token = (s && s.access_token) || (s && s.currentSession && s.currentSession.access_token) || token;
-            } catch (e) {}
+            const _readToken = function () {
+                try {
+                    const raw = localStorage.getItem('sb-uapiytquwuhtewqieegx-auth-token');
+                    const s = raw ? JSON.parse(raw) : null;
+                    return (s && s.access_token) || (s && s.currentSession && s.currentSession.access_token) || null;
+                } catch (e) { return null; }
+            };
+            // Expired or within 2 min of expiry? Refresh the session first so a stale
+            // token self-heals instead of failing the upload.
+            const _expSoon = function (tok) {
+                try { const p = JSON.parse(atob(tok.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); return !p.exp || (p.exp - Math.floor(Date.now() / 1000) < 120); }
+                catch (e) { return true; }
+            };
+            let token = _readToken();
+            if (!token || _expSoon(token)) {
+                try { await db.auth.refreshSession(); const fresh = _readToken(); if (fresh) token = fresh; } catch (e) {}
+            }
+            token = token || SUPABASE_ANON_KEY;
             let tinfo = 'no-decode';
             try {
                 const p = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
