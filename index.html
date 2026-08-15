@@ -26190,11 +26190,26 @@ Be direct and concrete with real industry insight — never generic filler. When
             }
         };
         window.handleLicenseTrack = function (trackId, title, price) { window.aiadLicenseSync(trackId, title, price, null); };
+        async function loadSupervisorSaved() {
+            const s = sess(); const view = document.getElementById('supervisorSavedView');
+            if (!s || !view) return;
+            const rows = await rest(`sync_saves?select=listing_id,created_at&supervisor_id=eq.${s.user.id}&order=created_at.desc`);
+            const box = view.querySelector('div'); if (!box) return;
+            if (!Array.isArray(rows) || !rows.length) return; // keep the empty state already in the DOM
+            const ids = rows.map((r) => r.listing_id).filter(Boolean);
+            if (!ids.length) return;
+            const listings = await rest(`sync_listings?select=*&id=in.(${ids.join(',')})`);
+            const byId = Object.fromEntries((listings || []).map((l) => [l.id, l]));
+            const cards = ids.map((id) => byId[id]).filter(Boolean).map((t) => _syncCard(t, true)).join('');
+            if (!cards) return;
+            box.innerHTML = `<h1 style="font-size:1.3rem;font-weight:700;color:var(--text-primary);margin-bottom:6px;">Saved Tracks</h1>
+                <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:28px;">Tracks you've bookmarked for consideration</p>
+                <div style="display:flex;flex-direction:column;gap:8px;">${cards}</div>`;
+        }
         async function loadSupervisorLicenses() {
-            const s = sess(); const view = document.getElementById('supervisorLicensesView'); if (!s || !view || view.__loaded) return;
+            const s = sess(); const view = document.getElementById('supervisorLicensesView'); if (!s || !view) return;
             const rows = await rest(`sync_licenses?select=*&supervisor_id=eq.${s.user.id}&order=created_at.desc`);
             if (!Array.isArray(rows) || !rows.length) return;
-            view.__loaded = true;
             const box = view.querySelector('div'); if (!box) return;
             box.innerHTML = `<h1 style="font-size:1.3rem;font-weight:700;color:var(--text-primary);margin-bottom:6px;">My Licenses</h1>
                 <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:20px;">Tracks you've licensed through AIAD</p>
