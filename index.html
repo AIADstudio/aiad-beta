@@ -27593,9 +27593,22 @@ Be direct and concrete with real industry insight — never generic filler. When
       var toSync=document.getElementById('aiadUpSync').checked;
       var name=null; try{ name=(window.AppState&&AppState.artistProfile&&(AppState.artistProfile.artist_name||AppState.artistProfile.full_name))||null; }catch(e){}
       var ext=((f.name.split('.').pop())||'mp3').toLowerCase();
+      var stamp=Date.now();
+      // Optional cover art -> public artist-media bucket (thumbnails need no signing).
+      var coverUrl=null;
+      var cf=document.getElementById('aiadUpCover') && document.getElementById('aiadUpCover').files[0];
+      if(cf){
+        if(!/^image\//.test(cf.type||'')){ msg.textContent='Cover must be an image file.'; return; }
+        if(cf.size > 2*1024*1024){ msg.textContent='Cover art must be under 2MB.'; return; }
+        msg.textContent='Uploading cover art…';
+        var cext=(cf.name.split('.').pop()||'jpg').toLowerCase();
+        var cpath=s.user.id+'/covers/'+stamp+'.'+cext;
+        var upc=await fetch(SU+'/storage/v1/object/artist-media/'+cpath,{method:'POST',headers:{apikey:ANON,Authorization:'Bearer '+s.access_token,'Content-Type':(cf.type||'image/jpeg'),'x-upsert':'true'},body:cf});
+        if(upc.ok) coverUrl=SU+'/storage/v1/object/public/artist-media/'+cpath;
+        else if(window.__aiadReportError) window.__aiadReportError('storage.upload','artist-media',new Error('cover '+upc.status));
+      }
       if(toSync){
         // Licensable master -> PRIVATE bucket. Supervisors hear a WATERMARKED preview; full master is license-gated.
-        var stamp=Date.now();
         msg.textContent='Uploading master (protected)…';
         var mpath=s.user.id+'/'+stamp+'.'+ext;
         var upm=await fetch(SU+'/storage/v1/object/sync-masters/'+mpath,{method:'POST',headers:{apikey:ANON,Authorization:'Bearer '+s.access_token,'Content-Type':(f.type||'audio/mpeg'),'x-upsert':'false'},body:f});
