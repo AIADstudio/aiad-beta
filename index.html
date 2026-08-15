@@ -17257,7 +17257,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 const ext = (cf.name.split('.').pop() || 'jpg').toLowerCase();
                 const path = AppState.currentUser.id + '/covers/' + Date.now() + '.' + ext;
                 const up = await window.aiadStorageUpload('artist-media', path, cf, cf.type);
-                if (!up.ok) { window.__aiadReportError && window.__aiadReportError('storage.upload', 'artist-media', new Error('cover ' + up.status + ' authed=' + up.authed + ' ' + up.body), { path }); if (msg) msg.textContent = 'Cover upload failed — try again.'; stop(); return; }
+                if (!up.ok) { window.__aiadReportError && window.__aiadReportError('storage.upload', 'artist-media', new Error('cover ' + up.status + ' | ' + up.tinfo + ' | uid=' + String((AppState.currentUser && AppState.currentUser.id) || '').slice(0, 8) + ' | ' + up.body), { path }); if (msg) msg.textContent = 'Cover upload failed — try again.'; stop(); return; }
                 coverUrl = up.publicUrl;
             }
             const patch = {
