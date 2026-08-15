@@ -26363,10 +26363,10 @@ Be direct and concrete with real industry insight — never generic filler. When
             const useCases = Array.from(document.querySelectorAll('#editSyncUses .style-tag-chip.selected')).map((el) => el.textContent.trim());
             // Optional new cover art (existing artwork stays if none chosen).
             let coverUrl; // undefined = leave unchanged
-            const cf = document.getElementById('editSyncCover') && document.getElementById('editSyncCover').files[0];
+            let cf = document.getElementById('editSyncCover') && document.getElementById('editSyncCover').files[0];
             if (cf) {
-                if (!/^image\//.test(cf.type || '')) { (window.showToast || alert)('Cover must be an image file'); return; }
-                if (cf.size > 2 * 1024 * 1024) { (window.showToast || alert)('Cover art must be under 2MB'); return; }
+                try { cf = await window.compressImage(cf, { maxBytes: 2 * 1024 * 1024, maxDim: 1600 }); }
+                catch (e) { (window.showToast || alert)(e.message); window.__aiadReportError && window.__aiadReportError('image.compress', 'cover', e, { size: cf.size, type: cf.type }); return; }
                 const cext = (cf.name.split('.').pop() || 'jpg').toLowerCase();
                 const cpath = s.user.id + '/covers/' + Date.now() + '.' + cext;
                 const upc = await fetch(`${SUPA}/storage/v1/object/artist-media/${cpath}`, { method: 'POST', headers: { apikey: anon(), Authorization: 'Bearer ' + s.access_token, 'Content-Type': (cf.type || 'image/jpeg'), 'x-upsert': 'true' }, body: cf });
