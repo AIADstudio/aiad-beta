@@ -14284,14 +14284,12 @@ Only capture real, meaningful decisions — not questions or general discussion.
                         try {
                             const ext = (_fileToUpload.name.split('.').pop() || 'bin').toLowerCase();
                             const path = `posts/${AppState.currentUser.id}/${Date.now()}.${ext}`;
-                            const { error: uploadError } = await db.storage
-                                .from('artist-media')
-                                .upload(path, _fileToUpload, { upsert: false, contentType: _fileToUpload.type });
-                            if (uploadError) {
-                                console.warn('[AIAD] Storage upload error:', uploadError.message);
+                            const up = await window.aiadStorageUpload('artist-media', path, _fileToUpload, _fileToUpload.type);
+                            if (!up.ok) {
+                                console.warn('[AIAD] Storage upload error:', up.status);
+                                window.__aiadReportError && window.__aiadReportError('storage.upload', 'artist-media', new Error('post ' + up.status), { path });
                             } else {
-                                const { data: urlData } = db.storage.from('artist-media').getPublicUrl(path);
-                                persistentUrl = urlData?.publicUrl || null;
+                                persistentUrl = up.publicUrl || null;
                                 if (persistentUrl) {
                                     newPost.querySelectorAll('img, video, audio').forEach(el => {
                                         if (el.src && el.src.startsWith('blob:')) el.src = persistentUrl;
