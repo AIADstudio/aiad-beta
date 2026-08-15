@@ -27901,8 +27901,14 @@ Be direct and concrete with real industry insight — never generic filler. When
       var coverUrl=null;
       var cf=document.getElementById('aiadUpCover') && document.getElementById('aiadUpCover').files[0];
       if(cf){
-        if(!/^image\//.test(cf.type||'')){ msg.textContent='Cover must be an image file.'; return; }
-        if(cf.size > 2*1024*1024){ msg.textContent='Cover art must be under 2MB.'; return; }
+        try {
+          msg.textContent='Preparing image…';
+          cf = await window.compressImage(cf, { maxBytes: 2*1024*1024, maxDim: 1600 });
+        } catch(e) {
+          msg.textContent = e.message;
+          window.__aiadReportError && window.__aiadReportError('image.compress','cover',e,{size:cf.size,type:cf.type});
+          return;
+        }
         msg.textContent='Uploading cover art…';
         var cext=(cf.name.split('.').pop()||'jpg').toLowerCase();
         var cpath=s.user.id+'/covers/'+stamp+'.'+cext;
