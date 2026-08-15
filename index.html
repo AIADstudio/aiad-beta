@@ -17612,6 +17612,11 @@ Only capture real, meaningful decisions — not questions or general discussion.
                         trackId,
                         title: track.title,
                         audioUrl: track.url,
+                        // Resolver inputs so private uploads can be signed at play time.
+                        url: track.url,
+                        bucket: track.bucket || null,
+                        storage_path: track.storage_path || null,
+                        source: track.source || 'generated',
                         imageUrl: track.cover_url || '',
                         lyrics: track.lyrics || '',
                         tags, blobUrl: null
