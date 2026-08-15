@@ -13992,14 +13992,21 @@ Only capture real, meaningful decisions — not questions or general discussion.
            db.storage's implicit auth can go out as anon in some scopes, which the
            authenticated-only artist-media INSERT policy then rejects. Raw fetch avoids that. */
         window.aiadStorageUpload = async function (bucket, path, file, contentType) {
+            // Read the token from localStorage — the source the working uploads use.
             let token = SUPABASE_ANON_KEY;
-            try { const gs = await db.auth.getSession(); token = (gs && gs.data && gs.data.session && gs.data.session.access_token) || token; } catch (e) {}
+            try {
+                const raw = localStorage.getItem('sb-uapiytquwuhtewqieegx-auth-token');
+                const s = raw ? JSON.parse(raw) : null;
+                token = (s && s.access_token) || (s && s.currentSession && s.currentSession.access_token) || token;
+            } catch (e) {}
             const r = await fetch('https://uapiytquwuhtewqieegx.supabase.co/storage/v1/object/' + bucket + '/' + path, {
                 method: 'POST',
                 headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + token, 'Content-Type': contentType || (file && file.type) || 'application/octet-stream', 'x-upsert': 'true' },
                 body: file
             });
-            return { ok: r.ok, status: r.status, publicUrl: 'https://uapiytquwuhtewqieegx.supabase.co/storage/v1/object/public/' + bucket + '/' + path };
+            let body = '';
+            if (!r.ok) { try { body = (await r.text() || '').slice(0, 300); } catch (e) {} }
+            return { ok: r.ok, status: r.status, body: body, authed: token !== SUPABASE_ANON_KEY, publicUrl: 'https://uapiytquwuhtewqieegx.supabase.co/storage/v1/object/public/' + bucket + '/' + path };
         };
 
         function _humanBytes(n) {
