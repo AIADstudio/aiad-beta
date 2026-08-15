@@ -15713,12 +15713,89 @@ Only capture real, meaningful decisions — not questions or general discussion.
 
         function setAnalyticsPeriod(days, btn) {
             document.querySelectorAll('.time-period-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-
+            if (btn) btn.classList.add('active');
+            window._analyticsPeriod = days;
             const labels = {7:'Last 7 days', 30:'Last 30 days', 90:'Last 90 days', 365:'Last 12 months'};
             document.querySelectorAll('.dash-analytics-period').forEach(el => el.textContent = labels[days] || 'Last ' + days + ' days');
-            showToast('Showing ' + (labels[days] || days + ' days'));
+            if (window.loadArtistAnalytics) loadArtistAnalytics(days);
         }
+
+        // Real artist analytics — every number comes from a table, honest zero when empty.
+        // No invented "views/streams" metric: we have no play/view tracking in the schema.
+        window._analyticsPeriod = 30;
+        async function loadArtistAnalytics(days) {
+            days = days || window._analyticsPeriod || 30;
+            window._analyticsPeriod = days;
+            if (!AppState || !AppState.currentUser) return;
+            const uid = AppState.currentUser.id;
+            const since = new Date(Date.now() - days * 86400000).toISOString();
+            const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+            const money = (n) => '$' + Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
+            const periodLabel = days >= 365 ? 'Last 12 months' : ('Last ' + days + ' days');
+
+            // Supporters + Avg Support — paying rows in fan_support for the period.
+            try {
+                const { data: fs, error } = await db.from('fan_support')
+                    .select('amount,status,created_at').eq('artist_id', uid).gte('created_at', since);
+                if (error) throw error;
+                const paid = (fs || []).filter(r => Number(r.amount) > 0 && r.status !== 'cancelled' && r.status !== 'refunded');
+                const count = paid.length;
+                const total = paid.reduce((a, r) => a + Number(r.amount || 0), 0);
+                setTxt('analyticsSupporters', count);
+                setTxt('analyticsSupportersSub', count ? periodLabel : 'No supporters yet');
+                if (count) { setTxt('analyticsAvgSupport', money(total / count)); setTxt('analyticsAvgSupportSub', 'per supporter · ' + periodLabel); }
+                else { setTxt('analyticsAvgSupport', '—'); setTxt('analyticsAvgSupportSub', 'No data yet'); }
+            } catch (e) { window.reportDbError && window.reportDbError('select', 'fan_support', e, { where: 'analytics' }); }
+
+            // Revenue — paid orders for this artist in the period (0 for everyone today = honest $0).
+            try {
+                const { data: ord, error } = await db.from('orders')
+                    .select('amount,artist_earnings,status,created_at').eq('artist_id', uid).eq('status', 'paid').gte('created_at', since);
+                if (error) throw error;
+                const rev = (ord || []).reduce((a, r) => a + Number(r.artist_earnings != null ? r.artist_earnings : (r.amount || 0)), 0);
+                setTxt('analyticsRevenue', money(rev));
+                setTxt('analyticsRevenueSub', (ord && ord.length) ? (ord.length + ' order' + (ord.length === 1 ? '' : 's') + ' · ' + periodLabel) : 'No sales yet');
+            } catch (e) { window.reportDbError && window.reportDbError('select', 'orders', e, { where: 'analytics' }); }
+
+            // Reach — snapshot from artist_stats (Spotify followers, else self-reported). Not period-bound.
+            try {
+                const { data: st } = await db.from('artist_stats').select('spotify_stats,self_reported').eq('user_id', uid).maybeSingle();
+                let reach = null, sub = 'No data yet';
+                const sp = st && st.spotify_stats;
+                if (sp && sp.followers != null) { reach = sp.followers; sub = 'Spotify followers'; }
+                else {
+                    const self = st && st.self_reported;
+                    const selfN = self && (self.monthly_listeners || self.followers);
+                    if (selfN != null) { reach = selfN; sub = 'Self-reported'; }
+                }
+                setTxt('analyticsStreams', reach != null ? Number(reach).toLocaleString() : '—');
+                setTxt('analyticsStreamsSub', sub);
+            } catch (e) { window.reportDbError && window.reportDbError('select', 'artist_stats', e, { where: 'analytics' }); }
+
+            // Engagement + Merch — real counts, honest zeros.
+            try {
+                const act = document.getElementById('analyticsActivity');
+                const { data: posts } = await db.from('artist_posts').select('id').eq('user_id', uid).eq('archived', false);
+                const postIds = (posts || []).map(p => p.id);
+                const postsInPeriod = await db.from('artist_posts').select('id', { count: 'exact', head: true }).eq('user_id', uid).eq('archived', false).gte('created_at', since);
+                let likes = 0, comments = 0;
+                if (postIds.length) {
+                    const lk = await db.from('post_likes').select('id', { count: 'exact', head: true }).in('post_id', postIds).gte('created_at', since);
+                    likes = lk.count || 0;
+                    const cm = await db.from('post_comments').select('id', { count: 'exact', head: true }).in('post_id', postIds).gte('created_at', since);
+                    comments = cm.count || 0;
+                }
+                const prod = await db.from('products').select('id', { count: 'exact', head: true }).eq('artist_id', uid).eq('is_active', true);
+                const cell = (label, val) => '<div style="flex:1;min-width:88px;text-align:center;padding:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:10px;"><div style="font-size:1.25rem;font-weight:700;color:var(--text-primary);">' + val + '</div><div style="font-size:0.66rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.03em;margin-top:2px;">' + label + '</div></div>';
+                if (act) act.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px;">'
+                    + cell('Posts', (postsInPeriod.count || 0))
+                    + cell('Likes', likes)
+                    + cell('Comments', comments)
+                    + cell('Products', (prod.count || 0))
+                    + '</div><div style="font-size:0.72rem;color:var(--text-muted);margin-top:10px;">' + periodLabel + ' — engagement counts activity in this window; Products is your current live listings.</div>';
+            } catch (e) { window.reportDbError && window.reportDbError('select', 'artist_posts', e, { where: 'analytics' }); }
+        }
+        window.loadArtistAnalytics = loadArtistAnalytics;
 
         async function loadRevenueTierBreakdown() {
             if (!AppState.currentUser) return;
