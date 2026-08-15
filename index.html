@@ -13988,6 +13988,20 @@ Only capture real, meaningful decisions — not questions or general discussion.
             return new File([blob], base + '.jpg', { type: mime, lastModified: Date.now() });
         };
 
+        /* Upload to a public storage bucket with the session token sent EXPLICITLY.
+           db.storage's implicit auth can go out as anon in some scopes, which the
+           authenticated-only artist-media INSERT policy then rejects. Raw fetch avoids that. */
+        window.aiadStorageUpload = async function (bucket, path, file, contentType) {
+            let token = SUPABASE_ANON_KEY;
+            try { const gs = await db.auth.getSession(); token = (gs && gs.data && gs.data.session && gs.data.session.access_token) || token; } catch (e) {}
+            const r = await fetch('https://uapiytquwuhtewqieegx.supabase.co/storage/v1/object/' + bucket + '/' + path, {
+                method: 'POST',
+                headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + token, 'Content-Type': contentType || (file && file.type) || 'application/octet-stream', 'x-upsert': 'true' },
+                body: file
+            });
+            return { ok: r.ok, status: r.status, publicUrl: 'https://uapiytquwuhtewqieegx.supabase.co/storage/v1/object/public/' + bucket + '/' + path };
+        };
+
         function _humanBytes(n) {
             n = Number(n) || 0;
             if (n < 1024) return n + ' B';
