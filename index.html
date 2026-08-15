@@ -17220,10 +17220,16 @@ Only capture real, meaningful decisions — not questions or general discussion.
             if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
             const stop = () => { if (btn) { btn.disabled = false; btn.textContent = 'Save'; } };
             let coverUrl; // undefined = leave unchanged
-            const cf = document.getElementById('editTrackCover') && document.getElementById('editTrackCover').files[0];
+            let cf = document.getElementById('editTrackCover') && document.getElementById('editTrackCover').files[0];
             if (cf) {
-                if (!/^image\//.test(cf.type || '')) { if (msg) msg.textContent = 'Cover must be an image.'; stop(); return; }
-                if (cf.size > 2 * 1024 * 1024) { if (msg) msg.textContent = 'Cover must be under 2MB.'; stop(); return; }
+                try {
+                    if (msg) msg.textContent = 'Preparing image…';
+                    cf = await window.compressImage(cf, { maxBytes: 2 * 1024 * 1024, maxDim: 1600 });
+                } catch (e) {
+                    if (msg) msg.textContent = e.message;
+                    window.__aiadReportError && window.__aiadReportError('image.compress', 'cover', e, { size: cf.size, type: cf.type });
+                    stop(); return;
+                }
                 const ext = (cf.name.split('.').pop() || 'jpg').toLowerCase();
                 const path = AppState.currentUser.id + '/covers/' + Date.now() + '.' + ext;
                 const { error: upErr } = await db.storage.from('artist-media').upload(path, cf, { upsert: true, contentType: cf.type });
