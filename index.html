@@ -710,9 +710,11 @@ html, body {
                         </button>
                     </div>
 
-                    <div class="sign-in-divider">or</div>
+                    <!-- Google/Apple hidden until the OAuth providers are configured in Supabase
+                         (Authentication → Providers). Remove the two style="display:none" below to re-enable. -->
+                    <div class="sign-in-divider" style="display:none">or</div>
 
-                    <div class="sign-in-social">
+                    <div class="sign-in-social" style="display:none">
                         <button class="social-btn" onclick="handleSocialSignIn('google')">
                             <svg viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
