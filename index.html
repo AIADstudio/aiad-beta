@@ -10310,6 +10310,24 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             videoGeneration: 20
         };
 
+        // The one place that answers "who is signed in, right now". Reads AppState first
+        // and falls back to the stored session, and returns null rather than undefined so
+        // a caller can't accidentally interpolate "undefined" into a query filter.
+        // AppState.user does not exist — only AppState.currentUser — and three selects
+        // were reading the former, sending the literal string "undefined" to PostgREST.
+        function aiadResolvedUserId() {
+            try {
+                const fromState = window.AppState && window.AppState.currentUser && window.AppState.currentUser.id;
+                if (fromState) return fromState;
+                const raw = localStorage.getItem('sb-uapiytquwuhtewqieegx-auth-token')
+                         || sessionStorage.getItem('sb-uapiytquwuhtewqieegx-auth-token');
+                const parsed = raw ? JSON.parse(raw) : null;
+                const sess = parsed && (parsed.currentSession || parsed);
+                return (sess && sess.user && sess.user.id) || null;
+            } catch (e) { return null; }
+        }
+        window.aiadResolvedUserId = aiadResolvedUserId;
+
         const AppState = {
             currentPage: 'industry-selection',
             currentUser: null,
@@ -13820,8 +13838,9 @@ Only capture real, meaningful decisions — not questions or general discussion.
             } else if (view === 'supporters') {
                 viewEl.classList.add('active');
                 navItems[3].classList.add('active');
-                setTimeout(() => loadSupportersData(), 100);
-                setTimeout(() => loadSupportersData(), 100);
+                // Was loadSupportersData() — a name nothing defines, called twice. The
+                // real loader is loadArtistSupporters(), which guards on currentUser.
+                setTimeout(() => { try { loadArtistSupporters(); } catch (e) { console.warn('[AIAD] supporters load failed:', e); } }, 100);
             } else if (view === 'projects') {
                 viewEl.classList.add('active');
                 navItems[5].classList.add('active');
@@ -14009,7 +14028,10 @@ Only capture real, meaningful decisions — not questions or general discussion.
             if (!token || _expSoon(token)) {
                 try { await db.auth.refreshSession(); const fresh = _readToken(); if (fresh) token = fresh; } catch (e) {}
             }
-            token = token || SUPABASE_ANON_KEY;
+            if (!token) {
+                return { ok: false, status: 401, tinfo: 'no-session',
+                         body: 'Not signed in — every artist-media policy requires an authenticated role, so the anon key can only 403 here.' };
+            }
             let tinfo = 'no-decode';
             try {
                 const p = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
@@ -14969,30 +14991,45 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 const client = (typeof db !== 'undefined' && db) || window.db;
                 if (!client || typeof client.from !== 'function') return;
 
+                // Don't query without a resolved id: an undefined filter value reaches
+                // PostgREST as the string "undefined" and fails 22P02 rather than
+                // returning nothing.
+                const uid = aiadResolvedUserId();
+                if (!uid) {
+                    ['agentCtxSupporters', 'agentCtxRevenue', 'agentCtxMilestones'].forEach((id) => {
+                        const el = document.getElementById(id);
+                        if (el) el.textContent = el.id === 'agentCtxRevenue' ? '$0' : '0';
+                    });
+                    return;
+                }
+
                 // Supporters from Supabase
-                const { data: supporters } = await client
+                const { data: supporters, error: supErr } = await client
                     .from('fan_support')
                     .select('id', { count: 'exact', head: true })
-                    .eq('artist_id', AppState.user?.id);
+                    .eq('artist_id', uid);
+                if (supErr) console.warn('[AIAD] agent context supporters:', supErr.message);
                 const supCount = supporters?.length ?? 0;
                 const supEl = document.getElementById('agentCtxSupporters');
                 if (supEl) supEl.textContent = supCount;
 
                 // Revenue: sum of fan_support amounts
-                const { data: revData } = await client
+                const { data: revData, error: revErr } = await client
                     .from('fan_support')
                     .select('amount')
-                    .eq('artist_id', AppState.user?.id);
+                    .eq('artist_id', uid);
+                if (revErr) console.warn('[AIAD] agent context revenue:', revErr.message);
                 const totalRev = revData ? revData.reduce((s, r) => s + (r.amount || 0), 0) : 0;
                 const revEl = document.getElementById('agentCtxRevenue');
                 if (revEl) revEl.textContent = totalRev >= 1000 ? '$' + (totalRev/1000).toFixed(1) + 'K' : '$' + totalRev;
 
                 // Milestones
-                const { data: milestones } = await client
+                const { data: milestones, error: milErr } = await client
                     .from('artist_milestones')
                     .select('id')
-                    .eq('user_id', AppState.user?.id)
+                    .eq('user_id', uid)
                     .eq('completed', true);
+                if (milErr) console.warn('[AIAD] agent context milestones:', milErr.message);
                 const milEl = document.getElementById('agentCtxMilestones');
                 if (milEl) milEl.textContent = milestones?.length ?? 0;
             } catch(e) {
@@ -24487,17 +24524,18 @@ function toggleAgeRange(btn) {
             if (!sess?.user) { console.warn('[credits] no session available for balance fetch'); return; }
 
             try {
-                const anon = _anonKey();
-                const SU = (typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL) || 'https://uapiytquwuhtewqieegx.supabase.co';
-                const res = await fetch(`${SU}/rest/v1/ai_credits?select=balance,allowance&user_id=eq.${sess.user.id}`, {
-                    headers: { 'Authorization': 'Bearer ' + sess.access_token, 'apikey': anon || '' },
-                });
-                if (!res.ok) {
+                // Through the supabase client, not a raw fetch: the client refreshes an
+                // expired token, whereas the hand-built header pinned whatever
+                // sess.access_token happened to hold and returned PGRST303 once it aged out.
+                const _client = (typeof db !== 'undefined' && db) || window.db;
+                if (!_client || typeof _client.from !== 'function') { console.warn('[credits] no supabase client'); return; }
+                const { data: rows, error: credErr } = await _client
+                    .from('ai_credits').select('balance,allowance').eq('user_id', sess.user.id);
+                if (credErr) {
                     // Auth/permission failure — say so instead of inventing a balance.
-                    console.warn('[credits] balance fetch failed:', res.status, await res.text().catch(() => ''));
+                    console.warn('[credits] balance fetch failed:', credErr.code, credErr.message);
                     return;
                 }
-                const rows = await res.json();
                 if (!Array.isArray(rows)) { console.warn('[credits] unexpected balance payload:', rows); return; }
                 const row = rows[0];
                 if (!row) {
@@ -27753,11 +27791,21 @@ Be direct and concrete with real industry insight — never generic filler. When
     }
     function track(eventType, tool, metadata) {
       try {
-        if (!userId) return;
-        client.from('usage_events').insert({
-          user_id: userId, session_id: sessionId, event_type: eventType,
-          tool: tool || null, metadata: metadata || {}
-        }).then(function () {}, function () {});
+        // Read the id from the live session at call time. The cached `userId` was
+        // captured once at boot, so after a sign-out or an account switch it still held
+        // the previous user and the insert failed the WITH CHECK (auth.uid() = user_id).
+        // No session means no event — dropping an analytics row is fine, a 42501 is not.
+        client.auth.getSession().then(function (r) {
+          var live = (r && r.data && r.data.session && r.data.session.user) ? r.data.session.user.id : null;
+          userId = live;
+          if (!live) return;
+          client.from('usage_events').insert({
+            user_id: live, session_id: sessionId, event_type: eventType,
+            tool: tool || null, metadata: metadata || {}
+          }).then(function () {}, function (err) {
+            if (err && err.code) console.warn('[AIAD] usage_events insert:', err.code, err.message);
+          });
+        }, function () {});
       } catch (e) {}
     }
     window.__aiadTrack = track;
