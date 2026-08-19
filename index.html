@@ -4857,6 +4857,12 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                                 <input type="file" id="syncAudioUpload" accept="audio/*" style="display:none;" onchange="document.getElementById('syncAudioFilename').textContent = this.files[0]?.name || 'Upload MP3 or WAV'">
                             </div>
 
+                            <!-- The listing must reference a human-declared track: the DB
+                                 trigger rejects a null or non-human track_id. Filled by
+                                 aiadRenderSyncTrackPicker when the view opens. -->
+                            <div id="syncTrackPickerHost" style="margin-bottom:12px;"></div>
+                            <div id="syncAttestHost"></div>
+
                             <div style="display:flex;justify-content:flex-end;">
                                 <button onclick="handleSyncSubmit()" style="padding:10px 24px;background:var(--teal);border:none;border-radius:8px;color:#000;font-size:0.875rem;font-weight:600;cursor:pointer;">List Track</button>
                             </div>
@@ -13864,6 +13870,15 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 if (submenu) submenu.classList.add('open');
                 subItems[4].classList.add('active');
                 setTimeout(() => { try { loadMyListings(); loadSyncCatalog(); } catch (e) {} }, 60);
+                // Eligible-track picker + attestation. Rebuilt each time the view opens so a
+                // track declared human since the last visit shows up without a reload.
+                setTimeout(() => {
+                    try {
+                        const host = document.getElementById('syncAttestHost');
+                        if (host && window.aiadAttestationHtml) host.innerHTML = window.aiadAttestationHtml();
+                        if (window.aiadRenderSyncTrackPicker) window.aiadRenderSyncTrackPicker();
+                    } catch (e) {}
+                }, 80);
             } else if (view === 'analytics') {
                 viewEl.classList.add('active');
                 navItems[8].classList.add('active');
@@ -17325,6 +17340,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     <div style="font-size:0.85rem;font-weight:500;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${track.title}</div>
                     <div style="font-size:0.7rem;color:var(--text-muted);display:flex;align-items:center;gap:6px;margin-top:2px;">
                         <span style="padding:1px 7px;border-radius:4px;font-size:0.62rem;font-weight:600;letter-spacing:0.03em;color:${track.source === 'uploaded' ? '#a78bfa' : 'var(--teal)'};background:${track.source === 'uploaded' ? 'rgba(167,139,250,0.12)' : 'rgba(0,180,216,0.12)'};">${track.source === 'uploaded' ? 'Uploaded' : 'Generated'}</span>
+                        ${window.aiadOriginChip ? window.aiadOriginChip(track) : ''}
                         ${track.tags?.length ? `<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${track.tags.slice(0,2).join(' · ')}</span>` : ''}
                     </div>
                 </div>
@@ -17892,6 +17908,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
                         bucket: track.bucket || null,
                         storage_path: track.storage_path || null,
                         source: track.source || 'generated',
+                        origin: track.origin || 'unverified',
+                        originLocked: track.origin_locked === true,
                         imageUrl: track.cover_url || '',
                         lyrics: track.lyrics || '',
                         // Raw fields so the Edit-details modal can prefill + save.
@@ -26327,17 +26345,41 @@ Be direct and concrete with real industry insight — never generic filler. When
             const title = g('syncTrackTitle'), price = g('syncTrackPrice'), genre = g('syncTrackGenre'), mood = g('syncTrackMood'), bpm = g('syncTrackBpm');
             if (!title) { (window.showToast || alert)('Track title is required'); return; }
             const s = sess(); if (!s) { (window.showToast || alert)('Please sign in'); return; }
-            // This form only captures commercial terms — it never attaches audio. Without a
-            // master, supervisors can't preview the track. Warn before creating a silent listing.
-            if (!window.confirm('This listing won’t have any audio for supervisors to preview.\n\nTo attach a track, use the "Upload" button (it adds the master + a 20-second preview automatically). \n\nList "' + title + '" without audio anyway?')) return;
+            // The DB trigger rejects a listing whose track_id is null or whose track is not
+            // human-declared. Before the picker existed this form sent no track_id at all,
+            // so every submission failed 23514 — and because the fetch below never checked
+            // the response, the artist still got a success toast.
+            const trackId = g('syncTrackPick');
+            if (!trackId) { (window.showToast || alert)('Select a track from your library to submit.'); return; }
+            const attest = document.getElementById('syncAttest');
+            if (!attest || !attest.checked) { (window.showToast || alert)('Please confirm the recording is human-created.'); return; }
             const useCases = Array.from(document.querySelectorAll('#syncUseCases .style-tag-chip.selected')).map(el => el.textContent.trim());
             const artistName = (window.AppState && AppState.artistProfile && AppState.artistProfile.artistName) || (s.user.user_metadata && s.user.user_metadata.username) || 'Artist';
             try {
-                await fetch(`${SUPA}/rest/v1/sync_listings`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon(), 'Content-Type': 'application/json' }, body: JSON.stringify({ artist_id: s.user.id, artist_name: artistName, title, price: parseFloat(price) || null, genre, mood, bpm, use_cases: useCases }) });
+                const res = await fetch(`${SUPA}/rest/v1/sync_listings`, {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        artist_id: s.user.id, artist_name: artistName, title,
+                        price: parseFloat(price) || null, genre, mood, bpm, use_cases: useCases,
+                        track_id: trackId,
+                        // Version the wording, so a later reword doesn't rewrite what this
+                        // artist actually agreed to.
+                        attestation_text_version: window.AIAD_ATTESTATION_VERSION || 'v1-2026-08',
+                        attested_at: new Date().toISOString(),
+                    }),
+                });
+                if (!res.ok) {
+                    let err = {}; try { err = await res.json(); } catch (e2) {}
+                    throw Object.assign(new Error(err.message || `sync_listings ${res.status}`), { code: err.code, details: err.details });
+                }
                 (window.showToast || alert)(`"${title}" listed in the Sync Library`);
                 ['syncTrackTitle', 'syncTrackPrice', 'syncTrackBpm'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+                if (attest) attest.checked = false;
                 loadMyListings();
-            } catch (e) { (window.showToast || alert)('Could not list track — try again'); }
+            } catch (e) {
+                (window.showToast || alert)(window.aiadMapDbError ? window.aiadMapDbError(e, 'Listing the track') : 'Could not list track — try again');
+            }
         };
         window.suggestSyncPriceEdit = async function () {
             const useCases = Array.from(document.querySelectorAll('#editSyncUses .style-tag-chip.selected')).map((el) => el.textContent.trim());
@@ -27280,9 +27322,12 @@ Be direct and concrete with real industry insight — never generic filler. When
         ];
         function aiadPlanUsage(credits) {
             const n = (x, word) => x + ' ' + word + (x === 1 ? '' : 's');
-            const _img = Math.floor(credits / AIAD_IMAGE_COST);
-            return 'up to ' + n(Math.floor(credits / AIAD_SONG_COST), 'song') + ' or '
-                 + n(_img === 666 ? 665 : _img, 'image') + ' a month';
+            // Rounded down to a round number above 100 rather than special-casing one
+            // value: it always understates the real allowance, so the claim stays true,
+            // and 2000/3 reads as 660 instead of 666.
+            const round = (x) => (x >= 100 ? Math.floor(x / 10) * 10 : x);
+            return 'up to ' + n(round(Math.floor(credits / AIAD_SONG_COST)), 'song') + ' or '
+                 + n(round(Math.floor(credits / AIAD_IMAGE_COST)), 'image') + ' a month';
         }
         window.aiadShowObPricing = function (dash) {
             const stats = document.getElementById('aiadObStepStats'); if (stats) stats.style.display = 'none';
@@ -27849,6 +27894,18 @@ Be direct and concrete with real industry insight — never generic filler. When
     return null;
   }
   function jh(tok){ return { apikey:ANON, Authorization:'Bearer '+tok, 'Content-Type':'application/json' }; }
+  // Shared by the upload modal and the library "declare origin" modal so the wording
+  // an artist agrees to is identical in both places. Exposed for the library code,
+  // which lives in a different script block.
+  var AIAD_ORIGIN_OPTS = [
+    { value:'human',        label:'Human-created',
+      help:'Written, performed, and produced by people. AI tools used for mixing, mastering, noise reduction, or stem separation are fine.' },
+    { value:'ai_assisted',  label:'AI-assisted',
+      help:'AI contributed to some musical content, but the core performance or composition is human.' },
+    { value:'ai_generated', label:'AI-generated',
+      help:'AI generated the melody, harmony, vocals, or arrangement.' },
+  ];
+  window.AIAD_ORIGIN_OPTS = AIAD_ORIGIN_OPTS;
   function aiadEncodeWav(buf){
     var ch=1, sr=buf.sampleRate, len=buf.length, data=buf.getChannelData(0);
     var bl=len*2, ab=new ArrayBuffer(44+bl), v=new DataView(ab);
@@ -27913,13 +27970,34 @@ Be direct and concrete with real industry insight — never generic filler. When
       +'<label style="display:flex;gap:8px;align-items:center;font-size:.85rem;margin-bottom:8px;color:#cfcfcf"><input id="aiadUpPublic" type="checkbox" checked/> Public — visible to everyone (off = private, only you)</label>'
       +'<label style="display:flex;gap:8px;align-items:center;font-size:.85rem;margin-bottom:4px;color:#cfcfcf"><input id="aiadUpSync" type="checkbox"/> Also list in the Sync Library (for music supervisors)</label>'
       +'<div style="font-size:.72rem;color:#8a8a8a;margin:0 0 16px 24px;line-height:1.45">Supervisors hear a 20-second watermarked preview. Your full master stays private and license-gated — it never leaves until a license is signed.</div>'
+      // How the music was MADE — distinct from `source`, which records how the file got
+      // here. An uploaded file can still be a Suno export, which is the whole point.
+      // No default: the artist has to choose, and the trigger locks it on insert.
+      +'<div style="border-top:1px solid rgba(255,255,255,.1);padding-top:14px;margin-bottom:6px">'
+      +'<div style="font-weight:600;font-size:.9rem;margin-bottom:2px">How was this made?</div>'
+      +'<div style="font-size:.74rem;color:#8a8a8a;margin-bottom:10px">Required.</div>'
+      + AIAD_ORIGIN_OPTS.map(function(o){ return ''
+          +'<label style="display:flex;gap:9px;align-items:flex-start;margin-bottom:10px;cursor:pointer">'
+          +'<input type="radio" name="aiadUpOrigin" value="'+o.value+'" style="margin-top:3px;flex:none"/>'
+          +'<span><span style="font-size:.86rem;color:#fff;font-weight:600">'+o.label+'</span>'
+          +'<span style="display:block;font-size:.74rem;color:#8a8a8a;line-height:1.45;margin-top:1px">'+o.help+'</span></span></label>'; }).join('')
+      +'<div style="font-size:.74rem;color:#cfcfcf;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:9px 11px;line-height:1.5;margin-bottom:14px">'
+      +'Only human-created masters are eligible for the Sync Library. You can\'t change this after saving — contact support if you need it corrected.</div></div>'
       +'<div style="display:flex;gap:10px;justify-content:flex-end"><button id="aiadUpCancel" type="button" style="background:transparent;border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer">Cancel</button>'
       +'<button id="aiadUpGo" type="button" style="background:linear-gradient(135deg,#00D4FF,#0077B6);color:#001018;font-weight:700;border:none;border-radius:999px;padding:8px 18px;cursor:pointer">Upload</button></div>'
       +'<div id="aiadUpMsg" style="font-size:.8rem;color:#9aa;margin-top:10px"></div></div>';
     document.body.appendChild(ov);
     ov.addEventListener('click',function(e){ if(e.target===ov) ov.remove(); });
     document.getElementById('aiadUpCancel').onclick=function(){ ov.remove(); };
-    document.getElementById('aiadUpGo').onclick=doUpload;
+    var goBtn=document.getElementById('aiadUpGo');
+    goBtn.onclick=doUpload;
+    // Origin is required, so the button starts disabled rather than failing on submit.
+    goBtn.disabled=true; goBtn.style.opacity='.5'; goBtn.style.cursor='not-allowed';
+    Array.prototype.forEach.call(ov.querySelectorAll('input[name="aiadUpOrigin"]'),function(r){
+      r.addEventListener('change',function(){
+        goBtn.disabled=false; goBtn.style.opacity='1'; goBtn.style.cursor='pointer';
+      });
+    });
     document.getElementById('aiadUpCover').onchange=function(){
       var f=this.files[0], img=document.getElementById('aiadUpCoverPrev'), info=document.getElementById('aiadUpCoverInfo');
       if(!f){ img.style.display='none'; if(info)info.textContent=''; return; }
@@ -27931,6 +28009,9 @@ Be direct and concrete with real industry insight — never generic filler. When
     var msg=document.getElementById('aiadUpMsg');
     try{
       var s=sess(); if(!s){ msg.textContent='Sign in first.'; return; }
+      var originEl=document.querySelector('input[name="aiadUpOrigin"]:checked');
+      var origin=originEl?originEl.value:'';
+      if(!origin){ msg.textContent='Tell us how the track was made.'; return; }
       var f=document.getElementById('aiadUpFile').files[0];
       if(!f){ msg.textContent='Choose an audio file.'; return; }
       var title=(document.getElementById('aiadUpTitle').value||f.name.replace(/\.[^.]+$/,'')||'Untitled').trim();
@@ -27980,7 +28061,7 @@ Be direct and concrete with real industry insight — never generic filler. When
         msg.textContent='Saving to your library…';
         var trackId=null;
         try{
-          var trk=await fetch(SU+'/rest/v1/tracks',{method:'POST',headers:Object.assign(jh(s.access_token),{Prefer:'return=representation'}),body:JSON.stringify({user_id:s.user.id,title:title,genre:(genre||null),source:'uploaded',bucket:'sync-masters',storage_path:mpath,is_public:false,cover_url:coverUrl})});
+          var trk=await fetch(SU+'/rest/v1/tracks',{method:'POST',headers:Object.assign(jh(s.access_token),{Prefer:'return=representation'}),body:JSON.stringify({user_id:s.user.id,title:title,genre:(genre||null),source:'uploaded',origin:origin,bucket:'sync-masters',storage_path:mpath,is_public:false,cover_url:coverUrl})});
           if(trk.ok){ var trows=await trk.json(); trackId=(Array.isArray(trows)&&trows[0]&&trows[0].id)||null; }
           else if(window.__aiadReportError){ window.__aiadReportError('insert','tracks',new Error('track create '+trk.status)); }
         }catch(e){ if(window.__aiadReportError) window.__aiadReportError('insert','tracks',e); }
@@ -27998,7 +28079,7 @@ Be direct and concrete with real industry insight — never generic filler. When
         if(!up.ok){ msg.textContent='Upload failed ('+up.status+').'; return; }
         var url=SU+'/storage/v1/object/public/artist-media/'+path;
         msg.textContent='Saving to your library…';
-        var tr=await fetch(SU+'/rest/v1/tracks',{method:'POST',headers:Object.assign(jh(s.access_token),{Prefer:'return=minimal'}),body:JSON.stringify({user_id:s.user.id,title:title,url:url,genre:(genre||null),is_public:isPublic,source:'uploaded',bucket:'artist-media',storage_path:path,cover_url:coverUrl})});
+        var tr=await fetch(SU+'/rest/v1/tracks',{method:'POST',headers:Object.assign(jh(s.access_token),{Prefer:'return=minimal'}),body:JSON.stringify({user_id:s.user.id,title:title,url:url,genre:(genre||null),is_public:isPublic,source:'uploaded',origin:origin,bucket:'artist-media',storage_path:path,cover_url:coverUrl})});
         if(!tr.ok){ msg.textContent='Could not save track ('+tr.status+').'; return; }
         msg.textContent='Done! Added to your library.';
       }
@@ -29189,6 +29270,169 @@ Be direct and concrete with real industry insight — never generic filler. When
   #aiadBugBtn     { bottom: calc(164px + env(safe-area-inset-bottom, 0px)) !important; right: 12px !important; }
 }
 </style>
+<!-- ══════════════ TRACK ORIGIN + SYNC ATTESTATION ══════════════
+     `origin` is how the music was MADE (human / ai_assisted / ai_generated);
+     `source` is how the file got into AIAD (generated / uploaded). They are not
+     the same thing — an uploaded file can still be a Suno export — so nothing
+     here reads or writes `source`.
+
+     Two DB triggers own the rules and the client cannot bypass them:
+       · source='generated' is pinned to origin='ai_generated' and SILENTLY
+         coerced, so we never report back what the user picked — we re-read.
+       · once origin_locked, changing origin raises 42501.
+       · sync_listings rejects a non-human or missing track_id with 23514.
+     The client's only job is collecting the declaration and rendering the
+     errors legibly.                                                        -->
+<script>
+(function () {
+    const ORIGIN_META = {
+        human:        { label: 'Human-created', fg: '#00D4FF', bg: 'rgba(0,180,216,0.14)' },
+        ai_assisted:  { label: 'AI-assisted',   fg: '#cbd5e1', bg: 'rgba(255,255,255,0.08)' },
+        ai_generated: { label: 'AI-generated',  fg: '#f0abfc', bg: 'rgba(217,70,239,0.15)' },
+        unverified:   { label: 'Origin not set', fg: '#94a3b8', bg: 'transparent' },
+    };
+    const CHIP = 'padding:1px 7px;border-radius:4px;font-size:0.62rem;font-weight:600;letter-spacing:0.03em;';
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
+        ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+    const toast = (m) => (window.showToast || window.alert)(m);
+    window.AIAD_ATTESTATION_VERSION = 'v1-2026-08';
+
+    // ── Error mapping ──────────────────────────────────────────────────────
+    // These triggers raise real Postgres errors that PostgREST passes straight
+    // through; without this the artist sees raw SQL text.
+    window.aiadMapDbError = function (error, ctx) {
+        if (!error) return null;
+        const code = error.code || '';
+        const detail = ((error.message || '') + ' ' + (error.details || '')).toLowerCase();
+        if (code === '42501') return "This track's origin is already set and can't be changed. Contact support if it needs correcting.";
+        if (code === '23514') {
+            // Same code for both refusals; the message distinguishes them.
+            if (detail.includes('reference') || detail.includes('must reference')) return 'Select a track from your library to submit.';
+            return 'The Sync Library accepts human-created masters only.';
+        }
+        if (code === '23503') return 'That track is no longer in your library.';
+        return error.message || (ctx ? ctx + ' failed' : 'Something went wrong');
+    };
+
+    // ── Chip on a library row ──────────────────────────────────────────────
+    window.aiadOriginChip = function (track) {
+        const origin = (track && track.origin) || 'unverified';
+        const meta = ORIGIN_META[origin] || ORIGIN_META.unverified;
+        const id = esc(track && track.trackId);
+        if (origin === 'unverified') {
+            // Clickable: this is the only way an existing track becomes sync-eligible.
+            return '<span onclick="event.stopPropagation();aiadOpenOriginModal(\'' + id + '\')" title="Set how this track was made"'
+                + ' style="' + CHIP + 'cursor:pointer;color:' + meta.fg + ';border:1px dashed ' + meta.fg + '66;">'
+                + esc(meta.label) + '</span>';
+        }
+        // Declared (and therefore locked by the trigger) — static label, not a control.
+        return '<span style="' + CHIP + 'color:' + meta.fg + ';background:' + meta.bg + ';">' + esc(meta.label) + '</span>';
+    };
+
+    function optionsHtml(name) {
+        const opts = window.AIAD_ORIGIN_OPTS || [];
+        return opts.map((o) =>
+            '<label style="display:flex;gap:9px;align-items:flex-start;margin-bottom:10px;cursor:pointer;">'
+            + '<input type="radio" name="' + name + '" value="' + esc(o.value) + '" style="margin-top:3px;flex:none;">'
+            + '<span><span style="font-size:0.86rem;color:#fff;font-weight:600;">' + esc(o.label) + '</span>'
+            + '<span style="display:block;font-size:0.74rem;color:#8a8a8a;line-height:1.45;margin-top:1px;">' + esc(o.help) + '</span></span></label>').join('');
+    }
+
+    // ── Declare origin for an existing track ───────────────────────────────
+    window.aiadOpenOriginModal = function (trackId) {
+        const track = (window._trackData || {})[trackId];
+        if (track && track.originLocked) { toast('This track\'s origin is already set.'); return; }
+        document.getElementById('aiadOriginOverlay')?.remove();
+        const ov = document.createElement('div');
+        ov.id = 'aiadOriginOverlay';
+        ov.style.cssText = 'position:fixed;inset:0;background:rgba(3,5,12,0.84);backdrop-filter:blur(6px);z-index:2147483090;display:flex;align-items:center;justify-content:center;padding:18px;';
+        ov.innerHTML = '<div style="background:#0d0f17;border:1px solid rgba(255,255,255,0.1);border-radius:16px;max-width:440px;width:100%;padding:22px;">'
+            + '<div style="display:flex;justify-content:space-between;gap:10px;margin-bottom:2px;">'
+            + '<h3 style="margin:0;color:#fff;font-size:1.08rem;">How was this made?</h3>'
+            + '<button id="aiadOriginClose" aria-label="Close" style="background:none;border:none;color:#94a3b8;font-size:1.4rem;line-height:1;cursor:pointer;">&times;</button></div>'
+            + (track && track.title ? '<p style="color:#94a3b8;font-size:0.8rem;margin:0 0 14px;">' + esc(track.title) + '</p>' : '<div style="height:10px;"></div>')
+            + optionsHtml('aiadOriginPick')
+            + '<div style="font-size:0.74rem;color:#cfcfcf;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:9px 11px;line-height:1.5;margin:4px 0 12px;">'
+            + 'Only human-created masters are eligible for the Sync Library. You can\'t change this after saving — contact support if you need it corrected.</div>'
+            + '<div id="aiadOriginMsg" style="font-size:0.78rem;color:#f59e0b;min-height:16px;margin-bottom:6px;"></div>'
+            + '<button id="aiadOriginSave" disabled style="width:100%;background:linear-gradient(135deg,#06b6d4,#3b82f6);color:#fff;border:none;border-radius:10px;padding:11px;font-size:0.9rem;font-weight:700;cursor:not-allowed;opacity:.5;">Save</button></div>';
+        document.body.appendChild(ov);
+
+        const close = () => ov.remove();
+        document.getElementById('aiadOriginClose').addEventListener('click', close);
+        ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+        const saveBtn = document.getElementById('aiadOriginSave');
+        ov.querySelectorAll('input[name="aiadOriginPick"]').forEach((r) => r.addEventListener('change', () => {
+            saveBtn.disabled = false; saveBtn.style.cursor = 'pointer'; saveBtn.style.opacity = '1';
+        }));
+
+        saveBtn.addEventListener('click', async () => {
+            const picked = ov.querySelector('input[name="aiadOriginPick"]:checked');
+            const msg = document.getElementById('aiadOriginMsg');
+            if (!picked) { msg.textContent = 'Pick one first.'; return; }
+            saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; msg.textContent = '';
+            try {
+                const { error } = await window.db.from('tracks').update({ origin: picked.value }).eq('id', trackId);
+                if (error) throw error;
+                // Re-read rather than trusting the value we sent: the trigger may have
+                // coerced it (generated tracks are pinned to ai_generated).
+                const { data: row, error: readErr } = await window.db
+                    .from('tracks').select('origin,origin_locked').eq('id', trackId).maybeSingle();
+                if (readErr) throw readErr;
+                const saved = (row && row.origin) || 'unverified';
+                if (window._trackData && window._trackData[trackId]) {
+                    window._trackData[trackId].origin = saved;
+                    window._trackData[trackId].originLocked = !!(row && row.origin_locked);
+                }
+                close();
+                toast('Saved as ' + ((ORIGIN_META[saved] || {}).label || saved));
+                if (window.loadTracksFromDb) window.loadTracksFromDb();
+            } catch (e) {
+                msg.textContent = window.aiadMapDbError(e, 'Saving the origin');
+                saveBtn.disabled = false; saveBtn.textContent = 'Save'; saveBtn.style.cursor = 'pointer';
+            }
+        });
+    };
+
+    // ── Sync submission: eligible-track picker + attestation ───────────────
+    window.aiadHumanTracks = async function () {
+        const { data, error } = await window.db.from('tracks')
+            .select('id,title,origin').eq('origin', 'human').order('created_at', { ascending: false });
+        if (error) return [];
+        return data || [];
+    };
+
+    // Rendered into the sync form; replaces the free-text-only flow, which could
+    // never satisfy the trigger's track_id requirement.
+    window.aiadRenderSyncTrackPicker = async function () {
+        const host = document.getElementById('syncTrackPickerHost');
+        if (!host) return;
+        const rows = await window.aiadHumanTracks();
+        if (!rows.length) {
+            host.innerHTML = '<div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.32);border-radius:12px;padding:14px 16px;">'
+                + '<div style="font-weight:600;font-size:0.9rem;color:var(--text-primary);">No eligible tracks yet</div>'
+                + '<div style="font-size:0.82rem;color:var(--text-muted);margin-top:4px;line-height:1.5;">The Sync Library accepts human-created masters only. '
+                + 'Open your library and set a track\'s origin to “Human-created” to list it here.</div>'
+                + '<button onclick="showArtistView(\'music\')" style="margin-top:10px;background:transparent;border:1px solid var(--border-default);color:var(--text-primary);border-radius:9px;padding:8px 14px;font-size:0.82rem;cursor:pointer;">Go to your library</button></div>';
+            return;
+        }
+        host.innerHTML = '<label style="display:block;font-size:0.74rem;color:var(--text-muted);margin-bottom:3px;">Track</label>'
+            + '<select id="syncTrackPick" style="width:100%;box-sizing:border-box;background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">'
+            + '<option value="">Select a track…</option>'
+            + rows.map((r) => '<option value="' + esc(r.id) + '">' + esc(r.title || 'Untitled') + '</option>').join('')
+            + '</select>';
+    };
+
+    window.aiadAttestationHtml = function () {
+        return '<label style="display:flex;gap:9px;align-items:flex-start;margin:14px 0 4px;cursor:pointer;">'
+            + '<input type="checkbox" id="syncAttest" style="margin-top:3px;flex:none;">'
+            + '<span style="font-size:0.78rem;color:var(--text-secondary);line-height:1.55;">'
+            + 'I confirm this recording is human-created. AI was not used to generate any melodic, harmonic, rhythmic, lyrical, or vocal content. '
+            + 'I understand AIAD may request stems or project files to verify this, and that a false statement may result in removal from the Sync Library and termination of my account.'
+            + '</span></label>';
+    };
+})();
+</script>
 </body>
 
 
