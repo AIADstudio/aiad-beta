@@ -27322,9 +27322,12 @@ Be direct and concrete with real industry insight — never generic filler. When
         ];
         function aiadPlanUsage(credits) {
             const n = (x, word) => x + ' ' + word + (x === 1 ? '' : 's');
-            const _img = Math.floor(credits / AIAD_IMAGE_COST);
-            return 'up to ' + n(Math.floor(credits / AIAD_SONG_COST), 'song') + ' or '
-                 + n(_img === 666 ? 665 : _img, 'image') + ' a month';
+            // Rounded down to a round number above 100 rather than special-casing one
+            // value: it always understates the real allowance, so the claim stays true,
+            // and 2000/3 reads as 660 instead of 666.
+            const round = (x) => (x >= 100 ? Math.floor(x / 10) * 10 : x);
+            return 'up to ' + n(round(Math.floor(credits / AIAD_SONG_COST)), 'song') + ' or '
+                 + n(round(Math.floor(credits / AIAD_IMAGE_COST)), 'image') + ' a month';
         }
         window.aiadShowObPricing = function (dash) {
             const stats = document.getElementById('aiadObStepStats'); if (stats) stats.style.display = 'none';
