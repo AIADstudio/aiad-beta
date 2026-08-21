@@ -11790,8 +11790,6 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         }
 
         async function handleArtistProfileContinue() {
-            const uid = aiadResolvedUserId();
-            if (!uid) return;
             const btn = document.getElementById('artistProfileBtn');
             btn.disabled = true;
             btn.querySelector('span').textContent = 'Creating account...';
@@ -11846,7 +11844,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
 
             if (AppState.currentUser) {
                 await db.from('profiles').upsert({
-                    id: uid,
+                    id: AppState.currentUser.id,
                     email,
                     full_name: fullName,
                     username,
@@ -11862,7 +11860,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             // Write page-1 fields to artist_profiles immediately
             if (AppState.currentUser && AppState.artistProfile.artistName) {
                 await db.from('artist_profiles').upsert({
-                    user_id: uid,
+                    user_id: AppState.currentUser.id,
                     artist_name: AppState.artistProfile.artistName,
                     primary_genre: AppState.artistProfile.primaryGenre || null,
                     career_stage: AppState.artistProfile.artistLevel || null,
@@ -11885,8 +11883,6 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         }
 
         async function handleGoalsContinue() {
-            const uid = aiadResolvedUserId();
-            if (!uid) return;
             // Save goals + progressive profiling fields to AppState
             AppState.artistProfile.primaryPlatform = AppState.artistContext.primaryPlatform || '';
             AppState.artistProfile.followerCount = AppState.artistContext.followerCount || '';
@@ -11897,7 +11893,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             // Persist page-2 fields to Supabase
             if (AppState.currentUser) {
                 await db.from('artist_profiles').upsert({
-                    user_id: uid,
+                    user_id: AppState.currentUser.id,
                     primary_platform: AppState.artistProfile.primaryPlatform || null,
                     follower_count: AppState.artistProfile.followerCount || null,
                     goals: AppState.artistGoals.length ? AppState.artistGoals : null,
@@ -12323,14 +12319,12 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         }
 
         function handleSupervisorEnterDashboard() {
-            const uid = aiadResolvedUserId();
-            if (!uid) return;
 
             if (AppState.currentUser) {
                 // This duplicate literal previously omitted location and so overwrote the
                 // row written at signup with a null one.
                 db.from('profiles').upsert({
-                    id: uid,
+                    id: AppState.currentUser.id,
                     email: AppState.currentUser.email,
                     full_name: AppState.supervisorProfile?.name || '',
                     role: 'supervisor',
@@ -22607,8 +22601,6 @@ document.addEventListener('keydown', function(e) {
 
         // Step 2 → dashboard: save preferences then enter
         async function handleFanPreferencesContinue() {
-            const uid = aiadResolvedUserId();
-            if (!uid) return;
             const genres = Array.from(document.querySelectorAll('#fanGenreChips .genre-chip.selected'))
                                  .map(c => c.textContent.trim());
             const supportMethods = Array.from(document.querySelectorAll('#page-fan-preferences .goal-card[aria-checked="true"]'))
@@ -22622,7 +22614,7 @@ document.addEventListener('keydown', function(e) {
                 // so this needs the same collision handling as the profiles write.
                 const fanApUsername = await aiadUniqueUsername(acc.name || 'fan');
                 await db.from('artist_profiles').upsert({
-                    id: uid,
+                    id: AppState.currentUser.id,
                     username: fanApUsername,
                     artist_name: acc.name || 'Fan',
                     location: acc.location || '',
@@ -27765,8 +27757,6 @@ Be direct and concrete with real industry insight — never generic filler. When
             reader.readAsDataURL(file);
         };
         window.aiadSubmitOnboarding = async function (btn, dash) {
-            const uid = aiadResolvedUserId();
-            if (!uid) return;
             const g = (id) => (document.getElementById(id)?.value || '').trim();
             const data = {
                 artist_name: g('ob_artist_name'), primary_genre: g('ob_primary_genre'), sound: g('ob_substyle'),
