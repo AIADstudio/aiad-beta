@@ -523,7 +523,10 @@ html, body {
     gap: 6px;
     padding: 0 14px;
     height: 100%;
-    background: linear-gradient(135deg, rgba(255,0,255,0.15), rgba(0,212,255,0.1));
+    background: var(--bg-secondary);
+    background-image: linear-gradient(135deg, rgba(255,0,255,0.15), rgba(0,212,255,0.1));
+    position: relative;
+    z-index: 2;
     border-right: 1px solid var(--border-default);
     font-size: 0.6rem;
     font-weight: 700;
@@ -545,6 +548,8 @@ html, body {
 .live-stats-ticker {
     display: flex;
     align-items: center;
+    position: relative;
+    z-index: 1;
     animation: tickerScroll 40s linear infinite;
     white-space: nowrap;
     gap: 0;
@@ -14488,8 +14493,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
                         thumb = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:6px;"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--teal-light)" stroke-width="1.5"><polygon points="5 3 19 12 5 21 5 3"/></svg><span style="font-size:0.7rem;color:var(--text-muted);">Video</span></div>';
                     }
                     if (!thumb && post.content) {
-                        var snippet = post.content.length > 80 ? post.content.slice(0, 80) + '\u2026' : post.content;
-                        thumb = '<div style="padding:12px;font-size:0.78rem;line-height:1.5;color:var(--text-secondary);display:flex;align-items:center;height:100%;"><span>' + snippet + '</span></div>';
+                        var snippet = post.content.length > 140 ? post.content.slice(0, 140) + '\u2026' : post.content;
+                        thumb = '<div style="padding:16px 14px;font-size:0.88rem;line-height:1.5;font-weight:500;color:var(--text-primary);display:flex;align-items:flex-start;height:100%;background:linear-gradient(145deg,rgba(255,0,255,0.07),rgba(0,212,255,0.05));box-sizing:border-box;overflow:hidden;"><span>' + snippet + '</span></div>';
                     }
                     if (!thumb) {
                         thumb = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-hint);font-size:0.75rem;">Post</div>';
@@ -14941,12 +14946,38 @@ Only capture real, meaningful decisions — not questions or general discussion.
             ]
         };
 
+        // Resolve the user's real subscription plan once and cache it. AppState.artistProfile
+        // holds career data (artistLevel), never the billing plan — reading .plan off it always
+        // fell through to 'Free'.
+        async function ensurePlanLabel() {
+            if (AppState.planLabel) return AppState.planLabel;
+            try {
+                const uid = (AppState.currentUser && AppState.currentUser.id) || (AppState.user && AppState.user.id);
+                const client = (typeof db !== 'undefined' && db) || window.db;
+                if (uid && client && typeof client.from === 'function') {
+                    const r = await client.from('profiles').select('plan, plan_tier').eq('id', uid).maybeSingle();
+                    const key = (r && r.data && (r.data.plan_tier || r.data.plan)) || null;
+                    if (key) {
+                        const tier = (typeof SubscriptionTiers !== 'undefined') ? SubscriptionTiers[key] : null;
+                        AppState.planLabel = (tier && tier.name)
+                            ? tier.name
+                            : String(key).replace(/^artist_/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                        return AppState.planLabel;
+                    }
+                }
+            } catch (e) {}
+            try {
+                const ls = localStorage.getItem('aiad_plan');
+                if (ls) { AppState.planLabel = ls.charAt(0).toUpperCase() + ls.slice(1); return AppState.planLabel; }
+            } catch (e) {}
+            AppState.planLabel = 'Free';
+            return AppState.planLabel;
+        }
+
         async function populateAgentContext() {
             // Level from AppState
             try {
-                const profile = AppState.artistProfile;
-                const plan = profile?.plan || profile?.subscriptionTier || localStorage.getItem('aiad_plan') || 'Free';
-                const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1);
+                const planLabel = await ensurePlanLabel();
                 const lvlEl = document.getElementById('agentCtxLevel');
                 if (lvlEl) lvlEl.textContent = planLabel;
 
@@ -15034,7 +15065,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     <span class="chat-name">You</span>
                     <span class="chat-time">Just now</span>
                 </div>
-                <div class="chat-content">${message}</div>
+                <div class="chat-content">${escapeHtml(message)}</div>
             `;
             chatThread.appendChild(userMsg);
             input.value = '';
@@ -15095,7 +15126,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                         <span class="chat-name">AIAD</span>
                         <span class="chat-time">Just now</span>
                     </div>
-                    <div class="chat-content">${aiResponse.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*(.*?)\*/g, '<em>$1</em>').replace(/\n/g, '<br>')}</div>
+                    <div class="chat-content">${renderMarkdown(aiResponse)}</div>
                 `;
                 chatThread.appendChild(aiMsg);
                 chatThread.scrollTop = chatThread.scrollHeight;
@@ -21895,7 +21926,7 @@ document.addEventListener('keydown', function(e) {
                     { label: 'Posts',           val: posts.length,       change: null },
                     { label: 'Tracks',          val: tracks.length,      change: null },
                     { label: 'Active Projects', val: activeProj,         change: null },
-                    { label: 'Artist Level',    val: AppState.artistProfile?.plan || 'Free', change: null },
+                    { label: 'Artist Level',    val: await ensurePlanLabel(),                change: null },
                 ];
 
                 // Build HTML — duplicate for seamless scroll loop
@@ -24331,7 +24362,22 @@ function toggleAgeRange(btn) {
             let html = escapeHtml(text);
             html = html.replace(/^### (.+)$/gm, '<h4 style="font-size:0.9rem;font-weight:700;margin:14px 0 6px 0;color:var(--text-primary);">$1</h4>');
             html = html.replace(/^## (.+)$/gm, '<h3 style="font-size:0.98rem;font-weight:700;margin:16px 0 8px 0;color:var(--text-primary);">$1</h3>');
+            html = html.replace(/^# (.+)$/gm, '<h3 style="font-size:1.05rem;font-weight:700;margin:16px 0 8px 0;color:var(--text-primary);">$1</h3>');
+            html = html.replace(/^\s*(?:---|\*\*\*|___)\s*$/gm, '<hr style="border:none;border-top:1px solid var(--border-default);margin:14px 0;">');
+            html = html.replace(/(?:^[ \t]*[-+] .+(?:\n|$))+/gm, (block) => {
+                const items = block.trim().split('\n').map((l) => l.replace(/^[ \t]*[-+] /, ''));
+                return '<ul style="margin:8px 0 8px 20px;padding:0;line-height:1.55;">'
+                    + items.map((i) => '<li style="margin:3px 0;">' + i + '</li>').join('')
+                    + '</ul>\n';
+            });
+            html = html.replace(/(?:^[ \t]*\d+\. .+(?:\n|$))+/gm, (block) => {
+                const items = block.trim().split('\n').map((l) => l.replace(/^[ \t]*\d+\. /, ''));
+                return '<ol style="margin:8px 0 8px 20px;padding:0;line-height:1.55;">'
+                    + items.map((i) => '<li style="margin:3px 0;">' + i + '</li>').join('')
+                    + '</ol>\n';
+            });
             html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/(^|[^*\w])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
             html = html.replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.06);padding:1px 6px;border-radius:4px;font-size:0.85em;">$1</code>');
             // Pipe tables (very simple — convert into HTML)
             html = html.replace(/(\|[^\n]+\|\n)+/g, (block) => {
@@ -24352,7 +24398,11 @@ function toggleAgeRange(btn) {
                 t += '</tbody></table>';
                 return t;
             });
-            html = html.split(/\n{2,}/).map((p) => /^<(h\d|table)/.test(p) ? p : '<p style="margin:8px 0;line-height:1.55;">' + p.replace(/\n/g, '<br>') + '</p>').join('');
+            // Force block-level elements onto their own chunk so the paragraph pass below
+            // never swallows an <hr>, list or heading into a <p>.
+            html = html.replace(/(<(?:h3|h4|ul|ol|table|hr)\b)/g, '\n\n$1');
+            html = html.replace(/(<\/(?:h3|h4|ul|ol|table)>|<hr[^>]*>)/g, '$1\n\n');
+            html = html.split(/\n{2,}/).map((p) => (!p.trim() || /^<(h\d|table|ul|ol|hr)/.test(p.trim())) ? p : '<p style="margin:8px 0;line-height:1.55;">' + p.replace(/\n/g, '<br>') + '</p>').join('');
             return html;
         }
 
