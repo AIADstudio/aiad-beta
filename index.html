@@ -1410,13 +1410,30 @@ html, body {
 
                 <div style="display:flex;flex-direction:column;gap:10px;margin:24px 0;text-align:left;">
 
-                    <div id="onboardSpotifyBtn" onclick="connectSpotify()" style="display:flex;align-items:center;gap:14px;padding:14px 18px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:12px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor='#1db954'" onmouseout="this.style.borderColor='rgba(255,255,255,0.1)'">
-                        <svg viewBox="0 0 24 24" fill="#1db954" style="width:22px;height:22px;flex-shrink:0;"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
-                        <div style="flex:1;">
-                            <div style="font-size:0.875rem;font-weight:500;color:var(--text-primary);">Connect Spotify</div>
-                            <div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;">Streams, top tracks, audience data</div>
+                    <!-- Spotify's OAuth is unusable for us: Development Mode allowlists 5
+                         users and has deprecated artist top-tracks/followers/popularity for
+                         dev-mode apps, so Connect 403s for essentially every artist, and
+                         Extended Quota needs a registered business at 250k MAU. The flow
+                         itself is correct and stays in the code — connectSpotify(),
+                         checkSpotifyCallback(), processPendingSpotifyCode(), the
+                         spotify-auth function and the /callback rewrite are all intact and
+                         will work unchanged the day we qualify. Only the entry point is
+                         gone. Pasting the artist link is how all 12 linked artists got
+                         there, so it is the primary path now. -->
+                    <div style="padding:14px 18px;background:rgba(29,185,84,0.06);border:1px solid rgba(29,185,84,0.28);border-radius:12px;">
+                        <div style="display:flex;align-items:center;gap:14px;">
+                            <svg viewBox="0 0 24 24" fill="#1db954" style="width:22px;height:22px;flex-shrink:0;"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+                            <div style="flex:1;min-width:0;">
+                                <div style="font-size:0.875rem;font-weight:500;color:var(--text-primary);">Enter your Spotify artist link</div>
+                                <div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;">Open your artist page in Spotify, tap Share &rarr; Copy link, and paste it here.</div>
+                            </div>
                         </div>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;color:var(--text-muted);"><polyline points="9 18 15 12 9 6"/></svg>
+                        <input id="onboardSpotifyLink" type="url" inputmode="url" autocomplete="off"
+                            placeholder="https://open.spotify.com/artist/..."
+                            style="width:100%;box-sizing:border-box;margin-top:12px;background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:9px;padding:11px 13px;font-size:16px;outline:none;">
+                        <button type="button" onclick="saveOnboardSpotifyLink(this)"
+                            style="width:100%;margin-top:8px;min-height:44px;background:#1db954;color:#04160b;border:none;border-radius:9px;padding:11px;font-size:0.88rem;font-weight:700;cursor:pointer;font-family:inherit;">Save Spotify link</button>
+                        <div id="onboardSpotifyMsg" style="font-size:0.74rem;margin-top:8px;min-height:15px;color:var(--text-muted);"></div>
                     </div>
 
                     <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;opacity:0.5;">
@@ -13040,6 +13057,45 @@ Only capture real, meaningful decisions — not questions or general discussion.
             if (section) section.remove();
             showToast('YouTube disconnected');
         }
+
+        // Manual entry, the path that actually works. Kept next to connectSpotify so
+        // it is obvious the OAuth flow below is dormant rather than deleted.
+        window.saveOnboardSpotifyLink = async function (btn) {
+            const input = document.getElementById('onboardSpotifyLink');
+            const msg = document.getElementById('onboardSpotifyMsg');
+            const raw = (input && input.value || '').trim();
+            const show = (text, colour) => { if (msg) { msg.textContent = text; msg.style.color = colour || 'var(--text-muted)'; } };
+            if (!raw) { show('Paste your Spotify artist link first.', '#f59e0b'); return; }
+            // Accept a full share URL, a spotify:artist: URI, or a bare id.
+            const m = raw.match(/artist[/:]([A-Za-z0-9]{16,})/);
+            const id = m ? m[1] : (/^[A-Za-z0-9]{16,}$/.test(raw) ? raw : null);
+            if (!id) { show("That doesn't look like an artist link — it should contain /artist/.", '#f59e0b'); return; }
+
+            const orig = btn.textContent;
+            btn.disabled = true; btn.textContent = 'Saving…'; show('');
+            try {
+                const client = (typeof db !== 'undefined' && db) || window.db;
+                const { error } = await client.rpc('record_self_reported_stats', { p_spotify_id: id });
+                if (error) throw new Error(error.message);
+                show('Saved — your Spotify profile is linked.', '#22c55e');
+                if (input) input.value = id;
+                // Pull the public name/photo in the background; failure here is not the
+                // artist's problem and must not undo the save they just made.
+                try {
+                    const { data: { session } = {} } = await client.auth.getSession();
+                    if (session) {
+                        fetch('https://uapiytquwuhtewqieegx.supabase.co/functions/v1/fetch-artist-stats', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token },
+                            body: JSON.stringify({ user_id: session.user.id, action: 'fetch', spotify_id: id }),
+                        }).catch(function () {});
+                    }
+                } catch (e) {}
+            } catch (e) {
+                show(e.message || 'Could not save — try again.', '#f87171');
+            }
+            btn.disabled = false; btn.textContent = orig;
+        };
 
         function connectSpotify() {
             const state = Math.random().toString(36).substring(2);
