@@ -1,7 +1,7 @@
 // AIAD Service Worker — network-first for HTML/JS/CSS, cache-first for static assets.
 // Goal: every deploy reaches users immediately; the PWA still works offline by falling back to cache.
 
-const VERSION       = "aiad-" + (self.AIAD_BUILD || "20260812b");
+const VERSION       = "aiad-" + (self.AIAD_BUILD || "20260821a");
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const ASSET_CACHE   = `${VERSION}-assets`;
 
@@ -37,17 +37,32 @@ async function networkFirst(req) {
     const cache = await caches.open(RUNTIME_CACHE);
     try {
         const fresh = await fetch(req, { cache: "no-store" });
-        if (fresh && fresh.ok && fresh.type === "basic") cache.put(req, fresh.clone());
-        return fresh;
-    } catch (err) {
-        const cached = await cache.match(req);
-        if (cached) return cached;
-        if (req.mode === "navigate") {
-            const fallback = await cache.match("/index.html") || await cache.match("/");
-            if (fallback) return fallback;
+        if (fresh && fresh.ok && fresh.type === "basic") {
+            cache.put(req, fresh.clone());
+            return fresh;
         }
+        // A non-ok response is not content — it's an error page. Previously this
+        // returned it anyway, declining only to cache it, which meant Vercel's
+        // Security Checkpoint (HTTP 403, x-vercel-mitigated: challenge) replaced a
+        // perfectly good cached app with a spinner that reloads. Any 4xx/5xx now
+        // falls back to cache the same way a network failure does.
+        return (await cacheFallback(cache, req)) || fresh;
+    } catch (err) {
+        const fallback = await cacheFallback(cache, req);
+        if (fallback) return fallback;
         throw err;
     }
+}
+
+// Best cached answer for a request: the exact entry, or the app shell for a
+// navigation. Returns null when we have nothing, so callers can decide.
+async function cacheFallback(cache, req) {
+    const cached = await cache.match(req);
+    if (cached) return cached;
+    if (req.mode === "navigate") {
+        return (await cache.match("/index.html")) || (await cache.match("/")) || null;
+    }
+    return null;
 }
 
 async function cacheFirst(req) {
