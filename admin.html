@@ -126,7 +126,7 @@
           if(r.status===401||r.status===403){ gate('This account is not authorized. Sign in as the founder.'); return; }
           const d=await r.json();
           if(!r.ok||!d||d.message){ gate((d&&d.message)||'Could not load analytics.'); return; }
-          DATA=d; render(d);
+          DATA=d; render(d); loadBrief();
         }catch(e){ gate('Error: '+e.message); }
       }
 
@@ -173,6 +173,133 @@
         return '<div class="panel">'+head+'<div style="max-height:340px;overflow:auto">'+rows+'</div></div>';
       }
 
+
+      // ── Daily Brief ──────────────────────────────────────────────────────
+      // Same content and same computed lead as the Command Center tab, fetched
+      // straight from admin_daily_brief on every load. Built with this page's own
+      // classes (.panel/.kpi/.cards/.muted) rather than the modal's inline styles,
+      // so it reads as part of the page.
+      async function loadBrief(){
+        const host=document.getElementById('briefSection');
+        if(!host) return;
+        host.innerHTML='<div class="panel"><div class="muted" style="padding:8px 0">Generating today’s brief…</div></div>';
+        const t=await token();
+        if(!t){ host.innerHTML=''; return; }
+        let d=null, why='';
+        try{
+          const r=await fetch(API+'/rest/v1/rpc/admin_daily_brief',{method:'POST',
+            headers:{apikey:ANON,Authorization:'Bearer '+t,'Content-Type':'application/json'},body:'{}'});
+          const j=await r.json().catch(function(){return null;});
+          // The function RAISES for a non-founder, so the reason arrives as an error
+          // body rather than a payload. Surface it instead of a blank panel.
+          if(!r.ok){ why=(j&&(j.message||j.error))||('request failed ('+r.status+')'); }
+          else if(j&&j.message){ why=j.message; }
+          else d=j;
+        }catch(e){ why=e.message; }
+
+        if(!d){
+          host.innerHTML='<div class="panel"><h2>Daily Brief</h2>'
+            +'<div class="muted">Could not generate brief'+(why?': '+esc(why):'.')+'</div></div>';
+          return;
+        }
+        renderBrief(d,host);
+      }
+
+      function renderBrief(d,host){
+        const h=d.health||{}, ins=d.instrumentation||{}, w=d.watchlist||{};
+        const err=d.errors_24h||{total:0,auto:0,top:[]};
+        const sup=d.support||{open:0,tickets:[]};
+        const silent=w.silent_signups||[];
+        const trend=(h.signups_7d||0)-(h.signups_prior_7d||0);
+        const trendTxt=trend===0?'flat vs prior week':(trend>0?'up '+trend+' vs prior week':'down '+Math.abs(trend)+' vs prior week');
+
+        // Priority order: broken instrumentation, live silent failures, signups that
+        // never activate, then a normal day. Recomputed from the payload each load.
+        let lead;
+        if(ins.onboarding_only){
+          lead={t:'Usage instrumentation only covers onboarding.',
+            b:'All '+(ins.tool_open_total||0)+' tool opens are onboarding surfaces across '+(ins.distinct_tools||0)
+             +' tools — zero from the core product. Adoption is currently unmeasurable.'};
+        } else if(err.auto>0){
+          const top=(err.top||[])[0]||{};
+          lead={t:'Silent failures are firing in production.',
+            b:err.auto+' auto-logged errors in 24h. Most frequent: '+(top.target||'')+' — '+(top.detail||'')+' ('+(top.n||0)+'×).'};
+        } else if(silent.length>=3){
+          lead={t:'Signups are arriving and never activating.',
+            b:silent.length+' accounts have never fired a single event.'};
+        } else {
+          lead={t:'No blocking issue today.',
+            b:(h.active_3d||0)+' artists active in the last 3 days. Keep pushing platform linking — '
+             +(w.platform_links_linked||0)+' of '+(w.platform_links_total_artists||0)+' artists connected.'};
+        }
+
+        const kpi=(l,v,accent)=>'<div class="kpi"><div class="l">'+esc(l)+'</div>'
+          +'<div class="v"'+(accent?' style="color:'+accent+'"':'')+'>'+esc(v)+'</div></div>';
+        const dt=v=>v?new Date(v).toLocaleDateString(undefined,{month:'short',day:'numeric'}):'—';
+        const rows=(arr,cols)=>{
+          const list=Array.isArray(arr)?arr:[];
+          return '<div style="border:1px solid var(--bd);border-radius:12px;overflow:hidden">'
+            +(list.length?list.map(function(r,i){
+                return '<div style="display:flex;justify-content:space-between;gap:12px;padding:9px 13px;font-size:13px;'
+                  +(i?'border-top:1px solid var(--bd);':'')+'">'+cols(r)+'</div>';
+              }).join('')
+             :'<div class="muted" style="padding:11px 13px;font-size:13px">Nothing to show.</div>')
+            +'</div>';
+        };
+        const sect=(title,inner)=>'<h2 style="margin:20px 0 10px">'+esc(title)+'</h2>'+inner;
+
+        host.innerHTML=
+          '<div class="panel" style="margin-bottom:22px">'
+          +'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:14px">'
+            +'<div style="font-size:19px;font-weight:700;color:var(--tx)">AIAD Daily Brief</div>'
+            +'<div style="display:flex;align-items:center;gap:10px">'
+              +'<span class="muted" style="font-size:12px">'+esc(new Date(d.generated_at).toLocaleString(undefined,{weekday:'long',month:'short',day:'numeric'}))+'</span>'
+              +'<button class="btn" onclick="loadBrief()" title="Regenerate" style="padding:4px 10px">&#8635;</button>'
+            +'</div>'
+          +'</div>'
+
+          +'<div class="cards" style="margin-bottom:10px">'
+            +kpi('Signups',h.signups_total||0)
+            +kpi('New 24h',h.signups_24h||0,(h.signups_24h?'#22c55e':null))
+            +kpi('Active 3d',h.active_3d||0)
+            +kpi('Ever active',(h.profiles_with_event||0)+'/'+(h.signups_total||0))
+            +kpi('Errors 24h',err.auto||0,(err.auto?'#f87171':'#22c55e'))
+            +kpi('Open tickets',sup.open||0,(sup.open?'#FFB020':'#22c55e'))
+          +'</div>'
+          +'<div class="muted" style="font-size:13px">'+(h.signups_7d||0)+' signups in 7 days — '+esc(trendTxt)+'.</div>'
+
+          +'<div style="background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.28);border-radius:14px;padding:15px 17px;margin-top:16px">'
+            +'<div style="font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--teal);margin-bottom:6px">Most important thing today</div>'
+            +'<div style="font-size:15px;font-weight:600;color:var(--tx);margin-bottom:5px">'+esc(lead.t)+'</div>'
+            +'<div class="muted" style="font-size:13px;line-height:1.55">'+esc(lead.b)+'</div>'
+          +'</div>'
+
+          +sect('Signups this week',rows(d.signups_recent,function(r){
+            return '<span>'+esc(r.email)+'</span><span class="muted">'+esc(r.role||'')+' · '+esc(dt(r.created_at))+'</span>';}))
+          +sect('Tool opens',rows(d.tool_opens,function(r){
+            return '<span>'+esc(r.tool)+'</span><span class="muted">'+esc(r.n)+' opens · '+esc(r.users)+' users · '+esc(dt(r.last_used))+'</span>';}))
+          +sect('Most active',rows(d.top_users,function(r){
+            return '<span>'+esc(r.email)+'</span><span class="muted">'+esc(r.opens)+' opens · '+esc(dt(r.last_open))+'</span>';}))
+          +sect('Proof of concept',rows(d.proof_of_concept,function(r){
+            return '<span>'+esc(r.surface)+'</span><span class="muted">'+esc(r.rows)+' rows · '+esc(r.users)+' users · '+esc(dt(r.last))+'</span>';}))
+          +sect('Watch-list',
+            '<div style="border:1px solid var(--bd);border-radius:12px;padding:13px;font-size:13px;line-height:1.6">'
+            +'<div><strong style="color:#FFB020">Platform linking</strong> — '+(w.platform_links_linked||0)+' of '+(w.platform_links_total_artists||0)+' artists connected.</div>'
+            +'<div style="margin-top:7px"><strong style="color:#FFB020">Never activated</strong> — '+silent.length+' accounts with zero events: '
+              +(silent.slice(0,5).map(function(x){return esc(x.email);}).join(', ')||'—')+'</div>'
+            +'<div style="margin-top:7px"><strong style="color:#FFB020">One and done</strong> — '+((w.one_and_done||[]).length)+' artists with a single session and nothing since.</div>'
+            +'</div>')
+          +sect('Support',rows(sup.tickets,function(r){
+            return '<span>'+esc(r.subject||'(no subject)')+'</span><span style="color:'+((r.age_days>7)?'#f87171':'var(--mut)')+'">'+esc(r.age_days)+'d · '+esc(r.status)+(r.has_draft?' · draft ready':'')+'</span>';}))
+          +sect('Silent failures (7d)',rows(err.top,function(r){
+            return '<span>'+esc(r.target)+'</span><span class="muted">'+esc(r.detail)+' · '+esc(r.n)+'×</span>';}))
+
+          +'<div class="muted" style="margin-top:18px;font-size:11px">Generated live from base tables at '
+          +esc(new Date(d.generated_at).toLocaleTimeString())+'. est_minutes from v_user_usage is deliberately excluded — '
+          +'heartbeat gaps are summed with no session timeout, so the figure is not trustworthy.</div>'
+          +'</div>';
+      }
+
       function render(d){
         CHARTS.forEach(c=>{try{c.destroy()}catch(e){}}); CHARTS.length=0;
         document.getElementById('genAt').textContent='Updated '+fmtDate(d.generated_at);
@@ -195,6 +322,8 @@
           '<td>'+(u.verified?'<span class="chk">✓</span>':'')+'</td><td class="muted">'+fmtDate(u.created_at)+'</td></tr>';}).join('');
 
         document.getElementById('root').innerHTML=
+          // Brief sits above the metric cards; loadBrief() fills it after this paints.
+          '<div id="briefSection"></div>'+
           banner+
           '<div class="cards">'+cards+'</div>'+
           '<div class="grid g3">'+
