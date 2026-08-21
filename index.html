@@ -11806,7 +11806,6 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 password,
                 options: {
                     data: { full_name: fullName, username, role: 'artist' },
-                    emailRedirectTo: 'https://aiad.studio/?verified=1',
                 },
             });
 
@@ -12261,7 +12260,6 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     email, password,
                     options: {
                         data: { full_name: name, role: 'supervisor', company: company || '' },
-                        emailRedirectTo: 'https://aiad.studio/?verified=1',
                     },
                 });
 
@@ -16644,7 +16642,6 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 password,
                 options: {
                     data: { full_name: name, username, role },
-                    emailRedirectTo: 'https://aiad.studio/?verified=1',
                 },
             });
 
@@ -16818,11 +16815,22 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     if (e.key === 'Enter') { e.preventDefault(); codeBtn.click(); }
                 });
 
+                // A wrong code shouldn't be retryable instantly — Supabase rate-limits
+                // verifyOtp server-side and answers a burst with 429, which reads to the
+                // artist as "the code is wrong" when it isn't. Hold the button briefly
+                // after a failure and count the attempt down so the wait is visible.
+                const VERIFY_COOLDOWN_MS = 3000;
+                let verifyBusy = false;
                 codeBtn.onclick = async () => {
+                    if (verifyBusy) return;
                     const token = (codeInput.value || '').trim();
                     if (token.length < 6) { showToast('Enter the code from your email'); return; }
+                    verifyBusy = true;
                     codeBtn.disabled = true;
-                    const orig = codeBtn.textContent;
+                    // The markup indents the button text across lines; trim it once so the
+                    // countdown suffix doesn't render with a newline in the middle.
+                    const orig = codeBtn.dataset.label || codeBtn.textContent.trim();
+                    codeBtn.dataset.label = orig;
                     codeBtn.textContent = 'Verifying…';
                     try {
                         const { data, error } = await db.auth.verifyOtp({
@@ -16833,10 +16841,19 @@ Only capture real, meaningful decisions — not questions or general discussion.
                         if (error) throw error;
                         overlay.remove();
                         await finalizeVerifiedSignup(data?.user || (await db.auth.getUser())?.data?.user);
+                        return;   // verified — leave the button disabled, the overlay is gone
                     } catch (err) {
                         showToast('Code invalid or expired: ' + (err.message || err));
-                        codeBtn.disabled = false;
-                        codeBtn.textContent = orig;
+                        let left = Math.ceil(VERIFY_COOLDOWN_MS / 1000);
+                        codeBtn.textContent = orig + ' (' + left + ')';
+                        const tick = setInterval(() => {
+                            left -= 1;
+                            if (left > 0) { codeBtn.textContent = orig + ' (' + left + ')'; return; }
+                            clearInterval(tick);
+                            verifyBusy = false;
+                            codeBtn.disabled = false;
+                            codeBtn.textContent = orig;
+                        }, 1000);
                     }
                 };
 
@@ -16844,14 +16861,32 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     overlay.remove();
                     location.replace(location.origin + location.pathname);
                 };
+                let resendBusy = false;
                 document.getElementById('aiadVerifyResend').onclick = async (e) => {
                     e.preventDefault();
+                    if (resendBusy) return;
+                    const link = e.currentTarget;
+                    resendBusy = true;
+                    const label = link.dataset.label || link.textContent.trim();
+                    link.dataset.label = label;
                     try {
-                        await db.auth.resend({ type: 'signup', email: overlay.dataset.email, options: { emailRedirectTo: 'https://aiad.studio/?verified=1' } });
+                        await db.auth.resend({ type: 'signup', email: overlay.dataset.email });
                         showToast('Verification email resent');
                     } catch (err) {
                         showToast('Resend failed: ' + (err.message || err));
                     }
+                    // Supabase throttles resends per address; hammering it just earns a 429.
+                    let left = 30;
+                    link.style.opacity = '0.5';
+                    link.textContent = label + ' (' + left + 's)';
+                    const tick = setInterval(() => {
+                        left -= 1;
+                        if (left > 0) { link.textContent = label + ' (' + left + 's)'; return; }
+                        clearInterval(tick);
+                        resendBusy = false;
+                        link.style.opacity = '';
+                        link.textContent = label;
+                    }, 1000);
                 };
             }
             overlay.dataset.email = email;
@@ -19798,7 +19833,6 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     email, password,
                     options: {
                         data: { full_name: displayName, role: 'collaborator' },
-                        emailRedirectTo: 'https://aiad.studio/?verified=1',
                     },
                 });
 
@@ -22514,7 +22548,6 @@ document.addEventListener('keydown', function(e) {
                 email, password,
                 options: {
                     data: { full_name: name, role: 'fan' },
-                    emailRedirectTo: 'https://aiad.studio/?verified=1',
                 },
             });
             if (error) {
