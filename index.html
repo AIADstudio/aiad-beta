@@ -4343,7 +4343,10 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 </div>
                 <div class="studio-agent-chips">
                     <div class="studio-agent-chips-label">Quick prompts</div>
-                    <button class="studio-agent-chip" onclick="studioAgentChip('musicProd',this)">Suggest BPM for Afrobeats</button><button class="studio-agent-chip" onclick="studioAgentChip('musicProd',this)">Dark trap vibes</button><button class="studio-agent-chip" onclick="studioAgentChip('musicProd',this)">Best keys for R&B</button><button class="studio-agent-chip" onclick="studioAgentChip('musicProd',this)">Melodic drill structure</button><button class="studio-agent-chip" onclick="studioAgentChip('musicProd',this)">Chill lo-fi ideas</button><button class="studio-agent-chip" onclick="studioAgentChip('musicProd',this)">Hard-hitting 808s</button><button class="studio-agent-chip" onclick="studioAgentChip('musicProd',this)">Chords for a hit hook</button><button class="studio-agent-chip" onclick="studioAgentChip('musicProd',this)">Sample-flip tips</button>
+                    <button id="musicProdPromptRefresh" type="button" title="Show different prompts"
+                        style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.9rem;line-height:1;padding:2px 4px;float:right;transition:color .15s,transform .3s;">&#8635;</button>
+                    <!-- Filled by renderPromptChips('musicProd', …). -->
+                    <div id="musicProdPromptList" style="display:contents;"></div>
                 </div>
                 <div class="studio-agent-messages" id="musicProdAgentMsgs">
                     <div class="studio-agent-msg agent">Ask me anything about beat advisor — ideas, direction, feedback, or what's working in the industry right now.</div>
@@ -4528,7 +4531,10 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 </div>
                 <div class="studio-agent-chips">
                     <div class="studio-agent-chips-label">Quick prompts</div>
-                    <button class="studio-agent-chip" onclick="studioAgentChip('mixMedia',this)">Cover art color palettes</button><button class="studio-agent-chip" onclick="studioAgentChip('mixMedia',this)">Mood board for dark music</button><button class="studio-agent-chip" onclick="studioAgentChip('mixMedia',this)">Typography for hip-hop</button><button class="studio-agent-chip" onclick="studioAgentChip('mixMedia',this)">Press photo ideas</button><button class="studio-agent-chip" onclick="studioAgentChip('mixMedia',this)">Minimalist cover trends</button><button class="studio-agent-chip" onclick="studioAgentChip('mixMedia',this)">Afro-futurist aesthetic</button><button class="studio-agent-chip" onclick="studioAgentChip('mixMedia',this)">Brand colors that pop</button><button class="studio-agent-chip" onclick="studioAgentChip('mixMedia',this)">EPK photo direction</button>
+                    <button id="mixMediaPromptRefresh" type="button" title="Show different prompts"
+                        style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.9rem;line-height:1;padding:2px 4px;float:right;transition:color .15s,transform .3s;">&#8635;</button>
+                    <!-- Filled by renderPromptChips('mixMedia', …). -->
+                    <div id="mixMediaPromptList" style="display:contents;"></div>
                 </div>
                 <div class="studio-agent-messages" id="mixMediaAgentMsgs">
                     <div class="studio-agent-msg agent">Ask me anything about visual director — ideas, direction, feedback, or what's working in the industry right now.</div>
@@ -4768,7 +4774,10 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                          </div>
                          <div class="studio-agent-chips">
                              <div class="studio-agent-chips-label">Quick prompts</div>
-                             <button class="studio-agent-chip" onclick="studioAgentChip('merch',this)">Best-selling merch for artists</button><button class="studio-agent-chip" onclick="studioAgentChip('merch',this)">Price point strategy</button><button class="studio-agent-chip" onclick="studioAgentChip('merch',this)">Design trends 2025</button><button class="studio-agent-chip" onclick="studioAgentChip('merch',this)">Limited drop tactics</button><button class="studio-agent-chip" onclick="studioAgentChip('merch',this)">Hoodie vs tee — which first?</button><button class="studio-agent-chip" onclick="studioAgentChip('merch',this)">Pre-order strategy</button>
+                             <button id="merchPromptRefresh" type="button" title="Show different prompts"
+                                 style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.9rem;line-height:1;padding:2px 4px;float:right;transition:color .15s,transform .3s;">&#8635;</button>
+                             <!-- Filled by renderPromptChips('merch', …). -->
+                             <div id="merchPromptList" style="display:contents;"></div>
                          </div>
                          <div class="studio-agent-messages" id="merchAgentMsgs">
                              <div class="studio-agent-msg agent">Ask me anything about merch — products, pricing, drop strategy, or what fans actually buy.</div>
@@ -5033,13 +5042,14 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                             </button>
                         </div>
                         <div class="agent-example-prompts">
-                            <div class="example-prompts-label">Try asking:</div>
-                            <div class="example-prompts-list">
-                                <button class="example-prompt" onclick="useExamplePrompt('How should I price my new merch collection?')">How should I price my new merch collection?</button>
-                                <button class="example-prompt" onclick="useExamplePrompt('Should I do a surprise drop or build anticipation?')">Should I do a surprise drop or build anticipation?</button>
-                                <button class="example-prompt" onclick="useExamplePrompt('What content resonates most with my Inner Circle?')">What content resonates most with my Inner Circle?</button>
-                                <button class="example-prompt" onclick="useExamplePrompt('Help me think through live performance options')">Help me think through live performance options</button>
+                            <div class="example-prompts-label" style="display:flex;align-items:center;gap:10px;">
+                                <span>Try asking:</span>
+                                <button id="artistAgentPromptRefresh" type="button" title="Show different suggestions"
+                                    style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.9rem;line-height:1;padding:2px 4px;transition:color .15s,transform .3s;">&#8635;</button>
                             </div>
+                            <!-- Filled by renderPromptChips('agent', …); the four hardcoded
+                                 chips that were here showed every artist the same set. -->
+                            <div class="example-prompts-list" id="artistAgentPromptList"></div>
                         </div>
                     </div>
 
@@ -13834,7 +13844,16 @@ Only capture real, meaningful decisions — not questions or general discussion.
             } else if (view === 'agent') {
                 viewEl.classList.add('active');
                 navItems[2].classList.add('active');
-                setTimeout(() => { renderIndustryAIPrompts(); populateAgentContext(); }, 50);
+                setTimeout(() => {
+                    renderIndustryAIPrompts();
+                    populateAgentContext();
+                    try {
+                        if (window.renderPromptChips) {
+                            window.renderPromptChips('agent', 'artistAgentPromptList', 4,
+                                (q) => (window.useExamplePrompt ? useExamplePrompt(q) : null));
+                        }
+                    } catch (e) {}
+                }, 50);
             } else if (view === 'supporters') {
                 viewEl.classList.add('active');
                 navItems[3].classList.add('active');
@@ -18847,6 +18866,12 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 await restoreUserSession();
             }
             checkSpotifyCallback();
+            // Prompt context first, then draw — the chips are filtered against it, and
+            // an empty context still yields every unconditional prompt.
+            setTimeout(async () => {
+                try { if (window.buildPromptContext) await window.buildPromptContext(); } catch (e) {}
+                try { if (window.renderAllPromptSurfaces) window.renderAllPromptSurfaces(); } catch (e) {}
+            }, 400);
             setTimeout(() => { applyStoredAvatar(); initStudioHistory(); populateLiveStatsBar(); }, 300);
             // (removed dead exec_sql bootstrap calls — those columns/tables already exist; exec_sql RPC does not exist and must not, it would be arbitrary SQL over the anon key)
         });
@@ -24224,6 +24249,193 @@ function toggleAgeRange(btn) {
             compass:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16 8 13 13 8 16 11 11 16 8"/></svg>',
             document:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="14 3 14 9 20 9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>',
         };
+        // ── Stage prompt pools ─────────────────────────────────────────────
+        // 14-16 per stage instead of four, tiered by where the artist actually is.
+        // t:'e' is foundational (hidden from established artists), t:'l' is advanced
+        // (hidden from beginners), untagged applies at any level. Every pool opens
+        // with an orientation prompt for the artist who doesn't know what to ask.
+        // The `suggestions` arrays above remain as a fallback if a pool is missing.
+        const STAGE_POOLS = {
+          discover: [
+            { q:"What should I even be asking about A&R and readiness?" },
+            { q:"I'm an independent artist — score my own readiness honestly" },
+            { q:"What's my market lane and who are my closest comps?", t:'e' },
+            { q:"How do I find my comps without copying them?", t:'e' },
+            { q:"Which traction signals actually matter at my level?" },
+            { q:"Am I ready to release publicly, or should I keep developing?", t:'e' },
+            { q:"What does an A&R actually look for in 2026?" },
+            { q:"How do labels evaluate an artist before they reach out?" },
+            { q:"What would make someone bet on me over a similar artist?" },
+            { q:"Is my sound distinct enough, or am I in a crowded lane?" },
+            { q:c=>`What's happening in ${c.genre || 'my genre'} right now that I should know?`, when:c=>!!c.genre },
+            { q:"How do I read my own numbers honestly instead of hopefully?" },
+            { q:"What would a scout see as my biggest weakness?", t:'l' },
+            { q:"Should I be building a story or building a catalogue first?" },
+            { q:"How much of my identity should be fixed vs still forming?", t:'e' }
+          ],
+          develop: [
+            { q:"What should I even be asking about artist development?" },
+            { q:"Help me write a one-page brand brief — I'm starting from scratch", t:'e' },
+            { q:"I have 5 demos. Which one should I lead with?" },
+            { q:"Find me affordable producers in my genre (budget under $500/track)", t:'e' },
+            { q:"Plan a sustainable content cadence I can actually hold solo" },
+            { q:"How do I develop a sound without chasing trends?" },
+            { q:"What's the difference between a style and a gimmick?" },
+            { q:"How do I know when a song is finished?" },
+            { q:"Help me define what my project is actually about" },
+            { q:"How do I take feedback without losing my voice?" },
+            { q:c=>`Who should I be studying in ${c.genre || 'my genre'} — and what for?`, when:c=>!!c.genre },
+            { q:"I'm creatively stuck. Help me find a way back in." },
+            { q:"How do I evolve my sound without losing the audience I have?", t:'l' },
+            { q:"Should my next project be a single, an EP, or an album?" },
+            { q:"How do I build a visual identity that matches the music?" }
+          ],
+          record_release: [
+            { q:"What should I even be asking about releasing a record?" },
+            { q:"Build my first single rollout — release in 6 weeks, no team", t:'e' },
+            { q:"What metadata and credits do I need before I upload to DSPs?", t:'e' },
+            { q:"Walk me through pitching Spotify editorial as an indie" },
+            { q:"Am I release-ready? Run the full checklist" },
+            { q:"How far ahead should I be planning a release?" },
+            { q:"What does a realistic recording budget look like at my level?" },
+            { q:"How do I split a rollout across singles without losing momentum?" },
+            { q:"What actually moves the needle in release week?" },
+            { q:"How do I brief a mix and master engineer properly?" },
+            { q:"Explain pre-saves, pre-adds and whether they matter" },
+            { q:c=>`What's a realistic first-week target for ${c.genre || 'an artist like me'}?`, when:c=>!!c.genre },
+            { q:"How do I plan a rollout when I have no marketing budget?", t:'e' },
+            { q:"Should I hold this record for a better moment?" },
+            { q:"How do I build a release calendar for the next 12 months?", t:'l' },
+            { q:"What should I do differently on my next release?", when:c=>!!c.cadence && !/not yet/.test(c.cadence) }
+          ],
+          rights_royalties: [
+            { q:"What should I even be asking about rights and royalties?" },
+            { q:"Publishing 101 — what do I actually own and how do I get paid?", t:'e' },
+            { q:"I co-wrote with a friend on guitar. How do we split fairly?" },
+            { q:"Should I sign up for a PRO? Which one and how?", when:c=>!c.hasPublisher },
+            { q:"What rights am I giving up if I sign a distro or label deal?" },
+            { q:"Explain masters vs publishing like I've never heard the terms", t:'e' },
+            { q:"What royalties am I probably not collecting right now?" },
+            { q:"How do I register my songs properly, step by step?", t:'e' },
+            { q:"What is a split sheet and when do I need one signed?" },
+            { q:"How do mechanical royalties work and who owes them to me?" },
+            { q:"I own my masters — what does that let me do that others can't?", when:c=>c.ownsMasters },
+            { q:"How do I make sure I keep ownership going forward?", when:c=>!c.ownsMasters },
+            { q:"Should I sign a publishing deal or stay self-published?", when:c=>!c.hasPublisher },
+            { q:"How do I audit what my publisher is actually collecting?", when:c=>c.hasPublisher, t:'l' },
+            { q:"What happens to my rights if I use AI in a track?" },
+            { q:"How do samples and interpolations affect my splits?" }
+          ],
+          touring_live: [
+            { q:"What should I even be asking about playing live?" },
+            { q:"I've never played live. How do I book my first show?", t:'e' },
+            { q:"Price tickets for a 50-capacity room — what's realistic?", t:'e' },
+            { q:"Build a one-city show budget so I don't lose money" },
+            { q:"How do I land a support slot for a touring artist?" },
+            { q:"What should my live set actually look like at this stage?" },
+            { q:"How do I approach promoters without getting ignored?" },
+            { q:"Explain a show settlement so I know I'm not being shorted" },
+            { q:"What's a fair deal for a first paid show?" },
+            { q:"How do I turn a show into new followers, not just a night out?" },
+            { q:c=>`Where should I be playing in ${c.city || 'my city'} to start?`, when:c=>!!c.city, t:'e' },
+            { q:"When does touring start making money instead of costing it?" },
+            { q:"How do I route a small regional run efficiently?", t:'l' },
+            { q:"Do I need a booking agent yet, or can I self-book?", when:c=>!c.hasBooking },
+            { q:"How do I get more out of my booking agent?", when:c=>c.hasBooking },
+            { q:"What should I sell at the merch table and at what price?", when:c=>c.merchActive }
+          ],
+          brand_sync: [
+            { q:"What should I even be asking about sync and brand deals?" },
+            { q:"How do indie artists actually get songs placed in TV/film?", t:'e' },
+            { q:"What's a realistic sync placement payout at my level?" },
+            { q:"Brand partnerships when I'm small — what's worth pursuing?", t:'e' },
+            { q:"Where do I list my catalog so sync supervisors can find it?", when:c=>!c.syncActive },
+            { q:"What makes a track easy to license — and what kills it?" },
+            { q:"What does 'cleared' actually mean and how do I get there?" },
+            { q:"Explain exclusive vs non-exclusive sync in plain terms" },
+            { q:"How should I price a licence for a small indie film?" },
+            { q:"What metadata do supervisors need attached to my files?" },
+            { q:"Should I be making instrumental versions of everything?" },
+            { q:"How do I pitch to a supervisor without being annoying?" },
+            { q:"Is this brand deal worth it, or am I selling too cheap?", t:'l' },
+            { q:"How do I build a sync-ready catalogue over the next year?", when:c=>c.syncActive },
+            { q:"What kind of brand actually fits my audience?" }
+          ],
+          finances: [
+            { q:"What should I even be asking about money as an artist?" },
+            { q:"I have $500/month for music. Where should it go?", t:'e' },
+            { q:"How much should I set aside for taxes as an independent artist?" },
+            { q:"Spotify pays me ~$30/mo. When does that meaningfully grow?", t:'e' },
+            { q:"Build me a 12-month runway plan — what can I sustain?" },
+            { q:"What should I stop spending money on right now?" },
+            { q:"How do I separate my money from the music's money?", t:'e' },
+            { q:"What expenses can I actually write off?" },
+            { q:"Which revenue line should I be building next?" },
+            { q:"How much does it really cost to release one single properly?" },
+            { q:"When can I realistically go full-time on music?" },
+            { q:"How do I price my work without underselling myself?" },
+            { q:"Should I take this advance, or is the money too expensive?", t:'l' },
+            { q:"How do I read a royalty statement and spot what's missing?", t:'l' },
+            { q:"What does a healthy P&L look like for an artist at my level?" }
+          ],
+          strategy_team: [
+            { q:"What should I even be asking about my career strategy?" },
+            { q:"Do I need a manager yet? How do I know when it's time?", when:c=>!c.hasManager },
+            { q:"How do I get more out of my manager relationship?", when:c=>c.hasManager },
+            { q:"Map out my next 12 months — one realistic goal at a time" },
+            { q:"What should I do myself vs. hire/outsource at my level?" },
+            { q:"I'm overwhelmed. Help me pick the ONE thing to focus on this quarter" },
+            { q:"How do I know if I'm actually making progress?" },
+            { q:"What does the next level look like, concretely?" },
+            { q:"How do I build a team without giving away equity too early?", when:c=>!c.hasTeam },
+            { q:"When is the right time to make my first hire?", when:c=>c.hasTeam },
+            { q:"How do I say no to opportunities that don't fit?" },
+            { q:"What am I probably avoiding that I shouldn't be?" },
+            { q:c=>`My biggest challenge is ${c.challenge}. Where do I start?`, when:c=>c.challenge && c.challenge.length > 8 },
+            { q:"How do I balance making music with running the business?" },
+            { q:"What would you do first if you were me?" },
+            { q:"How do I plan a three-year arc without over-planning?", t:'l' }
+          ],
+          contract_review: [
+            { q:"What should I look out for before signing anything?" },
+            { q:"I'll paste a contract — flag the red flags in plain English" },
+            { q:"What should I look for in a distribution deal at my level?" },
+            { q:"Is 50/50 publishing fair for an indie? Walk me through it" },
+            { q:"Explain this contract clause-by-clause like I'm new to this" },
+            { q:"What's a normal management commission and term?", when:c=>!c.hasManager },
+            { q:"What terms should I never agree to, whatever the money?" },
+            { q:"How long should I be locked in for?" },
+            { q:"What does this deal look like if it goes badly?" },
+            { q:"What am I giving up that I can't get back?" },
+            { q:"Which parts of this are actually negotiable?" },
+            { q:"Explain recoupment — when do I actually see money?" },
+            { q:"Is a 360 deal ever worth it?", t:'l' },
+            { q:"What questions should I take to a lawyer about this?" }
+          ]
+        };
+
+        function stagePool(key) {
+            const c = (window.AppState && AppState.promptContext) || {};
+            const raw = STAGE_POOLS[key] || [];
+            const out = raw
+                .filter(p => {
+                    if (p.t === 'e' && c.late) return false;    // too basic for an established artist
+                    if (p.t === 'l' && c.early) return false;   // too advanced for a beginner
+                    if (p.when) { try { return !!p.when(c); } catch (e) { return false; } }
+                    return true;
+                })
+                .map(p => (typeof p.q === 'function' ? (function () { try { return p.q(c); } catch (e) { return null; } })() : p.q))
+                .filter(Boolean);
+            if (out.length) return out;
+            // Fallback: a stage with no pool, or every prompt filtered out.
+            const st = (STAGES.find(x => x.key === key)) || (typeof CONTRACT_REVIEW !== 'undefined' && CONTRACT_REVIEW.key === key ? CONTRACT_REVIEW : null);
+            return (st && st.suggestions) || [];
+        }
+        // Published rather than registered: the rotation module loads at the end of
+        // <body>, so registerPromptSource does not exist yet at this point in the file.
+        // eligible() reaches for this when the surface is a stage.
+        window.__aiadStagePool = stagePool;
+
         const STAGES = [
             { key: 'discover',         icon: ICONS.search,   name: 'Discover',         desc: 'A&R and talent evaluation',
               suggestions: [
@@ -24411,6 +24623,37 @@ function toggleAgeRange(btn) {
             return html;
         }
 
+        // Deals four from this stage's deck; the refresh control deals the next four,
+        // so nothing repeats until the eligible pool for that stage is exhausted.
+        function renderStageSuggestions() {
+            const thread = document.getElementById('stageAgentThread');
+            if (!thread || !activeStage) return;
+            const items = (window.nextPrompts ? window.nextPrompts('stage:' + activeStage.key, 4) : (activeStage.suggestions || []).slice(0, 4));
+            const sugs = items.map((s) =>
+                `<button type="button" data-sug="${escapeHtml(s)}" style="text-align:left;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.10);border-radius:10px;padding:11px 14px;color:var(--text-secondary);font-family:var(--font-body);font-size:0.84rem;line-height:1.4;cursor:pointer;transition:border-color 0.15s, background 0.15s;width:100%;" onmouseover="this.style.borderColor='rgba(255,0,255,0.35)';this.style.background='rgba(255,0,255,0.05)';" onmouseout="this.style.borderColor='rgba(255,255,255,0.10)';this.style.background='rgba(255,255,255,0.03)';">${escapeHtml(s)}</button>`
+            ).join('');
+            thread.innerHTML = `
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                    <div style="color:var(--text-muted);font-size:0.78rem;text-transform:uppercase;letter-spacing:0.08em;">Try asking</div>
+                    <button id="stageSugRefresh" type="button" title="Show different questions"
+                        style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.95rem;padding:2px 6px;transition:color .15s, transform .3s;">&#8635;</button>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr;gap:8px;">${sugs}</div>`;
+            thread.querySelectorAll('button[data-sug]').forEach((b) => {
+                b.addEventListener('click', () => {
+                    const input = document.getElementById('stageAgentInput');
+                    input.value = b.dataset.sug;
+                    input.focus();
+                });
+            });
+            const r = document.getElementById('stageSugRefresh');
+            if (r) r.onclick = function () {
+                this.style.transform = 'rotate(360deg)';
+                setTimeout(() => { this.style.transform = 'rotate(0deg)'; }, 320);
+                renderStageSuggestions();
+            };
+        }
+
         window.openStageAgent = function (key) {
             const stage = key === 'contract_review'
                 ? CONTRACT_REVIEW
@@ -24422,22 +24665,7 @@ function toggleAgeRange(btn) {
             iconEl.style.cssText = 'width:24px;height:24px;color:#fff;display:inline-flex;';
             document.getElementById('stageAgentName').textContent = stage.name;
             document.getElementById('stageAgentDesc').textContent = stage.desc;
-            const thread = document.getElementById('stageAgentThread');
-            const sugs = (stage.suggestions || []).map((s, i) =>
-                `<button type="button" data-sug="${escapeHtml(s)}" style="text-align:left;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.10);border-radius:10px;padding:11px 14px;color:var(--text-secondary);font-family:var(--font-body);font-size:0.84rem;line-height:1.4;cursor:pointer;transition:border-color 0.15s, background 0.15s;width:100%;" onmouseover="this.style.borderColor='rgba(255,0,255,0.35)';this.style.background='rgba(255,0,255,0.05)';" onmouseout="this.style.borderColor='rgba(255,255,255,0.10)';this.style.background='rgba(255,255,255,0.03)';">${escapeHtml(s)}</button>`
-            ).join('');
-            thread.innerHTML = `
-                <div style="color:var(--text-muted);font-size:0.78rem;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Try asking</div>
-                <div style="display:grid;grid-template-columns:1fr;gap:8px;">${sugs}</div>
-            `;
-            // Wire suggestion clicks to prefill input.
-            thread.querySelectorAll('button[data-sug]').forEach((b) => {
-                b.addEventListener('click', () => {
-                    const input = document.getElementById('stageAgentInput');
-                    input.value = b.dataset.sug;
-                    input.focus();
-                });
-            });
+            renderStageSuggestions();
             document.getElementById('stageAgentInput').value = '';
             const modal = document.getElementById('stageAgentModal');
             modal.style.display = 'flex';
@@ -29480,6 +29708,273 @@ Be direct and concrete with real industry insight — never generic filler. When
             + '</span></label>';
     };
 })();
+</script>
+
+<!-- ══════════════ PROMPT SUGGESTIONS — context, library, rotation ══════════════
+     One system behind the artist agent, the three studio advisors and the stage
+     agents. Prompts are filtered against the artist's onboarding answers so the
+     app never asks something it already knows the answer to.              -->
+<script>
+(function () {
+    // ── Context ────────────────────────────────────────────────────────────
+    // Onboarding fields are free text, not booleans: management reads
+    // "Vernon Jones Sr. - JIG Media" and team reads "Solo (just me)". So a
+    // truthiness test is wrong in both directions — the negative answers are
+    // long strings too, and 10 of 13 artists answer team with "Solo (just me)".
+    const NEGATIVE = ['no','none','n/a','na','nope','not yet','no one','nobody','-','0','false','unsigned','independent','self'];
+    // Phrases that read as "yes I typed something" but mean "nobody".
+    const NEGATIVE_RE = /^(solo\b|just me|myself|nobody|no one|none\b|not yet|n\/a|self[- ]?(booked|managed|released|published|represented))|^\s*no\b/i;
+
+    function has(v) {
+        if (v === true || v === 'true') return true;
+        if (v === false || v === 'false' || v == null) return false;
+        const str = String(v).trim();
+        const low = str.toLowerCase();
+        if (low.length <= 1) return false;
+        if (NEGATIVE.includes(low)) return false;
+        if (NEGATIVE_RE.test(low)) return false;
+        return true;
+    }
+    function num(v) { return parseInt(String(v == null ? '' : v).replace(/[^0-9]/g, ''), 10) || 0; }
+    // "I have a manager" arrives in `team` for artists who never saw the richer
+    // management field, so read both rather than only the one the newer form writes.
+    // A phrase only counts if it isn't negated. Team answers say both "handles
+    // management, booking and press" and "No booking agent, no label" in one
+    // sentence, so look at what sits immediately before each match rather than
+    // anywhere in the string.
+    function mentions(v, re) {
+        const str = String(v == null ? '' : v);
+        const g = new RegExp(re.source, re.flags.indexOf('g') === -1 ? re.flags + 'g' : re.flags);
+        let m;
+        while ((m = g.exec(str)) !== null) {
+            const before = str.slice(Math.max(0, m.index - 16), m.index);
+            if (!/\b(no|not|without|never|zero)\b[\s\w]*$/i.test(before)) return true;
+            if (g.lastIndex === m.index) g.lastIndex++;
+        }
+        return false;
+    }
+
+    window.buildPromptContext = async function () {
+        const uid = (window.AppState && AppState.currentUser && AppState.currentUser.id) || null;
+        if (!uid || !window.db) { AppState && (AppState.promptContext = {}); return {}; }
+        try {
+            const [ob, ap] = await Promise.all([
+                db.from('artist_onboarding').select('data').eq('user_id', uid).maybeSingle(),
+                db.from('artist_profiles').select('career_stage,primary_genre').eq('user_id', uid).maybeSingle()
+            ]);
+            if (ob.error) window.__aiadReportError && window.__aiadReportError('select', 'artist_onboarding', ob.error);
+            if (ap.error) window.__aiadReportError && window.__aiadReportError('select', 'artist_profiles', ap.error);
+            const d = (ob.data && ob.data.data) || {};
+            const prof = ap.data || {};
+            const team = d.team;
+
+            const ctx = {
+                stage:        String(d.career_stage || prof.career_stage || '').toLowerCase(),
+                genre:        d.primary_genre || prof.primary_genre || '',
+                sound:        d.sound || '',
+                city:         d.city || d.location || '',
+                hasManager:   has(d.management) || mentions(team, /\bmanager\b/i),
+                hasBooking:   has(d.booking)    || mentions(team, /booking agent/i),
+                hasLabel:     has(d.label),
+                hasPublisher: has(d.publishing),
+                hasDistro:    has(d.distribution),
+                hasTeam:      has(team) || num(d.team_size) > 0,
+                ownsMasters:  has(d.owns_masters),
+                ownsPub:      has(d.owns_publishing),
+                merchActive:  has(d.merch_active),
+                syncActive:   has(d.sync_active),
+                listeners:    num(d.monthly_listeners),
+                following:    num(d.total_following),
+                years:        num(d.years_active),
+                cadence:      String(d.release_cadence || '').toLowerCase(),
+                challenge:    String(d.biggest_challenge || '').toLowerCase(),
+                goals:        [].concat(d.top_goals || [], d.goal_12mo || [], d.success_3yr || []).join(' ').toLowerCase()
+            };
+
+            // Tiers must be mutually exclusive. Several artists describe themselves as
+            // Established while reporting a few hundred listeners, which satisfied both
+            // tests at once — and since 'e' is dropped when late and 'l' when early,
+            // that left them with only the untiered prompts. Stage wins, per the rule
+            // that an artist who calls themselves Established shouldn't be shown
+            // beginner prompts.
+            ctx.late  = /establish|professional/.test(ctx.stage) || ctx.listeners > 100000;
+            ctx.early = (/just start|develop|emerg/.test(ctx.stage) || ctx.listeners < 10000) && !ctx.late;
+
+            AppState.promptContext = ctx;
+            return ctx;
+        } catch (e) {
+            if (window.AppState) AppState.promptContext = {};
+            return {};
+        }
+    };
+
+    // ── Rotation ───────────────────────────────────────────────────────────
+    // A shuffled deck per surface with a cursor: refresh deals the next hand and
+    // nothing repeats until the eligible pool is exhausted.
+    const decks = {};
+    const sources = {};   // surface -> () => string[]
+
+    window.registerPromptSource = function (surface, fn) { sources[surface] = fn; };
+
+    function eligible(surface) {
+        if (sources[surface]) { try { return sources[surface]() || []; } catch (e) { return []; } }
+        if (surface.indexOf('stage:') === 0 && window.__aiadStagePool) {
+            try { return window.__aiadStagePool(surface.slice(6)) || []; } catch (e) { return []; }
+        }
+        const c = (window.AppState && AppState.promptContext) || {};
+        return (window.AIAD_PROMPTS || [])
+            .filter(p => p.s === surface)
+            .filter(p => { if (!p.when) return true; try { return !!p.when(c); } catch (e) { return false; } })
+            .map(p => (typeof p.q === 'function' ? (function () { try { return p.q(c); } catch (e) { return null; } })() : p.q))
+            .filter(Boolean);
+    }
+    function shuffle(a) {
+        for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+        return a;
+    }
+    window.nextPrompts = function (surface, count) {
+        const want = count || 4;
+        let d = decks[surface];
+        if (!d || d.i >= d.list.length) d = decks[surface] = { list: shuffle(eligible(surface)), i: 0 };
+        if (!d.list.length) return [];
+        const out = d.list.slice(d.i, d.i + want);
+        d.i += want;
+        if (out.length < want) {
+            // Deck ran short — reshuffle and take the remainder from the new deck,
+            // skipping anything already in this hand so one refresh never repeats.
+            const fresh = shuffle(eligible(surface));
+            const need = want - out.length;
+            const filler = fresh.filter(q => out.indexOf(q) === -1).slice(0, need);
+            decks[surface] = { list: fresh, i: filler.length };
+            out.push.apply(out, filler);
+        }
+        return out;
+    };
+    window.resetPromptDecks = function () { Object.keys(decks).forEach(k => delete decks[k]); };
+
+    // ── Renderer ───────────────────────────────────────────────────────────
+    window.renderPromptChips = function (surface, containerId, count, onPick, chipClass) {
+        const box = document.getElementById(containerId);
+        if (!box) return;
+        const esc = window.escapeHtml || function (s) {
+            return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+        };
+        const items = window.nextPrompts(surface, count || 4);
+        if (!items.length) { box.innerHTML = ''; return; }
+        box.innerHTML = items.map(q =>
+            '<button type="button" class="' + (chipClass || 'example-prompt') + '" data-q="' + esc(q) + '">' + esc(q) + '</button>'
+        ).join('');
+        box.querySelectorAll('button[data-q]').forEach(b => {
+            b.addEventListener('click', () => { try { onPick(b.dataset.q); } catch (e) {} });
+        });
+    };
+
+    // Spin the icon, deal a new hand.
+    window.wirePromptRefresh = function (btnId, render) {
+        const b = document.getElementById(btnId);
+        if (!b) return;
+        b.onclick = function () {
+            this.style.transform = 'rotate(360deg)';
+            setTimeout(() => { this.style.transform = 'rotate(0deg)'; }, 320);
+            try { render(); } catch (e) {}
+        };
+    };
+
+    // ── Surfaces ───────────────────────────────────────────────────────────
+    const STUDIO = [
+        { surface: 'musicProd', list: 'musicProdPromptList', refresh: 'musicProdPromptRefresh' },
+        { surface: 'mixMedia',  list: 'mixMediaPromptList',  refresh: 'mixMediaPromptRefresh'  },
+        { surface: 'merch',     list: 'merchPromptList',     refresh: 'merchPromptRefresh'     },
+    ];
+    window.renderAllPromptSurfaces = function () {
+        try {
+            window.renderPromptChips('agent', 'artistAgentPromptList', 4,
+                q => (window.useExamplePrompt ? useExamplePrompt(q) : null));
+            window.wirePromptRefresh('artistAgentPromptRefresh', () =>
+                window.renderPromptChips('agent', 'artistAgentPromptList', 4,
+                    q => (window.useExamplePrompt ? useExamplePrompt(q) : null)));
+        } catch (e) {}
+        STUDIO.forEach(cfg => {
+            // The studio chips send on click, which is what they did before.
+            const pick = q => {
+                const input = document.getElementById(cfg.surface + 'AgentInput');
+                if (input) { input.value = q; input.focus(); }
+                if (window.studioAgentSend) studioAgentSend(cfg.surface);
+            };
+            const draw = () => window.renderPromptChips(cfg.surface, cfg.list, 8, pick, 'studio-agent-chip');
+            try { draw(); window.wirePromptRefresh(cfg.refresh, draw); } catch (e) {}
+        });
+    };
+})();
+</script>
+
+<script>
+window.AIAD_PROMPTS = [
+  /* ---------- ARTIST AGENT ---------- */
+  { s:'agent', q:'What should I even be asking you about my career?' },
+  { s:'agent', q:'Do I need a manager at this stage?',                           when:c=>!c.hasManager && !c.late },
+  { s:'agent', q:'How do I get more out of my manager without losing control?',  when:c=> c.hasManager },
+  { s:'agent', q:'Should I sign with a label or stay independent?',              when:c=>!c.hasLabel },
+  { s:'agent', q:'How do I renegotiate my deal from a position of strength?',    when:c=> c.hasLabel },
+  { s:'agent', q:'What should I be doing with my publishing?',                   when:c=>!c.hasPublisher },
+  { s:'agent', q:'How do I find a booking agent who fits my level?',             when:c=>!c.hasBooking },
+  { s:'agent', q:'How should I price my first merch drop?',                      when:c=>!c.merchActive },
+  { s:'agent', q:'How do I turn merch into a real revenue line, not just swag?', when:c=> c.merchActive },
+  { s:'agent', q:'How do I get my music in front of music supervisors?',         when:c=>!c.syncActive },
+  { s:'agent', q:'What makes a track easy to license for film and TV?',          when:c=> c.syncActive },
+  { s:'agent', q:'Should I do a surprise drop or build anticipation?' },
+  { s:'agent', q:'What content actually resonates with my inner circle?' },
+  { s:'agent', q:'How do I build consistency without burning out?' },
+  { s:'agent', q:c=>`What is working right now for independent ${c.genre || 'artists'}?`, when:c=>!!c.genre },
+  { s:'agent', q:'How do I get my first 1,000 real fans?',                       when:c=> c.listeners < 5000 },
+  { s:'agent', q:'How do I convert passive listeners into paying supporters?',   when:c=> c.listeners >= 5000 },
+  { s:'agent', q:'What is a realistic release cadence for me?',                  when:c=>!c.cadence || /not yet/.test(c.cadence) },
+  { s:'agent', q:'Should I release singles or hold for a project?',              when:c=> !!c.cadence },
+  { s:'agent', q:'How do I build a team without giving away equity too early?',  when:c=>!c.hasTeam },
+  { s:'agent', q:'When is the right time to make my first hire?',                when:c=> c.hasTeam },
+  { s:'agent', q:'How do I make sure I keep ownership of my masters?',           when:c=>!c.ownsMasters },
+  { s:'agent', q:'Now that I own my masters, how do I monetise the catalogue?',  when:c=> c.ownsMasters },
+  { s:'agent', q:c=>`How do I stand out in a crowded ${c.genre || 'scene'}?`,     when:c=>!!c.genre },
+  { s:'agent', q:'Help me think through live performance options' },
+  { s:'agent', q:'What should I focus on in the next 90 days?' },
+  /* ---------- BEAT ADVISOR ---------- */
+  { s:'musicProd', q:'What should I even be asking about production?' },
+  { s:'musicProd', q:c=>`Suggest a BPM range for ${c.genre || 'my sound'}`,       when:c=>!!c.genre },
+  { s:'musicProd', q:c=>`Best keys for ${c.genre || 'my genre'}`,                 when:c=>!!c.genre },
+  { s:'musicProd', q:'Dark trap vibes' },
+  { s:'musicProd', q:'Melodic drill structure' },
+  { s:'musicProd', q:'Chill lo-fi ideas' },
+  { s:'musicProd', q:'Hard-hitting 808s' },
+  { s:'musicProd', q:'Chords for a hit hook' },
+  { s:'musicProd', q:'Sample-flip tips' },
+  { s:'musicProd', q:'How do I make my mix hit on phone speakers?' },
+  { s:'musicProd', q:'Arrangement ideas for a 2-minute record' },
+  { s:'musicProd', q:'How do I build tension into a drop?' },
+  { s:'musicProd', q:'What tempo travels best for sync?',                         when:c=> c.syncActive },
+  /* ---------- VISUAL DIRECTOR ---------- */
+  { s:'mixMedia', q:'What should I even be asking about visuals?' },
+  { s:'mixMedia', q:'Cover art colour palettes' },
+  { s:'mixMedia', q:'Mood board for dark music' },
+  { s:'mixMedia', q:c=>`Typography that fits ${c.genre || 'my sound'}`,           when:c=>!!c.genre },
+  { s:'mixMedia', q:'Press photo ideas' },
+  { s:'mixMedia', q:'Minimalist cover trends' },
+  { s:'mixMedia', q:'Afro-futurist aesthetic' },
+  { s:'mixMedia', q:'Brand colours that pop' },
+  { s:'mixMedia', q:'EPK photo direction' },
+  { s:'mixMedia', q:'How do I keep a consistent look across a rollout?' },
+  { s:'mixMedia', q:'Visual direction for a first campaign',                      when:c=> c.early },
+  /* ---------- MERCH STRATEGIST ---------- */
+  { s:'merch', q:'What should I even be asking about merch?' },
+  { s:'merch', q:'What sells best for artists at my level?' },
+  { s:'merch', q:'Price point strategy' },
+  { s:'merch', q:'Limited drop tactics' },
+  { s:'merch', q:'Hoodie vs tee — which first?',                                  when:c=>!c.merchActive },
+  { s:'merch', q:'How do I plan a drop calendar across a year?',                  when:c=> c.merchActive },
+  { s:'merch', q:'Pre-order strategy' },
+  { s:'merch', q:'How much inventory should a first run be?',                     when:c=>!c.merchActive },
+  { s:'merch', q:'How do I read sell-through and size the next run?',             when:c=> c.merchActive },
+  { s:'merch', q:'Bundling merch with a release' }
+];
 </script>
 </body>
 
