@@ -1444,12 +1444,19 @@ html, body {
                         </div>
                     </div>
 
-                    <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;opacity:0.5;">
+                    <!-- Live again: the redirect URI is now registered against the Google
+                         client, so the authorize call reaches a sign-in page instead of
+                         Error 400 redirect_uri_mismatch. Only youtube.readonly is asked
+                         for. The return leg was already wired — checkSpotifyCallback
+                         recognises a youtube_ state, stashes the code, and
+                         processPendingSpotifyCode hands it to the youtube-auth function. -->
+                    <div id="onboardYouTubeBtn" onclick="connectYouTube()" style="display:flex;align-items:center;gap:14px;padding:14px 18px;background:rgba(255,0,0,0.05);border:1px solid rgba(255,0,0,0.25);border-radius:12px;cursor:pointer;min-height:44px;">
                         <svg viewBox="0 0 24 24" fill="#ff0000" style="width:22px;height:22px;flex-shrink:0;"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-2.75 12.27 12.27 0 00-8.45 0A4.83 4.83 0 013.6 6.69 49.92 49.92 0 003 12a49.92 49.92 0 00.6 5.31 4.83 4.83 0 003.77 2.75 12.27 12.27 0 008.45 0 4.83 4.83 0 003.77-2.75A49.92 49.92 0 0021 12a49.92 49.92 0 00-.41-5.31zM9.75 15.02V8.98L15.5 12z"/></svg>
                         <div style="flex:1;">
-                            <div style="font-size:0.875rem;font-weight:500;color:var(--text-primary);">YouTube</div>
-                            <div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;">Coming soon</div>
+                            <div style="font-size:0.875rem;font-weight:500;color:var(--text-primary);">Connect YouTube</div>
+                            <div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;">Subscribers, views, recent uploads</div>
                         </div>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;color:var(--text-muted);"><polyline points="9 18 15 12 9 6"/></svg>
                     </div>
 
                     <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;opacity:0.5;">
