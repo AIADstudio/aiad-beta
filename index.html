@@ -12352,6 +12352,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         }
 
         function showSupervisorView(view) {
+            try { window.aiadTrackTool && window.aiadTrackTool('supervisor:' + view); } catch (e) {}
             try { history.replaceState(null, '', '#supervisor/' + view); } catch (e) {}
             document.querySelectorAll('#supervisorDashboard .dash-view').forEach(v => v.classList.remove('active'));
             document.querySelectorAll('#supervisorDashboard .dash-nav-item').forEach(n => n.classList.remove('active'));
@@ -13811,6 +13812,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             if (view === 'agents') view = 'agent';
             if (view === 'feed') view = 'posts';
             try { history.replaceState(null, '', '#artist/' + view); } catch (e) {}
+            try { window.aiadTrackTool && window.aiadTrackTool('artist:' + view); } catch (e) {}
 
             const allViews = ['artistHomeView', 'artistPostsView', 'artistSupportersView', 'artistProjectsView', 'artistRevenueView', 'artistScheduleView', 'artistCollaboratorsView', 'artistMusicView', 'artistSongwritingView', 'artistMixMediaView', 'artistMerchView', 'artistSyncLibraryView', 'artistMilestonesView', 'artistAnalyticsView', 'artistMyStatsView', 'artistAgentsView', 'artistInboxView', 'artistSettingsView', 'artistStoreView', 'artistPayoutsView'];
             allViews.forEach(v => {
@@ -19957,6 +19959,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
 
         function showCollabView(viewId) {
             try { history.replaceState(null, '', '#collab/' + viewId); } catch (e) {}
+            try { window.aiadTrackTool && window.aiadTrackTool('collab:' + viewId); } catch (e) {}
 
             const viewMap = {
                 'home': 'collabHomeView',
@@ -21953,6 +21956,7 @@ document.addEventListener('keydown', function(e) {
         }
 
         async function studioAgentSend(panelId) {
+            try { window.aiadTrackTool && window.aiadTrackTool('studio:' + panelId); } catch (e) {}
             const input   = document.getElementById(panelId + 'AgentInput');
             const msgBox  = document.getElementById(panelId + 'AgentMsgs');
             if (!input || !msgBox) return;
@@ -22700,6 +22704,7 @@ document.addEventListener('keydown', function(e) {
 // ── Fan view routing ──────────────────────────────────────────────────────
 function showFanView(view) {
     try { history.replaceState(null, '', '#fan/' + view); } catch (e) {}
+    try { window.aiadTrackTool && window.aiadTrackTool('fan:' + view); } catch (e) {}
     const viewMap = {
         home:'fanHomeView', feed:'fanFeedView', artists:'fanArtistsView',
         myCreators:'fanArtistsView', discover:'fanDiscoverView',
@@ -24765,6 +24770,7 @@ function toggleAgeRange(btn) {
                 ? CONTRACT_REVIEW
                 : STAGES.find((s) => s.key === key);
             if (!stage) return;
+            try { window.aiadTrackTool && window.aiadTrackTool('stage:' + key); } catch (e) {}
             activeStage = stage;
             const iconEl = document.getElementById('stageAgentEmoji');
             iconEl.innerHTML = stage.icon;
@@ -28283,6 +28289,27 @@ Be direct and concrete with real industry insight — never generic filler. When
       } catch (e) {}
     }
     window.__aiadTrack = track;
+
+    // Dashboard views swap by CSS class, and the fan/collab/supervisor routers use
+    // history.replaceState — neither fires hashchange, so the listener below never
+    // saw anything past the login pages. The routers report themselves instead.
+    // Names are prefixed so none can collide with the onboarding slugs the brief
+    // classifies against ('home', 'industry-selection', 'sign-in', 'artist-profile',
+    // 'role-selection', 'collaborator-roles', 'onboarding') — anything else counts
+    // as a core open.
+    var lastTool = '', lastToolAt = 0;
+    window.aiadTrackTool = function (name, metadata) {
+      try {
+        if (!name) return;
+        var now = Date.now();
+        // Routers get called more than once for a single navigation (alias
+        // normalisation, the wrappers around showArtistView). Collapse repeats so
+        // the counts reflect opens rather than re-renders.
+        if (name === lastTool && (now - lastToolAt) < 1500) return;
+        lastTool = name; lastToolAt = now;
+        track('tool_open', name, metadata || {});
+      } catch (e) {}
+    };
     (function fireStart(n) {
       if (userId) return track('session_start', null, { path: location.pathname });
       if (n > 0) setTimeout(function () { fireStart(n - 1); }, 1000);
