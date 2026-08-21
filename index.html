@@ -11790,6 +11790,8 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         }
 
         async function handleArtistProfileContinue() {
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             const btn = document.getElementById('artistProfileBtn');
             btn.disabled = true;
             btn.querySelector('span').textContent = 'Creating account...';
@@ -11845,7 +11847,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
 
             if (AppState.currentUser) {
                 await db.from('profiles').upsert({
-                    id: AppState.currentUser.id,
+                    id: uid,
                     email,
                     full_name: fullName,
                     username,
@@ -11861,7 +11863,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             // Write page-1 fields to artist_profiles immediately
             if (AppState.currentUser && AppState.artistProfile.artistName) {
                 await db.from('artist_profiles').upsert({
-                    user_id: AppState.currentUser.id,
+                    user_id: uid,
                     artist_name: AppState.artistProfile.artistName,
                     primary_genre: AppState.artistProfile.primaryGenre || null,
                     career_stage: AppState.artistProfile.artistLevel || null,
@@ -11884,6 +11886,8 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         }
 
         async function handleGoalsContinue() {
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             // Save goals + progressive profiling fields to AppState
             AppState.artistProfile.primaryPlatform = AppState.artistContext.primaryPlatform || '';
             AppState.artistProfile.followerCount = AppState.artistContext.followerCount || '';
@@ -11894,7 +11898,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             // Persist page-2 fields to Supabase
             if (AppState.currentUser) {
                 await db.from('artist_profiles').upsert({
-                    user_id: AppState.currentUser.id,
+                    user_id: uid,
                     primary_platform: AppState.artistProfile.primaryPlatform || null,
                     follower_count: AppState.artistProfile.followerCount || null,
                     goals: AppState.artistGoals.length ? AppState.artistGoals : null,
@@ -12321,12 +12325,14 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         }
 
         function handleSupervisorEnterDashboard() {
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
 
             if (AppState.currentUser) {
                 // This duplicate literal previously omitted location and so overwrote the
                 // row written at signup with a null one.
                 db.from('profiles').upsert({
-                    id: AppState.currentUser.id,
+                    id: uid,
                     email: AppState.currentUser.email,
                     full_name: AppState.supervisorProfile?.name || '',
                     role: 'supervisor',
@@ -12491,7 +12497,8 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         }
 
         async function loadArtistRevenue() {
-            if (!AppState.currentUser) {
+            const uid = aiadResolvedUserId();
+            if (!uid) {
                 showToast('Not logged in — track saved locally only');
                 return;
             }
@@ -12502,7 +12509,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
 
                 const { data } = await db.from('fan_support')
                     .select('*')
-                    .eq('artist_id', AppState.currentUser.id);
+                    .eq('artist_id', uid);
 
                 if (!data) return;
 
@@ -12541,11 +12548,12 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         }
 
         async function loadArtistSupporters() {
-            if (!AppState.currentUser) return;
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             try {
                 const { data, count } = await db.from('fan_support')
                     .select('fan_id, amount, status, created_at', { count: 'exact' })
-                    .eq('artist_id', AppState.currentUser.id)
+                    .eq('artist_id', uid)
                     .order('created_at', { ascending: false });
 
                 const total = count || 0;
@@ -12587,13 +12595,14 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         }
 
         async function toggleMilestone(key, row) {
-            if (!AppState.currentUser) return;
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             const isCompleted = row.classList.contains('completed');
 
             if (isCompleted) {
 
                 await db.from('artist_milestones').delete()
-                    .eq('user_id', AppState.currentUser.id)
+                    .eq('user_id', uid)
                     .eq('milestone_key', key);
                 row.classList.remove('completed');
                 const dateEl = document.getElementById(`ms-date-${key}`);
@@ -12602,7 +12611,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
 
                 const now = new Date();
                 await db.from('artist_milestones').upsert({
-                    user_id: AppState.currentUser.id,
+                    user_id: uid,
                     milestone_key: key,
                     completed_at: now.toISOString()
                 }, { onConflict: 'user_id,milestone_key' });
@@ -12614,11 +12623,12 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         }
 
         async function loadArtistMilestones() {
-            if (!AppState.currentUser) return;
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             try {
                 const { data } = await db.from('artist_milestones')
                     .select('*')
-                    .eq('user_id', AppState.currentUser.id);
+                    .eq('user_id', uid);
 
                 if (!data) return;
                 data.forEach(m => {
@@ -12654,10 +12664,11 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
 
             if (!title) { showToast('Add an event title'); return; }
             if (!event_date) { showToast('Pick a date'); return; }
-            if (!AppState.currentUser) return;
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
 
             const { error } = await db.from('artist_schedule').insert({
-                user_id: AppState.currentUser.id,
+                user_id: uid,
                 title, type, event_date, notes,
                 created_at: new Date().toISOString()
             });
@@ -12669,14 +12680,15 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         }
 
         async function loadArtistSchedule() {
-            if (!AppState.currentUser) return;
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             const list = document.getElementById('scheduleEventsList');
             if (!list) return;
 
             try {
                 const { data } = await db.from('artist_schedule')
                     .select('*')
-                    .eq('user_id', AppState.currentUser.id)
+                    .eq('user_id', uid)
                     .gte('event_date', new Date().toISOString().split('T')[0])
                     .order('event_date', { ascending: true })
                     .limit(20);
@@ -12727,10 +12739,11 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             const target_date = document.getElementById('newProjectDate').value || null;
 
             if (!title) { showToast('Add a project title'); return; }
-            if (!AppState.currentUser) { showToast('Not logged in'); return; }
+            const uid = aiadResolvedUserId();
+            if (!uid) { showToast('Not logged in'); return; }
 
             const { error } = await db.from('artist_projects').insert({
-                user_id: AppState.currentUser.id,
+                user_id: uid,
                 title, type, description, target_date,
                 status: 'planning',
                 progress: 0,
@@ -12744,14 +12757,15 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         }
 
         async function loadArtistProjects() {
-            if (!AppState.currentUser) return;
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             const grid = document.getElementById('projectsGrid');
             if (!grid) return;
 
             try {
                 const { data } = await db.from('artist_projects')
                     .select('*')
-                    .eq('user_id', AppState.currentUser.id)
+                    .eq('user_id', uid)
                     .order('created_at', { ascending: false });
 
                 if (!data || data.length === 0) {
@@ -12806,6 +12820,8 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         }
 
         async function saveNewMemory() {
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             const category = document.getElementById('memoryCategory').value;
             const reasoning = document.getElementById('memoryReasoning').value.trim();
             const tradeoff = document.getElementById('memoryTradeoff').value.trim();
@@ -12813,7 +12829,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
 
             try {
                 const { error } = await db.from('decision_memories').insert({
-                    user_id: AppState.currentUser.id,
+                    user_id: uid,
                     category,
                     reasoning,
                     tradeoff,
@@ -12829,11 +12845,12 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         }
 
         async function loadDecisionMemories() {
-            if (!AppState.currentUser) return;
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             try {
                 const { data, error } = await db.from('decision_memories')
                     .select('*')
-                    .eq('user_id', AppState.currentUser.id)
+                    .eq('user_id', uid)
                     .order('created_at', { ascending: false })
                     .limit(10);
 
@@ -12861,7 +12878,8 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         }
 
         async function autoCapureDecisionMemory(userMessage, agentResponse) {
-            if (!AppState.currentUser) return;
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
 
             if (artistAgentHistory.length < 2) return;
 
@@ -12886,7 +12904,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 if (!parsed.decision) return;
 
                 await db.from('decision_memories').insert({
-                    user_id: AppState.currentUser.id,
+                    user_id: uid,
                     category: parsed.category || 'strategy',
                     reasoning: parsed.reasoning,
                     tradeoff: parsed.tradeoff || null,
@@ -13479,7 +13497,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
 
         async function saveSettings(section) {
-            if (!AppState.currentUser) { showToast('Not logged in'); return; }
+            const uid = aiadResolvedUserId();
+            if (!uid) { showToast('Not logged in'); return; }
 
             if (section === 'profile') {
                 const updates = {
@@ -13494,7 +13513,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 };
 
                 const { error } = await db.from('artist_profiles')
-                    .upsert({ user_id: AppState.currentUser.id, ...updates }, { onConflict: 'user_id' });
+                    .upsert({ user_id: uid, ...updates }, { onConflict: 'user_id' });
 
                 if (error) { window.reportDbError('artist_profiles', 'upsert', error, { section: 'profile' }); showToast('Error saving — try again'); return; }
 
@@ -13516,7 +13535,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             if (section === 'monetization' || section === 'guidance' || section === 'notifications') {
                 const payload = collectSettings(section);
                 const { error } = await db.from('user_settings')
-                    .upsert({ user_id: AppState.currentUser.id, [section]: payload, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+                    .upsert({ user_id: uid, [section]: payload, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
                 if (error) {
                     window.reportDbError && window.reportDbError('user_settings', 'upsert', error, { section });
                     showSettingsToast('Could not save — we’ve logged it. Try again.');
@@ -13600,7 +13619,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
 
         // Load the signed-in user's settings when the Settings screen opens.
         async function loadUserSettings() {
-            if (!AppState.currentUser) return;
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             // Real account email — never a placeholder.
             const emailEl = document.getElementById('setAccountEmail');
             if (emailEl) emailEl.value = AppState.currentUser.email || '';
@@ -13608,7 +13628,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             try {
                 const { data, error } = await db.from('user_settings')
                     .select('monetization,guidance,notifications')
-                    .eq('user_id', AppState.currentUser.id)
+                    .eq('user_id', uid)
                     .maybeSingle();
                 if (error) { window.reportDbError && window.reportDbError('user_settings', 'select', error, { where: 'loadUserSettings' }); return; }
                 if (data) {
@@ -13621,13 +13641,15 @@ Only capture real, meaningful decisions — not questions or general discussion.
 
         // Real Decision Memory list (empty for everyone today — no fabricated entries).
         async function loadDecisionMemories() {
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             const list = document.getElementById('decisionMemoryList');
             const countEl = document.getElementById('decisionMemoryCount');
             if (!AppState.currentUser || !list) return;
             try {
                 const { data, error } = await db.from('decision_memories')
                     .select('id,category,reasoning,tradeoff,created_at')
-                    .eq('user_id', AppState.currentUser.id)
+                    .eq('user_id', uid)
                     .order('created_at', { ascending: false })
                     .limit(50);
                 if (error) { window.reportDbError && window.reportDbError('decision_memories', 'select', error, { where: 'loadDecisionMemories' }); return; }
@@ -13652,9 +13674,10 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
 
         async function resetDecisionMemory() {
-            if (!AppState.currentUser) return;
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             if (!window.confirm('Reset all decision memory? This permanently clears what AIAD remembers about your decisions.')) return;
-            const { error } = await db.from('decision_memories').delete().eq('user_id', AppState.currentUser.id);
+            const { error } = await db.from('decision_memories').delete().eq('user_id', uid);
             if (error) { window.reportDbError && window.reportDbError('decision_memories', 'delete', error, { reset: true }); showToast('Could not reset — try again'); return; }
             showToast('Decision memory cleared');
             loadDecisionMemories();
@@ -13703,11 +13726,12 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
 
         async function loadArtistProfile() {
-            if (!AppState.currentUser) return;
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             try {
                 const { data } = await db.from('artist_profiles')
                     .select('*')
-                    .eq('user_id', AppState.currentUser.id)
+                    .eq('user_id', uid)
                     .single();
 
                 if (!data) return;
@@ -14238,6 +14262,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
         function removeMedia() { clearPostMedia(); }
 
         async function createNewPost() {
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             // support both old pendingMedia and new pendingPostMedia
             const _pm = pendingPostMedia || pendingMedia;
             const _pmUrl = pendingPostMediaUrl || (typeof pendingMediaUrl !== 'undefined' ? pendingMediaUrl : null);
@@ -14347,7 +14373,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     if (_fileToUpload && _mediaType && _mediaType !== 'poll') {
                         try {
                             const ext = (_fileToUpload.name.split('.').pop() || 'bin').toLowerCase();
-                            const path = `posts/${AppState.currentUser.id}/${Date.now()}.${ext}`;
+                            const path = `posts/${uid}/${Date.now()}.${ext}`;
                             const up = await window.aiadStorageUpload('artist-media', path, _fileToUpload, _fileToUpload.type);
                             if (!up.ok) {
                                 console.warn('[AIAD] Storage upload error:', up.status);
@@ -14363,7 +14389,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                         } catch(e) { console.warn('[AIAD] Storage upload exception:', e); }
                     }
                     const { data: insertedPost, error: _postErr } = await db.from('artist_posts').insert({
-                        user_id: AppState.currentUser.id,
+                        user_id: uid,
                         content: text,
                         visibility,
                         media_type: _mediaType || null,
@@ -14395,14 +14421,15 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
 
         async function loadArtistInbox() {
-            if (!AppState.currentUser) return;
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             const list = document.getElementById('artistInboxList');
             if (!list) return;
 
             try {
                 const { data } = await db.from('fan_questions')
                     .select('*')
-                    .eq('artist_id', AppState.currentUser.id)
+                    .eq('artist_id', uid)
                     .order('created_at', { ascending: false })
                     .limit(30);
 
@@ -14436,17 +14463,18 @@ Only capture real, meaningful decisions — not questions or general discussion.
 
         // Winning definition: PULSE/AIAD-team messages + fan questions in one list.
         async function loadArtistInbox() {
-            if (!AppState.currentUser) return;
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             const list = document.getElementById('artistInboxList');
             if (!list) return;
             let pulseHtml = '';
             try {
-                const { data: sys } = await db.from('messages').select('*').eq('recipient_id', AppState.currentUser.id).order('created_at', { ascending: false });
+                const { data: sys } = await db.from('messages').select('*').eq('recipient_id', uid).order('created_at', { ascending: false });
                 pulseHtml = (sys || []).map(_systemMsgCard).join('');
             } catch (e) {}
             let fanHtml = '';
             try {
-                const { data } = await db.from('fan_questions').select('*').eq('artist_id', AppState.currentUser.id).order('created_at', { ascending: false }).limit(30);
+                const { data } = await db.from('fan_questions').select('*').eq('artist_id', uid).order('created_at', { ascending: false }).limit(30);
                 if (data && data.length) {
                     fanHtml = data.map(function (msg) {
                         const name = msg.fan_name || 'A fan';
@@ -14460,7 +14488,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 }
             } catch (e) {}
             list.innerHTML = pulseHtml + fanHtml + ((!pulseHtml && !fanHtml) ? '<div style="padding:40px;text-align:center;color:var(--text-muted);font-size:0.875rem;">No messages yet. When fans reach out, they\'ll appear here.</div>' : '');
-            try { await db.from('messages').update({ read: true }).eq('recipient_id', AppState.currentUser.id).eq('read', false); } catch (e) {}
+            try { await db.from('messages').update({ read: true }).eq('recipient_id', uid).eq('read', false); } catch (e) {}
             setTimeout(function () { if (window._refreshInboxBadge) window._refreshInboxBadge(); }, 400);
         }
 
@@ -14497,14 +14525,15 @@ Only capture real, meaningful decisions — not questions or general discussion.
         var _artistPostsData = [];
         var _artistPostCounts = {};
         async function loadArtistPosts() {
-            if (!AppState.currentUser) return;
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             var feed = document.getElementById('postsFeed');
             var emptyState = document.getElementById('postsFeedEmpty');
             if (!feed) return;
             try {
                 var resp = await db.from('artist_posts')
                     .select('*')
-                    .eq('user_id', AppState.currentUser.id)
+                    .eq('user_id', uid)
                     .or('archived.is.null,archived.eq.false')
                     .order('created_at', { ascending: false })
                     .limit(50);
@@ -14709,9 +14738,11 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
 
         async function _loadPostLikeState(pid) {
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             if (!AppState.currentUser || pid === 'tmp') return;
             try {
-                var resp = await db.from('post_likes').select('id').eq('post_id', pid).eq('user_id', AppState.currentUser.id).maybeSingle();
+                var resp = await db.from('post_likes').select('id').eq('post_id', pid).eq('user_id', uid).maybeSingle();
                 if (resp.data) {
                     var btn = document.getElementById('artistLikeBtn_' + pid);
                     if (btn) { btn.classList.add('liked'); }
@@ -14733,17 +14764,19 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
 
         async function _toggleLike(pid, btn) {
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             if (!AppState.currentUser || pid === 'tmp') { likePost(btn); return; }
             var isLiked = btn.classList.contains('liked');
             var countEl = btn.querySelector('.like-count');
             if (isLiked) {
                 btn.classList.remove('liked');
                 if (countEl) countEl.textContent = Math.max(0, parseInt(countEl.textContent) - 1);
-                try { await db.from('post_likes').delete().eq('post_id', pid).eq('user_id', AppState.currentUser.id); } catch(e) {}
+                try { await db.from('post_likes').delete().eq('post_id', pid).eq('user_id', uid); } catch(e) {}
             } else {
                 btn.classList.add('liked');
                 if (countEl) countEl.textContent = parseInt(countEl.textContent) + 1;
-                try { await db.from('post_likes').upsert({ post_id: pid, user_id: AppState.currentUser.id }, { onConflict: 'post_id,user_id' }); } catch(e) {}
+                try { await db.from('post_likes').upsert({ post_id: pid, user_id: uid }, { onConflict: 'post_id,user_id' }); } catch(e) {}
             }
         }
 
@@ -15084,6 +15117,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
         let artistAgentHistory = [];
 
         async function sendArtistAgentMessage() {
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             const input = document.getElementById('artistAgentInput');
             const message = input.value.trim();
             if (!message) return;
@@ -15137,7 +15172,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     body: JSON.stringify({
                         message,
                         conversationHistory: artistAgentHistory.slice(0, -1),
-                        user_id: (AppState.currentUser && AppState.currentUser.id) || null,
+                        user_id: (AppState.currentUser && uid) || null,
                         artistName: AppState.artistProfile.artistName,
                         genre: AppState.artistProfile.primaryGenre,
                         location: AppState.artistProfile.location,
@@ -15531,18 +15566,22 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
 
         async function archivePost(postCard, postId) {
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             postCard.style.transition = 'opacity 0.25s';
             postCard.style.opacity = '0';
             setTimeout(() => postCard.remove(), 260);
             if (postId && AppState.currentUser) {
                 await db.from('artist_posts').update({ archived: true })
                     .eq('id', postId)
-                    .eq('user_id', AppState.currentUser.id);
+                    .eq('user_id', uid);
             }
             showToast('Post archived — hidden from feed');
         }
 
         function _openPostDetailMenu(postId, btn) {
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             document.querySelectorAll('.post-detail-menu').forEach(m => m.remove());
             const menu = document.createElement('div');
             menu.className = 'post-detail-menu';
@@ -15559,7 +15598,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             menu.appendChild(mkItem('Archive Post', 'var(--text-secondary)', () => {
                 _closeArtistPost();
                 if (postId && AppState.currentUser) {
-                    db.from('artist_posts').update({ archived: true }).eq('id', postId).eq('user_id', AppState.currentUser.id);
+                    db.from('artist_posts').update({ archived: true }).eq('id', postId).eq('user_id', uid);
                 }
                 showToast('Post archived');
                 setTimeout(loadArtistPosts, 300);
@@ -15648,6 +15687,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
 
         async function handleAvatarUpload(input) {
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             if (!input.files || !input.files[0]) return;
             const file = input.files[0];
             if (!file.type.startsWith('image/')) { showToast('Please select an image file'); return; }
@@ -15674,18 +15715,18 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 applyAvatar(fullUrl);
                 // Save ONLY compressed to DB — no localStorage (avoids QuotaExceededError)
                 if (AppState.currentUser) {
-                    console.log('[AIAD] saving avatar for user:', AppState.currentUser.id, 'compressed length:', compressed.length);
+                    console.log('[AIAD] saving avatar for user:', uid, 'compressed length:', compressed.length);
                     try {
                         // profiles requires email (not-null constraint)
                         const email = AppState.currentUser.email || '';
                         const r1 = await db.from('profiles').upsert(
-                            { id: AppState.currentUser.id, email, avatar_url: compressed },
+                            { id: uid, email, avatar_url: compressed },
                             { onConflict: 'id' }
                         );
                         console.log('[AIAD] profiles upsert:', r1.error ? r1.error.message : 'OK');
                         // artist_profiles RLS requires user_id = auth.uid()
                         const r2 = await db.from('artist_profiles').update({ avatar_url: compressed })
-                            .eq('id', AppState.currentUser.id);
+                            .eq('id', uid);
                         console.log('[AIAD] artist_profiles update:', r2.error ? r2.error.message : 'OK');
                         if (!r1.error && !r2.error) {
                             // Store ONLY the compressed small version in localStorage
@@ -15745,9 +15786,10 @@ Only capture real, meaningful decisions — not questions or general discussion.
             const date  = document.getElementById('editEventDate').value;
             const notes = document.getElementById('editEventNotes').value.trim();
             if (!title) { showToast('Add a title'); return; }
-            if (!AppState.currentUser) { showToast('Not logged in'); return; }
+            const uid = aiadResolvedUserId();
+            if (!uid) { showToast('Not logged in'); return; }
             if (eventId) {
-                const { error } = await db.from('artist_schedule').update({ title, type, event_date: date || undefined, notes }).eq('id', eventId).eq('user_id', AppState.currentUser.id);
+                const { error } = await db.from('artist_schedule').update({ title, type, event_date: date || undefined, notes }).eq('id', eventId).eq('user_id', uid);
                 if (error) { showToast('Error saving'); return; }
             } else {
                 // no id — can't update, just toast
@@ -15759,8 +15801,10 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
 
         async function deleteScheduleEvent(eventId) {
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             if (!confirm('Delete this event?')) return;
-            await db.from('artist_schedule').delete().eq('id', eventId).eq('user_id', AppState.currentUser.id);
+            await db.from('artist_schedule').delete().eq('id', eventId).eq('user_id', uid);
             closeModal();
             showToast('Event deleted');
             loadArtistSchedule();
@@ -15837,12 +15881,13 @@ Only capture real, meaningful decisions — not questions or general discussion.
             const progress    = parseInt(document.getElementById('editProjProgress').value);
 
             if (!title) { showToast('Add a title'); return; }
-            if (!AppState.currentUser) { showToast('Not logged in'); return; }
+            const uid = aiadResolvedUserId();
+            if (!uid) { showToast('Not logged in'); return; }
 
             const { error } = await db.from('artist_projects')
                 .update({ title, type, status, description, target_date, progress })
                 .eq('id', projectId)
-                .eq('user_id', AppState.currentUser.id);
+                .eq('user_id', uid);
 
             if (error) { showToast('Error saving project'); return; }
             closeModal();
@@ -15851,8 +15896,10 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
 
         async function deleteProject(projectId) {
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             if (!confirm('Delete this project? This cannot be undone.')) return;
-            await db.from('artist_projects').delete().eq('id', projectId).eq('user_id', AppState.currentUser.id);
+            await db.from('artist_projects').delete().eq('id', projectId).eq('user_id', uid);
             closeModal();
             showToast('Project deleted');
             loadArtistProjects();
@@ -15888,10 +15935,10 @@ Only capture real, meaningful decisions — not questions or general discussion.
         // No invented "views/streams" metric: we have no play/view tracking in the schema.
         window._analyticsPeriod = 30;
         async function loadArtistAnalytics(days) {
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             days = days || window._analyticsPeriod || 30;
             window._analyticsPeriod = days;
-            if (!AppState || !AppState.currentUser) return;
-            const uid = AppState.currentUser.id;
             const since = new Date(Date.now() - days * 86400000).toISOString();
             const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
             const money = (n) => '$' + Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
@@ -15965,11 +16012,12 @@ Only capture real, meaningful decisions — not questions or general discussion.
         window.loadArtistAnalytics = loadArtistAnalytics;
 
         async function loadRevenueTierBreakdown() {
-            if (!AppState.currentUser) return;
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             try {
                 const { data } = await db.from('fan_support')
                     .select('amount, type')
-                    .eq('artist_id', AppState.currentUser.id)
+                    .eq('artist_id', uid)
                     .eq('status', 'active');
 
                 const container = document.getElementById('revenueTierBreakdown');
@@ -16179,9 +16227,11 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
 
         async function updateRevenueSupporterCount() {
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             const el = document.getElementById('revenueFromSupporters');
             if (!el || !AppState.currentUser) return;
-            const { count } = await db.from('fan_support').select('*', { count: 'exact', head: true }).eq('artist_id', AppState.currentUser.id);
+            const { count } = await db.from('fan_support').select('*', { count: 'exact', head: true }).eq('artist_id', uid);
             el.textContent = `From ${count || 0} supporters`;
         }
 
@@ -17301,6 +17351,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
             document.body.appendChild(ov);
         };
         window.saveTrackEdit = async function (trackId) {
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             const t = window._trackData && window._trackData[trackId];
             if (!t) return;
             const msg = document.getElementById('editTrackMsg');
@@ -17322,9 +17374,9 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     stop(); return;
                 }
                 const ext = (cf.name.split('.').pop() || 'jpg').toLowerCase();
-                const path = AppState.currentUser.id + '/covers/' + Date.now() + '.' + ext;
+                const path = uid + '/covers/' + Date.now() + '.' + ext;
                 const up = await window.aiadStorageUpload('artist-media', path, cf, cf.type);
-                if (!up.ok) { window.__aiadReportError && window.__aiadReportError('storage.upload', 'artist-media', new Error('cover ' + up.status + ' | ' + up.tinfo + ' | uid=' + String((AppState.currentUser && AppState.currentUser.id) || '').slice(0, 8) + ' | ' + up.body), { path }); if (msg) msg.textContent = 'Cover upload failed — try again.'; stop(); return; }
+                if (!up.ok) { window.__aiadReportError && window.__aiadReportError('storage.upload', 'artist-media', new Error('cover ' + up.status + ' | ' + up.tinfo + ' | uid=' + String((AppState.currentUser && uid) || '').slice(0, 8) + ' | ' + up.body), { path }); if (msg) msg.textContent = 'Cover upload failed — try again.'; stop(); return; }
                 coverUrl = up.publicUrl;
             }
             const patch = {
@@ -17610,13 +17662,15 @@ Only capture real, meaningful decisions — not questions or general discussion.
         // Generated audio comes back as a short-lived temp URL (expires → playback dies).
         // Pull it through the function's audio proxy (avoids CORS) and store it permanently.
         async function uploadTrackAudio(tempUrl) {
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             if (!tempUrl || !AppState.currentUser) return tempUrl;
             try {
                 const res = await fetch('https://uapiytquwuhtewqieegx.supabase.co/functions/v1/music-production?proxy=' + encodeURIComponent(tempUrl), { headers: { 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
                 if (!res.ok) return tempUrl;
                 const blob = await res.blob();
                 if (!blob || blob.size < 1000) return tempUrl;
-                const fileName = AppState.currentUser.id + '/track_' + Date.now() + '.mp3';
+                const fileName = uid + '/track_' + Date.now() + '.mp3';
                 const { error } = await db.storage.from('music-references').upload(fileName, blob, { contentType: blob.type || 'audio/mpeg', upsert: true });
                 if (error) { window.__aiadReportError && window.__aiadReportError('storage.upload', 'music-references', error); throw new Error(error.message); }
                 const { data } = db.storage.from('music-references').getPublicUrl(fileName);
@@ -17807,6 +17861,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
 
         async function generateTrackCoverArt(trackTitle, prompt, style) {
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             try {
                 const coverPrompt = `A song titled "${trackTitle}". Mood/style: ${style || prompt || 'modern'}. Dark, moody aesthetic with vibrant accents.`;
                 const data = await callCreativeStudio('coverart', coverPrompt);
@@ -17845,7 +17901,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 if (AppState.currentUser) {
                     const { data: tracks } = await db.from('tracks')
                         .select('id')
-                        .eq('user_id', AppState.currentUser.id)
+                        .eq('user_id', uid)
                         .order('created_at', { ascending: false })
                         .limit(1);
                     if (tracks && tracks[0]) {
@@ -17878,10 +17934,11 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 localStorage.setItem('aiad_tracks', JSON.stringify(localTracks.slice(0, 50)));
             } catch(e) {}
 
-            if (!AppState.currentUser) return;
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             try {
                 const payload = {
-                    user_id: AppState.currentUser.id,
+                    user_id: uid,
                     is_public: (window.__aiadPublish === false ? false : true),
                     title: title || 'Untitled',
                     url: audioUrl,
@@ -17906,19 +17963,20 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
 
         async function loadTracksFromDb() {
-            if (!AppState.currentUser) return;
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             try {
                 // Try user_id first (new schema)
                 let { data: tracks } = await db.from('tracks')
                     .select('*')
-                    .eq('user_id', AppState.currentUser.id)
+                    .eq('user_id', uid)
                     .order('created_at', { ascending: false })
                     .limit(50);
 
                 // Fallback: try via artists table (old schema)
                 if (!tracks || tracks.length === 0) {
                     const { data: artist } = await db.from('artists')
-                        .select('id').eq('user_id', AppState.currentUser.id).maybeSingle();
+                        .select('id').eq('user_id', uid).maybeSingle();
                     if (artist) {
                         const { data: oldTracks } = await db.from('tracks')
                             .select('*').eq('artist_id', artist.id)
@@ -18877,10 +18935,11 @@ Only capture real, meaningful decisions — not questions or general discussion.
         });
 
         async function restoreUserSession() {
-            if (!AppState.currentUser) return;
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             try {
                 let profile = null;
-                try { const _r = await db.from('profiles').select('*').eq('id', AppState.currentUser.id).maybeSingle(); profile = _r && _r.data; } catch (e) {}
+                try { const _r = await db.from('profiles').select('*').eq('id', uid).maybeSingle(); profile = _r && _r.data; } catch (e) {}
                 // Never dump a returning/known user into onboarding — fall back to the role in
                 // their auth token or cache if the profile read hiccups (RLS/token timing).
                 const _meta = (AppState.currentUser && AppState.currentUser.user_metadata) || {};
@@ -18893,7 +18952,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     // Fallback: if profiles has no avatar, try artist_profiles
                     if (!AppState.pendingAvatar && _role === 'artist') {
                         try {
-                            const { data: ap } = await db.from('artist_profiles').select('avatar_url').eq('user_id', AppState.currentUser.id).maybeSingle();
+                            const { data: ap } = await db.from('artist_profiles').select('avatar_url').eq('user_id', uid).maybeSingle();
                             if (ap && ap.avatar_url) AppState.pendingAvatar = ap.avatar_url;
                         } catch(e) {}
                     }
@@ -19653,6 +19712,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
 
         function handleCollabSettingsAvatarUpload(event) {
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             const file = event.target.files[0];
             if (!file) return;
             const reader = new FileReader();
@@ -19678,7 +19739,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     }
                     try { localStorage.setItem('aiad_collab_avatar_url', compressed); } catch(e) {}
                     if (AppState.currentUser) {
-                        db.from('profiles').upsert({ id: AppState.currentUser.id, avatar_url: compressed }, { onConflict: 'id' }).then(() => {});
+                        db.from('profiles').upsert({ id: uid, avatar_url: compressed }, { onConflict: 'id' }).then(() => {});
                     }
                     showToast('Photo updated');
                 };
@@ -20227,7 +20288,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
         // ─── Collab: My Artists ───
         async function loadCollabArtists() {
             const grid = document.getElementById('collabArtistsGrid');
-            if (!AppState.currentUser) {
+            const uid = aiadResolvedUserId();
+            if (!uid) {
                 grid.innerHTML = '<div style="grid-column:1/-1;padding:40px 20px;text-align:center;color:var(--text-muted);font-size:0.85rem;">Sign in to follow and support artists.</div>';
                 return;
             }
@@ -20235,7 +20297,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             try {
                 const { data } = await db.from('fan_support')
                     .select('artist_id, amount, status')
-                    .eq('fan_id', AppState.currentUser.id);
+                    .eq('fan_id', uid);
                 if (!data || data.length === 0) {
                     grid.innerHTML = '<div style="grid-column:1/-1;padding:50px 20px;text-align:center;background:var(--bg-card);border:1px dashed var(--border-default);border-radius:14px;"><svg viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5" style="width:44px;height:44px;margin-bottom:12px;opacity:0.4;"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg><div style="font-size:0.95rem;font-weight:600;color:var(--text-secondary);margin-bottom:6px;">No artists yet</div><div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:18px;">Discover artists and follow or support them to see them here.</div><button class="collab-btn primary" onclick="showCollabView(\'discover\')">Discover Artists</button></div>';
                     _setCollabStats(0, 0, 0);
@@ -20301,7 +20363,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
 
         async function loadCollabFeed() {
             const list = document.getElementById('collabFeedList');
-            if (!AppState.currentUser) {
+            const uid = aiadResolvedUserId();
+            if (!uid) {
                 list.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted);font-size:0.85rem;">Sign in to see posts from artists you follow.</div>';
                 return;
             }
@@ -20309,7 +20372,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             try {
                 const { data: sup } = await db.from('fan_support')
                     .select('artist_id, status, amount')
-                    .eq('fan_id', AppState.currentUser.id);
+                    .eq('fan_id', uid);
                 if (!sup || sup.length === 0) {
                     list.innerHTML = '<div style="padding:50px 20px;text-align:center;background:var(--bg-card);border:1px dashed var(--border-default);border-radius:14px;"><svg viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5" style="width:44px;height:44px;margin-bottom:12px;opacity:0.4;"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg><div style="font-size:0.95rem;font-weight:600;color:var(--text-secondary);margin-bottom:6px;">No posts yet</div><div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:18px;">Follow artists in Discover to see their posts here.</div><button class="collab-btn primary" onclick="showCollabView(\'discover\')">Discover Artists</button></div>';
                     return;
@@ -20513,6 +20576,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
 
         async function execCollabDiscover() {
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             const container = document.getElementById('collabDiscoverView');
             if (!container) return;
             const searchInput = container.querySelector('.collab-search-input');
@@ -20552,7 +20617,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 }
                 let followedIds = [];
                 if (AppState.currentUser) {
-                    try { const { data: sup } = await db.from('fan_support').select('artist_id').eq('fan_id', AppState.currentUser.id); followedIds = (sup || []).map(s => s.artist_id); } catch(e) {}
+                    try { const { data: sup } = await db.from('fan_support').select('artist_id').eq('fan_id', uid); followedIds = (sup || []).map(s => s.artist_id); } catch(e) {}
                 }
                 targetDiv.innerHTML = '<div style="display:flex;flex-direction:column;gap:12px;">' + artists.map(a => {
                     const name = a.artist_name || 'Artist';
@@ -20583,15 +20648,16 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
 
         async function collabFollowFromDiscover(artistId, artistName, btn) {
-            if (!AppState.currentUser) { showToast('Sign in to follow artists'); return; }
+            const uid = aiadResolvedUserId();
+            if (!uid) { showToast('Sign in to follow artists'); return; }
             const isFollowing = btn.textContent.trim() === 'Following';
             try {
                 if (isFollowing) {
-                    await db.from('fan_support').delete().eq('fan_id', AppState.currentUser.id).eq('artist_id', artistId);
+                    await db.from('fan_support').delete().eq('fan_id', uid).eq('artist_id', artistId);
                     btn.textContent = 'Follow'; btn.style.background = 'transparent'; btn.style.color = 'var(--text-primary)'; btn.style.borderColor = 'var(--border-default)';
                     showToast('Unfollowed ' + artistName);
                 } else {
-                    await db.from('fan_support').upsert({ fan_id: AppState.currentUser.id, artist_id: artistId, status: 'following', amount: 0 }, { onConflict: 'fan_id,artist_id' });
+                    await db.from('fan_support').upsert({ fan_id: uid, artist_id: artistId, status: 'following', amount: 0 }, { onConflict: 'fan_id,artist_id' });
                     btn.textContent = 'Following'; btn.style.background = 'rgba(0,212,255,0.1)'; btn.style.color = 'var(--teal-light)'; btn.style.borderColor = 'var(--teal)';
                     showToast('Now following ' + artistName + '!');
                 }
@@ -20817,9 +20883,10 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
 
         async function saveProfileToSupabase(industry, role) {
-            if (!AppState.currentUser) return;
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             const { error } = await db.from('profiles').upsert({
-                id: AppState.currentUser.id,
+                id: uid,
                 email: AppState.currentUser.email,
                 role: role,
                 industry: industry,
@@ -22008,11 +22075,12 @@ document.addEventListener('keydown', function(e) {
 
         // ── Fan Feed: Load real artist posts for supported/followed artists ──
         async function loadFanHomeFeed() {
-            if (!AppState.currentUser) return;
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             try {
                 // Get artists this fan supports or follows
                 const { data: supported } = await db.from('fan_support')
-                    .select('artist_id').eq('fan_id', AppState.currentUser.id);
+                    .select('artist_id').eq('fan_id', uid);
                 const artistIds = (supported || []).map(s => s.artist_id).filter(Boolean);
                 if (!artistIds.length) return;
 
@@ -22053,11 +22121,12 @@ document.addEventListener('keydown', function(e) {
 
         // ── Fan Following: load from Supabase ─────────────────────────────────
         async function loadFanFollowing() {
-            if (!AppState.currentUser) return;
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             try {
                 const { data } = await db.from('fan_support')
                     .select('artist_id, amount, status, artist_profiles(username, artist_name, avatar_url, primary_genre)')
-                    .eq('fan_id', AppState.currentUser.id);
+                    .eq('fan_id', uid);
                 if (!data || !data.length) return;
 
                 const grid = document.getElementById('fanFollowingGrid');
@@ -22258,11 +22327,12 @@ document.addEventListener('keydown', function(e) {
 
         // ── loadFanArtistsView: load from Supabase or show placeholder ─────
         async function loadFanArtistsView() {
-            if (!AppState.currentUser) return;
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             try {
                 const { data } = await db.from('fan_support')
                     .select('artist_id, amount, status, artist_profiles(username, artist_name, avatar_url, primary_genre)')
-                    .eq('fan_id', AppState.currentUser.id);
+                    .eq('fan_id', uid);
                 if (!data || !data.length) return;
 
                 const grid = document.getElementById('fanArtistsGrid');
@@ -22327,7 +22397,8 @@ document.addEventListener('keydown', function(e) {
         async function loadFanCreators() {
             const grid = document.getElementById('fanArtistsGrid');
             if (!grid) return;
-            if (!AppState.currentUser) {
+            const uid = aiadResolvedUserId();
+            if (!uid) {
                 // Show demo data if not logged in
                 renderDemoFanCreators(grid);
                 return;
@@ -22335,7 +22406,7 @@ document.addEventListener('keydown', function(e) {
             try {
                 const { data } = await db.from('fan_support')
                     .select('artist_id, amount, status, artist_profiles(username, artist_name, avatar_url, primary_genre, location)')
-                    .eq('fan_id', AppState.currentUser.id);
+                    .eq('fan_id', uid);
 
                 if (!data || !data.length) { renderDemoFanCreators(grid); return; }
 
@@ -22499,6 +22570,8 @@ document.addEventListener('keydown', function(e) {
 
         // Step 2 → dashboard: save preferences then enter
         async function handleFanPreferencesContinue() {
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             const genres = Array.from(document.querySelectorAll('#fanGenreChips .genre-chip.selected'))
                                  .map(c => c.textContent.trim());
             const supportMethods = Array.from(document.querySelectorAll('#page-fan-preferences .goal-card[aria-checked="true"]'))
@@ -22512,7 +22585,7 @@ document.addEventListener('keydown', function(e) {
                 // so this needs the same collision handling as the profiles write.
                 const fanApUsername = await aiadUniqueUsername(acc.name || 'fan');
                 await db.from('artist_profiles').upsert({
-                    id: AppState.currentUser.id,
+                    id: uid,
                     username: fanApUsername,
                     artist_name: acc.name || 'Fan',
                     location: acc.location || '',
@@ -22657,12 +22730,13 @@ async function loadFanHomeFeed() {
     loadFanHomeStats(); loadFanSidebarPerks(); loadFanSidebarPledges(); loadFanSidebarDiscovery();
     const list = document.getElementById('fanActivityList');
     if (!list) return;
-    if (!AppState.currentUser) {
+    const uid = aiadResolvedUserId();
+    if (!uid) {
         list.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:8px 0;text-align:center;">Sign in and follow creators to see their posts here.</div>';
         return;
     }
     try {
-        const { data: supported } = await db.from('fan_support').select('artist_id').eq('fan_id', AppState.currentUser.id);
+        const { data: supported } = await db.from('fan_support').select('artist_id').eq('fan_id', uid);
         const artistIds = (supported||[]).map(s=>s.artist_id).filter(Boolean);
         if (!artistIds.length) {
             list.innerHTML = `<div style="color:var(--text-muted);font-size:0.85rem;padding:8px 0;">No posts yet — <button style="color:var(--teal-light);background:none;border:none;cursor:pointer;font-family:var(--font-body);font-size:0.85rem;" onclick="showFanView('discover')">discover some creators</button> to follow.</div>`;
@@ -22712,9 +22786,10 @@ async function loadFanHomeFeed() {
 }
 
 async function loadFanHomeStats() {
-    if (!AppState.currentUser) return;
+    const uid = aiadResolvedUserId();
+    if (!uid) return;
     try {
-        const { data } = await db.from('fan_support').select('amount,status').eq('fan_id',AppState.currentUser.id);
+        const { data } = await db.from('fan_support').select('amount,status').eq('fan_id',uid);
         if (!data) return;
         const sup = data.filter(d=>d.status==='active'&&d.amount>0);
         const fol = data.filter(d=>!d.amount||d.amount===0||d.status==='following');
@@ -22727,14 +22802,15 @@ async function loadFanHomeStats() {
 async function loadFanSupportGrid() {
     const grid = document.getElementById('fanHomeSupportGrid');
     if (!grid) return;
-    if (!AppState.currentUser) {
+    const uid = aiadResolvedUserId();
+    if (!uid) {
         grid.innerHTML = `<div style="color:var(--text-muted);font-size:0.85rem;padding:8px 0;">No creators yet — <button style="color:var(--teal-light);background:none;border:none;cursor:pointer;font-family:var(--font-body);font-size:0.85rem;" onclick="showFanView('discover')">discover some</button> to support.</div>`;
         return;
     }
     try {
         const { data } = await db.from('fan_support')
             .select('artist_id,amount,status')
-            .eq('fan_id', AppState.currentUser.id)
+            .eq('fan_id', uid)
             .eq('status', 'active');
         if (!data || !data.length) {
             grid.innerHTML = `<div style="color:var(--text-muted);font-size:0.85rem;padding:8px 0;">No creators yet — <button style="color:var(--teal-light);background:none;border:none;cursor:pointer;font-family:var(--font-body);font-size:0.85rem;" onclick="showFanView('discover')">discover some</button> to support.</div>`;
@@ -22759,9 +22835,10 @@ async function loadFanSupportGrid() {
 async function loadFanSidebarPledges() {
     const el = document.getElementById('fanSidebarPledges');
     if (!el) return;
-    if (!AppState.currentUser) { el.innerHTML=`<div style="font-size:0.82rem;color:var(--text-muted);padding:8px 0;">No pledges yet.</div>`; return; }
+    const uid = aiadResolvedUserId();
+    if (!uid) { el.innerHTML=`<div style="font-size:0.82rem;color:var(--text-muted);padding:8px 0;">No pledges yet.</div>`; return; }
     try {
-        const { data } = await db.from('fan_support').select('amount,status,artist_id').eq('fan_id',AppState.currentUser.id);
+        const { data } = await db.from('fan_support').select('amount,status,artist_id').eq('fan_id',uid);
         if (!data||!data.length) { el.innerHTML=`<div style="font-size:0.82rem;color:var(--text-muted);padding:8px 0;">No pledges yet.</div>`; return; }
         el.innerHTML = data.map(d=>{const name=d.artist_profiles?.artist_name||'Artist';const amt=d.amount>0?'$'+d.amount+'/mo':'Following';const init=name[0]?.toUpperCase()||'?';return `<div class="dash-pledge-item"><div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#0d2f3f,#1a4a5e);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.8rem;color:var(--teal-light);flex-shrink:0;">${init}</div><div style="flex:1;min-width:0;"><div class="dash-pledge-name">${name}</div></div><span class="dash-pledge-amount">${amt}</span></div>`;}). join('');
     } catch(e) { el.innerHTML=''; }
@@ -22770,9 +22847,10 @@ async function loadFanSidebarPledges() {
 async function loadFanSidebarPerks() {
     const el = document.getElementById('fanSidebarPerks');
     if (!el) return;
-    if (!AppState.currentUser) { el.innerHTML=`<div style="font-size:0.82rem;color:var(--text-muted);">Support a creator to unlock perks.</div>`; return; }
+    const uid = aiadResolvedUserId();
+    if (!uid) { el.innerHTML=`<div style="font-size:0.82rem;color:var(--text-muted);">Support a creator to unlock perks.</div>`; return; }
     try {
-        const { data } = await db.from('fan_support').select('amount,status,artist_id').eq('fan_id',AppState.currentUser.id).gt('amount',0).eq('status','active');
+        const { data } = await db.from('fan_support').select('amount,status,artist_id').eq('fan_id',uid).gt('amount',0).eq('status','active');
         if (!data||!data.length) { el.innerHTML=`<div style="font-size:0.82rem;color:var(--text-muted);">Support a creator to unlock perks.</div>`; return; }
         const perks=[];
         data.forEach(d=>{const name=d.artist_profiles?.artist_name||'Artist';const amt=d.amount||0;if(amt>=5){perks.push({perk:'Early access to releases',artist:name});perks.push({perk:'Behind-the-scenes content',artist:name});};if(amt>=25){perks.push({perk:'Exclusive drops',artist:name});perks.push({perk:'Direct message access',artist:name});}});
@@ -22791,12 +22869,13 @@ async function loadFanFeed() {
     const list = document.getElementById('fanFeedList');
     if (!list) return;
     list.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:20px;text-align:center;">Loading...</div>';
-    if (!AppState.currentUser) {
+    const uid = aiadResolvedUserId();
+    if (!uid) {
         list.innerHTML = `<div style="color:var(--text-muted);font-size:0.85rem;padding:20px;text-align:center;">Sign in to see posts from creators you follow.</div>`;
         _fanFeedData = []; if (typeof renderFanFeed === 'function') renderFanFeed(list); return;
     }
     try {
-        const { data: sup } = await db.from('fan_support').select('artist_id,status,amount').eq('fan_id', AppState.currentUser.id);
+        const { data: sup } = await db.from('fan_support').select('artist_id,status,amount').eq('fan_id', uid);
         const all = (sup||[]).map(s => ({ id: s.artist_id, type: (s.amount > 0 && s.status === 'active') ? 'supporting' : 'following' }));
         const ids = all.map(s => s.id).filter(Boolean);
         if (!ids.length) {
@@ -22940,12 +23019,14 @@ function fanSelectTier(card, amount) {
 }
 
 async function fanConfirmSupport(artistId, artistName) {
+    const uid = aiadResolvedUserId();
+    if (!uid) return;
     if(!_fanSelectedTier||!AppState.currentUser) return;
     const btn=document.getElementById('fanSupportConfirmBtn');
     if(btn) btn.textContent='Saving...';
     const resolvedId=(artistId&&!artistId.includes('-'))?'ed9c7f5c-9c3c-4999-8bba-468d5ba9d935':artistId;
     try {
-        await db.from('fan_support').upsert({fan_id:AppState.currentUser.id,artist_id:resolvedId,status:'active',amount:parseInt(_fanSelectedTier)},{onConflict:'fan_id,artist_id'});
+        await db.from('fan_support').upsert({fan_id:uid,artist_id:resolvedId,status:'active',amount:parseInt(_fanSelectedTier)},{onConflict:'fan_id,artist_id'});
         document.getElementById('fanSupportModal')?.remove();
         showToast('Now supporting '+artistName+' at $'+_fanSelectedTier+'/mo! 🙌');
         AppState._fanCreatorsStale=true;
@@ -22962,14 +23043,15 @@ function fanSupportArtist(id, name) { fanOpenSupportModal(id, name); }
 async function loadFanCreators() {
     const grid = document.getElementById('fanArtistsGrid');
     if (!grid) return;
-    if (!AppState.currentUser) { _renderIndiigoDemoGrid(grid); return; }
+    const uid = aiadResolvedUserId();
+    if (!uid) { _renderIndiigoDemoGrid(grid); return; }
     grid.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:20px;">Loading your creators...</div>';
     try {
         // Step 1: get all fan_support rows for this user
         const { data: supData, error: supErr } = await db
             .from('fan_support')
             .select('artist_id,amount,status')
-            .eq('fan_id', AppState.currentUser.id);
+            .eq('fan_id', uid);
         if (supErr) throw supErr;
         if (!supData || !supData.length) { _renderIndiigoDemoGrid(grid); return; }
 
@@ -23075,6 +23157,8 @@ async function fanPreferredGenre() {
 window.aiadResetPreferredGenre = () => { _fanPreferredGenre = null; };
 
 async function _execDiscoverSearch() {
+    const uid = aiadResolvedUserId();
+    if (!uid) return;
     const results=document.getElementById('discoverResults');
     if(!results) return;
     const q=(document.getElementById('discoverSearch')?.value||'').trim();
@@ -23131,7 +23215,7 @@ async function _execDiscoverSearch() {
         results.innerHTML = note + artists.map(a=>_buildDiscoverCard(a)).join('');
         // Update follow state for already-followed artists
         if (AppState.currentUser) {
-            db.from('fan_support').select('artist_id').eq('fan_id', AppState.currentUser.id).then(({data}) => {
+            db.from('fan_support').select('artist_id').eq('fan_id', uid).then(({data}) => {
                 (data||[]).forEach(s => {
                     const btn = document.getElementById('discBtn_' + s.artist_id);
                     if (btn) { btn.textContent = 'Following'; btn.style.background='rgba(0,212,255,0.1)'; btn.style.color='var(--teal-light)'; btn.style.borderColor='var(--teal)'; }
@@ -23184,6 +23268,8 @@ async function loadFanDiscover() { setTimeout(()=>_execDiscoverSearch(),100); }
         // ── Artist search + follow (dashboard top bar) ─────────────────────────
         let _artistSearchTimer = null;
         window.aiadDoArtistSearch = function (q) {
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             clearTimeout(_artistSearchTimer);
             const box = document.getElementById('aiadArtistSearchResults');
             q = (q || '').trim();
@@ -23195,7 +23281,7 @@ async function loadFanDiscover() { setTimeout(()=>_execDiscoverSearch(),100); }
                     const unames = rows.map((r) => r.username).filter(Boolean);
                     const idMap = {};
                     if (unames.length) { const { data: pr } = await db.from('profiles').select('id,username,avatar_url').in('username', unames); (pr || []).forEach((p) => { idMap[p.username] = p; }); }
-                    const me = (window.AppState && AppState.currentUser) ? AppState.currentUser.id : null;
+                    const me = (window.AppState && AppState.currentUser) ? uid : null;
                     const following = new Set();
                     if (me) { try { const { data: fs } = await db.from('fan_support').select('artist_id').eq('fan_id', me); (fs || []).forEach((s) => following.add(s.artist_id)); } catch (e) {} }
                     _renderArtistSearch(rows, idMap, following, me);
@@ -23220,7 +23306,9 @@ async function loadFanDiscover() { setTimeout(()=>_execDiscoverSearch(),100); }
             box.style.display = 'block';
         }
         window.aiadToggleFollow = async function (artistId, name, btn) {
-            const me = (window.AppState && AppState.currentUser) ? AppState.currentUser.id : null;
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
+            const me = (window.AppState && AppState.currentUser) ? uid : null;
             if (!me) { (window.showToast || alert)('Sign in to follow'); return; }
             const isF = btn.textContent.trim() === 'Following';
             btn.disabled = true;
@@ -23298,9 +23386,11 @@ function _feedPostCard(p) {
         + '</article>';
 }
 async function loadHomeFeed() {
+    const uid = aiadResolvedUserId();
+    if (!uid) return;
     const box = document.getElementById('homeFeedInner');
     if (!box) return;
-    const me = (window.AppState && AppState.currentUser) ? AppState.currentUser.id : null;
+    const me = (window.AppState && AppState.currentUser) ? uid : null;
     if (!me) { box.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px">Sign in to see your feed.</div>'; return; }
     box.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px">Loading feed…</div>';
     try {
@@ -23320,6 +23410,8 @@ async function loadHomeFeed() {
 }
 
 async function loadArtistPage(artistId) {
+    const uid = aiadResolvedUserId();
+    if (!uid) return;
     if(!artistId) return;
     showFanView('artist');
     const nameEl=document.getElementById('fanArtistName');
@@ -23356,7 +23448,7 @@ async function loadArtistPage(artistId) {
             av = r1.data?.avatar_url || r2.data?.avatar_url || '';
         } catch(e) {}
     }
-    if (!av && AppState.currentUser && artistId === AppState.currentUser.id) {
+    if (!av && AppState.currentUser && artistId === uid) {
         av = localStorage.getItem('aiad_artist_avatar_url') || '';
     }
     if (av && (av.startsWith('http') || av.startsWith('data:'))) {
@@ -23392,7 +23484,7 @@ async function loadArtistPage(artistId) {
         let isFollowing=false,isSupporting=false,_supAmt=0;
         if(AppState.currentUser){
             try{const{data:f}=await db.rpc('is_following',{p_artist:pid});isFollowing=!!f;}catch(e){}
-            try{const{data:s}=await db.from('fan_support').select('amount').eq('fan_id',AppState.currentUser.id).eq('artist_id',pid).gt('amount',0).order('amount',{ascending:false}).limit(1);if(Array.isArray(s)&&s.length){isSupporting=true;_supAmt=s[0].amount||0;}}catch(e){}
+            try{const{data:s}=await db.from('fan_support').select('amount').eq('fan_id',uid).eq('artist_id',pid).gt('amount',0).order('amount',{ascending:false}).limit(1);if(Array.isArray(s)&&s.length){isSupporting=true;_supAmt=s[0].amount||0;}}catch(e){}
         }
         const rel={amount:_supAmt};
         if(isFollowing){followBtn.textContent='Following ✓';followBtn.style.cssText='padding:9px 20px;border-radius:10px;border:1px solid var(--teal);background:rgba(0,212,255,0.1);color:var(--teal-light);font-size:0.85rem;cursor:pointer;font-family:var(--font-body);min-width:100px;';}
@@ -23471,6 +23563,8 @@ async function _loadArtistFanPosts(artistId, artistName, artistAv) {
 
 // ── Fan settings ──────────────────────────────────────────────────────────
 async function applyFanSettingsProfile() {
+    const uid = aiadResolvedUserId();
+    if (!uid) return;
     let name  = localStorage.getItem('aiad_fan_name') || '';
     let av    = localStorage.getItem('aiad_fan_avatar_url') || localStorage.getItem('aiad_avatar_url') || '';
     let loc   = localStorage.getItem('aiad_fan_location') || '';
@@ -23502,7 +23596,7 @@ async function applyFanSettingsProfile() {
         try {
             const {data:p} = await db.from('profiles')
                 .select('full_name,avatar_url,email,location,age_range')
-                .eq('id', AppState.currentUser.id).single();
+                .eq('id', uid).single();
             if (p) {
                 if (!name && p.full_name)  { name = p.full_name; localStorage.setItem('aiad_fan_name', name); }
                 if (!av   && p.avatar_url) { av   = p.avatar_url; localStorage.setItem('aiad_fan_avatar_url', av); localStorage.setItem('aiad_avatar_url', av); }
@@ -23512,7 +23606,7 @@ async function applyFanSettingsProfile() {
             }
         } catch(e) {}
         try {
-            const {data:sup} = await db.from('fan_support').select('amount,status').eq('fan_id', AppState.currentUser.id);
+            const {data:sup} = await db.from('fan_support').select('amount,status').eq('fan_id', uid);
             if (sup) {
                 const s = sup.filter(d => d.status==='active' && d.amount>0);
                 const f = sup.filter(d => d.status==='following' || !d.amount || d.amount===0);
@@ -23564,6 +23658,8 @@ async function applyFanSettingsProfile() {
 }
 
 async function saveFanProfile() {
+    const uid = aiadResolvedUserId();
+    if (!uid) return;
     const name = document.getElementById('fanDisplayName')?.value.trim() || '';
     const loc  = document.getElementById('fanSettingsLocation')?.value.trim() || '';
     const age  = document.querySelector('#fanSettingsAge .fan-genre-chip.active')?.dataset.age || '';
@@ -23575,7 +23671,7 @@ async function saveFanProfile() {
     if (loc) localStorage.setItem('aiad_fan_location', loc);
     if (age) localStorage.setItem('aiad_fan_age', age);
     if (AppState.currentUser) {
-        try { await db.from('profiles').upsert({ id:AppState.currentUser.id, ...(name?{full_name:name}:{}), ...(loc?{location:loc}:{}), ...(age?{age_range:age}:{}) }, {onConflict:'id'}); } catch(e) {}
+        try { await db.from('profiles').upsert({ id:uid, ...(name?{full_name:name}:{}), ...(loc?{location:loc}:{}), ...(age?{age_range:age}:{}) }, {onConflict:'id'}); } catch(e) {}
     }
     const activeGenres = [...document.querySelectorAll('#fanSettingsGenres .fan-genre-chip.active')].map(b=>b.dataset.genre).join(',');
     if (activeGenres) localStorage.setItem('aiad_fan_genres', activeGenres);
@@ -23583,6 +23679,8 @@ async function saveFanProfile() {
 }
 
 function changeFanAvatar() {
+    const uid = aiadResolvedUserId();
+    if (!uid) return;
     let inp = document.getElementById('_fanAvatarFilePicker');
     if (!inp) {
         inp = document.createElement('input');
@@ -23617,7 +23715,7 @@ function changeFanAvatar() {
                 try { localStorage.setItem('aiad_fan_avatar_url', compressed); } catch(e) {}
                 // Save to DB
                 if (AppState.currentUser) {
-                    try { await db.from('profiles').upsert({ id: AppState.currentUser.id, avatar_url: compressed }, { onConflict: 'id' }); } catch(err) {}
+                    try { await db.from('profiles').upsert({ id: uid, avatar_url: compressed }, { onConflict: 'id' }); } catch(err) {}
                 }
                 showToast('Avatar updated ✓');
             };
@@ -23723,6 +23821,9 @@ function _buildFanPostCard(p) {
 }
 
 function _openFanPost(idx) {
+    // `uid` further down is the post's author; this is the signed-in viewer.
+    const viewerUid = aiadResolvedUserId();
+    if (!viewerUid) return;
     var p = _fanFeedData[idx];
     if (!p) return;
     var overlay = document.getElementById('fanPostModal');
@@ -23828,7 +23929,7 @@ function _openFanPost(idx) {
     document.body.style.overflow = 'hidden';
     // Load persisted like state and comments
     if (pid && pid !== 'tmp' && AppState.currentUser) {
-        db.from('post_likes').select('id').eq('post_id', pid).eq('user_id', AppState.currentUser.id).maybeSingle().then(function(r) {
+        db.from('post_likes').select('id').eq('post_id', pid).eq('user_id', viewerUid).maybeSingle().then(function(r) {
             if (r.data) { var b = overlay.querySelector('.fan-action-btn'); if (b) { b.classList.add('liked'); b.style.color = 'var(--magenta)'; } }
         }).catch(function(){});
         db.from('post_likes').select('post_id').eq('post_id', pid).then(function(r) {
@@ -24074,7 +24175,8 @@ async function _watermarkImageFile(file, handle) {
 
 
 async function _loadFanSidebarProfile() {
-    if (!AppState.currentUser) return;
+    const uid = aiadResolvedUserId();
+    if (!uid) return;
     // Apply from localStorage first (instant, no flash)
     const cached = localStorage.getItem('aiad_fan_avatar_url') || '';
     if (cached && (cached.startsWith('http') || cached.startsWith('data:'))) applyFanAvatar(cached);
@@ -24082,7 +24184,7 @@ async function _loadFanSidebarProfile() {
     if (cachedName) document.querySelectorAll('.fan-dash-username').forEach(el => el.textContent = cachedName);
     // Then verify with DB
     try {
-        const { data: p } = await db.from('profiles').select('full_name,avatar_url,email').eq('id', AppState.currentUser.id).single();
+        const { data: p } = await db.from('profiles').select('full_name,avatar_url,email').eq('id', uid).single();
         if (!p) return;
         const name = p.full_name || AppState.currentUser.email?.split('@')[0] || 'Fan';
         if (name !== cachedName) { localStorage.setItem('aiad_fan_name', name); document.querySelectorAll('.fan-dash-username').forEach(el => el.textContent = name); }
@@ -24564,10 +24666,12 @@ function toggleAgeRange(btn) {
               + '</div></div>';
         }
         async function _loadSystemInbox(mountId, opts) {
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             opts = opts || {};
             var el = document.getElementById(mountId);
             if (!el) return;
-            var me = (window.AppState && AppState.currentUser) ? AppState.currentUser.id : null;
+            var me = (window.AppState && AppState.currentUser) ? uid : null;
             if (!me) return;
             var msgs = [];
             try { var r = await db.from('messages').select('*').eq('recipient_id', me).order('created_at', { ascending: false }); msgs = r.data || []; } catch (e) { return; }
@@ -24579,7 +24683,9 @@ function toggleAgeRange(btn) {
         }
         window._refreshInboxBadge = _refreshInboxBadge;
         async function _refreshInboxBadge() {
-            var me = (window.AppState && AppState.currentUser) ? AppState.currentUser.id : null;
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
+            var me = (window.AppState && AppState.currentUser) ? uid : null;
             if (!me) return;
             var n = 0;
             try { var r = await db.from('messages').select('id', { count: 'exact', head: true }).eq('recipient_id', me).eq('read', false); n = r.count || 0; } catch (e) { return; }
@@ -26439,6 +26545,8 @@ Be direct and concrete with real industry insight — never generic filler. When
         // Shared audio element so two sync tracks can't play at once.
         window._syncAudio = null;
         window.playSyncTrack = async function (listingId, btn) {
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             const t = (window._myListings || []).concat(_syncCatalog || [], window._savedListings || []).find((x) => x.id === listingId);
             if (!t) return;
             // Toggle: if this one is already playing, pause and reset.
@@ -26451,7 +26559,7 @@ Be direct and concrete with real industry insight — never generic filler. When
             // The artist who owns the listing hears their master; everyone else gets the
             // watermarked preview only — the master never leaves before a license is signed.
             const s = (typeof sess === 'function') ? sess() : null;
-            const meId = (window.AppState && AppState.currentUser && AppState.currentUser.id) || (s && s.user && s.user.id) || null;
+            const meId = (window.AppState && AppState.currentUser && uid) || (s && s.user && s.user.id) || null;
             const isOwner = !!(meId && t.artist_id && meId === t.artist_id);
             // Non-owners get the preview ONLY — never fall back to the master.
             const path = isOwner ? (t.master_path || t.preview_path) : t.preview_path;
@@ -27482,6 +27590,8 @@ Be direct and concrete with real industry insight — never generic filler. When
             reader.readAsDataURL(file);
         };
         window.aiadSubmitOnboarding = async function (btn, dash) {
+            const uid = aiadResolvedUserId();
+            if (!uid) return;
             const g = (id) => (document.getElementById(id)?.value || '').trim();
             const data = {
                 artist_name: g('ob_artist_name'), primary_genre: g('ob_primary_genre'), sound: g('ob_substyle'),
@@ -27502,7 +27612,7 @@ Be direct and concrete with real industry insight — never generic filler. When
             if (window.aiadObAvatar) {
                 try {
                     const _s = sess();
-                    const uid = (_s && _s.user && _s.user.id) || (AppState.currentUser && AppState.currentUser.id);
+                    const uid = (_s && _s.user && _s.user.id) || aiadResolvedUserId();
                     if (uid) {
                         await db.from('profiles').upsert({ id: uid, avatar_url: window.aiadObAvatar }, { onConflict: 'id' });
                         try { db.from('artist_profiles').update({ avatar_url: window.aiadObAvatar }).eq('user_id', uid).then(() => {}); } catch (e) {}
@@ -28067,10 +28177,12 @@ Be direct and concrete with real industry insight — never generic filler. When
   }
   var _syncFails = 0;
   async function sync(){
+      const uid = aiadResolvedUserId();
+      if (!uid) return;
     if(_syncFails >= 3) return;   // stop hammering once auth is dead; resumes on visibilitychange
     try{
       if(!window.db || !(window.AppState && AppState.currentUser)) return;
-      var resp=await window.db.from('ai_credits').select('balance,allowance').eq('user_id', AppState.currentUser.id).limit(1);
+      var resp=await window.db.from('ai_credits').select('balance,allowance').eq('user_id', uid).limit(1);
       if(resp.error){ _syncFails++; return; }
       _syncFails = 0;
       var rows=resp.data; var row=rows&&rows[0]; if(!row) return;
@@ -28391,10 +28503,12 @@ Be direct and concrete with real industry insight — never generic filler. When
   }
   var _pullFails = 0;
   async function pull(){
+      const uid = aiadResolvedUserId();
+      if (!uid) return;
     if(_pullFails >= 3) return;
     try{
       if(!window.db || !(window.AppState && AppState.currentUser)) return;
-      var resp = await window.db.from('ai_credits').select('balance,allowance').eq('user_id', AppState.currentUser.id).limit(1);
+      var resp = await window.db.from('ai_credits').select('balance,allowance').eq('user_id', uid).limit(1);
       if(resp.error){ _pullFails++; return; }
       _pullFails = 0;
       var row = resp.data && resp.data[0]; if(!row) return;
