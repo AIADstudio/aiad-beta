@@ -27120,7 +27120,142 @@ Be direct and concrete with real industry insight — never generic filler. When
             return h;
         }
 
+        // ── Daily Brief ────────────────────────────────────────────────────
+        // Regenerated from base tables on every open; nothing here is written by hand.
+        // Calls db.rpc directly rather than the shared rpc() helper: that helper returns
+        // null on error, and admin_daily_brief RAISES "not authorized" for a non-founder,
+        // so going through it would show a blank failure with the reason discarded.
+        async function renderAdminBrief() {
+            adminLoading('Generating today’s brief…');
+            const esc = (v) => String(v == null ? '' : v).replace(/[&<>]/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[c]));
+
+            let d = null, failMsg = '';
+            try {
+                const client = (typeof db !== 'undefined' && db) || window.db;
+                if (!client) throw new Error('no database client');
+                const { data, error } = await client.rpc('admin_daily_brief', {});
+                if (error) failMsg = error.message || 'request failed';
+                else d = data;
+            } catch (e) { failMsg = (e && e.message) || String(e); }
+
+            if (!d || d.message) {
+                const why = failMsg || (d && d.message) || '';
+                adminBody().innerHTML = '<div style="color:#f87171;font-size:0.86rem;padding:24px 0;">Could not generate brief'
+                    + (why ? ': ' + esc(why) : '.') + '</div>';
+                return;
+            }
+
+            const h = d.health || {}, ins = d.instrumentation || {}, w = d.watchlist || {};
+            const err = d.errors_24h || { total: 0, auto: 0, top: [] };
+            const sup = d.support || { open: 0, tickets: [] };
+            const today = new Date().toLocaleDateString('en-US', { weekday:'long', month:'short', day:'numeric', year:'numeric' });
+            const trend = (h.signups_7d || 0) - (h.signups_prior_7d || 0);
+            const trendTxt = trend === 0 ? 'flat vs prior week'
+                : (trend > 0 ? 'up ' + trend + ' vs prior week' : 'down ' + Math.abs(trend) + ' vs prior week');
+
+            // The lead picks itself, in priority order, so the brief never opens stale.
+            const silent = (w.silent_signups || []);
+            let lead;
+            if (ins.onboarding_only) {
+                lead = { t: 'Usage instrumentation only covers onboarding.',
+                    b: 'All ' + (ins.tool_open_total || 0) + ' tool opens are onboarding surfaces across ' + (ins.distinct_tools || 0)
+                     + ' tools — zero from the core product. Adoption is currently unmeasurable. Wiring tool_open into the real tool routes is the highest-leverage move available.' };
+            } else if (err.auto > 0) {
+                const top = (err.top || [])[0] || {};
+                lead = { t: 'Silent failures are firing in production.',
+                    b: err.auto + ' auto-logged errors in 24h. Most frequent: ' + (top.target || '') + ' — ' + (top.detail || '') + ' (' + (top.n || 0) + '×).' };
+            } else if (silent.length >= 3) {
+                lead = { t: 'Signups are arriving and never activating.',
+                    b: silent.length + ' accounts have never fired a single event.' };
+            } else {
+                lead = { t: 'No blocking issue today.',
+                    b: (h.active_3d || 0) + ' artists active in the last 3 days. Keep pushing platform linking — '
+                     + (w.platform_links_linked || 0) + ' of ' + (w.platform_links_total_artists || 0) + ' artists connected.' };
+            }
+
+            const metric = (label, val, accent) =>
+                '<div style="background:#12141d;border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:12px 14px;">'
+                + '<div style="font-size:1.4rem;font-weight:700;color:' + (accent || '#fff') + ';">' + esc(val) + '</div>'
+                + '<div style="font-size:0.68rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.03em;margin-top:2px;">' + esc(label) + '</div></div>';
+
+            const section = (title, inner) =>
+                '<h3 style="margin:22px 0 10px;font-size:0.78rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;">' + esc(title) + '</h3>' + inner;
+
+            const rows = (arr, cols) => {
+                const list = Array.isArray(arr) ? arr : [];
+                return '<div style="background:#12141d;border:1px solid rgba(255,255,255,0.07);border-radius:12px;overflow:hidden;">'
+                    + (list.length
+                        ? list.map((r, i) => '<div style="display:flex;justify-content:space-between;gap:12px;padding:9px 14px;font-size:0.82rem;'
+                            + (i ? 'border-top:1px solid rgba(255,255,255,0.05);' : '') + '">' + cols(r) + '</div>').join('')
+                        : '<div style="padding:12px 14px;color:#64748b;font-size:0.82rem;">Nothing to show.</div>')
+                    + '</div>';
+            };
+            const dt = (v) => v ? new Date(v).toLocaleDateString('en-US', { month:'short', day:'numeric' }) : '—';
+
+            adminBody().innerHTML =
+              '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;">'
+            + '<h2 style="margin:0;font-size:1.25rem;color:#fff;">AIAD Daily Brief</h2>'
+            + '<div style="display:flex;align-items:center;gap:10px;">'
+            + '<span style="font-size:0.78rem;color:#64748b;">' + esc(today) + '</span>'
+            + '<button onclick="renderAdminBrief()" title="Regenerate" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:0.95rem;padding:2px 6px;">&#8635;</button>'
+            + '</div></div>'
+
+            + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:14px;">'
+            + metric('Signups', h.signups_total || 0)
+            + metric('New 24h', h.signups_24h || 0, h.signups_24h ? '#22c55e' : '#94a3b8')
+            + metric('Active 3d', h.active_3d || 0)
+            + metric('Ever active', (h.profiles_with_event || 0) + '/' + (h.signups_total || 0))
+            + metric('Errors 24h', err.auto || 0, err.auto ? '#f87171' : '#22c55e')
+            + metric('Open tickets', sup.open || 0, sup.open ? '#f59e0b' : '#22c55e')
+            + '</div>'
+            + '<div style="font-size:0.78rem;color:#94a3b8;margin-top:8px;">' + (h.signups_7d || 0) + ' signups in 7 days — ' + esc(trendTxt) + '.</div>'
+
+            + '<div style="background:linear-gradient(135deg,rgba(6,182,212,0.12),rgba(59,130,246,0.08));border:1px solid rgba(6,182,212,0.3);border-radius:14px;padding:16px 18px;margin-top:18px;">'
+            + '<div style="font-size:0.68rem;color:#67e8f9;text-transform:uppercase;letter-spacing:0.09em;margin-bottom:6px;">Most important thing today</div>'
+            + '<div style="font-size:1.0rem;color:#fff;font-weight:600;margin-bottom:6px;">' + esc(lead.t) + '</div>'
+            + '<div style="font-size:0.85rem;color:#cbd5e1;line-height:1.55;">' + esc(lead.b) + '</div></div>'
+
+            + section('Signups this week', rows(d.signups_recent, (r) =>
+                '<span style="color:#e2e8f0;">' + esc(r.email) + '</span>'
+              + '<span style="color:#64748b;">' + esc(r.role || '') + ' · ' + esc(dt(r.created_at)) + '</span>'))
+
+            + section('Tool opens', rows(d.tool_opens, (r) =>
+                '<span style="color:#e2e8f0;">' + esc(r.tool) + '</span>'
+              + '<span style="color:#64748b;">' + esc(r.n) + ' opens · ' + esc(r.users) + ' users · ' + esc(dt(r.last_used)) + '</span>'))
+
+            + section('Most active', rows(d.top_users, (r) =>
+                '<span style="color:#e2e8f0;">' + esc(r.email) + '</span>'
+              + '<span style="color:#64748b;">' + esc(r.opens) + ' opens · ' + esc(dt(r.last_open)) + '</span>'))
+
+            + section('Proof of concept', rows(d.proof_of_concept, (r) =>
+                '<span style="color:#e2e8f0;">' + esc(r.surface) + '</span>'
+              + '<span style="color:#64748b;">' + esc(r.rows) + ' rows · ' + esc(r.users) + ' users · ' + esc(dt(r.last)) + '</span>'))
+
+            + section('Watch-list',
+                '<div style="background:#12141d;border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:14px;font-size:0.83rem;color:#cbd5e1;line-height:1.6;">'
+              + '<div><strong style="color:#f59e0b;">Platform linking</strong> — ' + (w.platform_links_linked || 0) + ' of ' + (w.platform_links_total_artists || 0)
+              + ' artists connected. Stats depth, agent quality and sync matching all key off this.</div>'
+              + '<div style="margin-top:8px;"><strong style="color:#f59e0b;">Never activated</strong> — ' + silent.length + ' accounts with zero events: '
+              + (silent.slice(0, 5).map((x) => esc(x.email)).join(', ') || '—') + '</div>'
+              + '<div style="margin-top:8px;"><strong style="color:#f59e0b;">One and done</strong> — ' + ((w.one_and_done || []).length)
+              + ' artists with a single session and nothing since.</div></div>')
+
+            + section('Support', rows(sup.tickets, (r) =>
+                '<span style="color:#e2e8f0;">' + esc(r.subject || '(no subject)') + '</span>'
+              + '<span style="color:' + (r.age_days > 7 ? '#f87171' : '#64748b') + ';">' + esc(r.age_days) + 'd · ' + esc(r.status) + (r.has_draft ? ' · draft ready' : '') + '</span>'))
+
+            + section('Silent failures (7d)', rows(err.top, (r) =>
+                '<span style="color:#e2e8f0;">' + esc(r.target) + '</span>'
+              + '<span style="color:#64748b;">' + esc(r.detail) + ' · ' + esc(r.n) + '×</span>'))
+
+            + '<div style="margin-top:20px;font-size:0.72rem;color:#475569;">Generated live from base tables at '
+            + esc(new Date(d.generated_at).toLocaleTimeString()) + '. '
+            + 'est_minutes from v_user_usage is deliberately excluded — heartbeat gaps are summed with no session timeout, so the figure is not trustworthy.</div>';
+        }
+        window.renderAdminBrief = renderAdminBrief;
+
         const ADMIN_TABS = [
+            { id: 'brief', label: '📋 Daily Brief' },
             { id: 'overview', label: '📊 Overview' },
             { id: 'sales', label: '📈 Sales' },
             { id: 'subs', label: '💳 Subscriptions' },
@@ -27155,8 +27290,8 @@ Be direct and concrete with real industry insight — never generic filler. When
                 ov.addEventListener('click', (e) => { if (e.target === ov) ov.style.display = 'none'; });
             }
             ov.style.display = 'flex';
-            renderAdminTabs('overview');
-            adminSelectTab('overview');
+            renderAdminTabs('brief');
+            adminSelectTab('brief');
         }
         window.openAdminCenter = openAdminCenter;
 
@@ -27166,7 +27301,8 @@ Be direct and concrete with real industry insight — never generic filler. When
         }
         window.adminSelectTab = function (id) {
             renderAdminTabs(id);
-            if (id === 'overview') renderAdminOverview();
+            if (id === 'brief') renderAdminBrief();
+            else if (id === 'overview') renderAdminOverview();
             else if (id === 'sales') renderAgentTab('sales', 'Sales & Growth Agent', 'Analyzes signups, conversion and founding-spot momentum.');
             else if (id === 'subs') renderAgentTab('subscriptions', 'Subscriptions & Retention Agent', 'Reads MRR, churn risk and cancellations.');
             else if (id === 'support') renderAdminSupport();
