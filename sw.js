@@ -1,7 +1,7 @@
 // AIAD Service Worker — network-first for HTML/JS/CSS, cache-first for static assets.
 // Goal: every deploy reaches users immediately; the PWA still works offline by falling back to cache.
 
-const VERSION       = "aiad-" + (self.AIAD_BUILD || "20260821a");
+const VERSION       = "aiad-" + (self.AIAD_BUILD || "20260821b");
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const ASSET_CACHE   = `${VERSION}-assets`;
 
@@ -44,8 +44,14 @@ async function networkFirst(req) {
         // A non-ok response is not content — it's an error page. Previously this
         // returned it anyway, declining only to cache it, which meant Vercel's
         // Security Checkpoint (HTTP 403, x-vercel-mitigated: challenge) replaced a
-        // perfectly good cached app with a spinner that reloads. Any 4xx/5xx now
-        // falls back to cache the same way a network failure does.
+        // perfectly good cached app with a spinner that reloads. Blocked, broken and
+        // timed-out responses now fall back to cache the same way a network failure
+        // does — but 404 and 410 mean the resource is genuinely gone, so they are
+        // passed through rather than answered from a stale copy.
+        if (fresh && (fresh.status === 404 || fresh.status === 410)) {
+            cache.delete(req);   // drop any stale copy so it can't resurface later
+            return fresh;
+        }
         return (await cacheFallback(cache, req)) || fresh;
     } catch (err) {
         const fallback = await cacheFallback(cache, req);
