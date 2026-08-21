@@ -205,11 +205,15 @@ html, body {
     border-right:1px solid var(--border-default) !important;
     transition:width 0.22s ease, padding 0.22s ease, box-shadow 0.22s ease !important;
 }
+/* Touch devices fire :hover on the first tap and only navigate on the second,
+   so the sidebar needed two taps. Gate the expansion on a real pointer. */
+@media (hover: hover) and (pointer: fine) {
 #artistDashboard .dash-sidebar-left:hover,
 .dashboard-container.active .dash-sidebar-left:hover {
     width:220px !important;
     padding:24px 16px !important;
     box-shadow:6px 0 24px rgba(0,0,0,0.5) !important;
+}
 }
 /* Main: full height, offset left by 56px to clear fixed sidebar */
 #artistDashboard .dash-main,
@@ -309,12 +313,16 @@ html, body {
         box-shadow: 6px 0 24px rgba(0,0,0,0.6) !important;
     }
     /* Kill hover-expand on mobile */
+    /* Touch devices fire :hover on the first tap and only navigate on the second,
+       so the sidebar needed two taps. Gate the expansion on a real pointer. */
+    @media (hover: hover) and (pointer: fine) {
     #artistDashboard .dash-sidebar-left:hover,
     .dashboard-container.active .dash-sidebar-left:hover,
     .dash-sidebar-left:hover {
         width: 260px !important;
         padding: 24px 16px !important;
         box-shadow: none !important;
+    }
     }
 
     /* 5. dash-main: full width, flex-grows inside flex .dashboard, scrolls vertically */
@@ -462,6 +470,9 @@ html, body {
     overflow:hidden;
     display:inline-block;
 }
+/* Touch devices fire :hover on the first tap and only navigate on the second,
+   so the sidebar needed two taps. Gate the expansion on a real pointer. */
+@media (hover: hover) and (pointer: fine) {
 .dash-sidebar-left:hover .dash-logo-text,
 .dash-sidebar-left:hover .dash-subtitle,
 .dash-sidebar-left:hover .dash-nav-item > span,
@@ -471,6 +482,7 @@ html, body {
 .dash-sidebar-left:hover .role-switcher-btn > span {
     opacity:1;
     max-width:200px;
+}
 }
 /* Nav items always flex, icon stays visible */
 .dash-nav-item {
@@ -488,8 +500,12 @@ html, body {
     margin-left:0 !important;
     padding-left:0 !important;
 }
+/* Touch devices fire :hover on the first tap and only navigate on the second,
+   so the sidebar needed two taps. Gate the expansion on a real pointer. */
+@media (hover: hover) and (pointer: fine) {
 .dash-sidebar-left:hover .dash-nav-submenu.open {
     max-height:300px !important;
+}
 }
 /* Right sidebar stays as-is */
 /* Studio views fit screen */
@@ -17163,7 +17179,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     </div>
                     <div style="flex:1;min-width:0;cursor:pointer;" onclick="openTrackDetail(window._trackData['${trackId}'])">
                         <div style="font-size:0.875rem;font-weight:500;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${title}</div>
-                        <div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px;">MiniMax Music${tags.length ? ' · ' + tags.slice(0,2).join(', ') : ''}</div>
+                        <div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px;">${trackSourceLabel(meta || {})}${tags.length ? ' · ' + tags.slice(0,2).join(', ') : ''}</div>
                     </div>
                     <div style="display:flex;align-items:center;gap:6px;">
                         <button id="playBtn-${trackId}" onclick="playTrackById('${trackId}')" style="width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,0.15);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-primary);">
@@ -17183,7 +17199,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 player.src = audioUrl;
                 player.pause();
                 document.getElementById('bottomPlayer').style.display = 'block';
-            document.body.classList.add('aiad-player-active');
+                document.body.classList.add('aiad-player-active');
+                applyPlayerSourceLabel(Object.assign({}, meta || {}, globalTrack || {}));
                 document.getElementById('bottomPlayerTitle').textContent = title;
                 const bc = document.getElementById('bottomPlayerCover');
                 bc.src = imageUrl || '';
@@ -21467,6 +21484,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
 
             document.getElementById('bottomPlayer').style.display = 'block';
             document.body.classList.add('aiad-player-active');
+            applyPlayerSourceLabel(track);
             document.getElementById('bottomPlayerTitle').textContent = track.title;
             const cover = document.getElementById('bottomPlayerCover');
             cover.src = track.imageUrl || '';
@@ -21577,12 +21595,57 @@ Only capture real, meaningful decisions — not questions or general discussion.
             document.body.style.overflow = 'hidden';
         }
 
+        // Stops playback, hides the bar, and drops the body class so .dash-main gets its
+        // bottom padding back — otherwise the page keeps reserving room for a bar that
+        // is no longer there.
+        window.closeBottomPlayer = function () {
+            try {
+                const a = document.getElementById('globalAudioPlayer');
+                if (a) { a.pause(); try { a.currentTime = 0; } catch (e) {} }
+            } catch (e) {}
+            const bar = document.getElementById('bottomPlayer');
+            if (bar) bar.style.display = 'none';
+            document.body.classList.remove('aiad-player-active');
+            // Leave the transport buttons showing "paused" rather than lying.
+            try { if (window.updateBottomPlayBtn) window.updateBottomPlayBtn(false); } catch (e) {}
+            try { if (window.currentPlayingRowId && window.setRowPlayState) setRowPlayState(window.currentPlayingRowId, false); } catch (e) {}
+        };
+
         function openTrackDetailFromPlayer() {
             if (globalTrack) openTrackDetail(globalTrack);
         }
 
+        // "MiniMax Music" was printed on every track regardless of provenance, so an
+        // artist's own upload was labelled as AI-generated. tracks.source already
+        // records this — only generated tracks get the model name.
+        function trackSourceLabel(track) {
+            const src = (track && track.source) || '';
+            if (src === 'generated') return 'MiniMax Music';
+            if (src === 'uploaded') return (track && (track.artist_name || track.artist)) || '';
+            return '';   // unknown provenance: say nothing rather than guess
+        }
+        window.trackSourceLabel = trackSourceLabel;
+
+        // Fills whichever source line is on screen for the track now playing.
+        function applyPlayerSourceLabel(track) {
+            try {
+                const el = document.getElementById('bottomPlayerSource');
+                if (!el) return;
+                const lbl = trackSourceLabel(track || {});
+                el.textContent = lbl;
+                el.style.display = lbl ? '' : 'none';
+            } catch (e) {}
+        }
+        window.applyPlayerSourceLabel = applyPlayerSourceLabel;
+
         function populateTrackDetail(track) {
             document.getElementById('trackDetailTitle').textContent = track.title;
+            const _srcEl = document.getElementById('trackDetailSource');
+            if (_srcEl) {
+                const _lbl = trackSourceLabel(track);
+                _srcEl.textContent = _lbl ? (track.source === 'generated' ? _lbl + ' · AI Generated' : _lbl) : '';
+                _srcEl.style.display = _lbl ? '' : 'none';
+            }
             document.getElementById('trackDetailCover').src = track.imageUrl || '';
             document.getElementById('trackDetailCover').style.background = track.imageUrl ? 'none' : 'linear-gradient(135deg,#1a1a2e,#0d0d1a)';
             document.getElementById('trackDetailDownload').href = track.audioUrl;
@@ -21626,7 +21689,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 <img id="trackDetailCover" src="" alt="" style="width:160px;height:160px;border-radius:12px;object-fit:cover;flex-shrink:0;background:linear-gradient(135deg,#1a1a2e,#0d0d1a);">
                 <div style="flex:1;min-width:0;">
                     <div id="trackDetailTitle" style="font-size:1.75rem;font-weight:700;color:var(--text-primary);margin-bottom:8px;line-height:1.2;"></div>
-                    <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:16px;">MiniMax Music · AI Generated</div>
+                    <div id="trackDetailSource" style="font-size:0.8rem;color:var(--text-muted);margin-bottom:16px;"></div>
                     <div id="trackDetailTags" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:20px;"></div>
                     <div style="display:flex;gap:10px;">
                         <button id="trackDetailPlayBtn" onclick="trackDetailTogglePlay()" style="display:flex;align-items:center;gap:8px;padding:10px 20px;background:var(--teal);border:none;border-radius:8px;color:#000;font-size:0.875rem;font-weight:600;cursor:pointer;">
@@ -21673,13 +21736,19 @@ Only capture real, meaningful decisions — not questions or general discussion.
 
     <style>body.aiad-player-active .dash-main{padding-bottom:96px !important;}</style>
     <div id="bottomPlayer" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:1100;background:rgba(10,10,15,0.95);border-top:1px solid rgba(255,255,255,0.08);backdrop-filter:blur(20px);padding:10px 20px;">
+        <!-- Dismiss. Top-right and out of the flex row so it reads as "close the bar"
+             rather than another transport control. -->
+        <button id="bottomPlayerClose" type="button" onclick="closeBottomPlayer()" aria-label="Close player"
+            title="Close player"
+            style="position:absolute;top:6px;right:8px;z-index:2;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);color:var(--text-secondary);border-radius:50%;width:28px;height:28px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;font-size:15px;">&times;</button>
         <div style="max-width:900px;margin:0 auto;display:flex;align-items:center;gap:16px;">
 
             <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;cursor:pointer;" onclick="openTrackDetailFromPlayer()">
                 <img id="bottomPlayerCover" src="" alt="" style="width:40px;height:40px;border-radius:6px;object-fit:cover;background:linear-gradient(135deg,#1a1a2e,#0d0d1a);flex-shrink:0;">
                 <div style="min-width:0;">
                     <div id="bottomPlayerTitle" style="font-size:0.8rem;font-weight:500;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
-                    <div style="font-size:0.65rem;color:var(--text-muted);">MiniMax Music</div>
+                    <!-- Filled per track: the model name only when source === 'generated'. -->
+                    <div id="bottomPlayerSource" style="font-size:0.65rem;color:var(--text-muted);"></div>
                 </div>
             </div>
 
@@ -28205,6 +28274,13 @@ Be direct and concrete with real industry insight — never generic filler. When
         function wsCloseMenu() { const m = document.getElementById('aiadWsMenu'); if (m) m.style.display = 'none'; }
 
         async function renderWsSwitcher() {
+            // Removed: the floating category pill sat at bottom centre, collided with the
+            // player and the home indicator on mobile, and duplicated the role-switcher
+            // already in the sidebar.
+            const _old = document.getElementById('aiadWsSwitcher');
+            if (_old) _old.remove();
+            return;
+            // eslint-disable-next-line no-unreachable
             let bar = document.getElementById('aiadWsSwitcher');
             if (!wsInDashboard()) { if (bar) bar.style.display = 'none'; return; }
             const list = await wsFetch();
@@ -30309,8 +30385,16 @@ window.AIAD_PROMPTS = [
     padding-top: 10px;
     padding-bottom: 10px;
   }
-  /* Icon-only controls stay square rather than becoming tall slivers. */
+  /* Icon-only controls stay square rather than becoming tall slivers — the 44px
+     floor above turns a 28px circle into an ellipse otherwise. */
   .modal-close, .lb-close, #aiadBugBtn, #aiadHelpBtn { min-width: 44px; }
+  #bottomPlayerClose {
+    width: 44px !important; height: 44px !important; min-width: 44px;
+    font-size: 20px; top: 4px !important; right: 4px !important;
+  }
+  /* Keep the transport row out from under the close button — at 390px the
+     duration label was sitting beneath it. */
+  #bottomPlayer > div:not(#bottomPlayerClose) { padding-right: 46px; }
 
   /* 3 — the bottom edge is a stack, not a free-for-all. This breakpoint already
          pins .dash-mobile-nav to bottom:0 at 60px tall with z-index 100000, and
