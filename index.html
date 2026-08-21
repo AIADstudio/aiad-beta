@@ -26298,7 +26298,7 @@ Be direct and concrete with real industry insight — never generic filler. When
             }
             // Make the fashion share-link actually copy something real.
             if (!window.generateShareLink || !window.generateShareLink.__aiad) {
-                const link = 'https://aiad.studio/look/' + Math.random().toString(36).slice(2, 10);
+                const link = 'https://www.aiad.studio/look/' + Math.random().toString(36).slice(2, 10);
                 window.generateShareLink = function () {
                     try { if (window.closeModal) closeModal(); } catch (e) {}
                     try { navigator.clipboard.writeText(link); } catch (e) {}
