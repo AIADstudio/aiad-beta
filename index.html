@@ -14797,12 +14797,43 @@ Only capture real, meaningful decisions — not questions or general discussion.
             _appendCommentEl(pid, { user_name: userName, user_avatar: avatar, content: text, id: 'new_' + Date.now(), user_id: userId });
         }
 
+        // Fills every comment avatar from profiles — one batched read, so an avatar
+        // change propagates to old comments instead of freezing at post time.
+        // Comment and chat rows are appended from several places with no shared hook,
+        // so sweep for unresolved stamps. The call exits immediately when there are
+        // none, which is the usual case.
+        setInterval(function () { try { window.aiadResolveCommentAvatars(); } catch (e) {} }, 700);
+
+        window.aiadResolveCommentAvatars = async function (root) {
+            const scope = root || document;
+            const imgs = [...scope.querySelectorAll('img[data-avatar-for]')].filter((el) => !el.dataset.avatarDone);
+            if (!imgs.length) return;
+            const ids = imgs.map((el) => el.dataset.avatarFor).filter(Boolean);
+            if (!ids.length) return;
+            let map = {};
+            try { map = await window.aiadAvatarsFor(ids); } catch (e) { return; }
+            imgs.forEach((el) => {
+                const url = map[el.dataset.avatarFor];
+                el.dataset.avatarDone = '1';
+                // No avatar: leave hidden so the initial-letter fallback beside it shows.
+                if (url) {
+                    el.src = url; el.style.display = '';
+                    const fb = scope.querySelector('[data-avatar-fallback-for="' + el.dataset.avatarFor + '"]');
+                    if (fb) fb.style.display = 'none';
+                }
+            });
+        };
+
         function _appendCommentEl(pid, c, isReply) {
             var container = document.getElementById('artistPostComments_' + pid);
             if (!container) return;
-            var avEl = (c.user_avatar && (c.user_avatar.startsWith('http') || c.user_avatar.startsWith('data:')))
-                ? '<img src="' + c.user_avatar + '" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;">'
-                : '<div style="width:24px;height:24px;border-radius:50%;background:var(--bg-secondary);display:flex;align-items:center;justify-content:center;font-size:0.6rem;color:var(--text-muted);flex-shrink:0;">' + ((c.user_name || 'U')[0]) + '</div>';
+            // c.user_avatar is a snapshot from when the comment was posted — stale by
+            // design, and 7 of 8 rows hold a base64 blob, so it is deliberately not read.
+            // The image is stamped with the author id and filled from profiles by
+            // aiadResolveCommentAvatars; the initial shows until (or unless) one arrives.
+            var _avId = c.user_id || '';
+            var avEl = '<img data-avatar-for="' + _avId + '" alt="" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;display:none;">'
+                + '<div data-avatar-fallback-for="' + _avId + '" style="width:24px;height:24px;border-radius:50%;background:var(--bg-secondary);display:flex;align-items:center;justify-content:center;font-size:0.6rem;color:var(--text-muted);flex-shrink:0;">' + ((c.user_name || 'U')[0]) + '</div>';
             var replyBtn = '';
             if (!isReply && AppState.currentUser) {
                 replyBtn = ' <button onclick="_replyToComment(\'' + pid + '\',\'' + (c.user_name || '').replace(/'/g, "\\'") + '\',\'' + (c.id || '') + '\')" style="font-size:0.7rem;color:var(--text-muted);background:none;border:none;cursor:pointer;font-family:var(--font-body);margin-left:4px;">Reply</button>';
@@ -15216,7 +15247,9 @@ Only capture real, meaningful decisions — not questions or general discussion.
             userMsg.innerHTML = `
                 <div class="chat-message-header">
                     <div class="chat-avatar user">
-                        <img src="" alt="You">
+                        <!-- src="" resolves to the page URL and renders as a broken image.
+                             Seed from cache, then the resolver fills it from profiles. -->
+                        <img src="${window.aiadCachedAvatar() || ''}" data-avatar-for="${(AppState.currentUser && AppState.currentUser.id) || ''}" alt="You">
                     </div>
                     <span class="chat-name">You</span>
                     <span class="chat-time">Just now</span>
@@ -15767,59 +15800,21 @@ Only capture real, meaningful decisions — not questions or general discussion.
             if (u) role === 'fan' ? applyFanAvatar(u) : applyAvatar(u); } catch(e) {}
         }
 
+        // Uploads to artist-media and writes profiles.avatar_url only. This used to
+        // store a base64 data URI in profiles AND artist_profiles, which is exactly
+        // where the two-different-images problem came from.
         async function handleAvatarUpload(input) {
-            const uid = aiadResolvedUserId();
-            if (!uid) return;
             if (!input.files || !input.files[0]) return;
-            const file = input.files[0];
-            if (!file.type.startsWith('image/')) { showToast('Please select an image file'); return; }
-            const reader = new FileReader();
-            reader.onload = async function(e) {
-                const fullUrl = e.target.result;
-                // Compress to 160px JPEG for DB storage — center-crop from full image
-                const compressed = await new Promise(resolve => {
-                    const img = new Image();
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        const outSize = 160;
-                        canvas.width = outSize; canvas.height = outSize;
-                        const ctx = canvas.getContext('2d');
-                        const cropSize = Math.min(img.width, img.height);
-                        const sx = (img.width - cropSize) / 2;
-                        const sy = (img.height - cropSize) / 2;
-                        ctx.drawImage(img, sx, sy, cropSize, cropSize, 0, 0, outSize, outSize);
-                        resolve(canvas.toDataURL('image/jpeg', 0.9));
-                    };
-                    img.src = fullUrl;
-                });
-                // Apply full-res locally (DOM only, NOT localStorage)
-                applyAvatar(fullUrl);
-                // Save ONLY compressed to DB — no localStorage (avoids QuotaExceededError)
-                if (AppState.currentUser) {
-                    console.log('[AIAD] saving avatar for user:', uid, 'compressed length:', compressed.length);
-                    try {
-                        // profiles requires email (not-null constraint)
-                        const email = AppState.currentUser.email || '';
-                        const r1 = await db.from('profiles').upsert(
-                            { id: uid, email, avatar_url: compressed },
-                            { onConflict: 'id' }
-                        );
-                        console.log('[AIAD] profiles upsert:', r1.error ? r1.error.message : 'OK');
-                        // artist_profiles RLS requires user_id = auth.uid()
-                        const r2 = await db.from('artist_profiles').update({ avatar_url: compressed })
-                            .eq('id', uid);
-                        console.log('[AIAD] artist_profiles update:', r2.error ? r2.error.message : 'OK');
-                        if (!r1.error && !r2.error) {
-                            // Store ONLY the compressed small version in localStorage
-                            try { localStorage.setItem('aiad_artist_avatar_url', compressed); } catch(e) {}
-                        }
-                    } catch(err) { console.warn('[AIAD] avatar save error:', err); }
-                } else {
-                    console.warn('[AIAD] no currentUser — not saved to DB');
-                }
-                showToast('Profile photo updated ✓');
-            };
-            reader.readAsDataURL(file);
+            try {
+                await window.aiadSaveAvatar(input.files[0], { onPreview: (pv) => window.aiadPaintMyAvatar(pv) });
+                showToast('Profile photo updated');
+            } catch (e) {
+                showToast(e.message || 'Could not update your photo');
+                // Repaint what is actually stored, so a failed upload cannot leave the
+                // optimistic preview on screen pretending it saved.
+                try { await window.aiadSyncMyAvatar(); } catch (_e) {}
+            }
+            try { input.value = ''; } catch (e) {}
         }
 
         function openScheduleDetail(title, date, type, meta, eventId) {
@@ -19050,6 +19045,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 try { if (window.renderAllPromptSurfaces) window.renderAllPromptSurfaces(); } catch (e) {}
             }, 400);
             setTimeout(() => { applyStoredAvatar(); initStudioHistory(); populateLiveStatsBar(); }, 300);
+            // Cache paints instantly; this confirms it against profiles and corrects it.
+            setTimeout(() => { try { window.aiadSyncMyAvatar && window.aiadSyncMyAvatar(); } catch (e) {} }, 700);
             // (removed dead exec_sql bootstrap calls — those columns/tables already exist; exec_sql RPC does not exist and must not, it would be arbitrary SQL over the anon key)
         });
 
@@ -19067,14 +19064,9 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     AppState.userIndustry = (profile && profile.industry) || _meta.industry || localStorage.getItem('aiad_user_industry') || 'music';
                     AppState.userRole = _role;
                     // Set avatar BEFORE setTimeout so jumpToDashboard can use it
+                    // profiles is the only source; the artist_profiles fallback that
+                    // used to sit here is what let a second, older picture win.
                     AppState.pendingAvatar = (profile && profile.avatar_url) || '';
-                    // Fallback: if profiles has no avatar, try artist_profiles
-                    if (!AppState.pendingAvatar && _role === 'artist') {
-                        try {
-                            const { data: ap } = await db.from('artist_profiles').select('avatar_url').eq('user_id', uid).maybeSingle();
-                            if (ap && ap.avatar_url) AppState.pendingAvatar = ap.avatar_url;
-                        } catch(e) {}
-                    }
                     // Pre-populate avatar cache for this artist
                     if (profile && profile.avatar_url) { if (!AppState._cachedArtistAvatars) AppState._cachedArtistAvatars = {}; AppState._cachedArtistAvatars[AppState.currentUser?.id] = profile.avatar_url; }
                     AppState.pendingAvatarRole = _role || 'artist';
@@ -19830,49 +19822,19 @@ Only capture real, meaningful decisions — not questions or general discussion.
             document.getElementById('collabSettingsAvatarFile').click();
         }
 
-        function handleCollabSettingsAvatarUpload(event) {
-            const uid = aiadResolvedUserId();
-            if (!uid) return;
-            const file = event.target.files[0];
+        async function handleCollabSettingsAvatarUpload(event) {
+            const file = event && event.target && event.target.files && event.target.files[0];
             if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const img = new Image();
-                img.onload = function() {
-                    const canvas = document.createElement('canvas');
-                    const size = Math.min(img.width, img.height, 400);
-                    canvas.width = size; canvas.height = size;
-                    const ctx = canvas.getContext('2d');
-                    const sx = (img.width - size) / 2, sy = (img.height - size) / 2;
-                    ctx.drawImage(img, sx, sy, size, size, 0, 0, size, size);
-                    const compressed = canvas.toDataURL('image/jpeg', 0.85);
-                    // Update settings avatar preview
-                    const settingsAv = document.getElementById('collabSettingsAvatar');
-                    if (settingsAv) {
-                        settingsAv.innerHTML = '<img src="' + compressed + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
-                    }
-                    // Update sidebar avatar
-                    const sidebarAv = document.getElementById('collabUserAvatar');
-                    if (sidebarAv) {
-                        sidebarAv.innerHTML = '<img src="' + compressed + '" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">';
-                    }
-                    try { localStorage.setItem('aiad_collab_avatar_url', compressed); } catch(e) {}
-                    if (AppState.currentUser) {
-                        db.from('profiles').upsert({ id: uid, avatar_url: compressed }, { onConflict: 'id' }).then(() => {});
-                    }
-                    showToast('Photo updated');
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
+            try {
+                await window.aiadSaveAvatar(file, { onPreview: (pv) => window.aiadPaintMyAvatar(pv) });
+                showToast('Profile photo updated');
+            } catch (e) {
+                showToast(e.message || 'Could not update your photo');
+                try { await window.aiadSyncMyAvatar(); } catch (_e) {}
+            }
+            try { event.target.value = ''; } catch (e) {}
         }
 
-        // ── Username generation ────────────────────────────────────────────────
-        // list_collaborators keys its cards off username, and both card actions
-        // (view profile, message) need one. profiles.username also carries a UNIQUE
-        // index, so a collision doesn't just look bad — the insert fails outright.
-        // The old rule here was name.toLowerCase().replace(/\s+/g,'_'), which kept
-        // apostrophes and accents and never checked whether the name was taken.
         function aiadUsernameSlug(fullName) {
             return String(fullName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
         }
@@ -23611,11 +23573,10 @@ async function loadArtistPage(artistId) {
     let av = AppState._cachedArtistAvatars?.[artistId] || '';
     if (!av) {
         try {
-            const [r1, r2] = await Promise.all([
-                db.from('artist_profiles').select('avatar_url').eq('id', artistId).maybeSingle(),
-                db.from('profiles').select('avatar_url').eq('id', artistId).maybeSingle()
-            ]);
-            av = r1.data?.avatar_url || r2.data?.avatar_url || '';
+            // profiles only. This pair used to prefer artist_profiles while
+            // restoreUserSession preferred profiles, so the same user showed two
+            // different pictures depending on which path painted last.
+            av = await window.aiadAvatarFor(artistId);
         } catch(e) {}
     }
     if (!av && AppState.currentUser && artistId === uid) {
@@ -23678,8 +23639,7 @@ async function _loadArtistFanPosts(artistId, artistName, artistAv) {
             db.from('artist_posts').select('*')
                 .eq('user_id', artistId).eq('archived', false)
                 .order('created_at', { ascending: false }).limit(10),
-            db.from('artist_profiles').select('avatar_url').eq('id', artistId).maybeSingle(),
-            db.from('profiles').select('avatar_url').eq('id', artistId).maybeSingle()
+            window.aiadAvatarFor(artistId)
         ]);
         const posts = postsResult.data;
         if (!posts || !posts.length) {
@@ -23849,50 +23809,26 @@ async function saveFanProfile() {
 }
 
 function changeFanAvatar() {
-    const uid = aiadResolvedUserId();
-    if (!uid) return;
     let inp = document.getElementById('_fanAvatarFilePicker');
     if (!inp) {
         inp = document.createElement('input');
         inp.type = 'file'; inp.accept = 'image/*';
         inp.id = '_fanAvatarFilePicker'; inp.style.display = 'none';
         document.body.appendChild(inp);
-        inp.onchange = async function(e) {
-            const file = e.target.files[0];
+        inp.onchange = async function (e) {
+            const file = e.target.files && e.target.files[0];
             if (!file) return;
-            const reader = new FileReader();
-            reader.onload = async function(ev) {
-                const fullUrl = ev.target.result;
-                // Compress to 160px for storage — center-crop from full image
-                const compressed = await new Promise(resolve => {
-                    const img = new Image();
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        const outSize = 160;
-                        canvas.width = outSize; canvas.height = outSize;
-                        const ctx = canvas.getContext('2d');
-                        const cropSize = Math.min(img.width, img.height);
-                        const sx = (img.width - cropSize) / 2;
-                        const sy = (img.height - cropSize) / 2;
-                        ctx.drawImage(img, sx, sy, cropSize, cropSize, 0, 0, outSize, outSize);
-                        resolve(canvas.toDataURL('image/jpeg', 0.9));
-                    };
-                    img.src = fullUrl;
-                });
-                // Apply full-res to DOM only
-                applyFanAvatar(fullUrl);
-                // Store only compressed in localStorage
-                try { localStorage.setItem('aiad_fan_avatar_url', compressed); } catch(e) {}
-                // Save to DB
-                if (AppState.currentUser) {
-                    try { await db.from('profiles').upsert({ id: uid, avatar_url: compressed }, { onConflict: 'id' }); } catch(err) {}
-                }
-                showToast('Avatar updated ✓');
-            };
-            reader.readAsDataURL(file);
+            try {
+                await window.aiadSaveAvatar(file, { onPreview: (pv) => window.aiadPaintMyAvatar(pv) });
+                showToast('Profile photo updated');
+            } catch (err) {
+                showToast(err.message || 'Could not update your photo');
+                try { await window.aiadSyncMyAvatar(); } catch (_e) {}
+            }
+            try { e.target.value = ''; } catch (_e) {}
         };
     }
-    inp.value = ''; inp.click();
+    inp.click();
 }
 
 async function handleFanSignOut() {
@@ -24148,9 +24084,13 @@ function _loadFanPostComments(pid) {
         var container = document.getElementById('fanModalComments_' + pid);
         if (container) container.innerHTML = '';
         comments.forEach(function(c) {
-            var avEl = (c.user_avatar && (c.user_avatar.startsWith('http') || c.user_avatar.startsWith('data:')))
-                ? '<img src="' + c.user_avatar + '" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;">'
-                : '<div style="width:24px;height:24px;border-radius:50%;background:var(--bg-secondary);display:flex;align-items:center;justify-content:center;font-size:0.6rem;color:var(--text-muted);flex-shrink:0;">' + ((c.user_name||'U')[0]) + '</div>';
+            // c.user_avatar is a snapshot from when the comment was posted — stale by
+            // design, and 7 of 8 rows hold a base64 blob, so it is deliberately not read.
+            // The image is stamped with the author id and filled from profiles by
+            // aiadResolveCommentAvatars; the initial shows until (or unless) one arrives.
+            var _avId = c.user_id || '';
+            var avEl = '<img data-avatar-for="' + _avId + '" alt="" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;display:none;">'
+                + '<div data-avatar-fallback-for="' + _avId + '" style="width:24px;height:24px;border-radius:50%;background:var(--bg-secondary);display:flex;align-items:center;justify-content:center;font-size:0.6rem;color:var(--text-muted);flex-shrink:0;">' + ((c.user_name || 'U')[0]) + '</div>';
             var div = document.createElement('div');
             div.style.cssText = 'display:flex;gap:8px;align-items:flex-start;padding:8px 12px;background:var(--bg-secondary);border-radius:10px;' + (c.parent_id ? 'margin-left:32px;' : '');
             div.innerHTML = avEl + '<div><span style="font-size:0.8rem;font-weight:600;color:var(--text-primary);">' + (c.user_name||'User') + '</span><p style="font-size:0.82rem;color:var(--text-secondary);margin:2px 0 0;line-height:1.4;">' + c.content + '</p></div>';
@@ -24823,7 +24763,8 @@ function toggleAgeRange(btn) {
                 return d.toLocaleDateString(undefined,{month:'short',day:'numeric'}); } catch(e){ return ''; }
         }
         function _systemMsgCard(m) {
-            var av = (m.sender_avatar && /^data:|^http/.test(m.sender_avatar)) ? m.sender_avatar : PULSE_AVATAR;
+            // messages.sender_avatar is unread now — all 20 rows are empty anyway.
+            var av = PULSE_AVATAR;
             return '<div style="display:flex;gap:12px;padding:16px;background:var(--bg-card);border:1px solid ' + (m.read ? 'var(--border-default)' : 'var(--teal)') + ';border-radius:14px;margin-bottom:12px;">'
               + '<img src="' + av + '" alt="" style="width:42px;height:42px;border-radius:50%;flex-shrink:0;">'
               + '<div style="min-width:0;flex:1;">'
@@ -27874,25 +27815,19 @@ Be direct and concrete with real industry insight — never generic filler. When
         };
         // Onboarding avatar: compressed to a small square data URL and stored on the
         // profile, matching how avatars are saved elsewhere in the app.
-        window.aiadObAvatar = '';
+        // Holds the chosen File until submit, then uploads it. Previously this kept a
+        // base64 data URI on window and wrote it straight into two tables.
+        window.aiadObAvatarFile = null;
         window.aiadObPickAvatar = function (input) {
             const file = input.files && input.files[0]; if (!file) return;
             if (!/^image\//.test(file.type)) { try { showToast('Please choose an image file.'); } catch (e) {} return; }
+            window.aiadObAvatarFile = file;
+            // Local preview only — nothing is stored until the account exists.
             const reader = new FileReader();
             reader.onload = function (ev) {
-                const img = new Image();
-                img.onload = function () {
-                    const size = 400, canvas = document.createElement('canvas');
-                    canvas.width = size; canvas.height = size;
-                    const ctx = canvas.getContext('2d'), s = Math.min(img.width, img.height);
-                    ctx.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, size, size);
-                    const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
-                    window.aiadObAvatar = dataUrl;
-                    const prev = document.getElementById('ob_avatar_preview'), plus = document.getElementById('ob_avatar_plus');
-                    if (prev) { prev.src = dataUrl; prev.style.display = 'block'; }
-                    if (plus) plus.style.display = 'none';
-                };
-                img.src = ev.target.result;
+                const prev = document.getElementById('ob_avatar_preview'), plus = document.getElementById('ob_avatar_plus');
+                if (prev) { prev.src = ev.target.result; prev.style.display = 'block'; }
+                if (plus) plus.style.display = 'none';
             };
             reader.readAsDataURL(file);
         };
@@ -27913,17 +27848,17 @@ Be direct and concrete with real industry insight — never generic filler. When
             if (!data.primary_genre) { try { showToast('Please pick your genre so fans can find you.'); } catch(_e){ alert('Please pick your genre so fans can find you.'); } var _g = document.getElementById('ob_primary_genre'); if (_g) _g.focus(); return; }
             btn.disabled = true; btn.textContent = 'Saving…';
             try { await rpc('save_artist_onboarding', { p_data: data }); } catch (e) {}
-            // Persist the profile photo if one was picked.
-            if (window.aiadObAvatar) {
+            // Persist the profile photo if one was picked. Uploads the file to
+            // artist-media and writes profiles.avatar_url only — artist_profiles is no
+            // longer written, and nothing stores base64.
+            if (window.aiadObAvatarFile) {
                 try {
-                    const _s = sess();
-                    const uid = (_s && _s.user && _s.user.id) || aiadResolvedUserId();
-                    if (uid) {
-                        await db.from('profiles').upsert({ id: uid, avatar_url: window.aiadObAvatar }, { onConflict: 'id' });
-                        try { db.from('artist_profiles').update({ avatar_url: window.aiadObAvatar }).eq('user_id', uid).then(() => {}); } catch (e) {}
-                        try { localStorage.setItem('aiad_artist_avatar_url', window.aiadObAvatar); localStorage.setItem('aiad_avatar_url', window.aiadObAvatar); } catch (e) {}
-                    }
-                } catch (e) {}
+                    await window.aiadSaveAvatar(window.aiadObAvatarFile);
+                    window.aiadObAvatarFile = null;
+                } catch (e) {
+                    // A photo that fails to upload must not block finishing onboarding.
+                    console.warn('[AIAD] onboarding avatar:', e.message);
+                }
             }
             // Auto-fetch public stats from the links (no manual numbers). YouTube works now;
             // Spotify populates once SPOTIFY_CLIENT_ID/SECRET are set. Fire-and-forget.
@@ -30694,6 +30629,171 @@ window.AIAD_PROMPTS = [
     // floating widgets in this file stay in sync.
     setInterval(render, 2000);
     window.addEventListener('resize', render);
+})();
+</script>
+
+<!-- ══════════════ AVATARS — one source of truth ══════════════
+     profiles.avatar_url is the only column read. artist_profiles.avatar_url,
+     artists.avatar_url, post_comments.user_avatar and messages.sender_avatar are
+     all left in place but no longer read from, so nothing has to be migrated
+     before this is safe and there is a month of rollback available.
+
+     Avatars are files in the public artist-media bucket, never base64 in a row.
+     A 28k-character data URI in a column is slow to read, easy to truncate in a
+     payload, and duplicated into every comment that copies it.               -->
+<script>
+(function () {
+    const BUCKET = 'artist-media';
+    const CACHE_KEY = 'aiad_avatar_url';        // the single cache key
+    const LEGACY_KEYS = ['aiad_artist_avatar_url', 'aiad_fan_avatar_url', 'aiad_collab_avatar_url', 'aiad_fan_avatar'];
+    const mem = new Map();                       // userId -> url, per page load
+
+    function client() { return (typeof db !== 'undefined' && db) || window.db || null; }
+
+    // ── Cache ──────────────────────────────────────────────────────────────
+    // Only ever written after a successful read or write against profiles, so a
+    // stale value cannot outlive its source.
+    window.aiadCachedAvatar = function () {
+        try {
+            const v = localStorage.getItem(CACHE_KEY);
+            if (v) return v;
+            // One-time read of the old keys so an existing session doesn't flash
+            // an empty avatar on the first load after this ships.
+            for (const k of LEGACY_KEYS) {
+                const old = localStorage.getItem(k);
+                if (old && !old.startsWith('data:')) { localStorage.setItem(CACHE_KEY, old); return old; }
+            }
+        } catch (e) {}
+        return '';
+    };
+    function cacheAvatar(url) {
+        try {
+            if (url && !url.startsWith('data:')) localStorage.setItem(CACHE_KEY, url);
+            else localStorage.removeItem(CACHE_KEY);
+            LEGACY_KEYS.forEach((k) => { try { localStorage.removeItem(k); } catch (e) {} });
+        } catch (e) {}
+    }
+    window.aiadClearAvatarCache = function () {
+        try { localStorage.removeItem(CACHE_KEY); LEGACY_KEYS.forEach((k) => localStorage.removeItem(k)); } catch (e) {}
+        mem.clear();
+    };
+
+    // ── Read ───────────────────────────────────────────────────────────────
+    window.aiadAvatarFor = async function (userId) {
+        if (!userId) return '';
+        if (mem.has(userId)) return mem.get(userId);
+        const c = client();
+        if (!c) return '';
+        try {
+            const { data, error } = await c.from('profiles').select('avatar_url').eq('id', userId).maybeSingle();
+            if (error) { console.warn('[AIAD] avatar read:', error.message); return ''; }
+            const url = (data && data.avatar_url) || '';
+            mem.set(userId, url);
+            return url;
+        } catch (e) { return ''; }
+    };
+
+    // Batch form for list renders — one query for a whole feed rather than one per row.
+    window.aiadAvatarsFor = async function (userIds) {
+        const ids = [...new Set((userIds || []).filter(Boolean))];
+        const out = {};
+        const missing = [];
+        ids.forEach((id) => { if (mem.has(id)) out[id] = mem.get(id); else missing.push(id); });
+        if (!missing.length) return out;
+        const c = client();
+        if (!c) return out;
+        try {
+            const { data, error } = await c.from('profiles').select('id,avatar_url').in('id', missing);
+            if (error) { console.warn('[AIAD] avatar batch read:', error.message); return out; }
+            (data || []).forEach((r) => { mem.set(r.id, r.avatar_url || ''); out[r.id] = r.avatar_url || ''; });
+            missing.forEach((id) => { if (!(id in out)) { mem.set(id, ''); out[id] = ''; } });
+        } catch (e) {}
+        return out;
+    };
+
+    // ── Write ──────────────────────────────────────────────────────────────
+    // Square-crops to 320px and uploads a real file. The bucket's UPDATE policy
+    // scopes on the first path segment, so the uid has to lead the path.
+    function squareBlob(file, size) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onerror = () => reject(new Error('Could not read that file'));
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onerror = () => reject(new Error('That file is not a readable image'));
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = size; canvas.height = size;
+                    const ctx = canvas.getContext('2d');
+                    const crop = Math.min(img.width, img.height);
+                    ctx.drawImage(img, (img.width - crop) / 2, (img.height - crop) / 2, crop, crop, 0, 0, size, size);
+                    canvas.toBlob((b) => b ? resolve({ blob: b, preview: canvas.toDataURL('image/jpeg', 0.9) })
+                                            : reject(new Error('Could not process that image')), 'image/jpeg', 0.9);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // Uploads the file, writes profiles.avatar_url, caches, repaints. Returns the URL.
+    window.aiadSaveAvatar = async function (file, opts) {
+        const o = opts || {};
+        const uid = (window.aiadResolvedUserId && window.aiadResolvedUserId()) || null;
+        if (!uid) throw new Error('Please sign in again');
+        if (!file || !file.type || !file.type.startsWith('image/')) throw new Error('Please select an image file');
+
+        const { blob, preview } = await squareBlob(file, 320);
+        if (o.onPreview) { try { o.onPreview(preview); } catch (e) {} }
+
+        if (!window.aiadStorageUpload) throw new Error('Upload unavailable');
+        const path = uid + '/avatar/' + Date.now() + '.jpg';
+        const up = await window.aiadStorageUpload(BUCKET, path, blob, 'image/jpeg');
+        if (!up || !up.ok) {
+            const detail = (up && (up.body || up.status)) || 'unknown';
+            window.__aiadReportError && window.__aiadReportError('storage.upload', BUCKET, new Error('avatar ' + detail), { path });
+            throw new Error('Upload failed — please try again');
+        }
+        const url = up.publicUrl;
+
+        const c = client();
+        const row = { id: uid, avatar_url: url };
+        // profiles.email is NOT NULL, so an upsert that creates the row needs it.
+        const email = (AppState.currentUser && AppState.currentUser.email) || '';
+        if (email) row.email = email;
+        const { error } = await c.from('profiles').upsert(row, { onConflict: 'id' });
+        if (error) throw new Error(error.message);
+
+        mem.set(uid, url);
+        cacheAvatar(url);
+        window.aiadPaintMyAvatar(url);
+        return url;
+    };
+
+    // ── Paint ──────────────────────────────────────────────────────────────
+    // Every element that shows *my* avatar, including chat rows created later.
+    const MY_SELECTORS = '.settings-image-preview:not(.banner),.new-composer-avatar,.composer-avatar,'
+        + '.post-avatar,.dash-post-avatar,.chat-avatar.user img,.agent-message-avatar.user img,'
+        + '#settingsAvatarPreview,#composerAvatarImg,#sidebarUserAvatar,#fanSidebarAvatar,#fanAvatarPreview';
+    window.aiadPaintMyAvatar = function (url) {
+        const src = url || window.aiadCachedAvatar();
+        if (!src) return;
+        document.querySelectorAll(MY_SELECTORS).forEach((el) => {
+            if (el.tagName === 'IMG') { el.src = src; el.style.objectFit = 'cover'; }
+        });
+    };
+
+    // Boot: paint from cache immediately, then confirm against profiles and
+    // correct if they disagree. The cache is only rewritten on a successful read.
+    window.aiadSyncMyAvatar = async function () {
+        const cached = window.aiadCachedAvatar();
+        if (cached) window.aiadPaintMyAvatar(cached);
+        const uid = (window.aiadResolvedUserId && window.aiadResolvedUserId()) || null;
+        if (!uid) return;
+        const url = await window.aiadAvatarFor(uid);
+        if (url) { cacheAvatar(url); window.aiadPaintMyAvatar(url); }
+        else if (cached) { try { localStorage.removeItem(CACHE_KEY); } catch (e) {} }
+    };
 })();
 </script>
 </body>
