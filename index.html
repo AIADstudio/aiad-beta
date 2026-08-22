@@ -19463,22 +19463,6 @@ Only capture real, meaningful decisions — not questions or general discussion.
             showFanSettingsToast('Profile saved');
         }
 
-        function changeFanAvatar() {
-            document.getElementById('modalBody').innerHTML = `
-                <h2 style="margin-bottom: 16px;">Upload Avatar</h2>
-                <div style="background: var(--bg-secondary); border: 2px dashed var(--border-default); border-radius: 12px; padding: 40px; text-align: center; margin-bottom: 20px;">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 48px; height: 48px; color: var(--text-muted); margin-bottom: 12px;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                    <p style="color: var(--text-secondary);">Click to upload or drag and drop</p>
-                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 8px;">JPG, PNG • Max 5MB</p>
-                </div>
-                <div class="project-detail-actions">
-                    <button class="secondary" onclick="closeModal()">Cancel</button>
-                    <button class="primary" onclick="closeModal(); showToast('Avatar updated!')">Upload</button>
-                </div>
-            `;
-            document.getElementById('globalModal').classList.add('active');
-        }
-
         function confirmResetFanMemory() {
             if (confirm('Reset Decision Memory?\n\nThis will clear all learned preferences. AIAD will start fresh. This cannot be undone.')) {
                 localStorage.removeItem('aiad_fan_memory');
@@ -20386,8 +20370,9 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 }
                 const ids = data.map(d => d.artist_id);
                 const { data: profiles } = await db.from('artist_profiles')
-                    .select('id, user_id, artist_name, tagline, avatar_url, primary_genre, location')
+                    .select('id, user_id, artist_name, tagline, primary_genre, location')
                     .in('id', ids);
+                await window.aiadFillAvatars(profiles);
                 const pMap = {};
                 (profiles || []).forEach(p => pMap[p.id] = p);
 
@@ -20477,8 +20462,9 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 // Fetch artist profiles for names/avatars
                 const postArtistIds = [...new Set(posts.map(p => p.user_id))];
                 const { data: profiles } = await db.from('artist_profiles')
-                    .select('id, user_id, artist_name, avatar_url')
+                    .select('id, user_id, artist_name')
                     .in('id', postArtistIds);
+                await window.aiadFillAvatars(profiles);
                 const aMap = {};
                 (profiles || []).forEach(p => { aMap[p.id] = p; if (p.user_id) aMap[p.user_id] = p; });
 
@@ -20683,7 +20669,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             targetDiv.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-muted);font-size:0.85rem;">Searching...</div>';
 
             try {
-                let query = db.from('artist_profiles').select('id, user_id, artist_name, tagline, short_bio, location, avatar_url, primary_genre').order('created_at', { ascending: false }).limit(200);
+                let query = db.from('artist_profiles').select('id, user_id, artist_name, tagline, short_bio, location, primary_genre').order('created_at', { ascending: false }).limit(200);
                 if (q) query = query.ilike('artist_name', '%' + q + '%');
                 if (genre) query = query.ilike('primary_genre', '%' + genre + '%');
                 if (loc) {
@@ -20696,6 +20682,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     targetDiv.innerHTML = '<div style="padding:50px 20px;text-align:center;background:var(--bg-card);border:1px dashed var(--border-default);border-radius:14px;"><div style="font-size:0.95rem;font-weight:600;color:var(--text-secondary);margin-bottom:6px;">No artists found</div><div style="font-size:0.82rem;color:var(--text-muted);">Try a different search or check back later.</div></div>';
                     return;
                 }
+                await window.aiadFillAvatars(artists);
                 let followedIds = [];
                 if (AppState.currentUser) {
                     try { const { data: sup } = await db.from('fan_support').select('artist_id').eq('fan_id', uid); followedIds = (sup || []).map(s => s.artist_id); } catch(e) {}
@@ -22220,13 +22207,16 @@ document.addEventListener('keydown', function(e) {
 
                 // Load recent posts from those artists
                 const { data: posts } = await db.from('artist_posts')
-                    .select('*, artist_profiles(username, artist_name, avatar_url)')
+                    .select('*, artist_profiles(username, artist_name)')
                     .in('user_id', artistIds)
                     .eq('archived', false)
                     .order('created_at', { ascending: false })
                     .limit(10);
 
                 if (!posts || !posts.length) return;
+
+                const avMap = await window.aiadAvatarsFor(posts.map(p => p.user_id)).catch(() => ({}));
+                posts.forEach(p => { if (p.artist_profiles) p.artist_profiles.avatar_url = avMap[p.user_id] || ''; });
 
                 const list = document.getElementById('fanActivityList');
                 if (!list) return;
@@ -22259,9 +22249,12 @@ document.addEventListener('keydown', function(e) {
             if (!uid) return;
             try {
                 const { data } = await db.from('fan_support')
-                    .select('artist_id, amount, status, artist_profiles(username, artist_name, avatar_url, primary_genre)')
+                    .select('artist_id, amount, status, artist_profiles(username, artist_name, primary_genre)')
                     .eq('fan_id', uid);
                 if (!data || !data.length) return;
+
+                const avMap = await window.aiadAvatarsFor(data.map(s => s.artist_id)).catch(() => ({}));
+                data.forEach(s => { if (s.artist_profiles) s.artist_profiles.avatar_url = avMap[s.artist_id] || ''; });
 
                 const grid = document.getElementById('fanFollowingGrid');
                 if (!grid) return;
@@ -22465,9 +22458,12 @@ document.addEventListener('keydown', function(e) {
             if (!uid) return;
             try {
                 const { data } = await db.from('fan_support')
-                    .select('artist_id, amount, status, artist_profiles(username, artist_name, avatar_url, primary_genre)')
+                    .select('artist_id, amount, status, artist_profiles(username, artist_name, primary_genre)')
                     .eq('fan_id', uid);
                 if (!data || !data.length) return;
+
+                const avMap = await window.aiadAvatarsFor(data.map(s => s.artist_id)).catch(() => ({}));
+                data.forEach(s => { if (s.artist_profiles) s.artist_profiles.avatar_url = avMap[s.artist_id] || ''; });
 
                 const grid = document.getElementById('fanArtistsGrid');
                 if (!grid) return;
@@ -22539,10 +22535,13 @@ document.addEventListener('keydown', function(e) {
             }
             try {
                 const { data } = await db.from('fan_support')
-                    .select('artist_id, amount, status, artist_profiles(username, artist_name, avatar_url, primary_genre, location)')
+                    .select('artist_id, amount, status, artist_profiles(username, artist_name, primary_genre, location)')
                     .eq('fan_id', uid);
 
                 if (!data || !data.length) { renderDemoFanCreators(grid); return; }
+
+                const avMap = await window.aiadAvatarsFor(data.map(s => s.artist_id)).catch(() => ({}));
+                data.forEach(s => { if (s.artist_profiles) s.artist_profiles.avatar_url = avMap[s.artist_id] || ''; });
 
                 const supporting = data.filter(d => d.status === 'active' && d.amount > 0);
                 const following  = data.filter(d => !d.amount || d.amount === 0);
@@ -22880,7 +22879,8 @@ async function loadFanHomeFeed() {
         const postArtistIds2 = [...new Set(posts.map(p => p.user_id).filter(Boolean))];
         const artMap = {};
         try {
-            const { data: apRows } = await db.from('artist_profiles').select('id,user_id,artist_name,avatar_url').in('id', postArtistIds2);
+            const { data: apRows } = await db.from('artist_profiles').select('id,user_id,artist_name').in('id', postArtistIds2);
+            await window.aiadFillAvatars(apRows);
             (apRows||[]).forEach(ap => { artMap[ap.id] = ap; if(ap.user_id) artMap[ap.user_id] = ap; });
         } catch(e) {}
         // Group posts by artist, show one card per artist with post count
@@ -23026,18 +23026,19 @@ async function loadFanFeed() {
         try {
             // Try by id first, then by user_id
             const { data: byId } = await db.from('artist_profiles')
-                .select('id,user_id,artist_name,avatar_url')
+                .select('id,user_id,artist_name')
                 .in('id', artistIds);
             (byId||[]).forEach(p => { artistMap[p.id] = p; if(p.user_id) artistMap[p.user_id] = p; });
             // Fill any missing ones by user_id
             const missing = artistIds.filter(id => !artistMap[id]);
             if (missing.length) {
                 const { data: byUserId } = await db.from('artist_profiles')
-                    .select('id,user_id,artist_name,avatar_url')
+                    .select('id,user_id,artist_name')
                     .in('user_id', missing)
                     .neq('role', 'fan');
                 (byUserId||[]).forEach(p => { artistMap[p.id] = p; if(p.user_id) artistMap[p.user_id] = p; });
             }
+            await window.aiadFillAvatars([...new Set(Object.values(artistMap))]);
         } catch(e) {}
         _fanFeedData = posts.map(p => ({ ...p, _relType: all.find(a => a.id === p.user_id)?.type || 'following', artist_profiles: { artist_name: artistMap[p.user_id]?.artist_name || 'Artist', avatar_url: artistMap[p.user_id]?.avatar_url || '' } }));
         // Fetch like/comment counts for hover overlay
@@ -23191,21 +23192,14 @@ async function loadFanCreators() {
         const artistIds = [...new Set(supData.map(s => s.artist_id).filter(Boolean))];
         const { data: profiles } = await db
             .from('artist_profiles')
-            .select('id,user_id,artist_name,tagline,location,avatar_url')
+            .select('id,user_id,artist_name,tagline,location')
             .in('id', artistIds);
         const profileMap = {};
         (profiles||[]).forEach(p => { profileMap[p.id] = p; });
 
-        // Fallback: also check profiles table for avatar_url
-        const { data: authProfiles } = await db
-            .from('profiles')
-            .select('id,avatar_url')
-            .in('id', artistIds);
-        (authProfiles||[]).forEach(ap => {
-            if (profileMap[ap.id] && !profileMap[ap.id].avatar_url && ap.avatar_url) {
-                profileMap[ap.id].avatar_url = ap.avatar_url;
-            }
-        });
+        // profiles is the avatar source, so this reads it directly rather than
+        // taking artist_profiles' copy and patching the gaps from profiles after.
+        await window.aiadFillAvatars(profiles);
 
         // Step 3: merge and render
         const merged = supData.map(s => ({ ...s, artist_profiles: profileMap[s.artist_id] || null }));
@@ -23338,7 +23332,9 @@ async function _execDiscoverSearch() {
             tagline:     r.genre || '',
             short_bio:   '',
             location:    r.location || '',
-            avatar_url:  r.avatar || (idMap[r.username] || {}).avatar_url || '',
+            // profiles first — the RPC carries its own copy, which is the column
+            // that used to drift. Its value is only a fallback for an unmatched username.
+            avatar_url:  (idMap[r.username] || {}).avatar_url || r.avatar || '',
         }));
 
         const note = widened
@@ -23535,6 +23531,8 @@ async function loadHomeFeed() {
                 + '<div style="font-size:0.9rem;color:var(--text-muted)">Follow artists and their latest posts show up here. Use the search bar up top to find them.</div></div>';
             return;
         }
+        const avMap = await window.aiadAvatarsFor(rows.map(r => r.author_id)).catch(() => ({}));
+        rows.forEach(r => { r.avatar_url = avMap[r.author_id] || r.avatar_url || ''; });
         box.innerHTML = rows.map(_feedPostCard).join('');
     } catch (e) {
         box.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px">Could not load feed. Pull down to retry.</div>';
@@ -23557,7 +23555,7 @@ async function loadArtistPage(artistId) {
     if(artistId.includes('-')) {
         try {
             const { data: d1, error: e1 } = await db.from('artist_profiles')
-                .select('id,user_id,artist_name,tagline,short_bio,full_bio,location,avatar_url')
+                .select('id,user_id,artist_name,tagline,short_bio,full_bio,location')
                 .eq('id', artistId).maybeSingle();
             console.log('[AIAD] artist profile fetch:', d1 ? 'found: '+d1.artist_name : 'null', 'error:', e1?.message || 'none');
             if (d1) profile = d1;
@@ -23635,7 +23633,7 @@ async function _loadArtistFanPosts(artistId, artistName, artistAv) {
     if (!container) return;
     try {
         // Fetch posts and avatar in parallel
-        const [postsResult, apResult, prResult] = await Promise.all([
+        const [postsResult, profileAv] = await Promise.all([
             db.from('artist_posts').select('*')
                 .eq('user_id', artistId).eq('archived', false)
                 .order('created_at', { ascending: false }).limit(10),
@@ -23646,11 +23644,11 @@ async function _loadArtistFanPosts(artistId, artistName, artistAv) {
             container.innerHTML = `<div style="color:var(--text-muted);font-size:0.85rem;padding:20px;text-align:center;">No posts yet from this artist.</div>`;
             return;
         }
-        // Use DB avatar — definitive source, not subject to timing
-        // Try artist_profiles first, then profiles (public), then passed-in, then cache
-        const dbAv = apResult.data?.avatar_url || prResult.data?.avatar_url || '';
+        // profiles is the definitive source, so a fresh read wins over the session
+        // cache — otherwise an avatar changed mid-session stays stale until reload.
+        const dbAv = profileAv || '';
         const cached = AppState._cachedArtistAvatars?.[artistId] || '';
-        const av = cached || (dbAv && (dbAv.startsWith('http') || dbAv.startsWith('data:')) ? dbAv : '') || (artistAv && (artistAv.startsWith('http') || artistAv.startsWith('data:')) ? artistAv : '') || '';
+        const av = (dbAv && (dbAv.startsWith('http') || dbAv.startsWith('data:')) ? dbAv : '') || cached || (artistAv && (artistAv.startsWith('http') || artistAv.startsWith('data:')) ? artistAv : '') || '';
         if (av) {
             if (!AppState._cachedArtistAvatars) AppState._cachedArtistAvatars = {};
             AppState._cachedArtistAvatars[artistId] = av;
@@ -28863,8 +28861,9 @@ Be direct and concrete with real industry insight — never generic filler. When
     if(!pid) return;
     var s=sess(); var hdr={apikey:ANON}; if(s) hdr.Authorization='Bearer '+s.access_token;
     var ap=null;
-    try{ var r=await fetch(SU+'/rest/v1/artist_profiles?or=(id.eq.'+pid+',user_id.eq.'+pid+')&select=id,user_id,artist_name,tagline,short_bio,location,avatar_url,primary_genre&limit=1',{headers:hdr}); var j=await r.json(); ap=j&&j[0]; }catch(e){}
+    try{ var r=await fetch(SU+'/rest/v1/artist_profiles?or=(id.eq.'+pid+',user_id.eq.'+pid+')&select=id,user_id,artist_name,tagline,short_bio,location,primary_genre&limit=1',{headers:hdr}); var j=await r.json(); ap=j&&j[0]; }catch(e){}
     if(!ap) ap={artist_name:'Artist', user_id:pid};
+    try{ ap.avatar_url = await window.aiadAvatarFor(ap.user_id||ap.id||pid); }catch(e){ ap.avatar_url=''; }
     var tracks=[];
     try{ var tr=await fetch(SU+'/rest/v1/tracks?user_id=eq.'+(ap.user_id||pid)+'&is_public=eq.true&select=title,url,cover_url,genre&order=created_at.desc&limit=8',{headers:hdr}); tracks=await tr.json(); if(!Array.isArray(tracks)) tracks=[]; }catch(e){}
     var av = ap.avatar_url && (ap.avatar_url.indexOf('http')===0||ap.avatar_url.indexOf('data:')===0) ? '<img src="'+ap.avatar_url+'" style="width:64px;height:64px;border-radius:50%;object-fit:cover">' : '<div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#0d2f3f,#1a4a5e);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.4rem;color:#7fe6ff">'+(((ap.artist_name||'A')[0]).toUpperCase())+'</div>';
@@ -30709,6 +30708,21 @@ window.AIAD_PROMPTS = [
             missing.forEach((id) => { if (!(id in out)) { mem.set(id, ''); out[id] = ''; } });
         } catch (e) {}
         return out;
+    };
+
+    // Rows read from artist_profiles no longer select avatar_url; this stamps each
+    // one from profiles in a single query, so a changed avatar reaches every feed
+    // instead of drifting from whatever artist_profiles happened to hold. A row's
+    // profiles id is its user_id, except for older rows where id already is the
+    // user id — both are offered and whichever answers wins. Never throws: an
+    // avatar that fails to resolve renders as the initial-letter fallback.
+    window.aiadFillAvatars = async function (rows) {
+        const list = (rows || []).filter(Boolean);
+        if (!list.length) return list;
+        let map = {};
+        try { map = await window.aiadAvatarsFor(list.flatMap((r) => [r.user_id, r.id])); } catch (e) {}
+        list.forEach((r) => { r.avatar_url = map[r.user_id] || map[r.id] || ''; });
+        return list;
     };
 
     // ── Write ──────────────────────────────────────────────────────────────
