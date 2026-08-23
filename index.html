@@ -3644,7 +3644,23 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                             </div>
                         </div>
                     </div>
-                
+
+                    <div class="breakdown-panel" id="aiadEarningsSection" style="margin-top:20px;">
+                        <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                            <div>
+                                <h3 class="breakdown-title" style="margin:0;">Imported earnings</h3>
+                                <p style="font-size:0.76rem;color:var(--text-muted);margin:4px 0 0;">Royalties from your distributor statements.</p>
+                            </div>
+                            <button onclick="aiadOpenImport()" style="display:flex;align-items:center;gap:7px;padding:8px 15px;border-radius:9px;background:transparent;border:1px solid var(--teal);color:var(--teal);font-size:0.8rem;font-weight:500;cursor:pointer;font-family:var(--font-body);">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                Import statement
+                            </button>
+                        </div>
+                        <div id="aiadEarningsBody">
+                            <p style="color:var(--text-muted);font-size:0.85rem;margin:0;">Loading…</p>
+                        </div>
+                    </div>
+
                     </div> <!-- /main -->
             <div class="studio-agent-col" id="revenueAiadPanel" style="position:sticky;top:24px;">
                 <div class="studio-agent-header">
@@ -5602,6 +5618,16 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                             <div class="settings-actions">
                                 <button class="settings-btn secondary">Preview public page</button>
                                 <button class="settings-btn primary" onclick="saveSettings('profile')">Save changes</button>
+                            </div>
+                        </div>
+
+                        <div class="settings-section" id="aiadDistributorSection">
+                            <div class="settings-section-header">
+                                <h2 class="settings-section-title">Your distributor</h2>
+                                <p class="settings-section-subtitle">Where your music is already released.</p>
+                            </div>
+                            <div id="aiadDistributorPicker">
+                                <p class="settings-helper">Loading distributors…</p>
                             </div>
                         </div>
 
@@ -13981,6 +14007,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 viewEl.classList.add('active');
                 navItems[7].classList.add('active');
                 if (typeof loadRevenueData === 'function') setTimeout(() => loadRevenueData(), 100);
+                try { window.aiadLoadEarnings && window.aiadLoadEarnings(); } catch (e) {}
             } else if (view === 'music') {
                 viewEl.classList.add('active');
                 if (dropdown) dropdown.classList.add('open');
@@ -14055,6 +14082,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 setTimeout(() => loadArtistProfile(), 100);
                 loadAccountUsage();
                 loadUserSettings();
+                try { window.aiadRenderDistributorPicker && window.aiadRenderDistributorPicker(); } catch (e) {}
             }
         }
 
@@ -21611,6 +21639,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
         function openTrackDetail(track) {
             globalTrack = track;
             populateTrackDetail(track);
+            try { window.aiadRenderReleaseButton && window.aiadRenderReleaseButton(); } catch (e) {}
             document.getElementById('trackDetailPage').style.display = 'block';
             document.body.style.overflow = 'hidden';
         }
@@ -21716,6 +21745,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                             <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                             Play
                         </button>
+                        <span id="aiadReleaseBtnHost" style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;"></span>
                         <a id="trackDetailDownload" href="" download="track.mp3" style="display:flex;align-items:center;gap:8px;padding:10px 20px;background:transparent;border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:var(--text-secondary);font-size:0.875rem;text-decoration:none;">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                             Download
@@ -30809,6 +30839,719 @@ window.AIAD_PROMPTS = [
         else if (cached) { try { localStorage.removeItem(CACHE_KEY); } catch (e) {} }
     };
 })();
+</script>
+
+<!-- Statement import. Distributors publish no third-party read API for artist
+     accounts, so the artist brings the CSV their distributor already gives them. -->
+<div id="aiadImportModal" style="display:none;position:fixed;inset:0;z-index:100010;background:rgba(0,0,0,0.78);align-items:center;justify-content:center;padding:20px;">
+  <div style="background:var(--bg-card,#161616);border:1px solid var(--border-default,rgba(255,255,255,0.08));border-radius:16px;max-width:760px;width:100%;max-height:88vh;overflow-y:auto;padding:22px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px;">
+      <div>
+        <h2 style="font-size:1.05rem;font-weight:600;color:var(--text-primary);margin:0 0 4px;">Import a royalty statement</h2>
+        <p style="font-size:0.8rem;color:var(--text-muted);margin:0;">Upload the CSV your distributor gives you. Nothing is sent anywhere else.</p>
+      </div>
+      <button onclick="aiadCloseImport()" aria-label="Close" style="background:transparent;border:none;color:var(--text-muted);font-size:1.4rem;line-height:1;cursor:pointer;padding:0 4px;">&times;</button>
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:14px;">
+      <label style="flex:1;min-width:170px;font-size:0.72rem;color:var(--text-muted);display:flex;flex-direction:column;gap:5px;">Distributor
+        <select id="aiadImportDist" onchange="aiadImportDistChanged()" style="background:var(--bg-secondary);border:1px solid var(--border-default);border-radius:9px;color:var(--text-primary);font-size:0.85rem;padding:9px 11px;"></select>
+      </label>
+      <label style="flex:1;min-width:140px;font-size:0.72rem;color:var(--text-muted);display:flex;flex-direction:column;gap:5px;">Period start
+        <input type="date" id="aiadImportStart" style="background:var(--bg-secondary);border:1px solid var(--border-default);border-radius:9px;color:var(--text-primary);font-size:0.85rem;padding:9px 11px;">
+      </label>
+      <label style="flex:1;min-width:140px;font-size:0.72rem;color:var(--text-muted);display:flex;flex-direction:column;gap:5px;">Period end
+        <input type="date" id="aiadImportEnd" style="background:var(--bg-secondary);border:1px solid var(--border-default);border-radius:9px;color:var(--text-primary);font-size:0.85rem;padding:9px 11px;">
+      </label>
+    </div>
+
+    <p id="aiadImportNote" style="font-size:0.78rem;color:var(--text-secondary);background:rgba(0,180,216,0.07);border:1px solid rgba(0,180,216,0.25);border-radius:9px;padding:10px 12px;margin:0 0 14px;line-height:1.5;"></p>
+
+    <label style="display:block;border:2px dashed var(--border-default);border-radius:11px;padding:18px;text-align:center;cursor:pointer;margin-bottom:14px;">
+      <input type="file" id="aiadImportFile" accept=".csv,text/csv,text/plain" onchange="aiadImportFileChosen(this)" style="display:none;">
+      <div style="font-size:0.85rem;color:var(--text-secondary);">Choose your CSV statement</div>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;">Parsed in your browser — you confirm before anything is saved.</div>
+    </label>
+
+    <div id="aiadImportPreview"></div>
+    <p id="aiadImportStatus" style="display:none;font-size:0.8rem;margin:12px 0 0;line-height:1.5;"></p>
+
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px;">
+      <button onclick="aiadCloseImport()" style="padding:9px 18px;border-radius:9px;background:transparent;border:1px solid var(--border-default);color:var(--text-secondary);font-size:0.85rem;cursor:pointer;font-family:var(--font-body);">Cancel</button>
+      <button id="aiadImportConfirmBtn" onclick="aiadConfirmImport()" style="display:none;align-items:center;gap:7px;padding:9px 18px;border-radius:9px;background:var(--teal);border:none;color:#001018;font-size:0.85rem;font-weight:600;cursor:pointer;font-family:var(--font-body);">Import statement</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── AIAD distributor link + royalty import ────────────────────────────────
+   The artist keeps their distributor; AIAD only links out to it and reads the
+   CSV statements they already download. Nothing here moves money, and no
+   distributor exposes a third-party read API for consumer accounts, so import
+   is by file rather than by connection. */
+(function () {
+    'use strict';
+
+    function client() { return window.db || null; }
+    function myId() {
+        try {
+            if (window.aiadResolvedUserId) { const u = window.aiadResolvedUserId(); if (u) return u; }
+            return (window.AppState && AppState.currentUser && AppState.currentUser.id) || null;
+        } catch (e) { return null; }
+    }
+    function esc(v) {
+        return String(v == null ? '' : v)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    function toast(m) { try { if (window.showToast) window.showToast(m); } catch (e) {} }
+    function money(n, cur) {
+        const v = Number(n) || 0;
+        try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: cur || 'USD' }).format(v); }
+        catch (e) { return (cur || 'USD') + ' ' + v.toFixed(2); }
+    }
+
+    // ── Reference data ─────────────────────────────────────────────────────
+    // distributors is a table precisely so the list can change without a deploy,
+    // so this caches per session but never hardcodes a fallback list.
+    let _distCache = null;
+    window.aiadDistributors = async function () {
+        if (_distCache) return _distCache;
+        const c = client();
+        if (!c) return [];
+        const { data, error } = await c.from('distributors')
+            .select('slug,name,upload_url,dashboard_url,statement_notes,sort_order')
+            .eq('active', true).order('sort_order', { ascending: true });
+        if (error) { console.warn('[AIAD] distributors:', error.message); return []; }
+        _distCache = data || [];
+        return _distCache;
+    };
+    function distBySlug(slug) { return (_distCache || []).find(function (d) { return d.slug === slug; }) || null; }
+
+    let _myDist = null;   // { slug, other_name } from profiles
+    window.aiadMyDistributor = async function (force) {
+        if (_myDist && !force) return _myDist;
+        const c = client(), uid = myId();
+        if (!c || !uid) return null;
+        const { data, error } = await c.from('profiles')
+            .select('distributor_slug,distributor_other_name,distributor_set_at').eq('id', uid).maybeSingle();
+        if (error) { console.warn('[AIAD] my distributor:', error.message); return null; }
+        _myDist = data || {};
+        return _myDist;
+    };
+    // The name to show: the picked distributor, or whatever they typed for "other".
+    function myDistName() {
+        if (!_myDist || !_myDist.distributor_slug) return '';
+        if (_myDist.distributor_slug === 'other') return _myDist.distributor_other_name || 'your distributor';
+        const d = distBySlug(_myDist.distributor_slug);
+        return d ? d.name : _myDist.distributor_slug;
+    }
+    window.aiadMyDistName = myDistName;
+
+    // ── 1. Settings picker ─────────────────────────────────────────────────
+    window.aiadRenderDistributorPicker = async function () {
+        const host = document.getElementById('aiadDistributorPicker');
+        if (!host) return;
+        const list = await window.aiadDistributors();
+        if (!list.length) {
+            host.innerHTML = '<p class="settings-helper">Could not load the distributor list. Reload and try again.</p>';
+            return;
+        }
+        const mine = (await window.aiadMyDistributor(true)) || {};
+        const cur = mine.distributor_slug || '';
+        host.innerHTML =
+            '<div class="settings-field">'
+            + '<label class="settings-label" for="aiadDistSelect">Distributor</label>'
+            + '<select id="aiadDistSelect" class="settings-input" onchange="aiadOnDistributorChange()">'
+            + '<option value="">Select your distributor…</option>'
+            + list.map(function (d) {
+                return '<option value="' + esc(d.slug) + '"' + (d.slug === cur ? ' selected' : '') + '>' + esc(d.name) + '</option>';
+            }).join('')
+            + '</select>'
+            + '<p class="settings-helper">Already distributing your music somewhere? Tell us where and we&#39;ll take you '
+            + 'straight there when you&#39;re ready to release. You keep your distributor, your deal, and your catalog — nothing moves.</p>'
+            + '</div>'
+            + '<div class="settings-field" id="aiadDistOtherWrap" style="display:' + (cur === 'other' ? 'block' : 'none') + ';">'
+            + '<label class="settings-label" for="aiadDistOther">Distributor name</label>'
+            + '<input type="text" id="aiadDistOther" class="settings-input" maxlength="80" placeholder="Who distributes your music?" value="'
+            + esc(mine.distributor_other_name || '') + '">'
+            + '<p class="settings-helper">We&#39;ll use this name across your dashboard.</p>'
+            + '</div>'
+            + '<div class="settings-actions"><button class="settings-btn primary" onclick="aiadSaveDistributor()">Save distributor</button></div>'
+            + '<p id="aiadDistStatus" class="settings-helper" style="margin-top:8px;"></p>';
+    };
+
+    window.aiadOnDistributorChange = function () {
+        const sel = document.getElementById('aiadDistSelect');
+        const wrap = document.getElementById('aiadDistOtherWrap');
+        if (sel && wrap) wrap.style.display = sel.value === 'other' ? 'block' : 'none';
+    };
+
+    window.aiadSaveDistributor = async function () {
+        const sel = document.getElementById('aiadDistSelect');
+        const status = document.getElementById('aiadDistStatus');
+        const say = function (m, bad) { if (status) { status.textContent = m; status.style.color = bad ? '#ff6b6b' : 'var(--text-muted)'; } };
+        if (!sel) return;
+        const slug = sel.value;
+        if (!slug) { say('Pick a distributor first.', true); return; }
+        const other = (document.getElementById('aiadDistOther') || {}).value || '';
+        if (slug === 'other' && !other.trim()) { say('Tell us who distributes your music.', true); return; }
+        const c = client(), uid = myId();
+        if (!c || !uid) { say('You need to be signed in to save this.', true); return; }
+        say('Saving…');
+        const { error } = await c.from('profiles').update({
+            distributor_slug: slug,
+            distributor_other_name: slug === 'other' ? other.trim() : null,
+            distributor_set_at: new Date().toISOString()
+        }).eq('id', uid);
+        if (error) { console.warn('[AIAD] save distributor:', error.message); say('Could not save that: ' + error.message, true); return; }
+        _myDist = { distributor_slug: slug, distributor_other_name: slug === 'other' ? other.trim() : null };
+        say('Saved.');
+        toast('Distributor saved');
+        try { window.aiadRenderReleaseButton(); } catch (e) {}
+    };
+
+    // ── 2. Deep-link button on the track page ──────────────────────────────
+    // upload_url lands on "new release" rather than a dashboard they'd have to
+    // navigate. 'other' ships an empty upload_url, so that case gets a note
+    // instead of a button that goes nowhere.
+    window.aiadRenderReleaseButton = async function () {
+        const host = document.getElementById('aiadReleaseBtnHost');
+        if (!host) return;
+        await window.aiadDistributors();
+        const mine = (await window.aiadMyDistributor()) || {};
+        const slug = mine.distributor_slug || '';
+        const base = 'display:flex;align-items:center;gap:8px;padding:10px 20px;border-radius:10px;font-size:0.875rem;font-weight:500;text-decoration:none;';
+        const icon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">'
+            + '<path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
+
+        if (!slug) {
+            host.innerHTML = '<button onclick="aiadGoToDistributorSettings()" style="' + base
+                + 'background:transparent;border:1px solid var(--border-default);color:var(--text-secondary);cursor:pointer;">'
+                + icon + 'Set your distributor</button>';
+            return;
+        }
+        const d = distBySlug(slug);
+        const url = d && d.upload_url ? d.upload_url : '';
+        const name = myDistName();
+        if (!url) {
+            host.innerHTML = '<button disabled title="Add a distributor with a release page to enable this" style="' + base
+                + 'background:transparent;border:1px solid var(--border-default);color:var(--text-muted);cursor:not-allowed;opacity:0.65;">'
+                + icon + 'Release on ' + esc(name) + '</button>'
+                + '<p style="width:100%;font-size:0.72rem;color:var(--text-muted);margin:6px 0 0;">'
+                + 'We don&#39;t have a release link for ' + esc(name) + '. Open it yourself and upload there — your statements still import here.</p>';
+            return;
+        }
+        host.innerHTML = '<a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer" style="' + base
+            + 'background:transparent;border:1px solid var(--teal);color:var(--teal);">'
+            + icon + 'Release on ' + esc(name) + '</a>';
+    };
+
+    window.aiadGoToDistributorSettings = function () {
+        try { if (window.closeTrackDetail) window.closeTrackDetail(); } catch (e) {}
+        try { if (window.showArtistView) window.showArtistView('settings'); } catch (e) {}
+        setTimeout(function () {
+            const el = document.getElementById('aiadDistributorSection');
+            if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 400);
+    };
+
+    // ── 3. CSV parsing ─────────────────────────────────────────────────────
+    // RFC4180: quoted fields carry commas, newlines and doubled quotes, so this
+    // is a real parser rather than a split on comma.
+    function sniffDelimiter(text) {
+        const line = text.slice(0, text.indexOf('\n') === -1 ? text.length : text.indexOf('\n'));
+        let best = ',', bestN = 0;
+        [',', ';', '\t', '|'].forEach(function (d) {
+            let n = 0, q = false;
+            for (let i = 0; i < line.length; i++) {
+                const ch = line[i];
+                if (ch === '"') q = !q;
+                else if (ch === d && !q) n++;
+            }
+            if (n > bestN) { bestN = n; best = d; }
+        });
+        return best;
+    }
+
+    function parseCSV(text) {
+        if (!text) return [];
+        if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);   // Excel writes a BOM
+        const delim = sniffDelimiter(text);
+        const rows = [];
+        let row = [], field = '', quoted = false, any = false;
+        for (let i = 0; i < text.length; i++) {
+            const ch = text[i];
+            if (quoted) {
+                if (ch === '"') {
+                    if (text[i + 1] === '"') { field += '"'; i++; }
+                    else quoted = false;
+                } else field += ch;
+                continue;
+            }
+            if (ch === '"') { quoted = true; any = true; continue; }
+            if (ch === delim) { row.push(field); field = ''; any = true; continue; }
+            if (ch === '\r') continue;
+            if (ch === '\n') { row.push(field); rows.push(row); row = []; field = ''; any = false; continue; }
+            field += ch; any = true;
+        }
+        if (any || field || row.length) { row.push(field); rows.push(row); }
+        return rows.filter(function (r) { return r.some(function (v) { return String(v).trim() !== ''; }); });
+    }
+
+    // ── Per-distributor column mapping ─────────────────────────────────────
+    // Every distributor names its export columns differently, so each slug gets
+    // its own names tried first. The shared pool below catches the rest and the
+    // variants each of them has shipped over the years; anything still unmatched
+    // is remapped by hand in the preview rather than guessed at.
+    const GENERIC = {
+        track_title: ['track title', 'song title', 'title', 'track', 'song', 'track name', 'song name', 'release title', 'item title'],
+        isrc:        ['isrc', 'isrc code', 'track isrc', 'isrc/upc'],
+        dsp:         ['dsp', 'store', 'platform', 'retailer', 'partner', 'service', 'store name', 'dsp name', 'shop', 'source', 'vendor'],
+        territory:   ['territory', 'country', 'country of sale', 'country code', 'region', 'sale country', 'customer country', 'territory code'],
+        units:       ['units', 'quantity', 'qty', 'streams', 'plays', 'downloads', 'sales', 'stream count', 'number of streams', 'unit count'],
+        amount:      ['amount', 'earnings', 'revenue', 'net revenue', 'royalty', 'royalties', 'net payable', 'payable', 'earnings (usd)',
+                      'net earnings', 'artist earnings', 'your earnings', 'net amount', 'total earned', 'total', 'net', 'payout'],
+        currency:    ['currency', 'currency code', 'cur']
+    };
+    const PER_SLUG = {
+        distrokid:     { track_title: ['title'], isrc: ['isrc'], dsp: ['store'], territory: ['country of sale'], units: ['quantity'], amount: ['earnings (usd)', 'earnings'] },
+        tunecore:      { track_title: ['song title'], isrc: ['isrc'], dsp: ['store'], territory: ['territory', 'country'], units: ['units'], amount: ['net revenue', 'revenue'] },
+        cdbaby:        { track_title: ['track title'], isrc: ['isrc'], dsp: ['partner', 'store'], territory: ['country'], units: ['units', 'quantity'], amount: ['net payable', 'earnings'] },
+        unitedmasters: { track_title: ['track', 'track name'], isrc: ['isrc'], dsp: ['platform', 'dsp'], territory: ['country'], units: ['streams'], amount: ['earnings', 'net earnings'] },
+        symphonic:     { track_title: ['track title'], isrc: ['isrc'], dsp: ['store', 'dsp'], territory: ['territory'], units: ['quantity'], amount: ['net revenue', 'royalty'] },
+        amuse:         { track_title: ['track', 'title'], isrc: ['isrc'], dsp: ['store', 'dsp'], territory: ['country'], units: ['streams'], amount: ['amount', 'revenue'] },
+        ditto:         { track_title: ['track title'], isrc: ['isrc'], dsp: ['retailer', 'store'], territory: ['country'], units: ['quantity'], amount: ['royalty', 'earnings'] },
+        toolost:       { track_title: ['title', 'track'], isrc: ['isrc'], dsp: ['dsp', 'store'], territory: ['country', 'territory'], units: ['quantity', 'streams'], amount: ['revenue', 'earnings'] },
+        other:         {}
+    };
+    const FIELDS = ['track_title', 'isrc', 'dsp', 'territory', 'units', 'amount', 'currency'];
+    const FIELD_LABEL = {
+        track_title: 'Track title', isrc: 'ISRC', dsp: 'Store / DSP',
+        territory: 'Territory', units: 'Units', amount: 'Amount', currency: 'Currency'
+    };
+
+    function normHeader(h) { return String(h == null ? '' : h).replace(/﻿/g, '').trim().toLowerCase().replace(/\s+/g, ' '); }
+    function loose(h) { return normHeader(h).replace(/[^a-z0-9]/g, ''); }
+
+    function autoMap(headers, slug) {
+        const norm = headers.map(normHeader);
+        const lo = headers.map(loose);
+        const per = PER_SLUG[slug] || {};
+        const out = {};
+        FIELDS.forEach(function (f) {
+            const names = (per[f] || []).concat(GENERIC[f] || []);
+            let idx = -1;
+            for (let i = 0; i < names.length && idx === -1; i++) idx = norm.indexOf(names[i]);
+            if (idx === -1) for (let i = 0; i < names.length && idx === -1; i++) idx = lo.indexOf(loose(names[i]));
+            if (idx !== -1) out[f] = idx;
+        });
+        return out;
+    }
+
+    function parseAmount(v) {
+        if (v == null) return null;
+        let s = String(v).trim();
+        if (!s) return null;
+        const neg = /^\(.*\)$/.test(s) || /^-/.test(s);
+        s = s.replace(/[()]/g, '').replace(/[^0-9.,]/g, '');   // drops $, £, USD, spaces
+        if (!s) return null;
+        const lastComma = s.lastIndexOf(','), lastDot = s.lastIndexOf('.');
+        if (lastComma > lastDot) {                              // 1.234,56 — comma is the decimal
+            s = s.replace(/\./g, '');
+            const i = s.lastIndexOf(',');
+            s = s.slice(0, i).replace(/,/g, '') + '.' + s.slice(i + 1);
+        } else {
+            s = s.replace(/,/g, '');                            // 1,234.56 — comma is the thousands mark
+        }
+        const n = parseFloat(s);
+        if (!isFinite(n)) return null;
+        return neg ? -Math.abs(n) : n;
+    }
+    function parseUnits(v) {
+        if (v == null || String(v).trim() === '') return null;
+        const n = parseInt(String(v).replace(/[^0-9-]/g, ''), 10);
+        return isFinite(n) ? n : null;
+    }
+    // Currency codes appear either in their own column or inside the amount text.
+    function sniffCurrency(rows, map) {
+        const SYM = { '$': 'USD', '£': 'GBP', '€': 'EUR', '¥': 'JPY' };
+        for (let i = 0; i < rows.length && i < 50; i++) {
+            if (map.currency != null) {
+                const c = String(rows[i][map.currency] || '').trim().toUpperCase();
+                if (/^[A-Z]{3}$/.test(c)) return c;
+            }
+            if (map.amount != null) {
+                const a = String(rows[i][map.amount] || '');
+                const code = a.match(/\b([A-Z]{3})\b/);
+                if (code && ['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'SEK', 'NOK', 'DKK', 'CHF'].indexOf(code[1]) !== -1) return code[1];
+                for (const s in SYM) if (a.indexOf(s) !== -1) return SYM[s];
+            }
+        }
+        return null;
+    }
+
+    // ── Import state ───────────────────────────────────────────────────────
+    const IMP = { rows: [], headers: [], map: {}, slug: '', filename: '', currency: 'USD' };
+
+    window.aiadOpenImport = async function () {
+        const ov = document.getElementById('aiadImportModal');
+        if (!ov) return;
+        await window.aiadDistributors();
+        const mine = (await window.aiadMyDistributor()) || {};
+        IMP.slug = mine.distributor_slug || '';
+        ov.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        const sel = document.getElementById('aiadImportDist');
+        if (sel) {
+            sel.innerHTML = (_distCache || []).map(function (d) {
+                return '<option value="' + esc(d.slug) + '"' + (d.slug === IMP.slug ? ' selected' : '') + '>' + esc(d.name) + '</option>';
+            }).join('');
+            if (!IMP.slug && _distCache && _distCache.length) IMP.slug = _distCache[0].slug;
+        }
+        aiadImportDistChanged();
+        IMP.rows = []; IMP.headers = []; IMP.map = {}; IMP.filename = ''; IMP.currency = 'USD';
+        const p = document.getElementById('aiadImportPreview');
+        if (p) p.innerHTML = '';
+        const f = document.getElementById('aiadImportFile');
+        if (f) f.value = '';
+        aiadImportSay('');
+        const cb = document.getElementById('aiadImportConfirmBtn');
+        if (cb) cb.style.display = 'none';
+    };
+    window.aiadCloseImport = function () {
+        const ov = document.getElementById('aiadImportModal');
+        if (ov) ov.style.display = 'none';
+        document.body.style.overflow = '';
+    };
+    // statement_notes tells the artist where the export lives in their account.
+    window.aiadImportDistChanged = function () {
+        const sel = document.getElementById('aiadImportDist');
+        if (sel) IMP.slug = sel.value;
+        const note = document.getElementById('aiadImportNote');
+        const d = distBySlug(IMP.slug);
+        if (note) {
+            note.innerHTML = d && d.statement_notes
+                ? 'In ' + esc(d.name) + ', find your export under <strong>' + esc(d.statement_notes) + '</strong>, then upload the file here.'
+                : 'Download your statement as CSV from your distributor, then upload it here.';
+        }
+    };
+    function aiadImportSay(msg, bad) {
+        const el = document.getElementById('aiadImportStatus');
+        if (!el) return;
+        el.innerHTML = msg ? esc(msg) : '';
+        el.style.color = bad ? '#ff6b6b' : 'var(--text-muted)';
+        el.style.display = msg ? 'block' : 'none';
+    }
+
+    window.aiadImportFileChosen = function (input) {
+        const file = input && input.files && input.files[0];
+        if (!file) return;
+        IMP.filename = file.name;
+        const reader = new FileReader();
+        reader.onerror = function () { aiadImportSay('Could not read that file. Try downloading the statement again.', true); };
+        reader.onload = function (e) {
+            let rows;
+            try { rows = parseCSV(String(e.target.result || '')); }
+            catch (err) { aiadImportSay('That file could not be parsed as CSV. Export it again as CSV, not Excel or PDF.', true); return; }
+            if (!rows.length) { aiadImportSay('That file is empty — no rows found.', true); return; }
+            if (rows.length < 2) { aiadImportSay('That file has a header row but no data rows.', true); return; }
+            IMP.headers = rows[0];
+            IMP.rows = rows.slice(1).filter(function (r) { return r.length > 1; });
+            if (!IMP.rows.length) { aiadImportSay('No data rows found under the header.', true); return; }
+            IMP.map = autoMap(IMP.headers, IMP.slug);
+            // Reset before sniffing: a previous file's currency must not carry over
+            // onto one that doesn't declare its own, or totals get labelled wrongly.
+            IMP.currency = 'USD';
+            const sniffed = sniffCurrency(IMP.rows, IMP.map);
+            if (sniffed) IMP.currency = sniffed;
+            renderPreview();
+        };
+        reader.readAsText(file);
+    };
+
+    function mappedRow(r) {
+        const g = function (f) { return IMP.map[f] != null ? r[IMP.map[f]] : null; };
+        return {
+            track_title: (g('track_title') || '').toString().trim() || null,
+            isrc: ((g('isrc') || '').toString().trim().toUpperCase().replace(/[^A-Z0-9]/g, '')) || null,
+            dsp: (g('dsp') || '').toString().trim() || null,
+            territory: (g('territory') || '').toString().trim().slice(0, 40) || null,
+            units: parseUnits(g('units')),
+            amount: parseAmount(g('amount'))
+        };
+    }
+
+    function renderPreview() {
+        const host = document.getElementById('aiadImportPreview');
+        const btn = document.getElementById('aiadImportConfirmBtn');
+        if (!host) return;
+
+        // The one field an import is meaningless without.
+        if (IMP.map.amount == null) {
+            btn && (btn.style.display = 'none');
+            host.innerHTML = '<div style="padding:14px;border:1px solid rgba(255,107,107,0.4);background:rgba(255,107,107,0.08);border-radius:10px;">'
+                + '<div style="font-weight:600;color:#ff6b6b;margin-bottom:6px;">These columns don&#39;t match a '
+                + esc((distBySlug(IMP.slug) || {}).name || 'distributor') + ' statement</div>'
+                + '<div style="font-size:0.8rem;color:var(--text-secondary);line-height:1.5;">'
+                + 'We couldn&#39;t find an earnings column. Your file has: <em>' + esc(IMP.headers.filter(Boolean).join(', ')) + '</em>.<br>'
+                + 'Pick the right column below, or re-export the statement.</div>'
+                + '<div style="margin-top:12px;">' + mapperControls() + '</div></div>';
+            return;
+        }
+
+        const sample = IMP.rows.slice(0, 10).map(mappedRow);
+        let total = 0, bad = 0;
+        IMP.rows.forEach(function (r) { const m = mappedRow(r); if (m.amount == null) bad++; else total += m.amount; });
+
+        const cells = function (m) {
+            return '<tr>'
+                + '<td style="padding:6px 8px;border-top:1px solid var(--border-default);">' + esc(m.track_title || '—') + '</td>'
+                + '<td style="padding:6px 8px;border-top:1px solid var(--border-default);font-variant-numeric:tabular-nums;">' + esc(m.isrc || '—') + '</td>'
+                + '<td style="padding:6px 8px;border-top:1px solid var(--border-default);">' + esc(m.dsp || '—') + '</td>'
+                + '<td style="padding:6px 8px;border-top:1px solid var(--border-default);">' + esc(m.territory || '—') + '</td>'
+                + '<td style="padding:6px 8px;border-top:1px solid var(--border-default);text-align:right;font-variant-numeric:tabular-nums;">' + (m.units == null ? '—' : m.units) + '</td>'
+                + '<td style="padding:6px 8px;border-top:1px solid var(--border-default);text-align:right;font-variant-numeric:tabular-nums;">'
+                + (m.amount == null ? '<span style="color:#ff6b6b;">—</span>' : esc(money(m.amount, IMP.currency))) + '</td>'
+                + '</tr>';
+        };
+
+        host.innerHTML =
+            '<div style="margin-bottom:12px;">' + mapperControls() + '</div>'
+            + (IMP.map.track_title == null
+                ? '<p style="font-size:0.76rem;color:#ffb347;margin:0 0 10px;">No track title column matched, so these lines won&#39;t be tied to your tracks. Totals still import.</p>'
+                : '')
+            + '<div style="overflow-x:auto;border:1px solid var(--border-default);border-radius:10px;">'
+            + '<table style="width:100%;border-collapse:collapse;font-size:0.78rem;min-width:640px;">'
+            + '<thead><tr style="color:var(--text-muted);text-align:left;">'
+            + '<th style="padding:8px;font-weight:500;">Track</th><th style="padding:8px;font-weight:500;">ISRC</th>'
+            + '<th style="padding:8px;font-weight:500;">Store</th><th style="padding:8px;font-weight:500;">Territory</th>'
+            + '<th style="padding:8px;font-weight:500;text-align:right;">Units</th><th style="padding:8px;font-weight:500;text-align:right;">Amount</th>'
+            + '</tr></thead><tbody>' + sample.map(cells).join('') + '</tbody></table></div>'
+            + '<div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:12px;font-size:0.8rem;color:var(--text-secondary);">'
+            + '<span><strong style="color:var(--text-primary);">' + IMP.rows.length + '</strong> rows</span>'
+            + '<span>Showing first ' + sample.length + '</span>'
+            + '<span>Total <strong style="color:var(--text-primary);">' + esc(money(total, IMP.currency)) + '</strong></span>'
+            + (bad ? '<span style="color:#ffb347;">' + bad + ' row' + (bad === 1 ? '' : 's') + ' with no readable amount — they&#39;ll import as blank</span>' : '')
+            + '</div>';
+        if (btn) btn.style.display = 'inline-flex';
+    }
+
+    // Auto-detection covers the shapes we know; this is the escape hatch for a
+    // renamed or unusual export, so a header we don't recognise isn't a dead end.
+    function mapperControls() {
+        const opts = function (sel) {
+            return '<option value="">—</option>' + IMP.headers.map(function (h, i) {
+                return '<option value="' + i + '"' + (sel === i ? ' selected' : '') + '>' + esc(h || ('Column ' + (i + 1))) + '</option>';
+            }).join('');
+        };
+        return '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;">'
+            + FIELDS.filter(function (f) { return f !== 'currency'; }).map(function (f) {
+                return '<label style="font-size:0.68rem;color:var(--text-muted);display:flex;flex-direction:column;gap:3px;">'
+                    + esc(FIELD_LABEL[f])
+                    + '<select onchange="aiadRemap(\'' + f + '\',this.value)" style="background:var(--bg-secondary);border:1px solid var(--border-default);border-radius:7px;color:var(--text-primary);font-size:0.75rem;padding:5px 7px;max-width:150px;">'
+                    + opts(IMP.map[f] == null ? null : IMP.map[f]) + '</select></label>';
+            }).join('')
+            + '<label style="font-size:0.68rem;color:var(--text-muted);display:flex;flex-direction:column;gap:3px;">Currency'
+            + '<input value="' + esc(IMP.currency) + '" maxlength="3" oninput="aiadSetCurrency(this.value)" style="background:var(--bg-secondary);border:1px solid var(--border-default);border-radius:7px;color:var(--text-primary);font-size:0.75rem;padding:5px 7px;width:60px;text-transform:uppercase;"></label>'
+            + '</div>';
+    }
+    window.aiadRemap = function (field, idx) {
+        if (idx === '') delete IMP.map[field]; else IMP.map[field] = parseInt(idx, 10);
+        renderPreview();
+    };
+    window.aiadSetCurrency = function (v) {
+        IMP.currency = (v || 'USD').toUpperCase().slice(0, 3) || 'USD';
+    };
+
+    // ── Confirm and write ──────────────────────────────────────────────────
+    window.aiadConfirmImport = async function () {
+        const c = client(), uid = myId();
+        if (!c || !uid) { aiadImportSay('You need to be signed in to import.', true); return; }
+        const ps = (document.getElementById('aiadImportStart') || {}).value || '';
+        const pe = (document.getElementById('aiadImportEnd') || {}).value || '';
+        if (!ps || !pe) { aiadImportSay('Pick the period this statement covers.', true); return; }
+        if (ps > pe) { aiadImportSay('The period start is after the period end.', true); return; }
+        if (IMP.map.amount == null) { aiadImportSay('Map the earnings column before importing.', true); return; }
+        if (!IMP.rows.length) { aiadImportSay('Nothing to import.', true); return; }
+
+        const btn = document.getElementById('aiadImportConfirmBtn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Importing…'; }
+        const done = function (msg, bad) {
+            aiadImportSay(msg, bad);
+            if (btn) { btn.disabled = false; btn.textContent = 'Import statement'; }
+        };
+
+        // Duplicate period — say so and let them replace rather than silently doubling totals.
+        const dup = await c.from('royalty_statements').select('id,source_filename,row_count')
+            .eq('user_id', uid).eq('distributor_slug', IMP.slug).eq('period_start', ps).eq('period_end', pe);
+        if (dup.error) { done('Could not check for an existing import: ' + dup.error.message, true); return; }
+        if (dup.data && dup.data.length) {
+            const prev = dup.data[0];
+            const ok = window.confirm('You already imported ' + ((distBySlug(IMP.slug) || {}).name || IMP.slug)
+                + ' for ' + ps + ' to ' + pe + ' (' + (prev.row_count || 0) + ' rows from '
+                + (prev.source_filename || 'a file') + ').\n\nReplace it with this file? The earlier import will be deleted.');
+            if (!ok) { done('Import cancelled — the existing statement was kept.'); return; }
+            const del = await c.from('royalty_statements').delete().eq('id', prev.id).eq('user_id', uid);
+            if (del.error) { done('Could not replace the earlier import: ' + del.error.message, true); return; }
+        }
+
+        // Match lines to tracks by title. tracks has no ISRC column yet, so an
+        // ISRC that would identify a track exactly can't be used for the join —
+        // it is still stored on every line, ready for when that column lands.
+        const titleMap = {};
+        const tr = await c.from('tracks').select('id,title').eq('user_id', uid);
+        if (tr.error) console.warn('[AIAD] track match:', tr.error.message);
+        (tr.data || []).forEach(function (t) {
+            const k = String(t.title || '').trim().toLowerCase();
+            if (!k) return;
+            if (!titleMap[k]) titleMap[k] = [];
+            titleMap[k].push(t.id);
+        });
+        const matchTrack = function (title) {
+            if (!title) return null;
+            const hit = titleMap[String(title).trim().toLowerCase()];
+            return hit && hit.length === 1 ? hit[0] : null;   // ambiguous stays null rather than guessing
+        };
+
+        const lines = IMP.rows.map(mappedRow);
+        // Summing floats leaves trailing error (1524.9499999999998); gross is money,
+        // so it gets rounded to the currency's precision before it is stored.
+        const gross = Math.round(lines.reduce(function (s, m) { return s + (m.amount || 0); }, 0) * 100) / 100;
+
+        const stmt = await c.from('royalty_statements').insert({
+            user_id: uid, distributor_slug: IMP.slug, period_start: ps, period_end: pe,
+            currency: IMP.currency, gross_amount: gross, source_filename: IMP.filename || null,
+            row_count: lines.length
+        }).select('id').single();
+        if (stmt.error || !stmt.data) {
+            done('Could not save the statement: ' + ((stmt.error && stmt.error.message) || 'no row returned'), true);
+            return;
+        }
+        const stmtId = stmt.data.id;
+
+        const payload = lines.map(function (m) {
+            return {
+                statement_id: stmtId, user_id: uid, track_id: matchTrack(m.track_title),
+                track_title: m.track_title, isrc: m.isrc, dsp: m.dsp, territory: m.territory,
+                units: m.units, amount: m.amount, currency: IMP.currency,
+                period_start: ps, period_end: pe
+            };
+        });
+        const CHUNK = 500;
+        for (let i = 0; i < payload.length; i += CHUNK) {
+            const res = await c.from('royalty_lines').insert(payload.slice(i, i + CHUNK));
+            if (res.error) {
+                // Roll the whole thing back — a half-written statement would report
+                // totals that are simply wrong. royalty_lines cascades on delete.
+                const rb = await c.from('royalty_statements').delete().eq('id', stmtId).eq('user_id', uid);
+                if (rb.error) console.warn('[AIAD] rollback:', rb.error.message);
+                done('Import failed partway through and was rolled back: ' + res.error.message, true);
+                return;
+            }
+        }
+
+        const matched = payload.filter(function (p) { return p.track_id; }).length;
+        toast('Statement imported');
+        done('Imported ' + payload.length + ' rows · ' + money(gross, IMP.currency)
+            + ' · ' + matched + ' matched to your tracks.');
+        try { await window.aiadLoadEarnings(true); } catch (e) {}
+        setTimeout(window.aiadCloseImport, 1600);
+    };
+
+    // ── 4. Earnings view ───────────────────────────────────────────────────
+    const LINE_CAP = 5000;
+    window.aiadLoadEarnings = async function (force) {
+        const host = document.getElementById('aiadEarningsBody');
+        if (!host) return;
+        const c = client(), uid = myId();
+        if (!c || !uid) { host.innerHTML = ''; return; }
+        await window.aiadDistributors();
+        await window.aiadMyDistributor(force);
+
+        const res = await c.from('royalty_lines')
+            .select('track_title,dsp,territory,units,amount,currency,period_start,period_end')
+            .eq('user_id', uid).order('period_start', { ascending: false }).limit(LINE_CAP);
+        if (res.error) {
+            console.warn('[AIAD] earnings:', res.error.message);
+            host.innerHTML = '<p style="color:#ff6b6b;font-size:0.82rem;">Could not load your imported earnings: ' + esc(res.error.message) + '</p>';
+            return;
+        }
+        const lines = res.data || [];
+        if (!lines.length) {
+            host.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;line-height:1.6;margin:0;">'
+                + 'No statements imported yet. Upload a CSV from your distributor and your earnings by store, territory and track show up here.</p>';
+            return;
+        }
+
+        const cur = lines[0].currency || 'USD';
+        const sum = function (key) {
+            const m = {};
+            lines.forEach(function (l) {
+                const k = (l[key] || '').toString().trim() || 'Unknown';
+                if (!m[k]) m[k] = { amount: 0, units: 0 };
+                m[k].amount += Number(l.amount) || 0;
+                m[k].units += Number(l.units) || 0;
+            });
+            return Object.keys(m).map(function (k) { return { key: k, amount: m[k].amount, units: m[k].units }; })
+                .sort(function (a, b) { return b.amount - a.amount; });
+        };
+        const byPeriod = {};
+        lines.forEach(function (l) {
+            const k = (l.period_start || '?') + ' → ' + (l.period_end || '?');
+            byPeriod[k] = (byPeriod[k] || 0) + (Number(l.amount) || 0);
+        });
+        const periods = Object.keys(byPeriod).sort().reverse()
+            .map(function (k) { return { key: k, amount: byPeriod[k] }; });
+        const total = lines.reduce(function (s, l) { return s + (Number(l.amount) || 0); }, 0);
+        const units = lines.reduce(function (s, l) { return s + (Number(l.units) || 0); }, 0);
+
+        const panel = function (title, rows, showUnits) {
+            const max = rows.reduce(function (m, r) { return Math.max(m, Math.abs(r.amount)); }, 0) || 1;
+            return '<div style="background:var(--bg-card);border:1px solid var(--border-default);border-radius:12px;padding:16px;">'
+                + '<h4 style="font-size:0.8rem;font-weight:600;margin:0 0 12px;color:var(--text-primary);">' + esc(title) + '</h4>'
+                + rows.slice(0, 8).map(function (r) {
+                    return '<div style="margin-bottom:9px;">'
+                        + '<div style="display:flex;justify-content:space-between;gap:10px;font-size:0.78rem;margin-bottom:3px;">'
+                        + '<span style="color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(r.key) + '</span>'
+                        + '<span style="color:var(--text-primary);font-variant-numeric:tabular-nums;white-space:nowrap;">' + esc(money(r.amount, cur))
+                        + (showUnits && r.units ? ' <span style="color:var(--text-muted);font-size:0.72rem;">· ' + r.units.toLocaleString() + '</span>' : '')
+                        + '</span></div>'
+                        + '<div style="height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;">'
+                        + '<div style="height:100%;width:' + Math.max(2, Math.round(Math.abs(r.amount) / max * 100)) + '%;background:var(--teal);"></div></div>'
+                        + '</div>';
+                }).join('')
+                + (rows.length > 8 ? '<div style="font-size:0.7rem;color:var(--text-muted);margin-top:6px;">+' + (rows.length - 8) + ' more</div>' : '')
+                + '</div>';
+        };
+
+        const dName = myDistName() || 'your distributor';
+        host.innerHTML =
+            '<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:14px;">'
+            + '<div style="flex:1;min-width:150px;background:var(--bg-card);border:1px solid var(--border-default);border-radius:12px;padding:14px 16px;">'
+            + '<div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:5px;">Imported total</div>'
+            + '<div style="font-size:1.4rem;font-weight:700;color:var(--text-primary);">' + esc(money(total, cur)) + '</div></div>'
+            + '<div style="flex:1;min-width:150px;background:var(--bg-card);border:1px solid var(--border-default);border-radius:12px;padding:14px 16px;">'
+            + '<div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:5px;">Units</div>'
+            + '<div style="font-size:1.4rem;font-weight:700;color:var(--text-primary);">' + units.toLocaleString() + '</div></div>'
+            + '<div style="flex:1;min-width:150px;background:var(--bg-card);border:1px solid var(--border-default);border-radius:12px;padding:14px 16px;">'
+            + '<div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:5px;">Lines</div>'
+            + '<div style="font-size:1.4rem;font-weight:700;color:var(--text-primary);">' + lines.length.toLocaleString() + '</div></div>'
+            + '</div>'
+            + (lines.length >= LINE_CAP
+                ? '<p style="font-size:0.72rem;color:#ffb347;margin:0 0 12px;">Showing the most recent ' + LINE_CAP.toLocaleString() + ' lines — older lines are stored but not counted in these totals.</p>'
+                : '')
+            + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;">'
+            + panel('By period', periods, false)
+            + panel('By store', sum('dsp'), true)
+            + panel('By territory', sum('territory'), true)
+            + panel('By track', sum('track_title'), true)
+            + '</div>'
+            + '<p style="font-size:0.75rem;color:var(--text-muted);line-height:1.6;margin:14px 0 0;padding-top:12px;border-top:1px solid var(--border-default);">'
+            + 'Imported from your ' + esc(dName) + ' statements. AIAD doesn&#39;t process or hold your royalties — your distributor pays you directly.</p>';
+    };
+})();
+
 </script>
 </body>
 
