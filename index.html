@@ -19204,6 +19204,39 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
         window.aiadClearUserCache = clearUserScopedCache;
 
+        // Loaders that need a user id bail out when the session hasn't resolved yet —
+        // that guard is what stopped the 22P02 "undefined" errors, but nothing re-ran
+        // them afterwards, so a cold deep-link (#artist/agent) painted zeros and left
+        // them there. Re-run the active view's loader once the session actually lands.
+        //
+        // Keyed on the resolved id: a token refresh carries the same user and must not
+        // re-query, an account switch carries a different one and must.
+        let _aiadLoadedForUid = null;
+        const AIAD_SESSION_LOADERS = {
+            artistAgentsView:     () => populateAgentContext(),
+            artistSupportersView: () => loadArtistSupporters(),
+            artistMilestonesView: () => loadArtistMilestones(),
+            artistAnalyticsView:  () => loadArtistAnalytics(),
+            artistRevenueView:    () => {
+                if (typeof loadRevenueData === 'function') loadRevenueData();
+                if (window.aiadLoadEarnings) window.aiadLoadEarnings(true);
+            },
+            artistInboxView:      () => loadArtistInbox(),
+        };
+        function aiadRerunActiveViewForSession() {
+            let uid = null;
+            try { uid = aiadResolvedUserId(); } catch (e) { return; }
+            if (uid === _aiadLoadedForUid) return;   // same user (or still none): nothing to redo
+            _aiadLoadedForUid = uid;
+            if (!uid) return;                        // signed out: leave the empty state alone
+            const active = document.querySelector('#artistDashboard .dash-view.active');
+            if (!active) return;
+            const run = AIAD_SESSION_LOADERS[active.id];
+            if (!run) return;
+            try { run(); } catch (e) { console.warn('[AIAD] session re-run failed for', active.id, e); }
+        }
+        window.aiadRerunActiveViewForSession = aiadRerunActiveViewForSession;
+
         db.auth.onAuthStateChange(async (event, session) => {
             if (event === 'SIGNED_IN' && session) {
                 const newUid = session.user.id;
@@ -19222,6 +19255,13 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 clearUserScopedCache();
                 window.__aiadBootUid = null;
                 AppState.currentUser = null;
+            }
+            // INITIAL_SESSION is what fires on a cold load when supabase-js restores a
+            // stored session — the exact case the deep-link restore races against.
+            if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
+                aiadRerunActiveViewForSession();
+            } else if (event === 'SIGNED_OUT') {
+                _aiadLoadedForUid = null;
             }
         });
 
