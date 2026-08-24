@@ -5525,36 +5525,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                         <button class="time-period-btn" onclick="setAnalyticsPeriod(365, this)">12 months</button>
                     </div>
 
-                    <div class="analytics-summary-grid">
-                        <div class="analytics-summary-card">
-                            <div class="analytics-summary-label">Reach</div>
-                            <div class="analytics-summary-value" id="analyticsStreams">—</div>
-                            <div class="analytics-summary-trend steady" id="analyticsStreamsSub">No data yet</div>
-                        </div>
-                        <div class="analytics-summary-card">
-                            <div class="analytics-summary-label">Supporters</div>
-                            <div class="analytics-summary-value" id="analyticsSupporters">0</div>
-                            <div class="analytics-summary-trend steady" id="analyticsSupportersSub">This period</div>
-                        </div>
-                        <div class="analytics-summary-card">
-                            <div class="analytics-summary-label">Revenue</div>
-                            <div class="analytics-summary-value" id="analyticsRevenue">$0</div>
-                            <div class="analytics-summary-trend steady" id="analyticsRevenueSub">This period</div>
-                        </div>
-                        <div class="analytics-summary-card">
-                            <div class="analytics-summary-label">Avg Support</div>
-                            <div class="analytics-summary-value" id="analyticsAvgSupport">—</div>
-                            <div class="analytics-summary-trend steady" id="analyticsAvgSupportSub">No data yet</div>
-                        </div>
-                    </div>
-
-
-
-                    <div class="patterns-panel" id="analyticsPatternsPanel">
-                        <div class="patterns-title">Activity</div>
-                        <div id="analyticsActivity" style="font-size:0.85rem;color:var(--text-muted);padding:8px 0;">Loading…</div>
-                    </div>
-
+                    <div id="analyticsBody"></div>
                     <div class="aiad-insights" id="analyticsAiadObservations">
                         <div class="aiad-insights-header">
                             <div class="aiad-insights-icon">
@@ -16307,80 +16278,216 @@ Only capture real, meaningful decisions — not questions or general discussion.
         // Real artist analytics — every number comes from a table, honest zero when empty.
         // No invented "views/streams" metric: we have no play/view tracking in the schema.
         window._analyticsPeriod = 30;
+        // ── Artist analytics ───────────────────────────────────────────────────
+        // Everything here comes from one call to artist_analytics(p_days), which is
+        // SECURITY DEFINER and scoped to auth.uid(). The previous version stitched
+        // together five client-side counts and read artist_posts directly, which is
+        // why the page looked like the feed.
+        function _anEsc(v) {
+            return String(v == null ? '' : v)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+        function _anNum(n) { return Number(n || 0).toLocaleString(); }
+        function _anMoney(n) {
+            const v = Number(n || 0);
+            try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(v); }
+            catch (e) { return '$' + v.toFixed(0); }
+        }
+        function _anNotice(msg, bad) {
+            return '<div style="padding:14px 16px;border-radius:11px;font-size:0.85rem;line-height:1.5;'
+                + (bad ? 'background:rgba(255,107,107,0.08);border:1px solid rgba(255,107,107,0.35);color:#ff9b9b;'
+                       : 'background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-secondary);')
+                + '">' + _anEsc(msg) + '</div>';
+        }
+        // usage_events records surfaces as "artist:music"; artists read "Music".
+        function _anToolLabel(t) {
+            const s = String(t || '').replace(/^artist:/, '').replace(/[-_]+/g, ' ').trim();
+            if (!s) return 'Unknown';
+            const named = { mystats: 'My Stats', synclibrary: 'Sync Library', mixmedia: 'Mix-Media',
+                            agent: 'AIAD Agent', posts: 'Posts', music: 'Music Production' };
+            if (named[s.replace(/\s+/g, '')]) return named[s.replace(/\s+/g, '')];
+            return s.charAt(0).toUpperCase() + s.slice(1);
+        }
+        function _anAgo(iso) {
+            if (!iso) return '';
+            const d = new Date(iso);
+            if (isNaN(d)) return '';
+            const mins = Math.floor((Date.now() - d.getTime()) / 60000);
+            if (mins < 1) return 'just now';
+            if (mins < 60) return mins + 'm ago';
+            const h = Math.floor(mins / 60);
+            if (h < 24) return h + 'h ago';
+            const days = Math.floor(h / 24);
+            return days === 1 ? 'yesterday' : days + 'd ago';
+        }
+
+        function _anTile(label, value, sub) {
+            return '<div class="analytics-summary-card">'
+                + '<div class="analytics-summary-label">' + _anEsc(label) + '</div>'
+                + '<div class="analytics-summary-value">' + value + '</div>'
+                + (sub ? '<div class="analytics-summary-trend steady">' + _anEsc(sub) + '</div>' : '')
+                + '</div>';
+        }
+
+        // Sparkline over whatever daily buckets came back. Days with no rows are absent
+        // from the payload, so they are filled as zero rather than closing the gap.
+        function _anSpark(rows, key, days) {
+            const list = Array.isArray(rows) ? rows : [];
+            if (!list.length) return '';
+            const byDay = {};
+            list.forEach((r) => { byDay[String(r.day).slice(0, 10)] = Number(r[key]) || 0; });
+            // One point per day is unreadable over a long window: 365 points with data
+            // in the last week draws a flat line and a spike on the edge. Long windows
+            // are summed into at most 60 buckets so the shape survives.
+            const BUCKETS = Math.min(days, 60);
+            const perBucket = days / BUCKETS;
+            const pts = new Array(BUCKETS).fill(0);
+            const end = new Date();
+            for (let i = days - 1; i >= 0; i--) {
+                const d = new Date(end.getTime() - i * 86400000).toISOString().slice(0, 10);
+                const idx = Math.min(BUCKETS - 1, Math.floor((days - 1 - i) / perBucket));
+                pts[idx] += byDay[d] || 0;
+            }
+            const max = Math.max.apply(null, pts.concat([1]));
+            const W = 100, H = 26;
+            const step = pts.length > 1 ? W / (pts.length - 1) : W;
+            const path = pts.map((v, i) => (i ? 'L' : 'M') + (i * step).toFixed(2) + ' ' + (H - (v / max) * (H - 2)).toFixed(2)).join(' ');
+            return '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" style="width:100%;height:26px;display:block;margin-top:6px;">'
+                + '<path d="' + path + '" fill="none" stroke="var(--teal)" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg>';
+        }
+
+        function _anToolUsage(list) {
+            const rows = Array.isArray(list) ? list : [];
+            if (!rows.length) {
+                return '<div style="background:var(--bg-card);border:1px solid var(--border-default);border-radius:12px;padding:16px;">'
+                    + '<h4 style="font-size:0.8rem;font-weight:600;margin:0 0 6px;color:var(--text-primary);">What you actually use</h4>'
+                    + '<p style="font-size:0.8rem;color:var(--text-muted);margin:0;line-height:1.55;">'
+                    + 'Nothing recorded in this window. As you move around the platform, the tools you open most show up here.</p></div>';
+            }
+            const max = rows.reduce((m, r) => Math.max(m, Number(r.opens) || 0), 0) || 1;
+            return '<div style="background:var(--bg-card);border:1px solid var(--border-default);border-radius:12px;padding:16px;">'
+                + '<h4 style="font-size:0.8rem;font-weight:600;margin:0 0 4px;color:var(--text-primary);">What you actually use</h4>'
+                + '<p style="font-size:0.72rem;color:var(--text-muted);margin:0 0 12px;">Your own tool opens in this window.</p>'
+                + rows.map((r) => {
+                    const n = Number(r.opens) || 0;
+                    return '<div style="margin-bottom:10px;">'
+                        + '<div style="display:flex;justify-content:space-between;gap:10px;font-size:0.8rem;margin-bottom:3px;">'
+                        + '<span style="color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _anEsc(_anToolLabel(r.tool)) + '</span>'
+                        + '<span style="color:var(--text-primary);font-variant-numeric:tabular-nums;white-space:nowrap;">' + _anNum(n)
+                        + (r.last_used ? ' <span style="color:var(--text-muted);font-size:0.72rem;">· ' + _anEsc(_anAgo(r.last_used)) + '</span>' : '')
+                        + '</span></div>'
+                        + '<div style="height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;">'
+                        + '<div style="height:100%;width:' + Math.max(2, Math.round(n / max * 100)) + '%;background:var(--teal);"></div></div>'
+                        + '</div>';
+                }).join('')
+                + '</div>';
+        }
+
+        // Self-reported figures are whatever the artist typed into My Stats. They are
+        // never presented as platform data — no API gives us these numbers.
+        function _anSelfReported(sr, handles) {
+            const s = sr && typeof sr === 'object' ? sr : {};
+            const FIELDS = [
+                ['spotify_monthly_listeners', 'Spotify monthly listeners'],
+                ['spotify_followers', 'Spotify followers'],
+                ['youtube_subscribers', 'YouTube subscribers'],
+                ['instagram_followers', 'Instagram followers'],
+                ['tiktok_followers', 'TikTok followers'],
+            ];
+            const rows = FIELDS.filter(([k]) => s[k] != null && s[k] !== '').map(([k, label]) =>
+                '<div style="display:flex;justify-content:space-between;gap:10px;font-size:0.82rem;padding:5px 0;">'
+                + '<span style="color:var(--text-secondary);">' + _anEsc(label) + '</span>'
+                + '<span style="color:var(--text-primary);font-variant-numeric:tabular-nums;">' + _anNum(s[k]) + '</span></div>');
+
+            const h = handles && typeof handles === 'object' ? handles : {};
+            const linked = Object.keys(h).filter((k) => h[k]).length;
+
+            if (!rows.length) {
+                return '<div style="background:var(--bg-card);border:1px solid var(--border-default);border-radius:12px;padding:16px;">'
+                    + '<h4 style="font-size:0.8rem;font-weight:600;margin:0 0 6px;color:var(--text-primary);">Reach <span style="font-weight:500;color:var(--text-muted);">— self-reported</span></h4>'
+                    + '<p style="font-size:0.8rem;color:var(--text-muted);margin:0;line-height:1.55;">'
+                    + 'You haven&#39;t entered any reach figures. Add them in My Stats — they are your own numbers, not pulled from any platform.</p></div>';
+            }
+            return '<div style="background:var(--bg-card);border:1px solid var(--border-default);border-radius:12px;padding:16px;">'
+                + '<h4 style="font-size:0.8rem;font-weight:600;margin:0 0 4px;color:var(--text-primary);">Reach <span style="font-weight:500;color:var(--text-muted);">— self-reported</span></h4>'
+                + '<p style="font-size:0.72rem;color:var(--text-muted);margin:0 0 10px;line-height:1.5;">Figures you entered yourself'
+                + (s.updated_at ? ', last updated ' + _anEsc(String(s.updated_at).slice(0, 10)) : '')
+                + '. Not pulled from Spotify, YouTube or anywhere else.</p>'
+                + rows.join('')
+                + (linked ? '<p style="font-size:0.7rem;color:var(--text-muted);margin:10px 0 0;">' + linked + ' handle' + (linked === 1 ? '' : 's') + ' on file.</p>' : '')
+                + '</div>';
+        }
+
         async function loadArtistAnalytics(days) {
-            const uid = aiadResolvedUserId();
-            if (!uid) return;
+            const host = document.getElementById('analyticsBody');
+            if (!host) return;
             days = days || window._analyticsPeriod || 30;
             window._analyticsPeriod = days;
-            const since = new Date(Date.now() - days * 86400000).toISOString();
-            const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-            const money = (n) => '$' + Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
-            const periodLabel = days >= 365 ? 'Last 12 months' : ('Last ' + days + ' days');
 
-            // Supporters + Avg Support — paying rows in fan_support for the period.
-            try {
-                const { data: fs, error } = await db.from('fan_support')
-                    .select('amount,status,created_at').eq('artist_id', uid).gte('created_at', since);
-                if (error) throw error;
-                const paid = (fs || []).filter(r => Number(r.amount) > 0 && r.status !== 'cancelled' && r.status !== 'refunded');
-                const count = paid.length;
-                const total = paid.reduce((a, r) => a + Number(r.amount || 0), 0);
-                setTxt('analyticsSupporters', count);
-                setTxt('analyticsSupportersSub', count ? periodLabel : 'No supporters yet');
-                if (count) { setTxt('analyticsAvgSupport', money(total / count)); setTxt('analyticsAvgSupportSub', 'per supporter · ' + periodLabel); }
-                else { setTxt('analyticsAvgSupport', '—'); setTxt('analyticsAvgSupportSub', 'No data yet'); }
-            } catch (e) { window.reportDbError && window.reportDbError('select', 'fan_support', e, { where: 'analytics' }); }
+            const uid = aiadResolvedUserId();
+            if (!uid) { host.innerHTML = _anNotice('Sign in to see your analytics.'); return; }
+            host.innerHTML = _anNotice('Loading…');
 
-            // Revenue — paid orders for this artist in the period (0 for everyone today = honest $0).
-            try {
-                const { data: ord, error } = await db.from('orders')
-                    .select('amount,artist_earnings,status,created_at').eq('artist_id', uid).eq('status', 'paid').gte('created_at', since);
-                if (error) throw error;
-                const rev = (ord || []).reduce((a, r) => a + Number(r.artist_earnings != null ? r.artist_earnings : (r.amount || 0)), 0);
-                setTxt('analyticsRevenue', money(rev));
-                setTxt('analyticsRevenueSub', (ord && ord.length) ? (ord.length + ' order' + (ord.length === 1 ? '' : 's') + ' · ' + periodLabel) : 'No sales yet');
-            } catch (e) { window.reportDbError && window.reportDbError('select', 'orders', e, { where: 'analytics' }); }
+            const { data, error } = await db.rpc('artist_analytics', { p_days: days });
+            if (error) {
+                window.reportDbError && window.reportDbError('artist_analytics', 'rpc', error, { where: 'analytics', days });
+                host.innerHTML = _anNotice('Could not load your analytics — ' + (error.message || 'unknown error'), true);
+                return;
+            }
+            if (!data) { host.innerHTML = _anNotice('No analytics returned.', true); return; }
 
-            // Reach — snapshot from artist_stats (Spotify followers, else self-reported). Not period-bound.
-            try {
-                const { data: st } = await db.from('artist_stats').select('spotify_stats,self_reported').eq('user_id', uid).maybeSingle();
-                let reach = null, sub = 'No data yet';
-                const sp = st && st.spotify_stats;
-                if (sp && sp.followers != null) { reach = sp.followers; sub = 'Spotify followers'; }
-                else {
-                    const self = st && st.self_reported;
-                    const selfN = self && (self.monthly_listeners || self.followers);
-                    if (selfN != null) { reach = selfN; sub = 'Self-reported'; }
-                }
-                setTxt('analyticsStreams', reach != null ? Number(reach).toLocaleString() : '—');
-                setTxt('analyticsStreamsSub', sub);
-            } catch (e) { window.reportDbError && window.reportDbError('select', 'artist_stats', e, { where: 'analytics' }); }
+            const h  = data.headline   || {};
+            const e  = data.engagement || {};
+            const tu = data.tool_usage || [];
+            const win = Number(data.window_days) || days;
+            const label = win >= 365 ? 'Last 12 months' : ('Last ' + win + ' days');
 
-            // Engagement + Merch — real counts, honest zeros.
-            try {
-                const act = document.getElementById('analyticsActivity');
-                const { data: posts } = await db.from('artist_posts').select('id').eq('user_id', uid).eq('archived', false);
-                const postIds = (posts || []).map(p => p.id);
-                const postsInPeriod = await db.from('artist_posts').select('id', { count: 'exact', head: true }).eq('user_id', uid).eq('archived', false).gte('created_at', since);
-                let likes = 0, comments = 0;
-                if (postIds.length) {
-                    const lk = await db.from('post_likes').select('id', { count: 'exact', head: true }).in('post_id', postIds).gte('created_at', since);
-                    likes = lk.count || 0;
-                    const cm = await db.from('post_comments').select('id', { count: 'exact', head: true }).in('post_id', postIds).gte('created_at', since);
-                    comments = cm.count || 0;
-                }
-                const prod = await db.from('products').select('id', { count: 'exact', head: true }).eq('artist_id', uid).eq('is_active', true);
-                // Followers = total audience connected via fan_support (cumulative, not period-bound).
-                const foll = await db.from('fan_support').select('id', { count: 'exact', head: true }).eq('artist_id', uid);
-                const cell = (label, val) => '<div style="flex:1;min-width:80px;text-align:center;padding:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:10px;"><div style="font-size:1.25rem;font-weight:700;color:var(--text-primary);">' + val + '</div><div style="font-size:0.66rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.03em;margin-top:2px;">' + label + '</div></div>';
-                if (act) act.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px;">'
-                    + cell('Followers', (foll.count || 0))
-                    + cell('Posts', (postsInPeriod.count || 0))
-                    + cell('Likes', likes)
-                    + cell('Comments', comments)
-                    + cell('Products', (prod.count || 0))
-                    + '</div><div style="font-size:0.72rem;color:var(--text-muted);margin-top:10px;">' + periodLabel + ' — Likes, Comments and Posts count activity in this window. Followers and Products are current totals.</div>';
-            } catch (e) { window.reportDbError && window.reportDbError('select', 'artist_posts', e, { where: 'analytics' }); }
+            // Honest zeros: when the artist genuinely has nothing, say so once rather
+            // than printing a wall of noughts that reads like the page is broken.
+            const totals = ['supporters','support_total','posts','tracks','sync_listings','products','orders','revenue','milestones_done']
+                .reduce((a, k) => a + (Number(h[k]) || 0), 0);
+            const anyEngagement = (Number(e.likes) || 0) + (Number(e.comments) || 0);
+            if (!totals && !anyEngagement && !tu.length) {
+                host.innerHTML =
+                    '<div style="padding:44px 24px;text-align:center;background:var(--bg-card);border:1px dashed var(--border-default);border-radius:14px;">'
+                    + '<div style="font-size:1rem;font-weight:600;color:var(--text-primary);margin-bottom:8px;">Nothing to measure yet</div>'
+                    + '<p style="font-size:0.85rem;color:var(--text-secondary);line-height:1.6;max-width:440px;margin:0 auto;">'
+                    + 'Post something, upload a track, or list for sync, and this fills in. These are real counts from your account — '
+                    + 'nothing here is estimated or filled in for you.</p></div>'
+                    + '<div style="margin-top:14px;">' + _anSelfReported(data.self_reported, data.platform_handles) + '</div>';
+                return;
+            }
+
+            const engSub = (Number(e.likes_window) || 0) + ' · ' + (Number(e.comments_window) || 0) + ' in ' + label.toLowerCase();
+
+            host.innerHTML =
+                '<div class="analytics-summary-grid">'
+                + _anTile('Supporters', _anNum(h.supporters), (Number(h.support_total) || 0) ? _anMoney(h.support_total) + ' pledged' : 'All time')
+                + _anTile('Revenue', _anMoney(h.revenue), (Number(h.orders) || 0) + ' order' + ((Number(h.orders) || 0) === 1 ? '' : 's'))
+                + _anTile('Posts', _anNum(h.posts), 'All time')
+                + _anTile('Engagement', _anNum((Number(e.likes) || 0) + (Number(e.comments) || 0)), engSub)
+                + '</div>'
+
+                + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:14px 0;">'
+                + _anTile('Tracks', _anNum(h.tracks), '')
+                + _anTile('Sync listings', _anNum(h.sync_listings), '')
+                + _anTile('Products', _anNum(h.products), '')
+                + _anTile('Milestones', _anNum(h.milestones_done), 'completed')
+                + '</div>'
+
+                + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-bottom:14px;">'
+                + _anToolUsage(tu)
+                + '<div style="background:var(--bg-card);border:1px solid var(--border-default);border-radius:12px;padding:16px;">'
+                +   '<h4 style="font-size:0.8rem;font-weight:600;margin:0 0 4px;color:var(--text-primary);">Activity</h4>'
+                +   '<p style="font-size:0.72rem;color:var(--text-muted);margin:0 0 2px;">Your sessions · ' + _anEsc(label.toLowerCase()) + '</p>'
+                +   (_anSpark(data.activity_days, 'events', win) || '<p style="font-size:0.78rem;color:var(--text-muted);margin:8px 0 0;">No activity recorded in this window.</p>')
+                +   '<p style="font-size:0.72rem;color:var(--text-muted);margin:12px 0 2px;">Posts published</p>'
+                +   (_anSpark(data.posts_timeline, 'posts', win) || '<p style="font-size:0.78rem;color:var(--text-muted);margin:8px 0 0;">No posts in this window.</p>')
+                + '</div>'
+                + '</div>'
+
+                + _anSelfReported(data.self_reported, data.platform_handles);
         }
         window.loadArtistAnalytics = loadArtistAnalytics;
 
