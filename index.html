@@ -5668,9 +5668,9 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                             <div class="settings-toggle-row">
                                 <div class="settings-toggle-info">
                                     <div class="settings-toggle-label">Public artist page</div>
-                                    <div class="settings-toggle-desc">When off, your page is hidden from search and discovery.</div>
+                                    <div class="settings-toggle-desc">When off, your page is hidden from search and discovery, and a direct link shows nothing.</div>
                                 </div>
-                                <div class="settings-toggle active" onclick="toggleSetting(this)"></div>
+                                <div class="settings-toggle active" id="setPublicProfile" data-section="profile" onclick="toggleSetting(this)"></div>
                             </div>
                             <div class="settings-actions">
                                 <button class="settings-btn secondary">Preview public page</button>
@@ -13769,6 +13769,27 @@ Only capture real, meaningful decisions — not questions or general discussion.
         async function persistSettingsSection(section) {
             const uid = aiadResolvedUserId();
             if (!uid) return { message: 'Not signed in' };
+
+            // Page visibility is a column on artist_profiles, not one of the three
+            // user_settings jsonb buckets — list_artists filters on it there, so that
+            // is where it has to be written.
+            if (section === 'profile') {
+                const el = document.getElementById('setPublicProfile');
+                const isPublic = !!(el && el.classList.contains('active'));
+                const { data, error } = await db.from('artist_profiles')
+                    .update({ is_public: isPublic, updated_at: new Date().toISOString() })
+                    .eq('user_id', uid)
+                    .select('user_id');
+                if (error) {
+                    window.reportDbError && window.reportDbError('artist_profiles', 'update', error, { section: 'profile' });
+                    return error;
+                }
+                // An update that matched nothing is not a save. Say so rather than
+                // letting the switch sit there claiming a state nothing stored.
+                if (!data || !data.length) return { message: 'No artist profile to update' };
+                return null;
+            }
+
             const payload = collectSettings(section);
             const { error } = await db.from('user_settings')
                 .upsert({ user_id: uid, [section]: payload, updated_at: new Date().toISOString() },
@@ -13943,6 +13964,20 @@ Only capture real, meaningful decisions — not questions or general discussion.
             const emailEl = document.getElementById('setAccountEmail');
             if (emailEl) emailEl.value = AppState.currentUser.email || '';
             loadDecisionMemories();
+
+            // Public-page visibility reads from artist_profiles, alongside the
+            // user_settings row. Absent column value defaults to public, matching
+            // the coalesce(is_public, true) the discovery RPCs use.
+            try {
+                const { data: ap, error: apErr } = await db.from('artist_profiles')
+                    .select('is_public').eq('user_id', uid).maybeSingle();
+                if (apErr) { window.reportDbError && window.reportDbError('artist_profiles', 'select', apErr, { where: 'loadUserSettings' }); }
+                else {
+                    const el = document.getElementById('setPublicProfile');
+                    if (el) el.classList.toggle('active', ap ? ap.is_public !== false : true);
+                }
+            } catch (e) { /* on-page default stands */ }
+
             try {
                 const { data, error } = await db.from('user_settings')
                     .select('monetization,guidance,notifications')
@@ -23851,13 +23886,18 @@ async function loadArtistPage(artistId) {
     if(artistId.includes('-')) {
         try {
             const { data: d1, error: e1 } = await db.from('artist_profiles')
-                .select('id,user_id,artist_name,tagline,short_bio,full_bio,location')
+                .select('id,user_id,artist_name,tagline,short_bio,full_bio,location,is_public')
                 .eq('id', artistId).maybeSingle();
             console.log('[AIAD] artist profile fetch:', d1 ? 'found: '+d1.artist_name : 'null', 'error:', e1?.message || 'none');
             if (d1) profile = d1;
         } catch(e) { console.warn('[AIAD] fetch error:', e); }
     }
-    if(!profile){try{const q='%'+artistId+'%';const{data}=await db.from('artist_profiles').select('*').ilike('artist_name',q).limit(1);profile=data?.[0]||null;}catch(e){}}
+    if(!profile){try{const q='%'+artistId+'%';const{data}=await db.from('artist_profiles').select('*').ilike('artist_name',q).eq('is_public',true).limit(1);profile=data?.[0]||null;}catch(e){}}
+    // A hidden page is not-found to everyone but its owner, who still needs to see
+    // it to check what they have turned off. RLS returns the row to any signed-in
+    // user, so this is presentation, not a security boundary — the enforcement that
+    // matters is in the RPCs.
+    if (profile && profile.is_public === false && profile.user_id !== uid) profile = null;
     if(!profile){if(nameEl)nameEl.textContent='Artist not found';return;}
     const name=profile.artist_name||'Artist';
     const genre=profile.tagline||'';
@@ -29181,7 +29221,13 @@ Be direct and concrete with real industry insight — never generic filler. When
     if(!pid) return;
     var s=sess(); var hdr={apikey:ANON}; if(s) hdr.Authorization='Bearer '+s.access_token;
     var ap=null;
-    try{ var r=await fetch(SU+'/rest/v1/artist_profiles?or=(id.eq.'+pid+',user_id.eq.'+pid+')&select=id,user_id,artist_name,tagline,short_bio,location,primary_genre&limit=1',{headers:hdr}); var j=await r.json(); ap=j&&j[0]; }catch(e){}
+    try{ var r=await fetch(SU+'/rest/v1/artist_profiles?or=(id.eq.'+pid+',user_id.eq.'+pid+')&select=id,user_id,artist_name,tagline,short_bio,location,primary_genre,is_public&limit=1',{headers:hdr}); var j=await r.json(); ap=j&&j[0]; }catch(e){}
+    // Hidden pages do not open from in-app links either. Owner still gets through.
+    var _me = (s && s.user && s.user.id) || null;
+    if (ap && ap.is_public === false && ap.user_id !== _me) {
+      try { (window.showToast || function(m){ alert(m); })('That artist page isn\'t available'); } catch(e){}
+      return;
+    }
     if(!ap) ap={artist_name:'Artist', user_id:pid};
     try{ ap.avatar_url = await window.aiadAvatarFor(ap.user_id||ap.id||pid); }catch(e){ ap.avatar_url=''; }
     var tracks=[];
