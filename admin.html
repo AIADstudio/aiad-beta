@@ -202,12 +202,47 @@
             +'<div class="muted">Could not generate brief'+(why?': '+esc(why):'.')+'</div></div>';
           return;
         }
-        renderBrief(d,host);
+
+        // Errors come from admin_error_summary(24, true) rather than the brief's own
+        // count: same 24h window, but production_only drops localhost traffic, so a
+        // day of local testing can't read as a day of live failures. Nothing is
+        // dropped on write — pass false to see everything.
+        let errSum=null;
+        try{
+          const er=await fetch(API+'/rest/v1/rpc/admin_error_summary',{method:'POST',
+            headers:{apikey:ANON,Authorization:'Bearer '+t,'Content-Type':'application/json'},
+            body:JSON.stringify({p_hours:24,p_production_only:true})});
+          const ej=await er.json().catch(function(){return null;});
+          if(er.ok && ej && typeof ej.total==='number') errSum=ej;
+          else console.warn('[admin] error summary unavailable:',(ej&&(ej.message||ej.error))||er.status);
+        }catch(e){ console.warn('[admin] error summary failed:',e.message); }
+
+        renderBrief(d,host,errSum);
       }
 
-      function renderBrief(d,host){
+      // admin_error_summary and the brief's errors_24h use different key names for
+      // the same things. Normalise to the shape the panel already renders, and fall
+      // back to the brief if the summary call didn't come back.
+      function normalizeErrors(sum,briefErr){
+        if(sum && typeof sum.total==='number'){
+          return {
+            total: sum.total,
+            auto:  sum.total,
+            issues: sum.distinct_issues||0,
+            users:  sum.affected_users||0,
+            productionOnly: sum.production_only!==false,
+            top: (sum.top||[]).map(function(t){
+              return { target:t.message||'', detail:t.error_detail||'', n:t.n||0,
+                       url:t.url||'', users:t.users||0, last_seen:t.last_seen||'' };
+            })
+          };
+        }
+        return briefErr||{total:0,auto:0,top:[]};
+      }
+
+      function renderBrief(d,host,errSum){
         const h=d.health||{}, ins=d.instrumentation||{}, w=d.watchlist||{};
-        const err=d.errors_24h||{total:0,auto:0,top:[]};
+        const err=normalizeErrors(errSum,d.errors_24h);
         const sup=d.support||{open:0,tickets:[]};
         const silent=w.silent_signups||[];
         const trend=(h.signups_7d||0)-(h.signups_prior_7d||0);
@@ -223,7 +258,9 @@
         } else if(err.auto>0){
           const top=(err.top||[])[0]||{};
           lead={t:'Silent failures are firing in production.',
-            b:err.auto+' auto-logged errors in 24h. Most frequent: '+(top.target||'')+' — '+(top.detail||'')+' ('+(top.n||0)+'×).'};
+            b:err.auto+' error'+(err.auto===1?'':'s')+' in 24h'
+             +(err.users?' across '+err.users+' user'+(err.users===1?'':'s'):'')
+             +'. Most frequent: '+(top.target||'')+' — '+(top.detail||'')+' ('+(top.n||0)+'×).'};
         } else if(silent.length>=3){
           lead={t:'Signups are arriving and never activating.',
             b:silent.length+' accounts have never fired a single event.'};
@@ -263,7 +300,7 @@
             +kpi('New 24h',h.signups_24h||0,(h.signups_24h?'#22c55e':null))
             +kpi('Active 3d',h.active_3d||0)
             +kpi('Ever active',(h.profiles_with_event||0)+'/'+(h.signups_total||0))
-            +kpi('Errors 24h',err.auto||0,(err.auto?'#f87171':'#22c55e'))
+            +kpi('Errors 24h'+(err.productionOnly?' (prod)':''),err.auto||0,(err.auto?'#f87171':'#22c55e'))
             +kpi('Open tickets',sup.open||0,(sup.open?'#FFB020':'#22c55e'))
           +'</div>'
           +'<div class="muted" style="font-size:13px">'+(h.signups_7d||0)+' signups in 7 days — '+esc(trendTxt)+'.</div>'
