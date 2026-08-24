@@ -3499,20 +3499,19 @@ html, body {
                 </div>
                 <div class="dash-subtitle">Artist Dashboard</div>
                 <nav class="dash-nav">
-                    <div class="dash-nav-item" id="navHome" onclick="showArtistView('home')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span> Home</span></div>
-                    <div class="dash-nav-item active" onclick="showArtistView('posts')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/></svg><span> Posts</span></div>
-                    <div class="dash-nav-item" onclick="showArtistView('agent')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span> AIAD Agent</span></div>
-                    <div class="dash-nav-item" onclick="showArtistView('supporters')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg><span> Supporters</span></div>
-                    <div class="dash-nav-item" onclick="showArtistView('collaborators')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg><span> Collaborators</span></div>
-                    <div class="dash-nav-item" onclick="showArtistView('projects')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg><span> Projects</span></div>
-                    <div class="dash-nav-item" onclick="showArtistView('schedule')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span> Schedule</span></div>
-                    <div class="dash-nav-item" onclick="showArtistView('revenue')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg><span> Revenue</span></div>
-                    <div class="dash-nav-item" onclick="showArtistView('analytics')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span> Analytics</span></div>
-                    <div class="dash-nav-item" id="navMyStats" onclick="showArtistView('mystats')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span> My Stats</span></div>
-                    <div class="dash-nav-item" onclick="showArtistView('milestones')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span> Milestones</span></div>
-                    <div class="dash-nav-item" onclick="showArtistView('inbox')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><span> Inbox </span><span id="artistInboxBadge" style="display:none;margin-left:auto;background:#f59e0b;color:#111;font-size:0.6rem;font-weight:700;min-width:16px;height:16px;border-radius:999px;display:none;align-items:center;justify-content:center;padding:0 5px;">0</span></div>
-                    <div class="dash-nav-item" id="navStore" onclick="showArtistView('store')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg><span> Store</span></div>
-                    <div class="dash-nav-item" id="navPayouts" onclick="showArtistView('payouts')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg><span> Payouts</span></div>
+                    <div class="dash-nav-item" id="navHome" data-view="home" onclick="showArtistView('home')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span> Home</span></div>
+                    <div class="dash-nav-item active" data-view="posts" onclick="showArtistView('posts')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/></svg><span> Posts</span></div>
+                    <div class="dash-nav-item" data-view="agent" onclick="showArtistView('agent')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span> AIAD Agent</span></div>
+                    <div class="dash-nav-item" data-view="supporters" onclick="showArtistView('supporters')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg><span> Supporters</span></div>
+                    <div class="dash-nav-item" data-view="collaborators" onclick="showArtistView('collaborators')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg><span> Collaborators</span></div>
+                    <div class="dash-nav-item" data-view="plan" onclick="showArtistView('plan')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span>Plan</span></div>
+                    <div class="dash-nav-item" data-view="revenue" onclick="showArtistView('revenue')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg><span> Revenue</span></div>
+                    <div class="dash-nav-item" data-view="analytics" onclick="showArtistView('analytics')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span> Analytics</span></div>
+                    <div class="dash-nav-item" id="navMyStats" data-view="mystats" onclick="showArtistView('mystats')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span> My Stats</span></div>
+                    <div class="dash-nav-item" data-view="milestones" onclick="showArtistView('milestones')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span> Milestones</span></div>
+                    <div class="dash-nav-item" data-view="inbox" onclick="showArtistView('inbox')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><span> Inbox </span><span id="artistInboxBadge" style="display:none;margin-left:auto;background:#f59e0b;color:#111;font-size:0.6rem;font-weight:700;min-width:16px;height:16px;border-radius:999px;display:none;align-items:center;justify-content:center;padding:0 5px;">0</span></div>
+                    <div class="dash-nav-item" id="navStore" data-view="store" onclick="showArtistView('store')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg><span> Store</span></div>
+                    <div class="dash-nav-item" id="navPayouts" data-view="payouts" onclick="showArtistView('payouts')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg><span> Payouts</span></div>
                     <div class="dash-nav-item dash-nav-dropdown" onclick="toggleCreativeStudio()">
                         <svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
                         <span>Creative Studio</span>
@@ -3570,6 +3569,48 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     </div>
                 </div>
 
+
+                <div class="dash-view" id="artistPlanView">
+                    <div class="studio-layout">
+                    <div> <!-- main -->
+                    <div class="view-header">
+                        <div>
+                            <h1 class="view-title">Plan</h1>
+                            <p class="view-subtitle">Your projects and dates on one timeline</p>
+                        </div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                            <button class="primary-btn" onclick="openNewProjectModal()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                New Project
+                            </button>
+                            <button class="primary-btn" onclick="openNewEventModal()" style="background:transparent;border:1px solid var(--border-default);color:var(--text-secondary);">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                Schedule Event
+                            </button>
+                        </div>
+                    </div>
+                    <div id="planTimeline">
+                        <div style="padding:40px;text-align:center;color:var(--text-muted);font-size:0.875rem;">Loading&hellip;</div>
+                    </div>
+                    </div> <!-- /main -->
+                    <div class="studio-agent-col" id="planAiadPanel" style="position:sticky;top:24px;">
+                        <div class="studio-agent-header">
+                            <div class="studio-agent-dot"></div>
+                            <span class="studio-agent-name">AIAD &middot; Planning</span>
+                        </div>
+                        <div class="studio-agent-messages" id="planAgentMsgs">
+                            <div class="studio-agent-msg agent">Ask me about sequencing a release, or what to line up next.</div>
+                        </div>
+                        <div class="studio-agent-input-row">
+                            <textarea class="studio-agent-input" id="planAgentInput" placeholder="Ask about planning your next release..." rows="1"
+                                onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();studioAgentSend('plan');}"></textarea>
+                            <button class="studio-agent-send" onclick="studioAgentSend('plan')">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    </div> <!-- /studio-layout -->
+                </div>
 
                 <div class="dash-view" id="artistProjectsView">
                     <div class="studio-layout">
@@ -5474,18 +5515,6 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                             <div style="font-size:0.75rem;font-weight:600;color:var(--text-primary);margin-bottom:14px;">Your Top Tracks — Last 4 Weeks</div>
                             <div id="spotifyTopTracks" style="display:flex;flex-direction:column;gap:10px;"></div>
                         </div>
-                    </div>
-
-                    <div class="guidance-note" id="analyticsGuidanceNote">
-                        <div class="guidance-note-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-                        </div>
-                        <div class="guidance-note-content">
-                            <p class="guidance-note-text">Follower growth is up while revenue is flat. Many artists pause here to reassess priorities. Neither direction is wrong — it depends what you're building toward.</p>
-                        </div>
-                        <button class="guidance-note-dismiss" onclick="dismissGuidanceNote('analyticsGuidanceNote')">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                        </button>
                     </div>
 
                     <div class="time-period-selector">
@@ -12774,6 +12803,12 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         }
 
         async function loadArtistSchedule() {
+            // Plan is the surface these rows are shown on now. The old views are kept
+            // and still render correctly, but when Plan is active it is what needs redrawing.
+            if (document.getElementById('artistPlanView') &&
+                document.getElementById('artistPlanView').classList.contains('active')) {
+                return loadPlan();
+            }
             const uid = aiadResolvedUserId();
             if (!uid) return;
             const list = document.getElementById('scheduleEventsList');
@@ -12850,7 +12885,124 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             loadArtistProjects();
         }
 
+        // Projects and Schedule are the same mental model — work with dates attached —
+        // so they render as one timeline. Both tables are kept; this is one surface over
+        // the two. Reads are issued together and BOTH errors surface: an unreadable table
+        // must not look like an artist with nothing planned.
+        async function loadPlan() {
+            const host = document.getElementById('planTimeline');
+            if (!host) return;
+            const uid = aiadResolvedUserId();
+            if (!uid) { host.innerHTML = _planNotice('Sign in to see your plan.'); return; }
+
+            const [projRes, schedRes] = await Promise.all([
+                db.from('artist_projects').select('id,title,type,status,progress,target_date,description').eq('user_id', uid),
+                db.from('artist_schedule').select('id,title,type,event_date,notes').eq('user_id', uid)
+            ]);
+            const failed = [];
+            if (projRes.error)  { failed.push('projects: ' + projRes.error.message);  console.warn('[AIAD] plan projects:', projRes.error.message); }
+            if (schedRes.error) { failed.push('schedule: ' + schedRes.error.message); console.warn('[AIAD] plan schedule:', schedRes.error.message); }
+            if (failed.length === 2) { host.innerHTML = _planNotice('Could not load your plan — ' + failed.join('; '), true); return; }
+
+            const projects = projRes.data || [];
+            const events   = schedRes.data || [];
+            window._projectsMap = window._projectsMap || {};
+            projects.forEach(p => { window._projectsMap[p.id] = p; });
+
+            const dated = [];
+            const undated = [];
+            projects.forEach(p => (p.target_date ? dated : undated).push({ kind: 'project', date: p.target_date, row: p }));
+            events.forEach(e => { if (e.event_date) dated.push({ kind: 'event', date: e.event_date, row: e }); });
+            dated.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+
+            if (!dated.length && !undated.length) {
+                host.innerHTML = _planEmpty();
+                return;
+            }
+
+            let html = '';
+            if (failed.length === 1) html += _planNotice('Partly loaded — ' + failed[0], true);
+            if (dated.length) html += '<div style="display:flex;flex-direction:column;gap:10px;">' + dated.map(_planItem).join('') + '</div>';
+            if (undated.length) {
+                html += '<h3 class="section-title" style="margin:22px 0 10px;">No date set</h3>'
+                     + '<div style="display:flex;flex-direction:column;gap:10px;">' + undated.map(_planItem).join('') + '</div>';
+            }
+            host.innerHTML = html;
+        }
+        window.loadPlan = loadPlan;
+
+        // escapeHtml() lower in the file is not on window, so the Plan helpers carry
+        // their own. Everything below renders artist-authored titles and notes.
+        function _planEsc(v) {
+            return String(v == null ? '' : v)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        function _planNotice(msg, bad) {
+            return '<div style="padding:12px 14px;margin-bottom:12px;border-radius:10px;font-size:0.82rem;line-height:1.5;'
+                + (bad ? 'background:rgba(255,107,107,0.08);border:1px solid rgba(255,107,107,0.35);color:#ff9b9b;'
+                       : 'background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-secondary);')
+                + '">' + _planEsc(msg) + '</div>';
+        }
+
+        function _planEmpty() {
+            return '<div style="padding:44px 24px;text-align:center;background:var(--bg-card);border:1px dashed var(--border-default);border-radius:14px;">'
+                + '<div style="font-size:1rem;font-weight:600;color:var(--text-primary);margin-bottom:8px;">Nothing planned yet</div>'
+                + '<p style="font-size:0.85rem;color:var(--text-secondary);line-height:1.6;max-width:420px;margin:0 auto 18px;">'
+                + 'Plan is where your releases, deadlines and dates live on one timeline. Add a project to track work toward a date, '
+                + 'or schedule an event for something already fixed.</p>'
+                + '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">'
+                + '<button class="primary-btn" onclick="openNewProjectModal()">New Project</button>'
+                + '<button class="primary-btn" onclick="openNewEventModal()" style="background:transparent;border:1px solid var(--border-default);color:var(--text-secondary);">Schedule Event</button>'
+                + '</div></div>';
+        }
+
+        function _planItem(it) {
+            const statusColors = { planning: '#6366f1', 'in-progress': '#10b981', completed: '#f59e0b', pending: '#6b7280' };
+            const r = it.row;
+            let badge = '<div class="event-date-badge" style="opacity:0.45;"><span class="event-day">--</span><span class="event-month">&nbsp;</span></div>';
+            if (it.date) {
+                const d = new Date(String(it.date).slice(0, 10) + 'T12:00:00');
+                if (!isNaN(d)) {
+                    badge = '<div class="event-date-badge"><span class="event-day">' + String(d.getDate()).padStart(2, '0')
+                          + '</span><span class="event-month">' + d.toLocaleDateString('en-US', { month: 'short' }) + '</span></div>';
+                }
+            }
+            if (it.kind === 'project') {
+                const pct = Math.max(0, Math.min(100, Number(r.progress) || 0));
+                return '<div class="event-card" style="cursor:pointer;" onclick="openProjectDetail(window._projectsMap[\'' + r.id + '\'])">'
+                    + badge
+                    + '<div class="event-content" style="flex:1;min-width:0;">'
+                    + '<div class="event-type" style="color:' + (statusColors[r.status] || '#6b7280') + ';">Project'
+                    + (r.status ? ' &middot; ' + _planEsc(r.status) : '') + '</div>'
+                    + '<h4 class="event-title">' + _planEsc(r.title || 'Untitled') + '</h4>'
+                    + '<div class="project-card-progress" style="margin-top:8px;">'
+                    + '<div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%"></div></div>'
+                    + '<span class="progress-label">' + pct + '% complete</span></div>'
+                    + '</div></div>';
+            }
+            return '<div class="event-card" style="cursor:pointer;" data-event-id="' + r.id + '" data-event-date="' + _planEsc(r.event_date || '') + '"'
+                + ' onclick="openScheduleDetail(' + JSON.stringify(r.title || '').replace(/"/g, '&quot;') + ','
+                + JSON.stringify(String(r.event_date || '')).replace(/"/g, '&quot;') + ','
+                + JSON.stringify(String(r.type || '')).replace(/"/g, '&quot;') + ','
+                + JSON.stringify(String(r.notes || '')).replace(/"/g, '&quot;') + ','
+                + JSON.stringify(String(r.id)).replace(/"/g, '&quot;') + ')">'
+                + badge
+                + '<div class="event-content" style="flex:1;min-width:0;">'
+                + '<div class="event-type ' + _planEsc(r.type || '') + '">' + _planEsc(r.type || 'Event') + '</div>'
+                + '<h4 class="event-title">' + _planEsc(r.title || 'Untitled') + '</h4>'
+                + (r.notes ? '<p class="event-meta">' + _planEsc(r.notes) + '</p>' : '')
+                + '</div></div>';
+        }
+
         async function loadArtistProjects() {
+            // Plan is the surface these rows are shown on now. The old views are kept
+            // and still render correctly, but when Plan is active it is what needs redrawing.
+            if (document.getElementById('artistPlanView') &&
+                document.getElementById('artistPlanView').classList.contains('active')) {
+                return loadPlan();
+            }
             const uid = aiadResolvedUserId();
             if (!uid) return;
             const grid = document.getElementById('projectsGrid');
@@ -13954,7 +14106,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             try { history.replaceState(null, '', '#artist/' + view); } catch (e) {}
             try { window.aiadTrackTool && window.aiadTrackTool('artist:' + view); } catch (e) {}
 
-            const allViews = ['artistHomeView', 'artistPostsView', 'artistSupportersView', 'artistProjectsView', 'artistRevenueView', 'artistScheduleView', 'artistCollaboratorsView', 'artistMusicView', 'artistSongwritingView', 'artistMixMediaView', 'artistMerchView', 'artistSyncLibraryView', 'artistMilestonesView', 'artistAnalyticsView', 'artistMyStatsView', 'artistAgentsView', 'artistInboxView', 'artistSettingsView', 'artistStoreView', 'artistPayoutsView'];
+            const allViews = ['artistPlanView', 'artistHomeView', 'artistPostsView', 'artistSupportersView', 'artistProjectsView', 'artistRevenueView', 'artistScheduleView', 'artistCollaboratorsView', 'artistMusicView', 'artistSongwritingView', 'artistMixMediaView', 'artistMerchView', 'artistSyncLibraryView', 'artistMilestonesView', 'artistAnalyticsView', 'artistMyStatsView', 'artistAgentsView', 'artistInboxView', 'artistSettingsView', 'artistStoreView', 'artistPayoutsView'];
             allViews.forEach(v => {
                 const el = document.getElementById(v);
                 if (el) el.classList.remove('active');
@@ -13962,6 +14114,12 @@ Only capture real, meaningful decisions — not questions or general discussion.
 
             const navItems = document.querySelectorAll('#artistDashboard .dash-nav-item:not(.dash-nav-dropdown)');
             navItems.forEach(item => item.classList.remove('active'));
+            // Highlight by data-view rather than by position: merging two nav rows into
+            // one would otherwise silently shift every index after it by one.
+            const markNav = (v) => {
+                const el = document.querySelector('#artistDashboard .dash-nav-item[data-view="' + v + '"]');
+                if (el) el.classList.add('active');
+            };
 
             const subItems = document.querySelectorAll('#artistDashboard .dash-nav-subitem');
             subItems.forEach(item => item.classList.remove('active'));
@@ -13974,9 +14132,12 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 'posts': 'artistPostsView',
                 'agent': 'artistAgentsView',
                 'supporters': 'artistSupportersView',
-                'projects': 'artistProjectsView',
+                // Projects and Schedule merged into Plan. Both keys still resolve so
+                // existing #artist/projects and #artist/schedule links keep working.
+                'plan': 'artistPlanView',
+                'projects': 'artistPlanView',
                 'collaborators': 'artistCollaboratorsView',
-                'schedule': 'artistScheduleView',
+                'schedule': 'artistPlanView',
                 'revenue': 'artistRevenueView',
                 'music': 'artistMusicView',
                 'songwriting': 'artistSongwritingView',
@@ -14006,10 +14167,10 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 loadHomeFeed();
             } else if (view === 'posts') {
                 viewEl.classList.add('active');
-                navItems[1].classList.add('active');
+                markNav('posts');
             } else if (view === 'agent') {
                 viewEl.classList.add('active');
-                navItems[2].classList.add('active');
+                markNav('agent');
                 setTimeout(() => {
                     renderIndustryAIPrompts();
                     populateAgentContext();
@@ -14022,25 +14183,21 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 }, 50);
             } else if (view === 'supporters') {
                 viewEl.classList.add('active');
-                navItems[3].classList.add('active');
+                markNav('supporters');
                 // Was loadSupportersData() — a name nothing defines, called twice. The
                 // real loader is loadArtistSupporters(), which guards on currentUser.
                 setTimeout(() => { try { loadArtistSupporters(); } catch (e) { console.warn('[AIAD] supporters load failed:', e); } }, 100);
-            } else if (view === 'projects') {
+            } else if (view === 'projects' || view === 'schedule' || view === 'plan') {
                 viewEl.classList.add('active');
-                navItems[5].classList.add('active');
-                setTimeout(() => { try { loadArtistProjects(); } catch (e) {} }, 100);
+                markNav('plan');
+                setTimeout(() => { try { loadPlan(); } catch (e) {} }, 100);
             } else if (view === 'collaborators') {
                 viewEl.classList.add('active');
-                navItems[4].classList.add('active');
+                markNav('collaborators');
                 setTimeout(() => { try { loadCollaborators(); } catch (e) {} }, 100);
-            } else if (view === 'schedule') {
-                viewEl.classList.add('active');
-                navItems[6].classList.add('active');
-                setTimeout(() => { try { loadArtistSchedule(); } catch (e) {} }, 100);
             } else if (view === 'revenue') {
                 viewEl.classList.add('active');
-                navItems[7].classList.add('active');
+                markNav('revenue');
                 if (typeof loadRevenueData === 'function') setTimeout(() => loadRevenueData(), 100);
                 try { window.aiadLoadEarnings && window.aiadLoadEarnings(); } catch (e) {}
             } else if (view === 'music') {
@@ -14086,27 +14243,27 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 }, 80);
             } else if (view === 'analytics') {
                 viewEl.classList.add('active');
-                navItems[8].classList.add('active');
+                markNav('analytics');
                 setTimeout(() => { try { loadArtistAnalytics(window._analyticsPeriod || 30); } catch (e) {} }, 60);
             } else if (view === 'mystats') {
                 viewEl.classList.add('active');
-                if (navItems[9]) navItems[9].classList.add('active');
+                markNav('mystats');
                 setTimeout(() => { if (typeof loadMyStats === 'function') loadMyStats(); }, 60);
             } else if (view === 'milestones') {
                 viewEl.classList.add('active');
-                if (navItems[10]) navItems[10].classList.add('active');
+                markNav('milestones');
                 setTimeout(() => { try { loadArtistMilestones(); } catch (e) {} }, 100);
             } else if (view === 'inbox') {
                 viewEl.classList.add('active');
-                if (navItems[11]) navItems[11].classList.add('active');
+                markNav('inbox');
                 setTimeout(function () { if (window.loadArtistInbox) loadArtistInbox(); }, 50);
             } else if (view === 'store') {
                 viewEl.classList.add('active');
-                if (navItems[12]) navItems[12].classList.add('active');
+                markNav('store');
                 setTimeout(() => { if (window.loadStoreManager) loadStoreManager(); }, 60);
             } else if (view === 'payouts') {
                 viewEl.classList.add('active');
-                if (navItems[13]) navItems[13].classList.add('active');
+                markNav('payouts');
                 setTimeout(() => { if (window.loadPayouts) loadPayouts('payoutsBody'); }, 60);
             } else if (view === 'settings') {
                 viewEl.classList.add('active');
@@ -19468,17 +19625,6 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 setTimeout(() => {
                     insight.style.display = 'none';
                     checkRemainingInsights();
-                }, 200);
-            }
-        }
-
-        function dismissGuidanceNote(noteId) {
-            const note = document.getElementById(noteId);
-            if (note) {
-                note.style.opacity = '0';
-                note.style.transform = 'translateY(-10px)';
-                setTimeout(() => {
-                    note.style.display = 'none';
                 }, 200);
             }
         }
