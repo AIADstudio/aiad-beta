@@ -500,11 +500,20 @@ html, body {
     margin-left:0 !important;
     padding-left:0 !important;
 }
+/* .open is set by an explicit tap on the Creative Studio row, not by hover, so it
+   un-clamps on every device. This override used to live only inside the
+   (hover:hover) and (pointer:fine) block below — which a phone matches neither
+   half of — so max-height:0 was never lifted on touch and the five Creative
+   Studio destinations could not be opened at all. */
+.dash-nav-submenu.open {
+    max-height:400px !important;
+}
 /* Touch devices fire :hover on the first tap and only navigate on the second,
-   so the sidebar needed two taps. Gate the expansion on a real pointer. */
+   so the sidebar needed two taps. Gate the hover-to-expand on a real pointer;
+   this is the collapsed-rail behaviour, separate from the tap toggle above. */
 @media (hover: hover) and (pointer: fine) {
 .dash-sidebar-left:hover .dash-nav-submenu.open {
-    max-height:300px !important;
+    max-height:400px !important;
 }
 }
 /* Right sidebar stays as-is */
@@ -603,6 +612,21 @@ html, body {
   .dash-sidebar-left{height:100vh !important;max-height:100vh !important;overflow:hidden !important;position:sticky !important;top:0 !important;}
   .dash-sidebar-left .dash-nav{flex:1 1 auto !important;min-height:0 !important;overflow-y:auto !important;}
   .dash-sidebar-left .dash-sidebar-footer{flex-shrink:0 !important;margin-top:0 !important;}
+}
+/* Mobile drawer: same problem, and it had no counterpart. .dash-nav overflowed
+   visible, so its children painted outside the box without adding to the
+   sidebar's scrollHeight — the drawer would scroll 34px and stop. Expanding
+   Creative Studio pushed all five items below the fold with no way to reach
+   them, which read as a heading with nothing under it. Scroll the nav itself. */
+@media (max-width:768px){
+  .dash-sidebar-left{display:flex !important;flex-direction:column !important;overflow:hidden !important;}
+  /* The bottom nav bar is 64px and sits above the drawer at z-index 100000, so the
+     last item scrolls under it without this clearance. */
+  .dash-sidebar-left .dash-nav{flex:1 1 auto !important;min-height:0 !important;overflow-y:auto !important;-webkit-overflow-scrolling:touch;
+    padding-bottom:calc(72px + env(safe-area-inset-bottom, 0px)) !important;}
+  .dash-sidebar-left .dash-logo,
+  .dash-sidebar-left .dash-subtitle,
+  .dash-sidebar-left .dash-sidebar-footer{flex-shrink:0 !important;}
 }
 </style>
 </head>
@@ -12686,6 +12710,9 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 const dateEl = document.getElementById(`ms-date-${key}`);
                 if (dateEl) dateEl.textContent = now.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
                 showToast('Milestone achieved 🎯');
+                // Only when completing — un-ticking a milestone is not an achievement.
+                const _msName = (row.querySelector('.milestone-title') || {}).textContent || '';
+                window.aiadNotify && window.aiadNotify('milestone_done', { name: _msName });
             }
         }
 
@@ -13908,6 +13935,14 @@ Only capture real, meaningful decisions — not questions or general discussion.
             const submenu = document.getElementById('creativeStudioSubmenu');
             dropdown.classList.toggle('open');
             submenu.classList.toggle('open');
+            // Creative Studio sits last in the nav, so on a phone the five items
+            // expand below the fold and look like nothing happened. Bring them
+            // into view once the max-height transition has run.
+            if (submenu.classList.contains('open')) {
+                setTimeout(function () {
+                    try { submenu.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (e) {}
+                }, 220);
+            }
         }
 
         function showArtistView(view) {
@@ -18098,6 +18133,9 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 } else {
                     console.log('Track saved to DB:', data);
                     showToast('Track saved to library ✓');
+                    // Inside the success branch on purpose: the error branch above
+                    // means nothing was saved, so there is nothing to announce.
+                    window.aiadNotify && window.aiadNotify('track_ready', { title: payload.title });
                 }
             } catch (e) {
                 console.error('Track save exception:', e);
@@ -26888,6 +26926,8 @@ Be direct and concrete with real industry insight — never generic filler. When
                     throw Object.assign(new Error(err.message || `sync_listings ${res.status}`), { code: err.code, details: err.details });
                 }
                 (window.showToast || alert)(`"${title}" listed in the Sync Library`);
+                // Past the !res.ok throw above, so the row really is in sync_listings.
+                window.aiadNotify && window.aiadNotify('sync_live', { title: title });
                 ['syncTrackTitle', 'syncTrackPrice', 'syncTrackBpm'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
                 if (attest) attest.checked = false;
                 loadMyListings();
@@ -29522,6 +29562,12 @@ Be direct and concrete with real industry insight — never generic filler. When
 
             window.closeModal();
             toast(id ? 'Product updated' : 'Product added');
+            // Only a genuinely new, live product is "published". A saved draft
+            // (is_active false) isn't, and an edit to an already-listed product
+            // isn't either — neither should claim to be.
+            if (!id && row.is_active) {
+                window.aiadNotify && window.aiadNotify('product_live', { name: row.name });
+            }
             loadStoreManager();
         } catch (e) {
             window.reportError('product_save_failed', (e && e.message) || String(e), {});
@@ -31552,6 +31598,90 @@ window.AIAD_PROMPTS = [
     };
 })();
 
+</script>
+
+<script>
+/* ── In-app notifications ──────────────────────────────────────────────────
+   Fires only after an action the artist actually took has completed AND the
+   write behind it succeeded, so a notification never announces something that
+   didn't happen. There are deliberately no scheduled "come back" nudges: there
+   is nothing on the other side of one yet, and a notification that turns out
+   to be untrue once stops being opened.
+
+   Notifications are rows in `messages` (is_system), which loadArtistInbox
+   already renders and _refreshInboxBadge already counts — no second inbox.
+   Email is out of scope for now; this writes in-app only. */
+(function () {
+    'use strict';
+
+    function esc(v) { return String(v == null ? '' : v).trim(); }
+    // A title the artist never filled in shouldn't produce `"" is live`.
+    function named(v, fallback) { const t = esc(v); return t ? '"' + t + '"' : fallback; }
+
+    const KINDS = {
+        track_ready: {
+            subject: 'Your track is ready',
+            body: function (d) {
+                return named(d.title, 'Your new track') + ' finished generating and is saved to your library.\n'
+                    + 'Find it under Creative Studio → Music Production.';
+            }
+        },
+        sync_live: {
+            subject: 'Your sync listing is live',
+            body: function (d) {
+                return named(d.title, 'Your track') + ' is now listed in the Sync Library.\n'
+                    + 'Supervisors browsing for music can find and license it from here.';
+            }
+        },
+        product_live: {
+            subject: 'Your product is published',
+            body: function (d) {
+                return named(d.name, 'Your new product') + ' is published to your store'
+                    + (d.price ? ' at ' + d.price : '') + '.\nFans can buy it now — see it under Store.';
+            }
+        },
+        milestone_done: {
+            subject: 'Milestone complete',
+            body: function (d) {
+                return 'You marked ' + named(d.name, 'a milestone') + ' complete.\n'
+                    + 'It’s recorded on your Milestones page with today’s date.';
+            }
+        }
+    };
+
+    // Never throws and never rejects: a notification failing must not take down
+    // the action that earned it. The caller does not await this.
+    window.aiadNotify = async function (kind, detail) {
+        try {
+            const c = window.db;
+            if (!c) return false;
+            const spec = KINDS[kind];
+            if (!spec) { console.warn('[AIAD] notify: unknown kind', kind); return false; }
+            let uid = null;
+            try {
+                uid = window.aiadResolvedUserId ? window.aiadResolvedUserId() : null;
+                if (!uid && window.AppState && AppState.currentUser) uid = AppState.currentUser.id;
+            } catch (e) {}
+            if (!uid) return false;
+
+            const { error } = await c.from('messages').insert({
+                recipient_id: uid,
+                is_system: true,
+                sender_name: 'AIAD',
+                subject: spec.subject,
+                body: spec.body(detail || {}),
+                read: false
+            });
+            if (error) { console.warn('[AIAD] notify insert:', error.message); return false; }
+            // Surface it without waiting out the 8s badge poll.
+            try { if (window._refreshInboxBadge) window._refreshInboxBadge(); } catch (e) {}
+            return true;
+        } catch (e) {
+            console.warn('[AIAD] notify:', e);
+            return false;
+        }
+    };
+})();
 </script>
 </body>
 
