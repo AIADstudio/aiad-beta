@@ -1,5 +1,5 @@
 {
-  "name": "AIAD — Creator Platform",
+  "name": "AIAD \u2014 Creator Platform",
   "short_name": "AIAD",
   "description": "AI-powered platform for independent music artists",
   "start_url": "/",
@@ -21,6 +21,25 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["music", "productivity", "entertainment"],
-  "screenshots": []
+  "categories": [
+    "music",
+    "productivity",
+    "entertainment"
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-mobile-1.png",
+      "sizes": "500x1000",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Pick your discipline and start building"
+    },
+    {
+      "src": "/screenshot-desktop-1.png",
+      "sizes": "1280x800",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "AIAD on the web"
+    }
+  ]
 }

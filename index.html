@@ -30997,6 +30997,19 @@ window.AIAD_PROMPTS = [
 }
 </style>
 
+<style>
+/* The slide-up is applied only when the page is visible. A hidden or throttled
+   tab never advances an animation, so it would hold the first keyframe and park
+   the sheet below the fold indefinitely. No fill-mode either, for the same
+   reason: on-screen is the resting state, the animation is decoration. */
+@keyframes aiadSheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes aiadPointBounce { 0%,100% { transform: translateY(0); opacity:0.85; } 50% { transform: translateY(6px); opacity:1; } }
+#aiadA2HSPointer svg { animation: aiadPointBounce 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  #aiadA2HSCard { animation: none !important; }
+  #aiadA2HSPointer svg { animation: none !important; }
+}
+</style>
 <!-- ══════════════ ADD TO HOME SCREEN ══════════════
      Android/Chrome gets the real thing: beforeinstallprompt is captured and a
      button calls prompt() on it. iOS has no install API at all, so Safari users
@@ -31006,7 +31019,8 @@ window.AIAD_PROMPTS = [
 <script>
 (function () {
     const DISMISS_KEY = 'aiad_a2hs_dismissed_at';
-    const RESHOW_AFTER = 30 * 24 * 60 * 60 * 1000;   // ~30 days
+    const RESHOW_AFTER = 14 * 24 * 60 * 60 * 1000;   // 14 days
+    const SESSION_KEY = 'aiad_a2hs_shown_this_session';
     let deferredPrompt = null;
 
     // Chrome fires this instead of showing its own mini-infobar; holding the event
@@ -31053,10 +31067,13 @@ window.AIAD_PROMPTS = [
     const canOffer = () => !isStandalone() && (!!deferredPrompt || isIOSSafari());
 
     const shareGlyph = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="width:17px;height:17px;vertical-align:-3px;"><path d="M12 15V3"/><path d="M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"/></svg>';
+    // The "Add" button in iOS's share sheet is a text button, so this stands in for
+    // it rather than inventing an Apple glyph that does not exist.
+    const addPillGlyph = '<svg viewBox="0 0 44 24" fill="none" stroke="currentColor" stroke-width="1.9" style="width:30px;height:17px;vertical-align:-3px;"><rect x="1" y="3" width="42" height="18" rx="6"/><text x="22" y="16" text-anchor="middle" font-size="9" fill="currentColor" stroke="none" font-family="inherit">Add</text></svg>';
     const plusBoxGlyph = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="width:17px;height:17px;vertical-align:-3px;"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/></svg>';
 
     window.aiadInstallApp = async function (btn) {
-        if (!deferredPrompt) { showIOSSheet(); return; }
+        if (!deferredPrompt) { showInstallSheet(); return; }
         const orig = btn && btn.textContent;
         if (btn) { btn.disabled = true; btn.textContent = 'Opening...'; }
         try {
@@ -31079,38 +31096,79 @@ window.AIAD_PROMPTS = [
         if (b) b.innerHTML = '';
     };
 
-    window.aiadShowInstallHelp = function () {
-        if (deferredPrompt) { window.aiadInstallApp(null); return; }
-        showIOSSheet();
-    };
+    // Settings entry: always opens the sheet, whichever platform this is.
+    window.aiadShowInstallHelp = function () { showInstallSheet(); };
 
-    function showIOSSheet() {
+    // Bottom sheet, not a banner: this is the one thing a new mobile user should
+    // see, and a strip above the feed gets scrolled past.
+    function showInstallSheet() {
         if (document.getElementById('aiadA2HSSheet')) return;
+        const native = !!deferredPrompt;
         const ov = document.createElement('div');
         ov.id = 'aiadA2HSSheet';
-        ov.style.cssText = 'position:fixed;inset:0;z-index:2147483200;background:rgba(3,5,12,0.82);backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center;';
+        ov.style.cssText = 'position:fixed;inset:0;z-index:2147483200;background:rgba(3,5,12,0.82);'
+            + 'backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center;';
+
         const step = function (n, text) {
             return '<div style="display:flex;gap:11px;align-items:flex-start;margin-bottom:13px;">'
-              + '<div style="flex:none;width:22px;height:22px;border-radius:50%;background:rgba(6,182,212,0.18);color:#67e8f9;font-size:0.72rem;font-weight:700;display:flex;align-items:center;justify-content:center;">' + n + '</div>'
+              + '<div style="flex:none;width:22px;height:22px;border-radius:50%;background:rgba(6,182,212,0.18);color:#67e8f9;'
+              + 'font-size:0.72rem;font-weight:700;display:flex;align-items:center;justify-content:center;">' + n + '</div>'
               + '<div style="font-size:0.88rem;color:#cbd5e1;line-height:1.5;">' + text + '</div></div>';
         };
+
+        // Android: one tap, the OS does the rest. No instructions to misread.
+        const body = native
+            ? '<button id="aiadA2HSInstall" type="button" style="width:100%;min-height:48px;background:linear-gradient(135deg,#06b6d4,#3b82f6);'
+              + 'color:#fff;border:none;border-radius:12px;padding:13px;font-size:0.95rem;font-weight:700;cursor:pointer;font-family:inherit;">'
+              + 'Add to Home Screen</button>'
+            : step(1, 'Tap the Share button ' + shareGlyph + ' in Safari&rsquo;s toolbar.')
+              + step(2, 'Scroll down and choose <strong style="color:#fff;">Add to Home Screen</strong> ' + plusBoxGlyph + '.')
+              + step(3, 'Tap <strong style="color:#fff;">Add</strong> ' + addPillGlyph + '. AIAD appears with your other apps.');
+
+        // The Share button is the step people miss, so point at where it physically
+        // sits. iOS 15+ puts Safari's toolbar at the bottom of the screen.
+        const pointer = native ? '' :
+            '<div id="aiadA2HSPointer" style="display:flex;flex-direction:column;align-items:center;gap:2px;margin-top:14px;color:#67e8f9;">'
+          + '<div style="font-size:0.72rem;letter-spacing:0.04em;">Share is down here</div>'
+          + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" '
+          + 'style="width:26px;height:26px;"><path d="M12 4v14"/><path d="M6 13l6 6 6-6"/></svg></div>';
+
         ov.innerHTML =
-            '<div style="background:#0d0f17;border:1px solid rgba(255,255,255,0.1);border-top-left-radius:18px;border-top-right-radius:18px;width:100%;max-width:520px;padding:20px 20px calc(20px + env(safe-area-inset-bottom, 0px));">'
-          + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:4px;">'
-          + '<h3 style="margin:0;color:#fff;font-size:1.06rem;">Add AIAD to your home screen</h3>'
-          + '<button id="aiadA2HSClose" type="button" aria-label="Close" style="background:none;border:none;color:#94a3b8;font-size:1.5rem;line-height:1;cursor:pointer;padding:0 4px;min-height:44px;">&times;</button></div>'
-          + '<p style="color:#94a3b8;font-size:0.82rem;margin:0 0 15px;">Opens full screen, with no browser bars &mdash; and it keeps you signed in.</p>'
-          + step(1, 'Tap the Share button ' + shareGlyph + ' in Safari&rsquo;s toolbar.')
-          + step(2, 'Scroll down and choose <strong style="color:#fff;">Add to Home Screen</strong> ' + plusBoxGlyph + '.')
-          + step(3, 'Tap <strong style="color:#fff;">Add</strong>. AIAD appears with your other apps.')
-          + '<button id="aiadA2HSGot" type="button" style="width:100%;margin-top:6px;min-height:44px;background:linear-gradient(135deg,#06b6d4,#3b82f6);color:#fff;border:none;border-radius:11px;padding:12px;font-size:0.9rem;font-weight:700;cursor:pointer;font-family:inherit;">Got it</button>'
+            '<div id="aiadA2HSCard" style="background:#0d0f17;border:1px solid rgba(255,255,255,0.1);border-top-left-radius:20px;'
+          + 'border-top-right-radius:20px;width:100%;max-width:520px;padding:22px 20px calc(18px + env(safe-area-inset-bottom, 0px));'
+          + (document.visibilityState === 'visible'
+               ? 'animation:aiadSheetUp 280ms cubic-bezier(0.22,1,0.36,1);' : '') + '">'
+          + '<div style="width:36px;height:4px;border-radius:2px;background:rgba(255,255,255,0.18);margin:0 auto 16px;"></div>'
+          + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">'
+          +   '<img src="/icon-192.png" alt="" width="44" height="44" style="width:44px;height:44px;border-radius:11px;flex:none;">'
+          +   '<div><h3 style="margin:0;color:#fff;font-size:1.12rem;line-height:1.25;">Add AIAD to your home screen</h3>'
+          +   '<p style="color:#94a3b8;font-size:0.84rem;margin:3px 0 0;">Open it like an app, no browser bar, full screen.</p></div>'
+          + '</div>'
+          + '<div style="margin-top:16px;">' + body + '</div>'
+          + pointer
+          + '<button id="aiadA2HSLater" type="button" style="width:100%;margin-top:14px;min-height:44px;background:none;border:none;'
+          + 'color:#94a3b8;font-size:0.86rem;cursor:pointer;font-family:inherit;">Not now</button>'
           + '</div>';
+
         document.body.appendChild(ov);
-        const close = function () { ov.remove(); };
-        ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
-        document.getElementById('aiadA2HSClose').addEventListener('click', close);
-        document.getElementById('aiadA2HSGot').addEventListener('click', close);
+
+        const close = function (persist) {
+            if (persist) { try { localStorage.setItem(DISMISS_KEY, String(Date.now())); } catch (e) {} }
+            const card = document.getElementById('aiadA2HSCard');
+            if (card) { card.style.animation = 'none'; card.style.transform = 'translateY(100%)';
+                        card.style.transition = 'transform 220ms ease-in'; }
+            setTimeout(function () { ov.remove(); }, 240);
+            render();
+        };
+        ov.addEventListener('click', function (e) { if (e.target === ov) close(true); });
+        document.getElementById('aiadA2HSLater').addEventListener('click', function () { close(true); });
+        const inst = document.getElementById('aiadA2HSInstall');
+        if (inst) inst.addEventListener('click', function () {
+            window.aiadInstallApp(inst).then(function () { close(false); }, function () {});
+        });
     }
+    // Kept for the older call sites and the Settings entry.
+    function showIOSSheet() { showInstallSheet(); }
 
     function bannerHtml() {
         const native = !!deferredPrompt;
@@ -31142,16 +31200,35 @@ window.AIAD_PROMPTS = [
     }
 
     function render() {
+        // The in-feed banner was easy to scroll past; the bottom sheet replaces it.
         const banner = document.getElementById('aiadInstallBanner');
-        if (banner) {
-            // Banner is mobile-only and stays gone for ~30 days once dismissed.
-            banner.innerHTML = (canOffer() && isMobile() && !dismissedRecently()) ? bannerHtml() : '';
-        }
+        if (banner) banner.innerHTML = '';
+        maybeAutoShow();
         const set = document.getElementById('aiadInstallSettings');
         if (set) set.innerHTML = settingsHtml();          // Settings entry is permanent
     }
 
+    function signedIn() {
+        try {
+            if (window.aiadResolvedUserId) return !!window.aiadResolvedUserId();
+            return !!(window.AppState && AppState.currentUser && AppState.currentUser.id);
+        } catch (e) { return false; }
+    }
+    function shownThisSession() {
+        try { return sessionStorage.getItem(SESSION_KEY) === '1'; } catch (e) { return false; }
+    }
+    // Shown once per session, to signed-in mobile users who can actually install,
+    // and not again for 14 days after a "Not now".
+    function maybeAutoShow() {
+        if (!canOffer() || !isMobile() || dismissedRecently() || shownThisSession()) return;
+        if (!signedIn()) return;
+        if (document.getElementById('aiadA2HSSheet')) return;
+        try { sessionStorage.setItem(SESSION_KEY, '1'); } catch (e) {}
+        showInstallSheet();
+    }
+
     window.aiadRenderInstallUI = render;
+    window.aiadShowInstallSheet = showInstallSheet;
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', render);
     else render();
     // Views mount after boot and there is no event for it, matching how the other
