@@ -3643,8 +3643,8 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     <span class="studio-agent-name">AIAD · Project Advisor</span>
                 </div>
                 <div style="padding:11px 13px;border-bottom:1px solid var(--border-default);">
-                    <div class="aiad-obs-item"><p>Projects with defined milestones are 3x more likely to reach release.</p></div>
-                    <div class="aiad-obs-item"><p>Most artists underestimate mixing/mastering time by 2-3 weeks.</p></div>
+                    <div class="aiad-obs-item"><p>Projects with defined milestones tend to actually reach release.</p></div>
+                    <div class="aiad-obs-item"><p>Most artists underestimate how long mixing and mastering takes.</p></div>
                     <div class="aiad-obs-item"><p>Setting a public release date creates accountability and fan anticipation.</p></div>
                 </div>
                 <div class="studio-agent-chips">
@@ -3735,7 +3735,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 </div>
                 <div style="padding:11px 13px;border-bottom:1px solid var(--border-default);">
                     <div class="aiad-obs-item"><p>Fan support recurring revenue is more stable than one-time purchases.</p></div>
-                    <div class="aiad-obs-item"><p>Artists with 3+ income streams earn 2.4x more than single-stream artists.</p></div>
+                    <div class="aiad-obs-item"><p>Artists earning from several sources tend to do better than those relying on one.</p></div>
                     <div class="aiad-obs-item"><p>Sync licensing often yields the highest per-placement revenue.</p></div>
                 </div>
                 <div class="studio-agent-chips">
@@ -4197,9 +4197,9 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     <span class="studio-agent-name">AIAD · Release Strategy</span>
                 </div>
                 <div style="padding:11px 13px;border-bottom:1px solid var(--border-default);">
-                    <div class="aiad-obs-item"><p>Deep work sessions under 90 minutes outperform marathon sessions for creative output.</p></div>
-                    <div class="aiad-obs-item"><p>Blocking 2 weeks before a release for promo-only doubles save conversion.</p></div>
-                    <div class="aiad-obs-item"><p>Friday releases outperform other days by 23% on streaming platforms.</p></div>
+                    <div class="aiad-obs-item"><p>Shorter focused sessions tend to beat marathon ones for creative output.</p></div>
+                    <div class="aiad-obs-item"><p>Blocking out promo-only time before a release helps it land.</p></div>
+                    <div class="aiad-obs-item"><p>Friday is the standard release day across streaming platforms.</p></div>
                 </div>
                 <div class="studio-agent-chips">
                     <div class="studio-agent-chips-label">Quick prompts</div>
@@ -4250,8 +4250,8 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     <span class="studio-agent-name">AIAD · Collab Advisor</span>
                 </div>
                 <div style="padding:11px 13px;border-bottom:1px solid var(--border-default);">
-                    <div class="aiad-obs-item"><p>Clear upfront agreements prevent 87% of collaboration disputes.</p></div>
-                    <div class="aiad-obs-item"><p>Cross-genre collaborations expand audience reach by an average of 34%.</p></div>
+                    <div class="aiad-obs-item"><p>Clear upfront agreements prevent most collaboration disputes.</p></div>
+                    <div class="aiad-obs-item"><p>Cross-genre collaborations tend to expand who hears you.</p></div>
                     <div class="aiad-obs-item"><p>Producers and mixers with shared vision outperform those hired purely on clout.</p></div>
                 </div>
                 <div class="studio-agent-chips">
@@ -5286,7 +5286,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     <span class="studio-agent-name">AIAD · Communication Coach</span>
                 </div>
                 <div style="padding:11px 13px;border-bottom:1px solid var(--border-default);">
-                    <div class="aiad-obs-item"><p>Fans who receive personal responses support 2.3x longer on average.</p></div>
+                    <div class="aiad-obs-item"><p>Fans who get a personal response tend to stay supporters longer.</p></div>
                     <div class="aiad-obs-item"><p>The best time to respond is within 48 hours of receiving a message.</p></div>
                     <div class="aiad-obs-item"><p>Acknowledging a fan by name increases retention significantly.</p></div>
                 </div>
@@ -5457,7 +5457,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     <span class="studio-agent-name">AIAD · Goal Coach</span>
                 </div>
                 <div style="padding:11px 13px;border-bottom:1px solid var(--border-default);">
-                    <div class="aiad-obs-item"><p>Artists who write down goals are 42% more likely to achieve them.</p></div>
+                    <div class="aiad-obs-item"><p>Writing a goal down makes it likelier to happen.</p></div>
                     <div class="aiad-obs-item"><p>Milestone-based progress creates momentum that sustains creative output.</p></div>
                     <div class="aiad-obs-item"><p>Breaking big goals into 30-day sprints prevents burnout.</p></div>
                 </div>
@@ -5543,7 +5543,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     <span class="studio-agent-name">AIAD · Analytics Insights</span>
                 </div>
                 <div style="padding:11px 13px;border-bottom:1px solid var(--border-default);">
-                    <div class="aiad-obs-item"><p>Listener retention past 30 seconds is the strongest predictor of algorithmic push.</p></div>
+                    <div class="aiad-obs-item"><p>Listeners staying past the first 30 seconds matters more than raw play count.</p></div>
                     <div class="aiad-obs-item"><p>Save rate matters more than play count for Spotify editorial consideration.</p></div>
                 </div>
                 <div class="studio-agent-chips">
@@ -5643,7 +5643,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                                 <div class="settings-toggle active" id="setPublicProfile" data-section="profile" onclick="toggleSetting(this)"></div>
                             </div>
                             <div class="settings-actions">
-                                <button class="settings-btn secondary">Preview public page</button>
+                                <button class="settings-btn secondary" onclick="aiadPreviewPublicPage(this)">Preview public page</button>
                                 <button class="settings-btn primary" onclick="saveSettings('profile')">Save changes</button>
                             </div>
                         </div>
@@ -5686,7 +5686,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                                     <tr><td>Nov 21, 2025</td><td>Pro Plan - Monthly</td><td>$19.00</td><td><a href="#" class="settings-billing-link">Download</a></td></tr>
                                 </tbody></table>
                             </details>
-                            <div class="settings-actions"><button class="settings-btn secondary">Pause subscription</button><button class="settings-btn danger">Cancel subscription</button></div>
+                            <div class="settings-actions"><button class="settings-btn danger" onclick="openSupportForm()">Cancel subscription</button></div>
                         </div>
 <div class="settings-section" id="fanSupportSection" style="display:none">
                             <div class="settings-section-header">
@@ -5700,7 +5700,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                             <h3 style="font-size: 0.9375rem; font-weight: 500; margin: var(--space-lg) 0 var(--space-md); color: var(--text-secondary);">Pledge Tiers</h3>
                             <div style="font-size: 0.875rem; color: var(--text-muted); line-height: 1.6; background: rgba(255,255,255,0.03); border: 1px solid var(--border-default); border-radius: 10px; padding: var(--space-md);">Custom pledge tiers are coming soon — they'll be backed by Stripe so fans can subscribe securely. Set up payouts first, then you'll be able to add tiers here.</div>
                             <div class="settings-toggle-row" style="margin-top: var(--space-lg);"><div class="settings-toggle-info"><div class="settings-toggle-label">Allow one-time contributions</div><div class="settings-toggle-desc">Fans can support without a monthly commitment.</div></div><div class="settings-toggle active" id="setOneTimeContrib" data-section="monetization" onclick="toggleSetting(this)"></div></div>
-                            <div class="settings-actions"><button class="settings-btn secondary">Configure payouts</button><button class="settings-btn primary" onclick="saveSettings('monetization')">Save changes</button></div>
+                            <div class="settings-actions"><button class="settings-btn secondary" onclick="showArtistView('payouts')">Configure payouts</button><button class="settings-btn primary" onclick="saveSettings('monetization')">Save changes</button></div>
                         </div>
                         </section>
                         <section class="settings-group" aria-labelledby="settingsGroupPreferences">
@@ -5791,20 +5791,10 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                                 <p class="settings-section-subtitle">Protect your account and data.</p>
                             </div>
                             <h3 style="font-size: 0.9375rem; font-weight: 500; margin-bottom: var(--space-md); color: var(--text-secondary);">Account Credentials</h3>
-                            <div class="settings-field"><label class="settings-label">Email</label><div style="display: flex; align-items: center; gap: var(--space-md);"><input type="email" id="setAccountEmail" class="settings-input" value="" placeholder="—" readonly style="flex: 1;"><button class="settings-btn secondary">Change</button></div></div>
-                            <div class="settings-field"><label class="settings-label">Password</label><div style="display: flex; align-items: center; gap: var(--space-md);"><span style="color: var(--text-muted); font-size: 0.9375rem;">Last changed: 45 days ago</span><button class="settings-btn secondary">Change password</button></div></div>
-                            <h3 style="font-size: 0.9375rem; font-weight: 500; margin: var(--space-lg) 0 var(--space-md); color: var(--text-secondary);">Two-Factor Authentication</h3>
-                            <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-md); background: rgba(0, 212, 255, 0.05); border-radius: 10px; margin-bottom: var(--space-lg);">
-                                <div style="display: flex; align-items: center; gap: var(--space-md);"><svg style="width: 20px; height: 20px; color: var(--teal);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><div><div style="font-size: 0.9375rem; font-weight: 500;">Enabled</div><div style="font-size: 0.8125rem; color: var(--text-muted);">Authenticator app</div></div></div>
-                                <button class="settings-btn secondary">Manage 2FA</button>
-                            </div>
-                            <h3 style="font-size: 0.9375rem; font-weight: 500; margin-bottom: var(--space-md); color: var(--text-secondary);">Active Sessions</h3>
-                            <div class="settings-session"><div class="settings-session-info"><div class="settings-session-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div><div><div class="settings-session-device">MacBook Pro</div><div class="settings-session-meta">Lagos, Nigeria • Now</div></div></div><span class="settings-session-current">Current</span></div>
-                            <div class="settings-session"><div class="settings-session-info"><div class="settings-session-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></div><div><div class="settings-session-device">iPhone 15</div><div class="settings-session-meta">Lagos, Nigeria • 2 hours ago</div></div></div><button class="settings-session-revoke">Revoke</button></div>
-                            <div class="settings-session"><div class="settings-session-info"><div class="settings-session-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div><div><div class="settings-session-device">Windows PC</div><div class="settings-session-meta">London, UK • 3 days ago</div></div></div><button class="settings-session-revoke">Revoke</button></div>
-                            <button class="settings-btn secondary" style="margin-top: var(--space-md);">Sign out all other devices</button>
-                            <h3 style="font-size: 0.9375rem; font-weight: 500; margin: var(--space-lg) 0 var(--space-md); color: var(--text-secondary);">Data &amp; Privacy</h3>
-                            <div class="settings-actions" style="justify-content: flex-start;"><button class="settings-btn secondary">Download my data</button><button class="settings-btn secondary">View privacy policy</button></div>
+                            <div class="settings-field"><label class="settings-label">Email</label><div style="display: flex; align-items: center; gap: var(--space-md);"><input type="email" id="setAccountEmail" class="settings-input" value="" placeholder="—" readonly style="flex: 1;"><button class="settings-btn secondary" onclick="aiadChangeEmail(this)">Change</button></div></div>
+                            <div class="settings-field"><label class="settings-label">Password</label><div style="display: flex; align-items: center; gap: var(--space-md);"><span style="color: var(--text-muted); font-size: 0.9375rem;">Last changed: 45 days ago</span><button class="settings-btn secondary" onclick="aiadSendPasswordReset(this)">Change password</button></div></div>
+<h3 style="font-size: 0.9375rem; font-weight: 500; margin: var(--space-lg) 0 var(--space-md); color: var(--text-secondary);">Data &amp; Privacy</h3>
+                            <div class="settings-actions" style="justify-content: flex-start;"><a class="settings-btn secondary" href="/privacy" target="_blank" rel="noopener noreferrer" style="text-decoration:none;display:inline-flex;align-items:center;">View privacy policy</a></div>
                         </div>
 <div class="settings-section settings-danger-zone">
                             <div class="settings-section-header">
@@ -8340,7 +8330,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                         <div style="padding:11px 13px;border-bottom:1px solid var(--border-default);">
                             <div class="aiad-obs-item"><p>AIAD surfaces artists based on taste, not popularity.</p></div>
                             <div class="aiad-obs-item"><p>Supporting an artist early gives you first-mover perks.</p></div>
-                            <div class="aiad-obs-item"><p>Artists with 100 supporters often earn more than those with 10k followers.</p></div>
+                            <div class="aiad-obs-item"><p>A small group of paying supporters can be worth more than a large follower count.</p></div>
                         </div>
                         <div class="studio-agent-chips">
                             <div class="studio-agent-chips-label">Quick prompts</div>
@@ -13735,6 +13725,70 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
 
         // The single write path. saveSettings() and toggleSetting() both go through here.
+        // Opens the artist's own public page. The route is /artist/:username, so this
+        // needs the username rather than the uid — profiles is the source for it.
+        window.aiadPreviewPublicPage = async function (btn) {
+            const uid = aiadResolvedUserId();
+            if (!uid) { showSettingsToast('Sign in first'); return; }
+            const label = btn && btn.textContent;
+            if (btn) { btn.disabled = true; btn.textContent = 'Opening…'; }
+            const { data, error } = await db.from('profiles').select('username').eq('id', uid).maybeSingle();
+            if (btn) { btn.disabled = false; btn.textContent = label; }
+            if (error) {
+                window.reportDbError && window.reportDbError('profiles', 'select', error, { where: 'previewPublicPage' });
+                showSettingsToast('Could not open your page — ' + error.message);
+                return;
+            }
+            const u = data && data.username;
+            if (!u) { showSettingsToast('Set a username before your page can be viewed'); return; }
+            window.open('/artist/' + encodeURIComponent(u), '_blank', 'noopener');
+        };
+
+        // Supabase mails the reset link; no password is handled in this page.
+        window.aiadSendPasswordReset = async function (btn) {
+            const email = (AppState.currentUser && AppState.currentUser.email) || '';
+            if (!email) { showSettingsToast('No account email on file'); return; }
+            const label = btn && btn.textContent;
+            if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+            const { error } = await db.auth.resetPasswordForEmail(email);
+            if (btn) { btn.disabled = false; btn.textContent = label; }
+            showSettingsToast(error ? ('Could not send the reset link — ' + error.message)
+                                    : ('Reset link sent to ' + email));
+        };
+
+        // Supabase confirms an address change by mail before it takes effect.
+        window.aiadChangeEmail = async function (btn) {
+            const field = document.getElementById('setAccountEmail');
+            if (!field) return;
+            if (field.readOnly) {
+                field.readOnly = false; field.focus(); field.select();
+                if (btn) btn.textContent = 'Send confirmation';
+                showSettingsToast('Enter the new address, then press Send confirmation');
+                return;
+            }
+            const next = (field.value || '').trim();
+            const current = (AppState.currentUser && AppState.currentUser.email) || '';
+            if (!next || next === current) { showSettingsToast('Enter a different address'); return; }
+            if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(next)) { showSettingsToast('That does not look like an email address'); return; }
+            if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+            const { error } = await db.auth.updateUser({ email: next });
+            if (btn) { btn.disabled = false; btn.textContent = 'Change'; }
+            field.readOnly = true;
+            if (error) { field.value = current; showSettingsToast('Could not change it — ' + error.message); return; }
+            showSettingsToast('Check ' + next + ' for a confirmation link');
+        };
+
+        // Ends every other session. supabase-js signs the local one out too unless
+        // the scope is narrowed, which would log the artist out of the page they
+        // just clicked in.
+        window.aiadSignOutOthers = async function (btn) {
+            const label = btn && btn.textContent;
+            if (btn) { btn.disabled = true; btn.textContent = 'Signing out…'; }
+            const { error } = await db.auth.signOut({ scope: 'others' });
+            if (btn) { btn.disabled = false; btn.textContent = label; }
+            showSettingsToast(error ? ('Could not do that — ' + error.message) : 'Other devices signed out');
+        };
+
         async function persistSettingsSection(section) {
             const uid = aiadResolvedUserId();
             if (!uid) return { message: 'Not signed in' };
