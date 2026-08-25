@@ -28446,6 +28446,18 @@ Be direct and concrete with real industry insight — never generic filler. When
                     return;
                 }
             }
+            // Register the workspace as soon as onboarding succeeds. wsSync() also does
+            // this, but only once the user is already inside a dashboard — which is a
+            // state an artist stuck before that point never reaches, so the row was never
+            // written and the switcher had nothing to list. Non-fatal: the profile is
+            // already saved and the dashboard reads profiles, not this row.
+            try {
+                const _ind = (window.AppState && AppState.userIndustry)
+                    || localStorage.getItem('aiad_user_industry') || 'music';
+                const { error: wsErr } = await db.rpc('ensure_workspace', { p_industry: _ind, p_role: 'creator' });
+                if (wsErr) window.reportDbError && window.reportDbError('ensure_workspace', 'rpc', wsErr, { where: 'onboarding', industry: _ind });
+            } catch (e) {}
+
             // Persist the profile photo if one was picked. Uploads the file to
             // artist-media and writes profiles.avatar_url only — artist_profiles is no
             // longer written, and nothing stores base64.
@@ -28911,6 +28923,225 @@ Be direct and concrete with real industry insight — never generic filler. When
             window.scrollTo(0, 0);
         }
 
+        // ── Workspace switcher ─────────────────────────────────────────────────
+        // One account, several workspaces. user_workspaces is keyed (user_id, industry),
+        // so a user has at most one workspace per industry and the row's role says what
+        // they are there. profiles.role/industry stay the default landing context —
+        // set_active_industry is what moves them, and everything else keeps reading
+        // profiles exactly as before.
+
+        // user_workspaces predates the longer industry keys the app routes on, so it
+        // holds 'film' and 'writing' where IndustryConfig says 'film_media' and
+        // 'writing_publishing'. Normalising on read keeps those rows routable; the raw
+        // value is kept alongside because set_active_industry matches on it exactly.
+        const WS_CANON = { film: 'film_media', writing: 'writing_publishing',
+                           visual: 'visual_arts', visualarts: 'visual_arts' };
+        const wsCanon = (i) => WS_CANON[String(i || '').toLowerCase()] || String(i || '').toLowerCase();
+        const WS_DASH = { music:'artist', fashion:'fashion', streaming:'streamer', visual_arts:'visualarts',
+                          writing_publishing:'writing', film_media:'film', games:'games', multi:'multi' };
+        // What the workspace role means to a person, not to the schema.
+        const WS_ROLE_LABEL = { creator:'Artist', artist:'Artist', collaborator:'Collaborator',
+                                fan:'Supporter', supervisor:'Supervisor' };
+
+        let _wsCache = null, _wsCacheAt = 0;
+
+        // The list comes from my_entitlements, not my_workspaces: my_workspaces omits
+        // `active`, and inactive rows exist in production, so it cannot tell a live
+        // workspace from a retired one.
+        window.aiadWorkspaces = async function (force) {
+            if (!force && _wsCache && (Date.now() - _wsCacheAt) < 30000) return _wsCache;
+            let ent = null;
+            try {
+                const { data, error } = await db.rpc('my_entitlements', {});
+                if (error) { window.reportDbError && window.reportDbError('my_entitlements', 'rpc', error, { where: 'wsList' }); return _wsCache || []; }
+                ent = data;
+            } catch (e) { return _wsCache || []; }
+            const raw = (ent && Array.isArray(ent.workspaces)) ? ent.workspaces : [];
+            const seen = new Set();
+            const list = [];
+            raw.forEach((w) => {
+                if (!w || w.active === false) return;              // retired workspace
+                const key = wsCanon(w.industry);
+                if (!key || seen.has(key)) return;                 // legacy + canonical duplicate
+                seen.add(key);
+                list.push({ key: key, raw: w.industry, role: w.role || 'creator', tier: w.tier || null });
+            });
+            _wsCache = list; _wsCacheAt = Date.now();
+            return list;
+        };
+
+        function wsCurrentKey() {
+            return wsCanon((window.AppState && AppState.userIndustry) || localStorage.getItem('aiad_user_industry') || '');
+        }
+
+        // Switching moves the default landing context server-side, so a different device
+        // resumes in the same workspace. set_active_industry returns {ok:false} rather
+        // than raising when the row is missing — reloading on that would drop the user
+        // somewhere they never chose.
+        window.aiadSwitchWorkspace = async function (rawIndustry) {
+            const target = wsCanon(rawIndustry);
+            if (!target || target === wsCurrentKey()) { wsCloseSwitcher(); return false; }
+            let res = null;
+            try {
+                const { data, error } = await db.rpc('set_active_industry', { p_industry: rawIndustry });
+                if (error) {
+                    window.reportDbError && window.reportDbError('set_active_industry', 'rpc', error, { industry: rawIndustry });
+                    try { showToast('Could not switch — ' + (error.message || 'try again')); } catch (e) {}
+                    return false;
+                }
+                res = data;
+            } catch (e) {
+                try { showToast('Could not switch — ' + ((e && e.message) || 'try again')); } catch (_e) {}
+                return false;
+            }
+            if (!res || res.ok !== true) {
+                try { showToast((res && res.error) === 'no such workspace'
+                        ? 'That workspace is no longer available.'
+                        : 'Could not switch workspaces.'); } catch (e) {}
+                return false;
+            }
+            AppState.userIndustry = target;
+            if (res.role) AppState.userRole = res.role;
+            try {
+                localStorage.setItem('aiad_user_industry', target);
+                if (res.role) localStorage.setItem('aiad_user_role', res.role);
+                localStorage.removeItem('aiad_last_dashboard');   // stale: points at the workspace we just left
+            } catch (e) {}
+            _wsCache = null;
+            wsCloseSwitcher();
+            const dash = WS_DASH[target] || 'artist';
+            try { if (window.jumpToDashboard) { window.jumpToDashboard(dash); return true; } } catch (e) {}
+            location.reload();
+            return true;
+        };
+
+        window.aiadCloseWsSwitcher = wsCloseSwitcher;
+        function wsCloseSwitcher() {
+            const m = document.getElementById('aiadWsPanel');
+            if (m) m.style.display = 'none';
+        }
+
+        window.aiadToggleWsSwitcher = async function () {
+            const m = document.getElementById('aiadWsPanel');
+            if (!m) return;
+            if (m.style.display === 'block') { m.style.display = 'none'; return; }
+            wsPositionPanel(m);
+            m.style.display = 'block';
+            m.innerHTML = '<div style="padding:10px 12px;font-size:0.78rem;color:var(--text-muted);">Loading…</div>';
+            const list = await window.aiadWorkspaces(true);
+            const cur = wsCurrentKey();
+            const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) =>
+                ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+            const rows = list.map((w) => {
+                const on = w.key === cur;
+                return '<div onclick="aiadSwitchWorkspace(' + JSON.stringify(w.raw).replace(/"/g,'&quot;') + ')"'
+                    + ' style="display:flex;align-items:center;gap:9px;padding:9px 12px;cursor:pointer;border-radius:9px;'
+                    + (on ? 'background:rgba(0,212,255,0.1);' : '') + '">'
+                    + '<span style="width:7px;height:7px;border-radius:50%;flex:none;background:' + (on ? 'var(--teal)' : 'rgba(255,255,255,0.25)') + ';"></span>'
+                    + '<span style="flex:1;min-width:0;font-size:0.82rem;color:' + (on ? 'var(--text-primary)' : 'var(--text-secondary)') + ';'
+                    + (on ? 'font-weight:600;' : '') + 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'
+                    + esc(WS_LABELS[w.key] || w.key)
+                    + '<span style="color:var(--text-muted);font-weight:400;"> · ' + esc(WS_ROLE_LABEL[w.role] || w.role) + '</span></span>'
+                    + (on ? '<span style="font-size:0.62rem;color:var(--teal);flex:none;">active</span>' : '')
+                    + '</div>';
+            }).join('');
+
+            // Only industries that are actually built can be added.
+            const have = new Set(list.map((w) => w.key));
+            have.add(cur);
+            const addable = WS_UNLOCKED.filter((i) => !have.has(i));
+            const adds = addable.map((i) =>
+                '<div onclick="aiadAddCategory(' + JSON.stringify(i).replace(/"/g,'&quot;') + ')"'
+                + ' style="display:flex;align-items:center;gap:9px;padding:9px 12px;cursor:pointer;border-radius:9px;">'
+                + '<span style="width:7px;text-align:center;color:var(--teal);flex:none;">+</span>'
+                + '<span style="font-size:0.82rem;color:var(--text-secondary);">Add ' + esc(WS_LABELS[i] || i) + '</span></div>').join('');
+
+            m.innerHTML =
+                '<div style="padding:8px 12px 4px;font-size:0.62rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);">Your workspaces</div>'
+              + (rows || '<div style="padding:8px 12px;font-size:0.78rem;color:var(--text-muted);">Just this one so far.</div>')
+              + (adds ? '<div style="height:1px;background:var(--border-default);margin:6px 8px;"></div>' + adds : '');
+            wsPositionPanel(m);          // height changed once the rows rendered
+            // The button label is built from the same list, so refresh it here rather
+            // than leaving whatever the cache held when the sidebar first mounted.
+            await wsPaintSwitcherLabel();
+        };
+
+        // The sidebar already carried .role-switcher-btn styling but never an element.
+        window.aiadMountWsSwitcher = async function () {
+            const side = document.querySelector('#artistDashboard .dash-sidebar-left');
+            if (!side) return;
+            if (document.getElementById('aiadWsSwitcherHost')) { await wsPaintSwitcherLabel(); return; }
+            if (!aiadResolvedUserId()) return;
+            const list = await window.aiadWorkspaces(true);
+            // A single workspace with nothing addable is just noise in the sidebar.
+            if (list.length < 2 && !WS_UNLOCKED.some((i) => i !== wsCurrentKey())) return;
+
+            const host = document.createElement('div');
+            host.id = 'aiadWsSwitcherHost';
+            host.style.cssText = 'position:relative;padding:0 10px 10px;flex:none;';
+            host.innerHTML =
+                '<div class="role-switcher-btn" onclick="aiadToggleWsSwitcher()" style="display:flex;align-items:center;gap:8px;padding:8px 10px;'
+              + 'border:1px solid var(--border-default);border-radius:10px;cursor:pointer;background:var(--bg-secondary);min-height:40px;">'
+              + '<span style="width:8px;height:8px;border-radius:50%;background:var(--teal);flex:none;"></span>'
+              + '<span id="aiadWsCurrentLabel" style="flex:1;min-width:0;font-size:0.8rem;color:var(--text-primary);font-weight:600;'
+              + 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Workspace</span>'
+              + '<span style="font-size:0.65rem;color:var(--text-muted);flex:none;">▾</span></div>'
+              + '</div>';
+            // Panel lives on <body>, not inside the rail that would clip it.
+            let panel = document.getElementById('aiadWsPanel');
+            if (!panel) {
+                panel = document.createElement('div');
+                panel.id = 'aiadWsPanel';
+                panel.style.cssText = 'display:none;position:fixed;z-index:2147483100;min-width:210px;max-width:260px;'
+                    + 'background:var(--bg-card);border:1px solid var(--border-default);border-radius:12px;padding:5px;'
+                    + 'box-shadow:0 12px 30px rgba(0,0,0,0.55);';
+                document.body.appendChild(panel);
+            }
+
+            const nav = side.querySelector('.dash-nav');
+            if (nav && nav.parentNode === side) side.insertBefore(host, nav.nextSibling);
+            else side.appendChild(host);
+            await wsPaintSwitcherLabel();
+        };
+
+        // Opens upward from the button, clamped to the viewport so it cannot run off
+        // the top on a short window or off the right on a narrow one.
+        function wsPositionPanel(panel) {
+            const btn = document.querySelector('#aiadWsSwitcherHost .role-switcher-btn');
+            if (!btn) return;
+            const r = btn.getBoundingClientRect();
+            const w = Math.min(260, Math.max(210, r.width));
+            panel.style.width = w + 'px';
+            panel.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
+            // Measuring needs the panel laid out, so restore whatever display state it
+            // was in — this runs a second time after the rows render, and forcing 'none'
+            // there hid the panel the caller had just opened.
+            const wasShown = panel.style.display === 'block';
+            panel.style.visibility = 'hidden'; panel.style.display = 'block'; panel.style.top = '0px';
+            const h = panel.offsetHeight || 160;
+            panel.style.display = wasShown ? 'block' : 'none';
+            panel.style.visibility = '';
+            const above = r.top - h - 6;
+            panel.style.top = (above >= 8 ? above : Math.min(r.bottom + 6, window.innerHeight - h - 8)) + 'px';
+        }
+
+        async function wsPaintSwitcherLabel() {
+            const el = document.getElementById('aiadWsCurrentLabel');
+            if (!el) return;
+            const cur = wsCurrentKey();
+            const list = await window.aiadWorkspaces();
+            const mine = list.find((w) => w.key === cur);
+            el.textContent = (WS_LABELS[cur] || cur || 'Workspace')
+                + (mine ? ' · ' + (WS_ROLE_LABEL[mine.role] || mine.role) : '');
+        }
+
+        // Close on an outside click, the way the account menu does.
+        document.addEventListener('click', function (e) {
+            const host = document.getElementById('aiadWsSwitcherHost');
+            if (host && !host.contains(e.target)) wsCloseSwitcher();
+        }, true);
+
         function wsCloseMenu() { const m = document.getElementById('aiadWsMenu'); if (m) m.style.display = 'none'; }
 
         async function renderWsSwitcher() {
@@ -28966,7 +29197,8 @@ Be direct and concrete with real industry insight — never generic filler. When
             setTimeout(() => { hookSettings(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); applyLiveMeta(); ensureArtistStats(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); wireFashionAgent(); wireAddCategory(); wireFashionDashboardExtras(); wsSync(); loadVerifiedNames().then(() => decorateBadges()); }, 1500);
         });
         // Re-decorate + (re)mount buttons/pickers as auth state / views change.
-        setInterval(() => { if (_verifiedNames) decorateBadges(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); wireFashionAgent(); wireAddCategory(); wireFashionDashboardExtras(); wsSync(); renderWsSwitcher(); }, 2500);
+        setInterval(() => { try { window.aiadMountWsSwitcher && window.aiadMountWsSwitcher(); } catch (e) {}
+            if (_verifiedNames) decorateBadges(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); wireFashionAgent(); wireAddCategory(); wireFashionDashboardExtras(); wsSync(); renderWsSwitcher(); }, 2500);
     })();
     </script>
 <!-- AIAD usage tracking (self-contained, fail-safe) -->
