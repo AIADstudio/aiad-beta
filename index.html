@@ -10508,6 +10508,13 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 targetPage.classList.add('active');
                 AppState.currentPage = pageId;
                 try { window.__aiadTrack && window.__aiadTrack('tool_open', pageId); } catch (e) {}
+                // Landing here with an industry already stored is the loop two artists were
+                // caught in: the screen asks for something the profile has, and the path
+                // beyond it ends at a signup form they cannot use because they already
+                // have an account. Send them on instead of showing it.
+                if (pageId === 'industry-selection') {
+                    try { window.aiadResumeStoredIndustry && window.aiadResumeStoredIndustry(); } catch (e) {}
+                }
                 const mainContainer = document.getElementById('mainContainer');
                 const formPages = ['artist-profile', 'artist-goals', 'reality-check', 'subjects', 'agent', 'subscription-tier', 'fan-profile', 'fan-identity', 'fan-discovery'];
                 mainContainer.classList.toggle('main-form', formPages.includes(pageId));
@@ -10562,6 +10569,48 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             localStorage.setItem('aiad_user_industry', AppState.userIndustry);
             navigateTo('role-selection');
         }
+
+        // Resolves the industry from the profile (falling back to cache) and moves a
+        // signed-in artist forward. Deliberately quiet for signed-out visitors — the
+        // picker is the correct first screen for them.
+        window.aiadResumeStoredIndustry = async function () {
+            const uid = aiadResolvedUserId();
+            if (!uid) return false;
+            if (window.__aiadResumingIndustry) return false;   // one attempt per navigation
+            window.__aiadResumingIndustry = true;
+            setTimeout(function () { window.__aiadResumingIndustry = false; }, 3000);
+
+            let industry = null, role = null;
+            try {
+                const { data, error } = await db.from('profiles')
+                    .select('role,industry').eq('id', uid).maybeSingle();
+                if (error) { window.reportDbError && window.reportDbError('profiles', 'select', error, { where: 'resumeStoredIndustry' }); return false; }
+                if (data) { industry = data.industry || null; role = data.role || null; }
+            } catch (e) { return false; }
+            if (!industry) industry = localStorage.getItem('aiad_user_industry') || null;
+            if (!industry) return false;                       // genuinely never chose one
+
+            AppState.userIndustry = industry;
+            if (role) AppState.userRole = role;
+            try { localStorage.setItem('aiad_user_industry', industry); } catch (e) {}
+
+            // Non-artists have their own destinations and never needed this screen.
+            if (role && role !== 'artist' && role !== 'creator') {
+                const BY_ROLE = { fan: 'fan', collaborator: 'collab', supervisor: 'supervisor' };
+                const d = BY_ROLE[role];
+                if (d && window.jumpToDashboard) { window.jumpToDashboard(d); return true; }
+                return false;
+            }
+
+            const IDASH = { music:'artist', fashion:'fashion', streaming:'streamer', visual_arts:'visualarts',
+                            writing_publishing:'writing', film_media:'film', games:'games', multi:'multi' };
+            const dash = IDASH[industry] || 'artist';
+            // The gate decides between onboarding and the dashboard, and repairs a
+            // missing artist_profiles row on the way through.
+            if (window.aiadGateArtistDashboard && await window.aiadGateArtistDashboard()) return true;
+            if (window.jumpToDashboard) { window.jumpToDashboard(dash); return true; }
+            return false;
+        };
 
         function updateRoleSelectionUI() {
             const config = getIndustryConfig();
@@ -17250,6 +17299,23 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     localStorage.removeItem('aiad_pending_profile');
                 }
             } catch (e) { console.warn('[aiad] finalizeVerifiedSignup', e); }
+
+            // The pending blob only exists in the browser that ran signup. Verifying on a
+            // different device, or after a storage clear, left industry null and dropped
+            // the user on the industry picker — asking them to choose something their
+            // profile already stores. Fall back to the row.
+            if (!industry || !role) {
+                try {
+                    const { data: prof, error: profErr } = await db.from('profiles')
+                        .select('role,industry').eq('id', user.id).maybeSingle();
+                    if (profErr) window.reportDbError && window.reportDbError('profiles', 'select', profErr, { where: 'finalizeVerifiedSignup' });
+                    if (prof) {
+                        if (!industry && prof.industry) industry = prof.industry;
+                        if (prof.role) role = prof.role;
+                    }
+                } catch (e) { /* fall through to the picker */ }
+            }
+
             AppState.currentUser = user;
             AppState.userRole = role;
             try { localStorage.setItem('aiad_user_role', role); } catch (e) {}
@@ -28363,7 +28429,23 @@ Be direct and concrete with real industry insight — never generic filler. When
             // is required here the same way it is on the signup form.
             if (!data.primary_genre) { try { showToast('Please pick your genre so fans can find you.'); } catch(_e){ alert('Please pick your genre so fans can find you.'); } var _g = document.getElementById('ob_primary_genre'); if (_g) _g.focus(); return; }
             btn.disabled = true; btn.textContent = 'Saving…';
-            try { await rpc('save_artist_onboarding', { p_data: data }); } catch (e) {}
+            // This one call writes artist_profiles and sets profiles.onboarded. It used to
+            // run through rpc(), which returns null on failure exactly as it does on
+            // success, inside a bare catch — so a failed save looked identical to a saved
+            // one, the user was sent on, and the next load put them back here. Nothing
+            // downstream is allowed to run unless this actually succeeded.
+            {
+                const { error: obErr } = await db.rpc('save_artist_onboarding', { p_data: data });
+                if (obErr) {
+                    window.reportDbError && window.reportDbError('save_artist_onboarding', 'rpc', obErr, { where: 'onboarding' });
+                    const msg = /genre_required/.test(obErr.message || '')
+                        ? 'Pick a genre before finishing.'
+                        : ('Could not save your details — ' + (obErr.message || 'please try again') + '.');
+                    try { showToast(msg); } catch (_e) { alert(msg); }
+                    btn.disabled = false; btn.textContent = 'Finish';
+                    return;
+                }
+            }
             // Persist the profile photo if one was picked. Uploads the file to
             // artist-media and writes profiles.avatar_url only — artist_profiles is no
             // longer written, and nothing stores base64.
@@ -28417,7 +28499,10 @@ Be direct and concrete with real industry insight — never generic filler. When
                     await rest('artist_profiles?on_conflict=user_id', { method:'POST', headers:{ 'Prefer':'resolution=merge-duplicates' }, body: JSON.stringify(row) });
                 }
             } catch (e) {}
-            document.getElementById('aiadObStep1').style.display = 'none';
+            // The save has already landed by this point. A missing step container must not
+            // throw here and strand the user mid-flow with their data committed.
+            const _step1 = document.getElementById('aiadObStep1');
+            if (_step1) _step1.style.display = 'none';
             // Stats step next. The account already exists and the user is signed in
             // by this point, which the RPC requires (it reads auth.uid()).
             const statsStep = document.getElementById('aiadObStepStats');
@@ -28464,7 +28549,17 @@ Be direct and concrete with real industry insight — never generic filler. When
         window.aiadShowObPricing = function (dash) {
             const stats = document.getElementById('aiadObStepStats'); if (stats) stats.style.display = 'none';
             const step1 = document.getElementById('aiadObStep1'); if (step1) step1.style.display = 'none';
-            document.getElementById('aiadObStep2').style.display = 'block';
+            // Guarded like the two above it. This runs immediately after the onboarding
+            // save has committed, so throwing here left the artist with a saved profile,
+            // no plan chosen, and a gate that sent them back into onboarding on every
+            // load — a loop entered by succeeding. Send them to the dashboard instead.
+            const step2 = document.getElementById('aiadObStep2');
+            if (!step2) {
+                const ov = document.getElementById('aiadOnboardOverlay'); if (ov) ov.remove();
+                try { if (window.jumpToDashboard) window.jumpToDashboard(dash || 'artist'); } catch (e) {}
+                return;
+            }
+            step2.style.display = 'block';
             window.scrollTo(0, 0);
             aiadRenderPlanGrid(dash);
         };
@@ -28619,6 +28714,7 @@ Be direct and concrete with real industry insight — never generic filler. When
                 return {
                     known: true,
                     isArtist: true,
+                    uid: s.user.id,
                     industry: prof.industry || 'music',
                     onboarded: prof.onboarded === true,
                     planChosen: status !== 'none',
@@ -28627,10 +28723,32 @@ Be direct and concrete with real industry insight — never generic filler. When
             } catch (e) { return { known: false }; }
         };
 
+        // Two artists reached a state the app could not get them out of: profiles said
+        // role=artist industry=music, artist_profiles had no row at all, and every entry
+        // point sent them back to the industry picker. A missing row is a repairable
+        // state, not a reason to loop.
+        window.aiadEnsureArtistProfileRow = async function (forUid) {
+            const uid = forUid || aiadResolvedUserId();
+            if (!uid) return false;
+            try {
+                const { data, error } = await db.from('artist_profiles')
+                    .select('user_id').eq('user_id', uid).maybeSingle();
+                if (error) { window.reportDbError && window.reportDbError('artist_profiles', 'select', error, { where: 'ensureRow' }); return false; }
+                if (data) return false;                       // already there, nothing to do
+                const { error: insErr } = await db.from('artist_profiles')
+                    .insert({ user_id: uid, updated_at: new Date().toISOString() });
+                if (insErr) { window.reportDbError && window.reportDbError('artist_profiles', 'insert', insErr, { where: 'ensureRow' }); return false; }
+                return true;
+            } catch (e) { return false; }
+        };
+
         // Called from every artist dashboard entry point. Returns true when it took over.
         window.aiadGateArtistDashboard = async function () {
             const st = await window.aiadArtistSetupState();
             if (!st.known || !st.isArtist || st.complete) return false;
+            // Onboarding writes this row itself, but an artist who never reached
+            // onboarding has none, and several reads assume one exists.
+            try { await window.aiadEnsureArtistProfileRow(st.uid); } catch (e) {}
             const IDASH = { music:'artist', fashion:'fashion', streaming:'streamer', visual_arts:'visualarts',
                             writing_publishing:'writing', film_media:'film', games:'games', multi:'multi' };
             const dash = IDASH[st.industry] || 'artist';
