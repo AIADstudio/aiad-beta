@@ -28950,18 +28950,18 @@ Be direct and concrete with real industry insight — never generic filler. When
 
         let _wsCache = null, _wsCacheAt = 0;
 
-        // The list comes from my_entitlements, not my_workspaces: my_workspaces omits
-        // `active`, and inactive rows exist in production, so it cannot tell a live
-        // workspace from a retired one.
+        // my_workspaces is the workspace list; my_entitlements stays where it belongs,
+        // answering the billing question in the add-a-category flow. Returns SETOF jsonb,
+        // so `data` is one row per workspace rather than a single object.
         window.aiadWorkspaces = async function (force) {
             if (!force && _wsCache && (Date.now() - _wsCacheAt) < 30000) return _wsCache;
-            let ent = null;
+            let rows = null;
             try {
-                const { data, error } = await db.rpc('my_entitlements', {});
-                if (error) { window.reportDbError && window.reportDbError('my_entitlements', 'rpc', error, { where: 'wsList' }); return _wsCache || []; }
-                ent = data;
+                const { data, error } = await db.rpc('my_workspaces', {});
+                if (error) { window.reportDbError && window.reportDbError('my_workspaces', 'rpc', error, { where: 'wsList' }); return _wsCache || []; }
+                rows = data;
             } catch (e) { return _wsCache || []; }
-            const raw = (ent && Array.isArray(ent.workspaces)) ? ent.workspaces : [];
+            const raw = Array.isArray(rows) ? rows : (rows ? [rows] : []);
             const seen = new Set();
             const list = [];
             raw.forEach((w) => {
@@ -28969,7 +28969,8 @@ Be direct and concrete with real industry insight — never generic filler. When
                 const key = wsNorm(w.industry);
                 if (!key || seen.has(key)) return;                 // unknown value, or already listed
                 seen.add(key);
-                list.push({ key: key, role: w.role || 'creator', tier: w.tier || null });
+                list.push({ key: key, role: w.role || 'creator', tier: w.tier || null,
+                            name: (w.display_name || '').trim() || null });
             });
             _wsCache = list; _wsCacheAt = Date.now();
             return list;
@@ -29054,7 +29055,7 @@ Be direct and concrete with real industry insight — never generic filler. When
                     + '<span style="width:7px;height:7px;border-radius:50%;flex:none;background:' + (on ? 'var(--teal)' : 'rgba(255,255,255,0.25)') + ';"></span>'
                     + '<span style="flex:1;min-width:0;font-size:0.82rem;color:' + (on ? 'var(--text-primary)' : 'var(--text-secondary)') + ';'
                     + (on ? 'font-weight:600;' : '') + 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'
-                    + esc(WS_LABELS[w.key] || w.key)
+                    + esc(w.name || WS_LABELS[w.key] || w.key)
                     + '<span style="color:var(--text-muted);font-weight:400;"> · ' + esc(WS_ROLE_LABEL[w.role] || w.role) + '</span></span>'
                     + (on ? '<span style="font-size:0.62rem;color:var(--teal);flex:none;">active</span>' : '')
                     + '</div>';
@@ -29145,7 +29146,7 @@ Be direct and concrete with real industry insight — never generic filler. When
             const cur = wsCurrentKey();
             const list = await window.aiadWorkspaces();
             const mine = list.find((w) => w.key === cur);
-            el.textContent = (WS_LABELS[cur] || cur || 'Workspace')
+            el.textContent = ((mine && mine.name) || WS_LABELS[cur] || cur || 'Workspace')
                 + (mine ? ' · ' + (WS_ROLE_LABEL[mine.role] || mine.role) : '');
         }
 
