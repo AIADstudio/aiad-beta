@@ -28930,13 +28930,18 @@ Be direct and concrete with real industry insight — never generic filler. When
         // set_active_industry is what moves them, and everything else keeps reading
         // profiles exactly as before.
 
-        // user_workspaces predates the longer industry keys the app routes on, so it
-        // holds 'film' and 'writing' where IndustryConfig says 'film_media' and
-        // 'writing_publishing'. Normalising on read keeps those rows routable; the raw
-        // value is kept alongside because set_active_industry matches on it exactly.
-        const WS_CANON = { film: 'film_media', writing: 'writing_publishing',
-                           visual: 'visual_arts', visualarts: 'visual_arts' };
-        const wsCanon = (i) => WS_CANON[String(i || '').toLowerCase()] || String(i || '').toLowerCase();
+        // user_workspaces.industry and profiles.industry both carry a CHECK constraint
+        // limiting them to exactly these values, so no alias mapping is needed — a bad
+        // value fails at the database rather than routing someone to the wrong
+        // dashboard. This list is only used to reject a stale *client* cache: a browser
+        // that stored 'film' before the migration would otherwise compare against
+        // 'film_media' forever and never match a workspace.
+        const WS_INDUSTRIES = ['music','fashion','film_media','writing_publishing',
+                               'games','streaming','visual_arts','multi'];
+        const wsNorm = (i) => {
+            const v = String(i == null ? '' : i).trim().toLowerCase();
+            return WS_INDUSTRIES.indexOf(v) === -1 ? '' : v;
+        };
         const WS_DASH = { music:'artist', fashion:'fashion', streaming:'streamer', visual_arts:'visualarts',
                           writing_publishing:'writing', film_media:'film', games:'games', multi:'multi' };
         // What the workspace role means to a person, not to the schema.
@@ -28961,17 +28966,25 @@ Be direct and concrete with real industry insight — never generic filler. When
             const list = [];
             raw.forEach((w) => {
                 if (!w || w.active === false) return;              // retired workspace
-                const key = wsCanon(w.industry);
-                if (!key || seen.has(key)) return;                 // legacy + canonical duplicate
+                const key = wsNorm(w.industry);
+                if (!key || seen.has(key)) return;                 // unknown value, or already listed
                 seen.add(key);
-                list.push({ key: key, raw: w.industry, role: w.role || 'creator', tier: w.tier || null });
+                list.push({ key: key, role: w.role || 'creator', tier: w.tier || null });
             });
             _wsCache = list; _wsCacheAt = Date.now();
             return list;
         };
 
         function wsCurrentKey() {
-            return wsCanon((window.AppState && AppState.userIndustry) || localStorage.getItem('aiad_user_industry') || '');
+            const fromState = wsNorm(window.AppState && AppState.userIndustry);
+            if (fromState) return fromState;
+            let cached = '';
+            try { cached = localStorage.getItem('aiad_user_industry') || ''; } catch (e) {}
+            const ok = wsNorm(cached);
+            // A value the database would now reject is a pre-migration leftover; drop it
+            // rather than carrying it forward as a key that can never match.
+            if (cached && !ok) { try { localStorage.removeItem('aiad_user_industry'); } catch (e) {} }
+            return ok;
         }
 
         // Switching moves the default landing context server-side, so a different device
@@ -28979,7 +28992,7 @@ Be direct and concrete with real industry insight — never generic filler. When
         // than raising when the row is missing — reloading on that would drop the user
         // somewhere they never chose.
         window.aiadSwitchWorkspace = async function (rawIndustry) {
-            const target = wsCanon(rawIndustry);
+            const target = wsNorm(rawIndustry);
             if (!target || target === wsCurrentKey()) { wsCloseSwitcher(); return false; }
             let res = null;
             try {
@@ -29035,7 +29048,7 @@ Be direct and concrete with real industry insight — never generic filler. When
 
             const rows = list.map((w) => {
                 const on = w.key === cur;
-                return '<div onclick="aiadSwitchWorkspace(' + JSON.stringify(w.raw).replace(/"/g,'&quot;') + ')"'
+                return '<div onclick="aiadSwitchWorkspace(' + JSON.stringify(w.key).replace(/"/g,'&quot;') + ')"'
                     + ' style="display:flex;align-items:center;gap:9px;padding:9px 12px;cursor:pointer;border-radius:9px;'
                     + (on ? 'background:rgba(0,212,255,0.1);' : '') + '">'
                     + '<span style="width:7px;height:7px;border-radius:50%;flex:none;background:' + (on ? 'var(--teal)' : 'rgba(255,255,255,0.25)') + ';"></span>'
