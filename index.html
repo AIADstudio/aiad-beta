@@ -19407,9 +19407,53 @@ Only capture real, meaningful decisions — not questions or general discussion.
         // and the nav credit indicator's auth hook) silently saw undefined.
         window.db = db;
 
+        /* ── Reporter noise gate ────────────────────────────────────────────────
+           Browser extensions inject scripts into the page, and when those scripts
+           fail the rejection surfaces in our handlers as if it were ours. One
+           session produced 575 identical "Object Not Found Matching Id" rejections
+           in six seconds and buried the nine real errors logged that day.
+
+           Every AUTOMATIC report passes through here. The manual "Report a bug"
+           button does not — a person chose to send that one, and it is never
+           dropped or capped. */
+        window.__aiadReportGate = (function () {
+            var DROP = [
+                /Object Not Found Matching Id/i,      // known extension-injection signature
+                /chrome-extension:\/\//i,
+                /moz-extension:\/\//i,
+                /safari-extension:\/\//i,
+                /safari-web-extension:\/\//i         // what Safari actually emits
+            ];
+            var CAP = 5;                              // identical signatures per page session
+            var seen = Object.create(null);
+            return function (message, detail) {
+                try {
+                    var blob = String(message == null ? '' : message) + ' ' +
+                               String(detail == null ? '' : detail);
+                    for (var i = 0; i < DROP.length; i++) {
+                        if (DROP[i].test(blob)) return false;
+                    }
+                    // Cap per signature, not overall: a genuine bug repeating across
+                    // different messages still gets through.
+                    var sig = String(message == null ? '' : message).slice(0, 120) + '|' +
+                              String(detail == null ? '' : detail).slice(0, 120);
+                    seen[sig] = (seen[sig] || 0) + 1;
+                    if (seen[sig] > CAP) return false;
+                    if (seen[sig] === CAP) {
+                        console.warn('[AIAD] reporter cap hit, silencing further copies of:', sig.slice(0, 90));
+                    }
+                    return true;
+                } catch (e) {
+                    console.warn('[AIAD] report gate threw, allowing through:', e && e.message);
+                    return true;      // a broken gate must not swallow real errors
+                }
+            };
+        })();
+
         // ── Error logging: make silent failures loud (writes to bug_reports) ────────
         window.reportError = function (message, detail, context) {
             try {
+                if (window.__aiadReportGate && !window.__aiadReportGate(message, detail)) return;
                 var u = (window.AppState && AppState.currentUser) ? AppState.currentUser : null;
                 var payload = {
                     user_id: u ? u.id : null,
@@ -19456,6 +19500,9 @@ Only capture real, meaningful decisions — not questions or general discussion.
             function report(op, table, err) {
                 try {
                     if (!err || !err.message) return;
+                    var _detail = [err.code, err.message, err.details, err.hint].filter(Boolean).join(' | ');
+                    if (window.__aiadReportGate &&
+                        !window.__aiadReportGate('auto: ' + op + ' failed on ' + table, _detail)) return;
                     var key = op + ':' + table + ':' + (err.code || '') + ':' + err.message;
                     var now = Date.now();
                     if (recent[key] && now - recent[key] < 60000) return;
@@ -19490,6 +19537,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             var origFrom = window.db.from.bind(window.db);
             window.db.from = function (table) {
                 var qb = origFrom(table);
+                if (table === 'bug_reports') return qb;   // never recurse, as with submit_bug_report
                 ['select', 'insert', 'update', 'upsert', 'delete'].forEach(function (verb) {
                     if (typeof qb[verb] !== 'function') return;
                     var orig = qb[verb].bind(qb);
