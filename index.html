@@ -3784,7 +3784,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
                                 Message all supporters
                             </button>
-                            <button class="communication-btn" onclick="showToast('Select tier: Inner Circle ($50+), Supporter ($25+), or Listener ($5+)')">
+                            <button class="communication-btn" onclick="showToast('Select tier: Inner Circle ($60+), Collector ($30+), Patron ($10+) or Supporter ($5+)')">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
                                 Message by tier
                             </button>
@@ -3801,22 +3801,29 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                         <div class="perks-list">
                             <div class="perk-item">
                                 <div>
-                                    <span class="perk-tier-name">Listener</span>
+                                    <span class="perk-tier-name">Supporter</span>
                                     <span class="perk-tier-price">$5/mo</span>
                                 </div>
                                 <span class="perk-utilization">0 supporters</span>
                             </div>
                             <div class="perk-item">
                                 <div>
-                                    <span class="perk-tier-name">Supporter</span>
-                                    <span class="perk-tier-price">$25/mo</span>
+                                    <span class="perk-tier-name">Patron</span>
+                                    <span class="perk-tier-price">$10/mo</span>
+                                </div>
+                                <span class="perk-utilization">0 supporters</span>
+                            </div>
+                            <div class="perk-item">
+                                <div>
+                                    <span class="perk-tier-name">Collector</span>
+                                    <span class="perk-tier-price">$30/mo</span>
                                 </div>
                                 <span class="perk-utilization">0 supporters</span>
                             </div>
                             <div class="perk-item">
                                 <div>
                                     <span class="perk-tier-name">Inner Circle</span>
-                                    <span class="perk-tier-price">$50/mo</span>
+                                    <span class="perk-tier-price">$60/mo</span>
                                 </div>
                                 <span class="perk-utilization">0 supporters</span>
                             </div>
@@ -4095,7 +4102,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                                     <span class="nc-spacer"></span>
                                     <select class="nc-vis-select" id="postVisibility">
                                         <option value="all">All Supporters</option>
-                                        <option value="inner">Inner Circle ($50+)</option>
+                                        <option value="inner">Inner Circle ($60+)</option>
                                         <option value="supporter">Supporters+ ($25+)</option>
                                         <option value="public">Public</option>
                                     </select>
@@ -8603,15 +8610,22 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     </div>
 
                     <div class="dash-tier featured">
+                        <div class="dash-tier-name">Patron</div>
+                        <div class="dash-tier-price">$10<span>/month</span></div>
+                        <p class="dash-tier-desc">Back the work properly and see how it gets made.</p>
+                        <button class="dash-tier-btn">Become a Patron</button>
+                    </div>
+
+                    <div class="dash-tier">
                         <div class="dash-tier-name">Collector</div>
-                        <div class="dash-tier-price">$25<span>/month</span></div>
+                        <div class="dash-tier-price">$30<span>/month</span></div>
                         <p class="dash-tier-desc">Go deeper into the creative process and world.</p>
                         <button class="dash-tier-btn">Join as Collector</button>
                     </div>
 
                     <div class="dash-tier">
                         <div class="dash-tier-name">Inner Circle</div>
-                        <div class="dash-tier-price">$50<span>/month</span></div>
+                        <div class="dash-tier-price">$60<span>/month</span></div>
                         <p class="dash-tier-desc">The closest connection to the journey.</p>
                         <button class="dash-tier-btn">Join Inner Circle</button>
                     </div>
@@ -9298,110 +9312,10 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 <p class="tier-modal-note">Every tier helps fuel independent creativity. Pick what feels right — you can always change later.</p>
             </div>
 
-            <div class="tier-selection-grid">
-
-                <div class="tier-detail-card" onclick="selectSupportTier(this, 'supporter')">
-                    <div class="tier-detail-header">
-                        <div class="tier-detail-name">Supporter</div>
-                        <div class="tier-detail-price">$5<span>/month</span></div>
-                    </div>
-                    <p class="tier-detail-desc">Stay connected and get first access to new work.</p>
-                    <div class="tier-detail-perks">
-                        <div class="tier-detail-perk">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                            <span>Early access to new releases (24 hours before public)</span>
-                        </div>
-                        <div class="tier-detail-perk">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                            <span>Supporter-only posts and updates</span>
-                        </div>
-                        <div class="tier-detail-perk">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                            <span>Name in credits for future releases</span>
-                        </div>
-                        <div class="tier-detail-perk">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                            <span>Supporter badge on your profile</span>
-                        </div>
-                    </div>
-                    <button class="tier-detail-btn">Choose Supporter</button>
-                </div>
-
-                <div class="tier-detail-card featured" onclick="selectSupportTier(this, 'collector')">
-                    <div class="tier-featured-badge">Most Popular</div>
-                    <div class="tier-detail-header">
-                        <div class="tier-detail-name">Collector</div>
-                        <div class="tier-detail-price">$25<span>/month</span></div>
-                    </div>
-                    <p class="tier-detail-desc">Go deeper into the creative process and world.</p>
-                    <div class="tier-detail-perks">
-                        <div class="tier-detail-perk">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                            <span>Everything in Supporter tier</span>
-                        </div>
-                        <div class="tier-detail-perk">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                            <span>Behind-the-scenes studio sessions</span>
-                        </div>
-                        <div class="tier-detail-perk">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                            <span>Exclusive unreleased demos and stems</span>
-                        </div>
-                        <div class="tier-detail-perk">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                            <span>Monthly Q&A sessions</span>
-                        </div>
-                        <div class="tier-detail-perk">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                            <span>15% discount on all merch</span>
-                        </div>
-                        <div class="tier-detail-perk">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                            <span>Priority access to concert tickets</span>
-                        </div>
-                    </div>
-                    <button class="tier-detail-btn featured">Choose Collector</button>
-                </div>
-
-                <div class="tier-detail-card" onclick="selectSupportTier(this, 'inner-circle')">
-                    <div class="tier-detail-header">
-                        <div class="tier-detail-name">Inner Circle</div>
-                        <div class="tier-detail-price">$50<span>/month</span></div>
-                    </div>
-                    <p class="tier-detail-desc">The closest connection to the journey.</p>
-                    <div class="tier-detail-perks">
-                        <div class="tier-detail-perk">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                            <span>Everything in Collector tier</span>
-                        </div>
-                        <div class="tier-detail-perk">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                            <span>Direct messaging access with the artist</span>
-                        </div>
-                        <div class="tier-detail-perk">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                            <span>Vote on creative decisions (cover art, setlists)</span>
-                        </div>
-                        <div class="tier-detail-perk">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                            <span>Exclusive signed merchandise yearly</span>
-                        </div>
-                        <div class="tier-detail-perk">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                            <span>Private virtual hangouts (quarterly)</span>
-                        </div>
-                        <div class="tier-detail-perk">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                            <span>Your name in album liner notes</span>
-                        </div>
-                        <div class="tier-detail-perk">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                            <span>First access to limited editions</span>
-                        </div>
-                    </div>
-                    <button class="tier-detail-btn">Choose Inner Circle</button>
-                </div>
-            </div>
+            <!-- Four tiers rendered from AIADTiers.TIERS; the three hardcoded
+                 cards here priced $5/$25/$50 and used the tier key "inner-circle",
+                 which fan_subscriptions.tier would have rejected. -->
+            <div id="tierSelectionMount"></div>
 
             <div class="tier-onetime-option">
                 <span class="tier-onetime-text">Prefer a one-time contribution?</span>
@@ -9687,16 +9601,21 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                                 <div class="explorer-tier-preview-card">
                                     <div class="explorer-tier-preview-name">Supporter</div>
                                     <div class="explorer-tier-preview-price">$5/month</div>
-                                    <div class="explorer-tier-preview-perks">Early access to releases, behind-the-scenes content</div>
+                                    <div class="explorer-tier-preview-perks">Early access to releases, supporter-only posts</div>
+                                </div>
+                                <div class="explorer-tier-preview-card">
+                                    <div class="explorer-tier-preview-name">Patron</div>
+                                    <div class="explorer-tier-preview-price">$10/month</div>
+                                    <div class="explorer-tier-preview-perks">Behind-the-scenes sessions, monthly Q&amp;A</div>
                                 </div>
                                 <div class="explorer-tier-preview-card">
                                     <div class="explorer-tier-preview-name">Collector</div>
-                                    <div class="explorer-tier-preview-price">$15/month</div>
-                                    <div class="explorer-tier-preview-perks">Exclusive tracks, monthly live sessions, Discord access</div>
+                                    <div class="explorer-tier-preview-price">$30/month</div>
+                                    <div class="explorer-tier-preview-perks">Exclusive demos and stems, 15% merch discount</div>
                                 </div>
                                 <div class="explorer-tier-preview-card">
                                     <div class="explorer-tier-preview-name">Inner Circle</div>
-                                    <div class="explorer-tier-preview-price">$50/month</div>
+                                    <div class="explorer-tier-preview-price">$60/month</div>
                                     <div class="explorer-tier-preview-perks">Direct messaging, liner note credit, limited editions</div>
                                 </div>
                             </div>
@@ -15679,7 +15598,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 return 'Release timing is crucial. Based on your audience patterns, your supporters are most active on Thursday evenings and Saturday afternoons. For maximum impact, I\'d suggest a Thursday midnight drop with a teaser 48 hours before. Would you like me to analyze your last few releases for specific insights?';
             }
             if (lowerMsg.includes('price') || lowerMsg.includes('cost') || lowerMsg.includes('money') || lowerMsg.includes('charge')) {
-                return 'Pricing is a balance between accessibility and sustainability. Your current $5/$25/$50 tiers are well-structured. Looking at comparable artists, your $50 Inner Circle tier could potentially go to $75 without significant churn — your retention rate at that tier is 94%. Want me to model different scenarios?';
+                return 'Pricing is a balance between accessibility and sustainability. Your current $5/$10/$30/$60 tiers are well-structured. Looking at comparable artists, your $50 Inner Circle tier could potentially go to $75 without significant churn — your retention rate at that tier is 94%. Want me to model different scenarios?';
             }
             if (lowerMsg.includes('collab') || lowerMsg.includes('work with') || lowerMsg.includes('feature')) {
                 return 'Collaborations can expand your reach significantly. Based on your sound and audience demographics, I see potential synergies with artists in the electronic/soul crossover space. Would you like me to identify specific collaborators in our network, or analyze how past collaborations have impacted similar artists?';
@@ -16605,7 +16524,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     <div class="tier-row">
                         <div class="tier-info">
                             <span class="tier-badge tier-${amount}">$${amount}/mo</span>
-                            <span class="tier-name">${amount >= 50 ? 'Inner Circle' : amount >= 25 ? 'Supporter' : 'Listener'}</span>
+                            <span class="tier-name">${(window.AIADTiers && AIADTiers.forAmountCents(Number(amount) * 100).name) || ''}</span>
                         </div>
                         <div class="tier-stats">
                             <span class="tier-count">${t.count} supporter${t.count !== 1 ? 's' : ''}</span>
@@ -17111,6 +17030,15 @@ Only capture real, meaningful decisions — not questions or general discussion.
             const avatar = artistAvatars[artistName] || '';
             document.getElementById('tierModalAvatar').src = avatar;
 
+            var _mount = document.getElementById('tierSelectionMount');
+            if (_mount && window.AIADTiers) {
+                AIADTiers.render(_mount, {
+                    onChoose: function (key) {
+                        var card = _mount.querySelector('.fan-tier-card[data-tier="' + key + '"]');
+                        selectSupportTier(card, key);
+                    }
+                });
+            }
             document.getElementById('tierSelectionModal').classList.add('active');
         }
 
@@ -17123,13 +17051,15 @@ Only capture real, meaningful decisions — not questions or general discussion.
         function selectSupportTier(card, tierName) {
 
             document.querySelectorAll('.tier-detail-card').forEach(c => c.classList.remove('selected'));
-            card.classList.add('selected');
+            if (card) card.classList.add('selected');
 
-            const tierPrices = { 'supporter': 5, 'collector': 25, 'inner-circle': 50 };
+            const _t = window.AIADTiers && AIADTiers.tier(tierName);
             const tierData = {
                 artist: document.getElementById('tierModalArtistName').textContent,
-                tier: tierName,
-                price: tierPrices[tierName],
+                tier: _t ? _t.key : tierName,
+                billing_interval: window.AIADTiers ? AIADTiers.interval() : 'month',
+                amount_cents: _t ? AIADTiers.priceFor(_t, AIADTiers.interval()) : null,
+                price: _t ? Math.round(AIADTiers.priceFor(_t, AIADTiers.interval()) / 100) : null,
                 intention: selectedIntention,
                 timestamp: new Date().toISOString()
             };
@@ -17144,11 +17074,11 @@ Only capture real, meaningful decisions — not questions or general discussion.
         }
 
         function showSupportConfirmation(tierData) {
-            const tierNames = { 'supporter': 'Supporter', 'collector': 'Collector', 'inner-circle': 'Inner Circle' };
+            const tierNames = null;   // names come from AIADTiers.label(), which knows all four
             document.getElementById('modalBody').innerHTML = `
                 <div style="text-align: center; padding: 20px;">
                     <div style="font-size: 4rem; margin-bottom: 16px;">🎉</div>
-                    <h2 style="margin-bottom: 12px;">You're now a ${tierNames[tierData.tier]}!</h2>
+                    <h2 style="margin-bottom: 12px;">You're now a ${(window.AIADTiers && AIADTiers.label(tierData.tier)) || 'supporter'}!</h2>
                     <p style="color: var(--text-secondary); margin-bottom: 20px;">Your $${tierData.price}/month support helps fuel ${tierData.artist}'s creative journey.</p>
                     <p style="font-size: 0.85rem; color: var(--text-muted);">(In production, this would proceed to payment processing)</p>
                 </div>
@@ -21904,7 +21834,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#1a1a2e,#16213e);display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;color:var(--teal-light,#00d4ff);">?</div>
                     <div>
                         <h2 class="supporter-profile-name">${name}</h2>
-                        <span class="supporter-tier tier-${tier}">${tier === '50' ? '$50/mo · Inner Circle' : tier === '25' ? '$25/mo · Supporter' : '$5/mo · Listener'}</span>
+                        <span class="supporter-tier tier-${tier}">${(function(){ var _t = window.AIADTiers && AIADTiers.forAmountCents(Number(tier) * 100); return _t ? AIADTiers.money(_t.cents) + '/mo · ' + _t.name : tier; })()}</span>
                     </div>
                 </div>
 
@@ -23708,9 +23638,10 @@ function fanOpenSupportModal(artistId, artistName) {
     modal.id = 'fanSupportModal';
     modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
     const tiers = [
-        ['5',  'Supporter — $5/mo',  'Early access · Behind-the-scenes'],
-        ['25', 'Collector — $25/mo', 'All above · Exclusive drops · DMs'],
-        ['50', 'Inner Circle — $50/mo','All above · Signed merch · Previews'],
+        ['5',  'Supporter — $5/mo',    'Early access · Supporter-only posts'],
+        ['10', 'Patron — $10/mo',      'All above · Behind-the-scenes · Monthly Q&A'],
+        ['30', 'Collector — $30/mo',   'All above · Demos & stems · 15% merch'],
+        ['60', 'Inner Circle — $60/mo','All above · DMs · Signed merch · Liner notes'],
     ];
     const tiersHtml = tiers.map(([amt, label, sub]) =>
         `<div onclick="fanSelectTier(this,'${amt}')" style="padding:14px 18px;border-radius:12px;border:1px solid var(--border-default);cursor:pointer;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
@@ -35801,6 +35732,157 @@ window.AIAD_PROMPTS = [
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watch);
     else watch();
+})();
+</script>
+<style id="aiad-pledge-tier-css">
+/* patron: the tier that did not exist when .pledge-tier-badge was written, plus an
+   underscore alias so the DB key renders the same as the old hyphen form. */
+.pledge-tier-badge.patron{background:rgba(224,64,251,0.15);color:var(--magenta-light,#FF66FF);}
+.pledge-tier-badge.inner_circle{background:linear-gradient(135deg,rgba(255,0,255,0.2),rgba(0,212,255,0.2));color:#fff;}
+.tier-interval-toggle{display:inline-flex;gap:4px;padding:4px;margin:0 0 18px;background:rgba(255,255,255,0.05);border-radius:999px;}
+.tier-interval-toggle button{border:none;background:transparent;cursor:pointer;font-family:inherit;color:var(--text-muted,rgba(255,255,255,0.5));font-size:0.82rem;font-weight:600;padding:8px 18px;border-radius:999px;transition:all 150ms ease;}
+.tier-interval-toggle button.active{background:var(--text-primary,#fff);color:#0a0a0a;}
+.tier-interval-toggle button span{font-weight:500;opacity:0.75;font-size:0.74rem;}
+.tier-yearly-note{font-size:0.74rem;color:var(--teal-light,#00D4FF);margin:-4px 0 8px;}
+.tier-catalog-note{margin:18px 0 0;padding:13px 16px;border-radius:11px;background:rgba(0,212,255,0.06);border:1px solid rgba(0,212,255,0.2);font-size:0.82rem;line-height:1.55;color:var(--text-secondary,rgba(255,255,255,0.7));}
+.fan-tier-card.selected{border-color:var(--teal-light,#00D4FF);box-shadow:0 0 0 1px var(--teal-light,#00D4FF);}
+</style>
+<script>
+/* ══════════════ FAN PLEDGE TIERS — one table ══════════════
+   Four tiers, and the keys here are the ones fan_subscriptions.tier accepts:
+   supporter / patron / collector / inner_circle. The rest of the file used to say
+   'inner-circle' with a hyphen, which the check constraint would have rejected on
+   the first real write. Prices were $5/$25/$50 in some places and $10/$30 in
+   others; both are gone.
+
+   NOT to be confused with AppState.userRole === 'supporter', which is a ROLE
+   (fan vs artist vs collaborator) and has nothing to do with the tier of the
+   same name. Those call sites are deliberately untouched. */
+(function () {
+    'use strict';
+    if (window.AIADTiers) return;
+
+    var YEARLY_MONTHS = 10;                 // pay 10, get 12
+
+    var TIERS = [
+        { key: 'supporter', name: 'Supporter', cents: 500,
+          desc: 'Stay connected and get first access to new work.',
+          perks: ['Early access to new releases (24 hours before public)',
+                  'Supporter-only posts and updates',
+                  'Name in credits for future releases',
+                  'Supporter badge on your profile'] },
+        { key: 'patron', name: 'Patron', cents: 1000, featured: true,
+          desc: 'Back the work properly and see how it gets made.',
+          perks: ['Everything in Supporter',
+                  'Behind-the-scenes studio sessions',
+                  'Monthly Q&A sessions',
+                  'Patron badge on your profile'] },
+        { key: 'collector', name: 'Collector', cents: 3000,
+          desc: 'Go deeper into the creative process and world.',
+          perks: ['Everything in Patron',
+                  'Exclusive unreleased demos and stems',
+                  '15% discount on all merch',
+                  'Priority access to concert tickets'] },
+        { key: 'inner_circle', name: 'Inner Circle', cents: 6000,
+          desc: 'The closest connection to the journey.',
+          perks: ['Everything in Collector',
+                  'Direct messaging access with the artist',
+                  'Vote on creative decisions (cover art, setlists)',
+                  'Exclusive signed merchandise yearly',
+                  'Private virtual hangouts (quarterly)',
+                  'Your name in album liner notes'] }
+    ];
+
+    var CATALOG_NOTE = 'A pledge to any artist unlocks the entire AIAD catalogue for streaming. ' +
+                       'AIAD takes 8% — the rest goes to the artist.';
+
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+    function tier(key) {
+        var k = String(key || '').replace(/-/g, '_');      // tolerate the old hyphen form
+        return TIERS.filter(function (t) { return t.key === k; })[0] || null;
+    }
+    function money(cents) { return '$' + (Math.round(cents) / 100).toFixed(2).replace(/\.00$/, ''); }
+    function priceFor(t, interval) { return interval === 'year' ? t.cents * YEARLY_MONTHS : t.cents; }
+    function label(key) { var t = tier(key); return t ? t.name : ''; }
+
+    var interval = 'month';
+    var selected = null;
+
+    function cardHtml(t) {
+        var amount = priceFor(t, interval);
+        var isSel = selected === t.key;
+        return '<div class="fan-tier-card tier-detail-card' + (t.featured ? ' featured' : '') +
+            (isSel ? ' selected' : '') + '" data-tier="' + esc(t.key) + '"' +
+            ' role="radio" aria-checked="' + (isSel ? 'true' : 'false') + '" tabindex="0">' +
+            (t.featured ? '<div class="tier-featured-badge">Most popular</div>' : '') +
+            '<div class="tier-detail-header">' +
+              '<div class="tier-detail-name">' + esc(t.name) + '</div>' +
+              '<div class="tier-detail-price">' + money(amount) +
+                '<span>/' + (interval === 'year' ? 'year' : 'month') + '</span></div>' +
+            '</div>' +
+            (interval === 'year' ? '<div class="tier-yearly-note">' + money(t.cents) + '/mo billed yearly — two months free</div>' : '') +
+            '<p class="tier-detail-desc">' + esc(t.desc) + '</p>' +
+            '<div class="tier-detail-perks">' +
+              t.perks.map(function (p) {
+                  return '<div class="tier-detail-perk">' +
+                      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>' +
+                      '<span>' + esc(p) + '</span></div>';
+              }).join('') +
+            '</div>' +
+            '<button class="tier-detail-btn' + (t.featured ? ' featured' : '') + '" type="button">Choose ' + esc(t.name) + '</button>' +
+        '</div>';
+    }
+
+    /* Renders into any host. onChoose(key, interval, cents) fires on a card click. */
+    function render(host, opts) {
+        if (!host) return;
+        opts = opts || {};
+        host.innerHTML =
+            '<div class="tier-interval-toggle" role="group" aria-label="Billing interval">' +
+              '<button type="button" data-iv="month" class="' + (interval === 'month' ? 'active' : '') + '">Monthly</button>' +
+              '<button type="button" data-iv="year" class="' + (interval === 'year' ? 'active' : '') + '">Yearly <span>2 months free</span></button>' +
+            '</div>' +
+            '<div class="fan-support-tiers tier-selection-grid" role="radiogroup">' +
+              TIERS.map(cardHtml).join('') +
+            '</div>' +
+            '<p class="tier-catalog-note">' + esc(CATALOG_NOTE) + '</p>';
+
+        host.querySelectorAll('.tier-interval-toggle button').forEach(function (b) {
+            b.addEventListener('click', function () { interval = b.dataset.iv; render(host, opts); });
+        });
+        host.querySelectorAll('.fan-tier-card').forEach(function (c) {
+            var pick = function () {
+                selected = c.dataset.tier;
+                render(host, opts);
+                var t = tier(selected);
+                if (opts.onChoose && t) opts.onChoose(t.key, interval, priceFor(t, interval));
+            };
+            c.addEventListener('click', pick);
+            c.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); }
+            });
+        });
+    }
+
+    window.AIADTiers = {
+        TIERS: TIERS, tier: tier, label: label, money: money,
+        priceFor: priceFor, render: render, CATALOG_NOTE: CATALOG_NOTE,
+        YEARLY_MONTHS: YEARLY_MONTHS,
+        interval: function () { return interval; },
+        selected: function () { return selected; },
+        setInterval: function (iv) { if (iv === 'month' || iv === 'year') interval = iv; },
+        /* Amount -> tier, for rendering historical pledges whose tier key was never
+           stored. Thresholds are the tier prices themselves. */
+        forAmountCents: function (cents) {
+            var n = Number(cents) || 0, out = TIERS[0];
+            TIERS.forEach(function (t) { if (n >= t.cents) out = t; });
+            return out;
+        }
+    };
 })();
 </script>
 </body>
