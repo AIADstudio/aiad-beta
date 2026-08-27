@@ -32594,6 +32594,21 @@ window.AIAD_PROMPTS = [
 #artistDistributeView .rw-deriv.is-work{background:rgba(255,255,255,0.04);border-color:var(--border-default,rgba(255,255,255,0.09));color:var(--text-secondary,rgba(255,255,255,0.6));}
 #artistDistributeView .rw-deriv.is-qc{background:rgba(239,68,68,0.09);border-color:rgba(239,68,68,0.33);color:#fca5a5;}
 #artistDistributeView .rw-deriv.is-none{background:transparent;border-color:transparent;color:var(--text-muted,rgba(255,255,255,0.4));padding-left:0;}
+#artistDistributeView .rw-explain{position:relative;background:rgba(0,212,255,0.06);border:1px solid rgba(0,212,255,0.22);border-radius:11px;padding:14px 38px 14px 16px;margin:0 0 14px;}
+#artistDistributeView .rw-explain strong{display:block;font-size:0.88rem;color:var(--text-primary,#fff);margin-bottom:5px;}
+#artistDistributeView .rw-explain p{margin:0;font-size:0.81rem;line-height:1.6;color:var(--text-secondary,rgba(255,255,255,0.68));}
+#artistDistributeView .rw-explain-x{position:absolute;top:9px;right:11px;background:none;border:none;color:var(--text-muted,rgba(255,255,255,0.45));font-size:1.2rem;line-height:1;cursor:pointer;padding:2px 5px;font-family:inherit;}
+#artistDistributeView .rw-explain-x:hover{color:var(--text-primary,#fff);}
+#artistDistributeView .rw-contrib{display:block;padding:11px 0;}
+#artistDistributeView .rw-contrib-top{display:flex;gap:7px;flex-wrap:wrap;align-items:center;}
+#artistDistributeView .rw-contrib-top .rw-input{flex:1 1 130px;width:auto;min-width:0;}
+#artistDistributeView .rw-contrib-top .rw-role{flex:0 1 150px;}
+#artistDistributeView .rw-contrib-sw{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 12px;margin:10px 0 0 9px;padding-left:11px;border-left:2px solid rgba(0,212,255,0.35);}
+#artistDistributeView .rw-sub-field{display:flex;flex-direction:column;gap:4px;min-width:0;}
+#artistDistributeView .rw-sub-wide{grid-column:span 2;}
+#artistDistributeView .rw-sub-field > span{font-size:0.71rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted,rgba(255,255,255,0.42));}
+#artistDistributeView .rw-sub-help{display:block;font-style:normal;font-size:0.7rem;line-height:1.45;color:var(--text-hint,rgba(255,255,255,0.32));margin-top:3px;}
+@media (max-width:768px){#artistDistributeView .rw-sub-wide{grid-column:span 1;}}
 #artistDistributeView .rw-payout{border:1px solid var(--border-default,rgba(255,255,255,0.09));border-radius:11px;overflow:hidden;margin:12px 0 4px;}
 #artistDistributeView .rw-payout-row{display:flex;justify-content:space-between;gap:14px;align-items:center;padding:8px 13px;font-size:0.81rem;color:var(--text-secondary,rgba(255,255,255,0.62));border-bottom:1px solid var(--border-default,rgba(255,255,255,0.06));}
 #artistDistributeView .rw-payout-row:last-child{border-bottom:none;}
@@ -33120,6 +33135,20 @@ window.AIAD_PROMPTS = [
             };
         }
 
+        // Publishers this artist has used before, for the combobox. A failure here
+        // only costs the suggestions, so it warns rather than blocking the wizard.
+        var pubs = await window.db.from('track_contributors')
+            .select('publisher_name, tracks!inner(user_id)')
+            .eq('tracks.user_id', u).not('publisher_name', 'is', null).limit(200);
+        if (pubs.error) {
+            console.warn('[AIAD release] publisher suggestions unavailable:', pubs.error.message);
+        } else {
+            var seen = Object.create(null);
+            knownPublishers = (pubs.data || []).map(function (r) { return trim(r.publisher_name); })
+                .filter(function (p) { if (!p || seen[p]) return false; seen[p] = 1; return true; })
+                .sort();
+        }
+
         RS.ready = true;
         RS.step = accepted ? Math.max(1, RS.step) : 0;
         busy(false);
@@ -33167,7 +33196,7 @@ window.AIAD_PROMPTS = [
                 localId: nextId(), dbId: row.id, role: row.role,
                 legal_name: row.legal_name || '', stage_name: row.stage_name || '',
                 share_percent: (row.share_percent == null ? '' : String(row.share_percent)),
-                publisher_name: row.publisher_name || '', pro: row.pro || '',
+                publisher_name: row.publisher_name || '', pro: row.pro || '', pro_other: '',
                 ipi_cae: row.ipi_cae || '', instrument: row.instrument || ''
             });
         });
@@ -33311,9 +33340,20 @@ window.AIAD_PROMPTS = [
             field('Early access window', false, '<select class="rw-input" id="rwEarly">' + opt([
                 { v: '0', l: 'None' }, { v: '24', l: '24 hours' }, { v: '48', l: '48 hours' }, { v: '72', l: '72 hours' }
             ], r.early_access_hours == null ? '0' : r.early_access_hours) + '</select>', 'Tier 2+ supporters get it early.') +
-            field('Primary genre', true, txt('rwGenre1', r.primary_genre, '')) +
-            field('Secondary genre', false, txt('rwGenre2', r.secondary_genre, '')) +
-            field('Language of release', true, txt('rwLang', r.language, 'English')) +
+            field('Primary genre', true, '<select class="rw-input" id="rwGenre1">' +
+                '<option value="">Choose…</option>' +
+                withCurrent(GENRES, r.primary_genre).map(function (g) {
+                    return '<option value="' + esc(g) + '"' + (r.primary_genre === g ? ' selected' : '') + '>' + esc(g) + '</option>';
+                }).join('') + '</select>') +
+            field('Secondary genre', false, '<select class="rw-input" id="rwGenre2">' +
+                '<option value="">None</option>' +
+                withCurrent(GENRES, r.secondary_genre).map(function (g) {
+                    return '<option value="' + esc(g) + '"' + (r.secondary_genre === g ? ' selected' : '') + '>' + esc(g) + '</option>';
+                }).join('') + '</select>') +
+            field('Language of release', true, '<select class="rw-input" id="rwLang">' +
+                withCurrent(LANGUAGES, r.language).map(function (l) {
+                    return '<option value="' + esc(l) + '"' + ((r.language || 'English') === l ? ' selected' : '') + '>' + esc(l) + '</option>';
+                }).join('') + '</select>') +
             field('Parental advisory', true, '<select class="rw-input" id="rwAdvisory">' + opt([
                 { v: 'explicit', l: 'Explicit' }, { v: 'clean', l: 'Clean' }, { v: 'not_applicable', l: 'Not applicable' }
             ], r.parental_advisory || 'not_applicable') + '</select>') +
@@ -33497,7 +33537,8 @@ window.AIAD_PROMPTS = [
             purchasable: true, min_price_cents: null,
             derivatives_status: 'pending', true_peak_dbtp: null, leading_silence_ms: null, loudness_lufs: null,
             contributors: [
-                { localId: nextId(), dbId: null, role: 'songwriter', legal_name: '', stage_name: '', share_percent: '100', publisher_name: '', pro: '', ipi_cae: '', instrument: '' },
+                { localId: nextId(), dbId: null, role: 'songwriter', legal_name: '', stage_name: '', share_percent: '100',
+                  publisher_name: 'Self-published', pro: '', pro_other: '', ipi_cae: '', instrument: '' },
                 { localId: nextId(), dbId: null, role: 'producer', legal_name: '', stage_name: '', share_percent: '', publisher_name: '', pro: '', ipi_cae: '', instrument: '' }
             ]
         };
@@ -33537,8 +33578,12 @@ window.AIAD_PROMPTS = [
         var c = contribById(t, cid);
         if (!c) return;
         c[key] = value;
+        if (key === 'publisher_name' && trim(value)) lastUsed.publisher = trim(value);
+        if (key === 'pro') lastUsed.pro = value;
+        if (key === 'pro_other' && trim(value)) lastUsed.pro_other = trim(value);
         if (key === 'share_percent') updateShareTotal(tid);
-        if (key === 'role') renderContribs(tid);
+        // Both change which fields the row shows, so the row is redrawn.
+        if (key === 'role' || key === 'pro') renderContribs(tid);
     }
     function updateShareTotal(tid) {
         var t = trackById(tid);
@@ -33571,9 +33616,16 @@ window.AIAD_PROMPTS = [
     function addContrib(tid, role) {
         var t = trackById(tid);
         if (!t) return;
+        var isSw = (role || 'songwriter') === 'songwriter';
         t.contributors.push({
             localId: nextId(), dbId: null, role: role || 'songwriter', legal_name: '', stage_name: '',
-            share_percent: '', publisher_name: '', pro: '', ipi_cae: '', instrument: ''
+            share_percent: '',
+            // Most indie artists are self-published, and the session remembers whatever
+            // was used last so a second songwriter is not retyped from scratch.
+            publisher_name: isSw ? (lastUsed.publisher || 'Self-published') : '',
+            pro: isSw ? (lastUsed.pro || '') : '',
+            pro_other: isSw ? (lastUsed.pro_other || '') : '',
+            ipi_cae: '', instrument: ''
         });
         renderContribs(tid);
     }
@@ -33590,36 +33642,186 @@ window.AIAD_PROMPTS = [
         renderContribs(tid);
     }
 
-    function contribRow(t, c) {
+    // ── Closed vocabularies ─────────────────────────────────────────────────
+    /* "Not sure / none" is first and is the default, and it is a perfectly valid
+       submission. Most artists have never signed with a PRO and should not be made
+       to feel they are missing a requirement. */
+    var PRO_OPTIONS = [
+        { v: '', l: 'Not sure / none' },
+        { v: 'ASCAP', l: 'ASCAP' },
+        { v: 'BMI', l: 'BMI' },
+        { v: 'SESAC', l: 'SESAC' },
+        { v: 'GMR', l: 'GMR' },
+        { v: 'SOCAN', l: 'SOCAN (Canada)' },
+        { v: 'PRS', l: 'PRS (UK)' },
+        { v: 'GEMA', l: 'GEMA (Germany)' },
+        { v: 'SACEM', l: 'SACEM (France)' },
+        { v: '__other', l: 'Other' }
+    ];
+    var GENRES = ['Alternative', 'Ambient', 'Blues', 'Classical', 'Country', 'Dance', 'Electronic',
+        'Experimental', 'Folk', 'Funk', 'Gospel', 'Hip-Hop', 'House', 'Indie', 'Jazz', 'Latin',
+        'Metal', 'Pop', 'Punk', 'R&B / Soul', 'Reggae', 'Rock', 'Singer-Songwriter', 'Soundtrack',
+        'Spoken Word', 'Techno', 'World'];
+    var LANGUAGES = ['English', 'Spanish', 'French', 'German', 'Portuguese', 'Italian', 'Dutch',
+        'Swedish', 'Norwegian', 'Danish', 'Polish', 'Russian', 'Arabic', 'Hebrew', 'Hindi',
+        'Bengali', 'Punjabi', 'Urdu', 'Mandarin', 'Cantonese', 'Japanese', 'Korean', 'Vietnamese',
+        'Thai', 'Indonesian', 'Tagalog', 'Swahili', 'Yoruba', 'Zulu', 'Afrikaans', 'Turkish',
+        'Greek', 'Romanian', 'Czech', 'Hungarian', 'Finnish', 'Icelandic', 'Irish', 'Welsh', 'Other'];
+    var LYRIC_LANGUAGES = ['Instrumental'].concat(LANGUAGES);
+
+    /* Carried across rows within a session: having typed a publisher or picked a PRO
+       once, an artist should not do it again on every songwriter of every track. */
+    var lastUsed = { pro: '', pro_other: '', publisher: 'Self-published' };
+    var knownPublishers = [];      // this artist's previous submissions, loaded once
+
+    function selectFrom(list, current, onchange, extraClass) {
+        return '<select class="rw-input ' + (extraClass || '') + '" onchange="' + onchange + '">' +
+            list.map(function (o) {
+                var v = typeof o === 'string' ? o : o.v;
+                var l = typeof o === 'string' ? o : o.l;
+                return '<option value="' + esc(v) + '"' + (String(current || '') === String(v) ? ' selected' : '') + '>' + esc(l) + '</option>';
+            }).join('') + '</select>';
+    }
+    /* A value already on the row that is not in the list must still round-trip —
+       older submissions and anything typed before these became selects. */
+    function withCurrent(list, current) {
+        var cur = String(current || '');
+        if (!cur) return list;
+        var has = list.some(function (o) { return (typeof o === 'string' ? o : o.v) === cur; });
+        return has ? list : list.concat([cur]);
+    }
+
+    // ── Credits ─────────────────────────────────────────────────────────────
+    var CREDITS_EXPLAINER_KEY = 'aiad_credits_explainer_dismissed';
+    function creditsExplainerDismissed() {
+        try { return localStorage.getItem(CREDITS_EXPLAINER_KEY) === '1'; } catch (e) { return false; }
+    }
+    function dismissCreditsExplainer() {
+        try { localStorage.setItem(CREDITS_EXPLAINER_KEY, '1'); } catch (e) {
+            console.warn('[AIAD release] could not persist explainer dismissal');
+        }
+        document.querySelectorAll('.rw-explain').forEach(function (n) { n.remove(); });
+    }
+    function creditsExplainer() {
+        if (creditsExplainerDismissed()) return '';
+        return '<div class="rw-explain">' +
+            '<button class="rw-explain-x" title="Dismiss" onclick="AIADRelease.dismissCreditsExplainer()">×</button>' +
+            '<strong>Why we ask for this</strong>' +
+            '<p>Songwriters get paid separately from the recording. These fields tell the ' +
+            'organisations that handle that money who to pay. If you wrote and recorded this ' +
+            'yourself, put your own legal name as the songwriter at 100% and leave the rest — ' +
+            'we’ll handle it. You can fill in the details later without re-submitting.</p>' +
+        '</div>';
+    }
+
+    function primaryArtistName() {
+        return trim(RS.release.primary_artist_name) ||
+               (window.AppState && AppState.artistProfile && AppState.artistProfile.artistName) || '';
+    }
+    function fillFromPrimary(tid, cid) {
+        var name = primaryArtistName();
+        if (!name) { banner('Set the primary artist on the Release step first.'); return; }
+        setC(tid, cid, 'legal_name', name);
+        renderContribs(tid);
+    }
+
+    function copyCreditsFromFirst(tid) {
+        var first = RS.tracks[0];
+        var t = trackById(tid);
+        if (!first || !t || first.localId === tid) return;
+        if (t.contributors.some(function (c) { return trim(c.legal_name); }) &&
+            !window.confirm('Replace this track’s credits with a copy of track 1?')) return;
+        t.contributors = first.contributors.map(function (c) {
+            return {
+                localId: nextId(), dbId: null, role: c.role,
+                legal_name: c.legal_name, stage_name: c.stage_name,
+                share_percent: c.share_percent, publisher_name: c.publisher_name,
+                pro: c.pro, pro_other: c.pro_other, ipi_cae: c.ipi_cae, instrument: c.instrument
+            };
+        });
+        renderContribs(tid);
+        banner('Credits copied from track 1 — edit as needed.', 'ok');
+    }
+
+    function contribRow(t, c, idx) {
         var isSw = c.role === 'songwriter';
-        var perf = c.role === 'featured_performer' || c.role === 'musician';
+        var isProd = ['producer', 'co_producer', 'additional_production'].indexOf(c.role) !== -1;
         var b = 'AIADRelease.setC(\'' + t.localId + '\',\'' + c.localId + '\',';
+        var perf = c.role === 'featured_performer' || c.role === 'musician';
+
+        // "Same as primary artist" on the first songwriter and the first producer only.
+        var firstOfKind = isSw
+            ? t.contributors.filter(function (x) { return x.role === 'songwriter'; })[0] === c
+            : (isProd && t.contributors.filter(function (x) {
+                  return ['producer', 'co_producer', 'additional_production'].indexOf(x.role) !== -1;
+              })[0] === c);
+
+        var proIsOther = c.pro === '__other' || (c.pro && !PRO_OPTIONS.some(function (o) { return o.v === c.pro; }));
+        var proValue = proIsOther ? '__other' : (c.pro || '');
+
         return '<div class="rw-contrib' + (isSw ? ' is-sw' : '') + '">' +
-            '<select class="rw-input rw-role" onchange="' + b + '\'role\',this.value)">' + opt(ROLES, c.role) + '</select>' +
-            '<input class="rw-input" placeholder="Legal name" value="' + esc(c.legal_name) + '" oninput="' + b + '\'legal_name\',this.value)">' +
-            '<input class="rw-input" placeholder="Stage name (optional)" value="' + esc(c.stage_name) + '" oninput="' + b + '\'stage_name\',this.value)">' +
-            (isSw
-                ? '<input class="rw-input rw-narrow" type="number" min="0" max="100" step="0.01" placeholder="Split %" value="' + esc(c.share_percent) + '" oninput="' + b + '\'share_percent\',this.value)">' +
-                  '<input class="rw-input" placeholder="Publisher" value="' + esc(c.publisher_name) + '" oninput="' + b + '\'publisher_name\',this.value)">' +
-                  '<input class="rw-input rw-narrow" placeholder="PRO" value="' + esc(c.pro) + '" oninput="' + b + '\'pro\',this.value)">' +
-                  '<input class="rw-input rw-narrow" placeholder="IPI/CAE" value="' + esc(c.ipi_cae) + '" oninput="' + b + '\'ipi_cae\',this.value)">'
+            '<div class="rw-contrib-top">' +
+              selectFrom(ROLES, c.role, b + '\'role\',this.value)', 'rw-role') +
+              '<input class="rw-input" placeholder="Legal name" value="' + esc(c.legal_name) +
+                '" oninput="' + b + '\'legal_name\',this.value)">' +
+              (firstOfKind && primaryArtistName()
+                ? '<button type="button" class="rw-btn rw-btn-sm" onclick="AIADRelease.fillFromPrimary(\'' +
+                  t.localId + '\',\'' + c.localId + '\')">Same as primary artist</button>'
                 : '') +
-            (perf ? '<input class="rw-input" placeholder="Instrument / role" value="' + esc(c.instrument) + '" oninput="' + b + '\'instrument\',this.value)">' : '') +
-            '<button class="rw-x" title="Remove" onclick="AIADRelease.removeContrib(\'' + t.localId + '\',\'' + c.localId + '\')">×</button>' +
+              '<input class="rw-input" placeholder="Stage name (optional)" value="' + esc(c.stage_name) +
+                '" oninput="' + b + '\'stage_name\',this.value)">' +
+              (perf ? '<input class="rw-input" placeholder="Instrument / role" value="' + esc(c.instrument) +
+                '" oninput="' + b + '\'instrument\',this.value)">' : '') +
+              '<button class="rw-x" title="Remove" onclick="AIADRelease.removeContrib(\'' +
+                t.localId + '\',\'' + c.localId + '\')">×</button>' +
+            '</div>' +
+            (isSw
+              ? '<div class="rw-contrib-sw">' +
+                  '<label class="rw-sub-field"><span>Split % <em class="rw-req">●</em></span>' +
+                    '<input class="rw-input rw-narrow" type="number" min="0" max="100" step="0.01" value="' +
+                    esc(c.share_percent) + '" oninput="' + b + '\'share_percent\',this.value)"></label>' +
+                  '<label class="rw-sub-field"><span>Publisher</span>' +
+                    '<input class="rw-input" list="rwPublishers" value="' + esc(c.publisher_name) +
+                    '" oninput="' + b + '\'publisher_name\',this.value)"></label>' +
+                  '<label class="rw-sub-field rw-sub-wide"><span>Performing rights organization</span>' +
+                    selectFrom(PRO_OPTIONS, proValue, b + '\'pro\',this.value)') +
+                    (proIsOther
+                      ? '<input class="rw-input" style="margin-top:6px;" placeholder="Which one?" value="' +
+                        esc(c.pro_other || '') + '" oninput="' + b + '\'pro_other\',this.value)">'
+                      : '') +
+                    '<em class="rw-sub-help">The group that collects your songwriting royalties when your ' +
+                    'music gets played. If you’ve never signed up with one, choose “Not sure / none” — ' +
+                    'you can add it later and it won’t hold up your release.</em></label>' +
+                  '<label class="rw-sub-field"><span>IPI / CAE</span>' +
+                    '<input class="rw-input" value="' + esc(c.ipi_cae) + '" oninput="' + b + '\'ipi_cae\',this.value)">' +
+                    '<em class="rw-sub-help">Optional. Find it in your PRO account, or add it later — ' +
+                    'it helps your royalties match faster.</em></label>' +
+                '</div>'
+              : '') +
             '</div>';
     }
 
     function contribsHtml(t) {
-        return t.contributors.map(function (c) { return contribRow(t, c); }).join('') +
+        var isFirstTrack = RS.tracks[0] && RS.tracks[0].localId === t.localId;
+        var publishers = ['Self-published'].concat(knownPublishers.filter(function (p) { return p !== 'Self-published'; }));
+        return (isFirstTrack ? creditsExplainer() : '') +
+            '<datalist id="rwPublishers">' +
+              publishers.map(function (p) { return '<option value="' + esc(p) + '"></option>'; }).join('') +
+            '</datalist>' +
+            t.contributors.map(function (c, i) { return contribRow(t, c, i); }).join('') +
             '<div class="rw-contrib-add">' +
               '<button class="rw-btn rw-btn-sm" onclick="AIADRelease.addContrib(\'' + t.localId + '\',\'songwriter\')">+ Songwriter</button>' +
               '<button class="rw-btn rw-btn-sm" onclick="AIADRelease.addContrib(\'' + t.localId + '\',\'producer\')">+ Producer</button>' +
               '<button class="rw-btn rw-btn-sm" onclick="AIADRelease.addContrib(\'' + t.localId + '\',\'mixing_engineer\')">+ Engineer</button>' +
               '<button class="rw-btn rw-btn-sm" onclick="AIADRelease.addContrib(\'' + t.localId + '\',\'featured_performer\')">+ Performer</button>' +
+              (!isFirstTrack && RS.tracks.length > 1
+                ? '<button class="rw-btn rw-btn-sm" onclick="AIADRelease.copyCreditsFromFirst(\'' + t.localId + '\')">Copy credits from track 1</button>'
+                : '') +
             '</div>' +
             '<div class="rw-sharetotal" id="rwSw-' + t.localId + '"></div>' +
-            '<div class="rw-hint">Sole writer? That is 100% to you. No publisher? Enter “Self-published.” No PRO? Enter “None” — but you are leaving money on the table.</div>';
+            '<div class="rw-hint">Sole writer? That is 100% to you. Only the legal name and the split have to be filled in — everything else can wait.</div>';
     }
+
     function renderContribs(tid) {
         var t = trackById(tid);
         var box = el('rwContribs-' + tid);
@@ -33690,7 +33892,11 @@ window.AIAD_PROMPTS = [
             field('Explicit', true, '<select class="rw-input" onchange="' + b + '\'explicit\',this.value===\'1\')">' +
                 '<option value="0"' + (t.explicit ? '' : ' selected') + '>No</option>' +
                 '<option value="1"' + (t.explicit ? ' selected' : '') + '>Yes</option></select>') +
-            field('Language of lyrics', true, '<input class="rw-input" value="' + esc(t.lyrics_language) + '" placeholder="English, or Instrumental" oninput="' + b + '\'lyrics_language\',this.value)">') +
+            field('Language of lyrics', true, '<select class="rw-input" onchange="' + b + '\'lyrics_language\',this.value)">' +
+                '<option value="">Choose…</option>' +
+                withCurrent(LYRIC_LANGUAGES, t.lyrics_language).map(function (l) {
+                    return '<option value="' + esc(l) + '"' + (t.lyrics_language === l ? ' selected' : '') + '>' + esc(l) + '</option>';
+                }).join('') + '</select>') +
             field('Preview start (seconds)', false, '<input class="rw-input" type="number" min="0" value="' + esc(t.preview_start_seconds == null ? 30 : t.preview_start_seconds) + '" oninput="' + b + '\'preview_start_seconds\',this.value)">', 'Where the 60s clip begins. Defaults to 0:30.') +
             field('Contains a sample or interpolation', true, '<select class="rw-input" onchange="' + b + '\'contains_sample\',this.value===\'1\')">' +
                 '<option value="0"' + (t.contains_sample ? '' : ' selected') + '>No</option>' +
@@ -33881,22 +34087,20 @@ window.AIAD_PROMPTS = [
             if (t.is_cover && !trim(t.cover_original_writers)) e.push(n + 'it is a cover, so the original writers are required.');
 
             var sw = songwriters(t);
-            var prod = t.contributors.filter(function (c) {
-                return ['producer', 'co_producer', 'additional_production'].indexOf(c.role) !== -1;
-            });
             if (!sw.length) e.push(n + 'at least one songwriter is required.');
-            if (!prod.length) e.push(n + 'at least one producer is required.');
+            // Producers are NOT a gate. A new track is created with an empty producer
+            // row as a prompt, and blocking on it would mean the row we added for the
+            // artist is the thing stopping their release. Empty contributor rows are
+            // dropped on save rather than rejected.
 
+            // Legal name and split only. Publisher, PRO and IPI are data quality, and
+            // blocking a release on data quality means the artist gives up instead of
+            // filling it in. The 100% split total stays a hard gate below — that one
+            // prevents real disputes over money.
             sw.forEach(function (c, j) {
                 var w = n + 'songwriter ' + (j + 1) + ' ';
                 if (!trim(c.legal_name)) e.push(w + 'needs a legal name.');
                 if (trim(c.share_percent) === '' || !isFinite(parseFloat(c.share_percent))) e.push(w + 'needs a split %.');
-                if (!trim(c.publisher_name)) e.push(w + 'needs a publisher — "Self-published" is fine.');
-                if (!trim(c.pro)) e.push(w + 'needs a PRO — "None" is fine.');
-                if (!trim(c.ipi_cae)) e.push(w + 'needs an IPI/CAE number.');
-            });
-            prod.forEach(function (c, j) {
-                if (!trim(c.legal_name)) e.push(n + 'producer ' + (j + 1) + ' needs a name.');
             });
             var total = shareTotal(t);
             if (sw.length && Math.abs(total - 100) > 0.0001) {
@@ -33968,7 +34172,9 @@ window.AIAD_PROMPTS = [
                     stage_name: trim(c.stage_name) || null,
                     share_percent: (c.role === 'songwriter' && isFinite(share)) ? share : null,
                     publisher_name: trim(c.publisher_name) || null,
-                    pro: trim(c.pro) || null, ipi_cae: trim(c.ipi_cae) || null,
+                    // "Other" is a UI affordance, not a value — store what they typed.
+                    pro: (c.pro === '__other' ? (trim(c.pro_other) || null) : (trim(c.pro) || null)),
+                    ipi_cae: trim(c.ipi_cae) || null,
                     instrument: trim(c.instrument) || null
                 };
             });
@@ -35018,6 +35224,8 @@ window.AIAD_PROMPTS = [
         saveRelease: saveRelease, uploadArtwork: uploadArtwork, syncTerritory: syncTerritory,
         addTrack: addTrack, removeTrack: removeTrack, setT: setT, setC: setC,
         addContrib: addContrib, removeContrib: removeContrib,
+        fillFromPrimary: fillFromPrimary, copyCreditsFromFirst: copyCreditsFromFirst,
+        dismissCreditsExplainer: dismissCreditsExplainer,
         uploadAudio: uploadAudio, resumeAudio: resumeAudio, saveTracks: saveTracks,
         setRights: setRights, uploadRightsDoc: uploadRightsDoc, uploadTrackDoc: uploadTrackDoc,
         setDest: setDest, saveDestinations: saveDestinations,

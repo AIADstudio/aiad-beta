@@ -33,12 +33,15 @@ Preview start point — where the 60s clip begins. Defaults to 0:30.
 ● Audio file — see Delivery Specs.
 
 ### Track credits
-● Songwriter(s) — required — Legal name, Split %, Publisher, PRO, IPI/CAE.
+● Songwriter(s) — required — Legal name and Split %.
+Publisher, performing rights organisation and IPI/CAE are optional. Supply them if you
+have them: they help royalties match faster. Not having them does not hold up a release,
+and "Not sure / none" is a valid answer for the PRO.
 ● Producer(s) — required — Name, Role (produced / co-produced / additional).
 Mixing engineer — optional. Mastering engineer — optional.
 Featured performers — optional — instrument / role.
 
-Songwriter splits must total exactly 100%. Submission is blocked otherwise. If you're the sole writer, that's 100% to you. If you have no publisher, enter "Self-published." If you're not affiliated with a PRO, enter "None" — but you should be, because that's money you're leaving on the table.
+Songwriter splits must total exactly 100%. Submission is blocked otherwise — that is the one credit rule that is enforced, because splits that do not add up become disputes over money. If you're the sole writer, that's 100% to you. Publisher defaults to "Self-published". If you're not affiliated with a PRO, choose "Not sure / none" — you can add one later, and it is worth doing, because that's money you're leaving on the table.
 
 ## SECTION 3 — Rights and clearances
 Answer for every track.
