@@ -3512,6 +3512,7 @@ html, body {
                     <div class="dash-nav-item" data-view="inbox" onclick="showArtistView('inbox')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><span> Inbox </span><span id="artistInboxBadge" style="display:none;margin-left:auto;background:#f59e0b;color:#111;font-size:0.6rem;font-weight:700;min-width:16px;height:16px;border-radius:999px;display:none;align-items:center;justify-content:center;padding:0 5px;">0</span></div>
                     <div class="dash-nav-item" id="navStore" data-view="store" onclick="showArtistView('store')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg><span> Store</span></div>
                     <div class="dash-nav-item" id="navPayouts" data-view="payouts" onclick="showArtistView('payouts')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg><span> Payouts</span></div>
+                    <div class="dash-nav-item" id="navDistribute" onclick="showArtistView('distribute')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5"/><polyline points="5 12 12 5 19 12"/><line x1="4" y1="21" x2="20" y2="21"/></svg><span> Distribute</span></div>
                     <div class="dash-nav-item dash-nav-dropdown" onclick="toggleCreativeStudio()">
                         <svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
                         <span>Creative Studio</span>
@@ -5107,6 +5108,20 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                         </div>
                     </div>
                     <div id="payoutsBody"></div>
+                </div>
+
+                <div class="dash-view" id="artistDistributeView">
+                    <div class="view-header">
+                        <div>
+                            <h1 class="view-title">Distribute to AIAD</h1>
+                            <p class="view-subtitle">Put a release on the AIAD Streaming Layer. Non-exclusive — keep it on Spotify, Apple, everywhere. AIAD takes 0% of your masters and 0% of your publishing.</p>
+                        </div>
+                        <button class="rw-btn rw-btn-ghost" onclick="AIADRelease.showSpecs()">Requirements</button>
+                    </div>
+                    <div class="rw-steps" id="rwSteps"></div>
+                    <div class="rw-banner" id="rwError" style="display:none"></div>
+                    <div class="rw-busy" id="rwBusy" style="display:none"><span class="rw-spin"></span><span>Working…</span></div>
+                    <div id="rwBody"><div class="rw-card rw-empty">Loading…</div></div>
                 </div>
 
                 <div class="dash-view" id="artistAgentsView">
@@ -14245,7 +14260,7 @@ Only capture real, meaningful decisions — not questions or general discussion.
             try { history.replaceState(null, '', '#artist/' + view); } catch (e) {}
             try { window.aiadTrackTool && window.aiadTrackTool('artist:' + view); } catch (e) {}
 
-            const allViews = ['artistPlanView', 'artistHomeView', 'artistPostsView', 'artistSupportersView', 'artistProjectsView', 'artistRevenueView', 'artistScheduleView', 'artistCollaboratorsView', 'artistMusicView', 'artistSongwritingView', 'artistMixMediaView', 'artistMerchView', 'artistSyncLibraryView', 'artistMilestonesView', 'artistAnalyticsView', 'artistMyStatsView', 'artistAgentsView', 'artistInboxView', 'artistSettingsView', 'artistStoreView', 'artistPayoutsView'];
+            const allViews = ['artistPlanView', 'artistHomeView', 'artistPostsView', 'artistSupportersView', 'artistProjectsView', 'artistRevenueView', 'artistScheduleView', 'artistCollaboratorsView', 'artistMusicView', 'artistSongwritingView', 'artistMixMediaView', 'artistMerchView', 'artistSyncLibraryView', 'artistMilestonesView', 'artistAnalyticsView', 'artistMyStatsView', 'artistAgentsView', 'artistInboxView', 'artistSettingsView', 'artistStoreView', 'artistPayoutsView', 'artistDistributeView'];
             allViews.forEach(v => {
                 const el = document.getElementById(v);
                 if (el) el.classList.remove('active');
@@ -14289,7 +14304,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 'inbox': 'artistInboxView',
                 'settings': 'artistSettingsView',
                 'store': 'artistStoreView',
-                'payouts': 'artistPayoutsView'
+                'payouts': 'artistPayoutsView',
+                'distribute': 'artistDistributeView'
             };
 
             const viewId = viewIdMap[view];
@@ -14404,6 +14420,10 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 viewEl.classList.add('active');
                 markNav('payouts');
                 setTimeout(() => { if (window.loadPayouts) loadPayouts('payoutsBody'); }, 60);
+            } else if (view === 'distribute') {
+                viewEl.classList.add('active');
+                const _nd = document.getElementById('navDistribute'); if (_nd) _nd.classList.add('active');
+                setTimeout(() => { if (window.AIADRelease) AIADRelease.open(); }, 60);
             } else if (view === 'settings') {
                 viewEl.classList.add('active');
                 // Auto-populate settings from AppState first (instant)
@@ -30652,7 +30672,7 @@ Be direct and concrete with real industry insight — never generic filler. When
         if (!btn) return;
         // Always bottom-right; just stack above whatever's parked in that corner
         // (player bar, founder Admin button / Preview panel). Never flip to the left.
-        const blockers = ['bottomPlayer', 'aiadAdminBtn', 'aiadPreviewPanel']
+        const blockers = ['bottomPlayer', 'aiadAdminBtn', 'aiadPreviewPanel', 'aiadReleaseDlBtn']
             .map((id) => topEdgeFromBottom(document.getElementById(id)))
             .filter((n) => n > 0);
         const bottom = blockers.length ? Math.max(14, Math.max.apply(null, blockers) + 10) : 14;
@@ -32576,6 +32596,1742 @@ window.AIAD_PROMPTS = [
             return false;
         }
     };
+})();
+</script>
+<style id="aiad-release-wizard-css">
+/* ── Distribute to AIAD — release submission wizard ──────────────────────── */
+#artistDistributeView .rw-card{background:var(--bg-card,#161616);border:1px solid var(--border-default,rgba(255,255,255,0.08));border-radius:16px;padding:26px;margin-bottom:20px;}
+#artistDistributeView .rw-h{font-size:1.15rem;font-weight:700;margin:0 0 6px;letter-spacing:-0.01em;}
+#artistDistributeView .rw-h4{font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--text-muted,rgba(255,255,255,0.4));margin:22px 0 10px;}
+#artistDistributeView .rw-sub{color:var(--text-secondary,rgba(255,255,255,0.6));font-size:0.88rem;line-height:1.6;margin:0 0 18px;}
+#artistDistributeView .rw-empty{color:var(--text-muted,rgba(255,255,255,0.4));text-align:center;padding:38px 20px;font-size:0.88rem;}
+#artistDistributeView .rw-note{font-size:0.78rem;color:var(--text-muted,rgba(255,255,255,0.4));padding:8px 0;}
+
+/* stepper */
+.rw-steps{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;}
+.rw-step{display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;font-size:0.78rem;font-weight:600;
+  background:rgba(255,255,255,0.03);border:1px solid var(--border-default,rgba(255,255,255,0.08));color:var(--text-muted,rgba(255,255,255,0.4));}
+.rw-step-n{display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:50%;
+  background:rgba(255,255,255,0.08);font-size:0.66rem;font-weight:700;}
+.rw-step.is-done{color:var(--text-secondary,rgba(255,255,255,0.6));cursor:pointer;border-color:rgba(0,180,216,0.28);}
+.rw-step.is-done .rw-step-n{background:rgba(0,180,216,0.25);color:var(--teal-light,#00D4FF);}
+.rw-step.is-now{color:#08131a;background:linear-gradient(135deg,var(--teal,#00B4D8),var(--magenta-dark,#E040FB));border-color:transparent;}
+.rw-step.is-now .rw-step-n{background:rgba(0,0,0,0.25);color:#fff;}
+
+/* banners + busy */
+#artistDistributeView .rw-banner{border-radius:12px;padding:13px 16px;font-size:0.84rem;line-height:1.55;margin-bottom:16px;}
+#artistDistributeView .rw-banner ul{margin:8px 0 0;padding-left:18px;}
+#artistDistributeView .rw-banner li{margin:3px 0;}
+#artistDistributeView .rw-banner-err{background:rgba(239,68,68,0.09);border:1px solid rgba(239,68,68,0.35);color:#fca5a5;}
+#artistDistributeView .rw-banner-ok{background:rgba(16,185,129,0.09);border:1px solid rgba(16,185,129,0.32);color:#6ee7b7;}
+#artistDistributeView .rw-busy{align-items:center;gap:10px;font-size:0.82rem;color:var(--text-secondary,rgba(255,255,255,0.6));margin-bottom:14px;}
+.rw-spin{width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,0.15);border-top-color:var(--teal-light,#00D4FF);animation:rwspin 0.7s linear infinite;}
+@keyframes rwspin{to{transform:rotate(360deg);}}
+
+/* form */
+#artistDistributeView .rw-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px 16px;}
+#artistDistributeView .rw-span{grid-column:1/-1;margin-top:14px;}
+#artistDistributeView .rw-field{display:flex;flex-direction:column;gap:6px;min-width:0;}
+#artistDistributeView .rw-label{font-size:0.74rem;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted,rgba(255,255,255,0.4));}
+#artistDistributeView .rw-req{color:var(--magenta-light,#FF66FF);}
+#artistDistributeView .rw-hint{font-size:0.73rem;color:var(--text-hint,rgba(255,255,255,0.3));line-height:1.5;}
+#artistDistributeView .rw-input{width:100%;box-sizing:border-box;background:rgba(255,255,255,0.04);border:1px solid var(--border-default,rgba(255,255,255,0.08));
+  border-radius:9px;padding:10px 12px;color:var(--text-primary,#fff);font-size:0.85rem;font-family:inherit;outline:none;transition:border-color 150ms ease;}
+#artistDistributeView .rw-input:focus{border-color:rgba(0,212,255,0.5);}
+#artistDistributeView .rw-input:disabled{opacity:0.55;}
+#artistDistributeView .rw-textarea{min-height:96px;resize:vertical;}
+#artistDistributeView .rw-file{font-size:0.78rem;color:var(--text-secondary,rgba(255,255,255,0.6));margin-top:8px;}
+#artistDistributeView .rw-check{display:flex;gap:10px;align-items:flex-start;font-size:0.84rem;line-height:1.55;
+  color:var(--text-secondary,rgba(255,255,255,0.6));margin:12px 0;cursor:pointer;}
+#artistDistributeView .rw-check input{margin-top:3px;accent-color:var(--teal,#00B4D8);flex-shrink:0;}
+#artistDistributeView .rw-radio{display:flex;gap:10px;align-items:flex-start;padding:9px 0;cursor:pointer;font-size:0.85rem;}
+#artistDistributeView .rw-radio input{margin-top:4px;accent-color:var(--teal,#00B4D8);flex-shrink:0;}
+#artistDistributeView .rw-radio em{display:block;font-style:normal;font-size:0.75rem;color:var(--text-muted,rgba(255,255,255,0.4));margin-top:2px;}
+#artistDistributeView .rw-radio.is-locked{opacity:0.55;cursor:default;}
+
+/* buttons */
+#artistDistributeView .rw-actions,.view-header .rw-btn{display:flex;}
+#artistDistributeView .rw-actions{gap:10px;flex-wrap:wrap;margin-top:22px;padding-top:18px;border-top:1px solid var(--border-default,rgba(255,255,255,0.08));}
+.rw-btn{background:rgba(255,255,255,0.05);border:1px solid var(--border-default,rgba(255,255,255,0.08));border-radius:9px;
+  padding:10px 18px;color:var(--text-primary,#fff);font-size:0.83rem;font-weight:600;font-family:inherit;cursor:pointer;transition:all 150ms ease;}
+.rw-btn:hover{border-color:var(--border-hover,rgba(255,255,255,0.15));background:rgba(255,255,255,0.08);}
+.rw-btn-primary{background:linear-gradient(135deg,var(--teal,#00B4D8),var(--magenta-dark,#E040FB));border-color:transparent;color:#fff;}
+.rw-btn-primary:hover{opacity:0.9;background:linear-gradient(135deg,var(--teal,#00B4D8),var(--magenta-dark,#E040FB));}
+.rw-btn-ghost{background:transparent;color:var(--text-secondary,rgba(255,255,255,0.6));}
+.rw-btn-sm{padding:6px 12px;font-size:0.75rem;}
+#artistDistributeView .rw-x{background:none;border:none;color:var(--text-muted,rgba(255,255,255,0.4));font-size:1.25rem;line-height:1;cursor:pointer;padding:2px 8px;flex-shrink:0;}
+#artistDistributeView .rw-x:hover{color:#fca5a5;}
+#artistDistributeView .rw-linkbtn{background:none;border:none;color:var(--teal-light,#00D4FF);font-size:0.78rem;cursor:pointer;text-decoration:underline;font-family:inherit;padding:0 4px;}
+
+/* license / specs body */
+#artistDistributeView .rw-legal,.rw-modal .rw-legal{max-height:min(46vh,420px);overflow-y:auto;background:rgba(0,0,0,0.28);
+  border:1px solid var(--border-default,rgba(255,255,255,0.08));border-radius:12px;padding:20px 22px;
+  font-size:0.83rem;line-height:1.68;color:var(--text-secondary,rgba(255,255,255,0.6));}
+.rw-legal h2{font-size:1rem;color:var(--text-primary,#fff);margin:0 0 10px;}
+.rw-legal h3{font-size:0.85rem;color:var(--teal-light,#00D4FF);margin:20px 0 7px;letter-spacing:0.02em;}
+.rw-legal h4{font-size:0.79rem;color:var(--text-primary,#fff);margin:15px 0 5px;}
+.rw-legal p{margin:0 0 9px;}
+.rw-legal ul{margin:0 0 9px;padding-left:20px;}
+.rw-legal li{margin:3px 0;}
+
+/* tracks */
+#artistDistributeView .rw-track{border:1px solid var(--border-default,rgba(255,255,255,0.08));border-radius:13px;padding:18px;margin:14px 0;background:rgba(255,255,255,0.015);}
+#artistDistributeView .rw-track-head{display:flex;align-items:center;gap:11px;margin-bottom:14px;}
+#artistDistributeView .rw-track-n{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:7px;
+  background:linear-gradient(135deg,var(--teal,#00B4D8),var(--magenta-dark,#E040FB));color:#fff;font-size:0.72rem;font-weight:700;flex-shrink:0;}
+#artistDistributeView .rw-track-title{flex:1;min-width:0;font-weight:600;font-size:0.95rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#artistDistributeView .rw-credits{margin-top:16px;padding-top:14px;border-top:1px dashed var(--border-default,rgba(255,255,255,0.08));}
+#artistDistributeView .rw-contrib{display:flex;gap:7px;flex-wrap:wrap;align-items:center;padding:7px 0;}
+#artistDistributeView .rw-contrib .rw-input{flex:1 1 130px;width:auto;min-width:0;}
+#artistDistributeView .rw-contrib .rw-narrow{flex:0 1 92px;}
+#artistDistributeView .rw-contrib .rw-role{flex:0 1 150px;}
+#artistDistributeView .rw-contrib.is-sw{border-left:2px solid rgba(0,212,255,0.4);padding-left:9px;}
+#artistDistributeView .rw-contrib-add{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0;}
+#artistDistributeView .rw-sharetotal{font-size:0.79rem;font-weight:700;padding:8px 12px;border-radius:8px;display:inline-block;margin:6px 0;}
+#artistDistributeView .rw-sharetotal.is-ok{background:rgba(16,185,129,0.11);color:#6ee7b7;}
+#artistDistributeView .rw-sharetotal.is-bad{background:rgba(239,68,68,0.11);color:#fca5a5;}
+#artistDistributeView .rw-audio-ok{font-size:0.8rem;color:#6ee7b7;padding:7px 0;}
+#artistDistributeView .rw-audio-none{font-size:0.8rem;color:var(--text-muted,rgba(255,255,255,0.4));padding:7px 0;}
+#artistDistributeView .rw-art{margin:10px 0;}
+#artistDistributeView .rw-art img{width:150px;height:150px;object-fit:cover;border-radius:10px;border:1px solid var(--border-default,rgba(255,255,255,0.08));display:block;}
+#artistDistributeView .rw-art-meta{font-size:0.73rem;color:var(--text-muted,rgba(255,255,255,0.4));margin-top:6px;}
+
+/* review + done */
+#artistDistributeView .rw-review{border:1px solid var(--border-default,rgba(255,255,255,0.08));border-radius:12px;overflow:hidden;}
+#artistDistributeView .rw-row{display:flex;justify-content:space-between;gap:18px;padding:10px 15px;font-size:0.82rem;
+  border-bottom:1px solid var(--border-default,rgba(255,255,255,0.08));}
+#artistDistributeView .rw-row:last-child{border-bottom:none;}
+#artistDistributeView .rw-row span{color:var(--text-muted,rgba(255,255,255,0.4));flex-shrink:0;}
+#artistDistributeView .rw-row strong{text-align:right;font-weight:600;word-break:break-word;}
+#artistDistributeView .rw-declaration{margin-top:22px;padding:18px;border-radius:12px;background:rgba(255,255,255,0.025);
+  border:1px solid var(--border-default,rgba(255,255,255,0.08));}
+#artistDistributeView .rw-declaration p{font-size:0.82rem;line-height:1.65;color:var(--text-secondary,rgba(255,255,255,0.6));margin:0 0 14px;}
+#artistDistributeView .rw-done{text-align:center;}
+#artistDistributeView .rw-done-mark{width:52px;height:52px;margin:6px auto 16px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:1.5rem;color:#fff;background:linear-gradient(135deg,var(--teal,#00B4D8),var(--magenta-dark,#E040FB));}
+#artistDistributeView .rw-done .rw-actions{justify-content:center;border-top:none;}
+#artistDistributeView .rw-ref{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:1.45rem;font-weight:700;letter-spacing:0.1em;
+  color:var(--teal-light,#00D4FF);margin:14px 0 18px;}
+
+/* requirements modal */
+.rw-overlay{position:fixed;inset:0;background:rgba(3,5,12,0.84);backdrop-filter:blur(6px);z-index:2147483200;display:flex;align-items:center;justify-content:center;padding:20px;}
+.rw-modal{background:var(--bg-card,#161616);border:1px solid var(--border-default,rgba(255,255,255,0.08));border-radius:16px;max-width:720px;width:100%;padding:22px;max-height:88dvh;overflow:hidden;display:flex;flex-direction:column;}
+.rw-modal-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;}
+.rw-modal-head h3{margin:0;font-size:1.05rem;color:var(--text-primary,#fff);}
+.rw-modal .rw-x{background:none;border:none;color:var(--text-muted,rgba(255,255,255,0.4));font-size:1.4rem;line-height:1;cursor:pointer;padding:0 6px;}
+.rw-modal .rw-legal{max-height:none;flex:1;min-height:0;}
+
+/* teal pill FAB */
+.rw-fab{position:fixed;right:18px;bottom:14px;z-index:99995;display:none;align-items:center;gap:7px;
+  background:linear-gradient(135deg,var(--teal,#00B4D8),var(--teal-dark,#0077B6));color:#fff;border:1px solid rgba(0,212,255,0.4);
+  border-radius:999px;padding:9px 16px;font-size:0.78rem;font-weight:700;font-family:inherit;cursor:pointer;
+  box-shadow:0 4px 18px rgba(0,120,160,0.45);}
+.rw-fab:hover{opacity:0.92;}
+.rw-fab svg{width:15px;height:15px;}
+
+@media (max-width:768px){
+  #artistDistributeView .rw-card{padding:18px;}
+  #artistDistributeView .rw-contrib .rw-input,#artistDistributeView .rw-contrib .rw-role,#artistDistributeView .rw-contrib .rw-narrow{flex:1 1 100%;}
+  #artistDistributeView .rw-row{flex-direction:column;gap:3px;}
+  #artistDistributeView .rw-row strong{text-align:left;}
+  #aiadReleaseDlBtn{bottom:calc(68px + env(safe-area-inset-bottom,0px)) !important;right:12px !important;}
+  #aiadHelpBtn{bottom:calc(116px + env(safe-area-inset-bottom,0px)) !important;}
+  #aiadAdminBtn{bottom:calc(164px + env(safe-area-inset-bottom,0px)) !important;}
+  #aiadBugBtn{bottom:calc(212px + env(safe-area-inset-bottom,0px)) !important;}
+}
+
+</style>
+<script>
+/* ══════════════ DISTRIBUTE TO AIAD — release submission wizard ══════════════
+   5 steps: license gate → release info → tracks → rights → review/submit.
+   Schema is already applied server-side; this file only reads and writes it.
+   Every db.from()/db.rpc() error is surfaced in #rwError, never swallowed. */
+(function () {
+    'use strict';
+
+    if (window.AIADRelease) return;
+
+    // Inlined verbatim from docs/streaming-license-v1.md and docs/delivery-specs.md.
+    var LICENSE_MD = "# AIAD Streaming License Agreement\nAIAD Studio Inc. — Artist Content License for the AIAD Streaming Layer. Version 1.0.\n\n## Read this first\nThis is not a record deal and not a distribution deal.\n- It is non-exclusive. Keep your music on Spotify, Apple, YouTube, everywhere.\n- AIAD takes 0% of your masters and 0% of your publishing.\n- You can pull any recording off AIAD at any time, for any reason, with no penalty.\n- AIAD does not pay you per stream. You are paid by your fans, directly, through supporter pledges. Streaming on AIAD is what your pledge unlocks for them.\n\n## 1. Definitions\n\"Recording\" — a sound recording you deliver to AIAD, including its artwork, metadata, and lyrics. \"Composition\" — the underlying song embodied in a Recording. \"Platform\" — aiad.studio and any AIAD-operated app or interface. \"Streaming Layer\" — the in-Platform playback feature through which fans listen to Recordings. \"Supporter Pledge\" — a recurring payment a fan makes to you through the Platform. \"Term\" — from your acceptance until you or AIAD terminate under Section 9.\n\n## 2. What you're granting\nYou grant AIAD Studio Inc. a non-exclusive, worldwide, royalty-free license, for the Term, to:\n2.1 Reproduce, store, encode, transcode, and format-shift each Recording as needed to deliver it, including cached and ephemeral copies and multiple bitrates.\n2.2 Publicly perform and digitally transmit each Recording to Platform users by on-demand interactive streaming and non-interactive radio-style streaming, within the Platform only.\n2.3 Display your artwork, artist name, approved photos, bio, and lyrics in connection with the Recordings.\n2.4 Create preview clips of up to 60 seconds for in-Platform discovery, playlists, and search results.\n2.5 Use your artist name, approved likeness, and Recording titles to promote your presence on AIAD, on the Platform and on AIAD's own social channels. Any use beyond that requires your written approval.\n\nWhat you are NOT granting: No downloads — fans stream only, unless you separately switch downloads on for a release. No sync — that is governed by the separate AIAD Sync Library terms you opt into separately. No sublicensing to other services — AIAD will not deliver your Recordings to Spotify, Apple, or any third party under this Agreement. No derivative works other than the technical encoding and preview clips above. No AI training — AIAD will not use your Recordings to train, fine-tune, or evaluate any generative model, and will not permit any third party to do so.\n\n## 3. You keep everything\nYou retain 100% ownership of your masters and 100% of your publishing. This Agreement transfers no copyright, assigns no rights, and creates no option, right of first refusal, or matching right on any future work.\n\n## 4. How you get paid\n4.1 Fans pay you through Supporter Pledges. AIAD retains an 8% platform fee; payment processing fees are deducted by the processor. The balance is paid to you through your connected payout account.\n4.2 AIAD does not pay a per-stream rate. Streams on AIAD are not a revenue event on their own — they are a benefit fans receive for supporting you.\n4.3 Plays, unique listeners, save/skip behavior, and geographic data are visible in your dashboard in near real time, and you can export all of it at any time, free.\n4.4 You are an independent contractor and responsible for your own taxes. AIAD will collect a W-9 or W-8BEN through its payment processor and issue tax forms where required by law.\n\n## 5. Publishing, mechanicals, and performance royalties\n5.1 You must identify, for every Recording, all songwriters, their splits totaling 100%, their publishers, and their PRO and IPI/CAE numbers. This is a condition of delivery.\n5.2 AIAD is responsible for licensing and paying the Composition side of the Streaming Layer — mechanical royalties via the MLC blanket license in the United States and equivalent bodies elsewhere, and public performance royalties via ASCAP, BMI, SESAC, GMR, and international societies. These are paid to publishers and PROs, not through AIAD. AIAD will report usage as those licenses require.\n5.3 You warrant that the songwriter and publisher information you supply is accurate and that the Compositions are correctly registered. If a Composition is unregistered or misregistered, royalties may be delayed or unmatched, and that is not AIAD's liability.\n5.4 If a Recording is a cover, you must say so at submission and identify the original writers. If it contains a sample or interpolation, you must upload written clearance before the Recording will go live.\n\n## 6. Your warranties\n6.1 You own or exclusively control all rights in each Recording, including the rights of all featured artists, producers, musicians, and engineers, and you have the authority to grant this license.\n6.2 No Recording is subject to a conflicting exclusive agreement with a label, distributor, or aggregator that would prevent this non-exclusive license.\n6.3 No Recording infringes any copyright, trademark, right of publicity, or other right of any third party.\n6.4 Every sample, interpolation, and cover is cleared and documented.\n6.5 Your origin declaration for each Recording — human-created, AI-assisted, or AI-generated — is truthful. AIAD's Sync Library accepts human-created masters only, and a false declaration is grounds for removal from both Streaming and Sync.\n6.6 No Recording contains content that is unlawful, defamatory, or that incites violence or hatred against a protected group.\n\n## 7. Streaming integrity\nArtificially inflating plays — bots, click farms, paid stream services, scripted playback, incentivized looping, or any automated manipulation — is a material breach. If AIAD detects manipulated activity, AIAD may withhold affected pledge payouts pending review, remove the Recordings, and terminate this Agreement. AIAD will tell you what it found and give you a chance to respond before any permanent action.\n\n## 8. Content moderation and takedowns\n8.1 AIAD is a registered DMCA service provider and will process takedown notices and counter-notices under 17 U.S.C. section 512.\n8.2 AIAD may remove or restrict a Recording that is the subject of a credible third-party claim, that violates Section 6, or that AIAD is legally required to remove, and will notify you and explain why.\n8.3 Repeat infringers will be removed from the Platform.\n\n## 9. Term and termination\n9.1 This Agreement starts when you accept it and continues until terminated.\n9.2 You can terminate at any time, in whole or per-Recording, from your dashboard. AIAD will remove the Recording within 7 days and purge cached copies within 30 days.\n9.3 AIAD may terminate for material breach, or for any reason on 30 days' written notice.\n9.4 On termination, AIAD deletes all copies except copies retained in backups until routinely overwritten, and records AIAD must keep for legal, tax, or royalty-reporting purposes.\n9.5 Termination does not affect pledges already collected or amounts already owed to you.\n9.6 Your catalog, metadata, listener data, and payout history are exportable at any time during the Term and for 90 days after termination, free and self-serve.\n\n## 10. Indemnity\n10.1 You will indemnify AIAD against third-party claims arising from a breach of your warranties in Section 6.\n10.2 AIAD will indemnify you against third-party claims arising from AIAD's operation of the Platform, other than claims caused by your content.\n10.3 Neither party is liable for indirect, incidental, or consequential damages. AIAD's total liability is capped at the greater of $500 or the platform fees AIAD retained from your pledges in the 12 months before the claim.\n\n## 11. General\n11.1 Assignment. AIAD may assign to an affiliate, including AIAD Distribution Inc., or in connection with a merger, financing, or sale of substantially all assets. You may not assign without AIAD's consent.\n11.2 Changes. AIAD will give 30 days' notice before any material change. If you don't accept it, you can terminate under 9.2 with no penalty. Changes are not retroactive.\n11.3 Governing law. Delaware, without regard to conflict-of-laws rules.\n11.4 Entire agreement. This Agreement, the AIAD Terms of Service, and the Privacy Policy are the whole agreement on this subject.\n11.5 Severability. If any provision is unenforceable, the rest survives.\n\nAIAD Studio Inc. — 2386 Barker Avenue, 1A, Bronx, NY 10467\n";
+    var SPECS_MD = "# AIAD Delivery Specifications\n\nTechnical standards for audio and artwork on the AIAD Streaming Layer.\n\n## Audio\n\n### Accepted\nFormat — WAV (preferred) or FLAC.\nBit depth — 24-bit preferred, 16-bit minimum.\nSample rate — 44.1 kHz minimum; 48 kHz and 96 kHz accepted.\nChannels — Stereo. Mono accepted if the recording is genuinely mono — do not fake-stereo a mono file.\nMax file size — 500 MB per track.\n\nMP3, M4A, AAC, and OGG are rejected. Delivering a lossy file means AIAD transcodes an already-transcoded file and the artifacts compound. Upload the master.\n\n### Levels\nTrue peak ceiling: −1.0 dBTP. Anything above is rejected for clipping.\nTarget loudness: −14 LUFS integrated. This is guidance, not a gate — AIAD normalizes on playback, so a hot master just gets turned down and loses dynamics. Nothing is rejected on loudness alone.\nNo inter-sample clipping.\n\n### Rejected on QC\nAudible clipping, digital distortion, or dropouts. More than 5 seconds of silence at the start. Producer tags, DJ drops, or watermarks not part of the released work. Audible watermarking from a beat lease preview. Files that are the wrong length versus the stated duration.\n\n## Artwork\n\n### Required\nDimensions — 3000 × 3000 px minimum, perfectly square.\nFormat — JPG or PNG. Color — RGB. Max file size — 10 MB. Resolution — 72 DPI minimum.\n\n### Rejected on QC\nAny URL, web address, email, or social handle. Any social platform or streaming service logo or name. Text that is blurry, pixelated, cropped, or unreadable. Misspelled artist name or release title. Artist or release name that doesn't match the metadata. Images you don't have the rights to — including stock photos without a license, celebrity photos, and screenshots. Placeholder or temporary artwork. Nudity or sexually explicit imagery.\n\nArtwork must be square. AIAD will not crop, pad, or resize on your behalf — a 1920×1080 image comes back as a rejection, not a letterbox.\n\n## Metadata formatting\nThese rules exist so search, playlists, and credits stay usable across the catalog.\n\nDo: Title Case for titles, e.g. \"Nothing Left to Say\". Featured artists in the dedicated field — primary \"Artist Name\", featured \"Other Artist\". Version info in parentheses — \"Nothing Left to Say (Acoustic)\". Real legal names in the songwriter fields, because stage names break PRO matching.\n\nDon't: ALL CAPS unless the work is genuinely stylized that way. \"(feat. X)\" typed into the title field. \"(Official Audio)\", \"(Official Video)\", \"(Lyrics)\", \"(HD)\", \"(Prod. by X)\" anywhere in the title. Emojis or decorative characters. Genre or mood keywords stuffed into the title. The same ISRC on two different recordings — including a remaster, which needs its own.\n\n## Turnaround\nQC review — 1–3 business days.\nMinimum lead time before go-live — 3 business days.\nRecommended lead time — 7 days, so a rejection doesn't move your date.\nTakedown from Streaming Layer — within 7 days of request.\nCache purge after takedown — within 30 days.\n\n## Storage\nMasters are stored in AIAD's private storage. They are served to fans as encoded streams only — the original file is never exposed at a public URL and is never downloadable by anyone but you.\n";
+
+    // ── Config ──────────────────────────────────────────────────────────────
+    var AGREEMENT_VERSION = '1.0';
+    // Artwork must resolve to a plain URL for players and cards, so it goes in the
+    // public bucket. Masters and legal documents go in the private one — per
+    // delivery-specs.md the original file is never exposed at a public URL.
+    var ART_BUCKET = 'artist-media';
+    var DOC_BUCKET = 'sync-masters';
+
+    var ART_MIN_PX = 3000;
+    var ART_MAX_BYTES = 10 * 1024 * 1024;
+    var ART_OK_EXT = ['jpg', 'jpeg', 'png'];
+    var AUDIO_MAX_BYTES = 500 * 1024 * 1024;
+    var AUDIO_OK_EXT = ['wav', 'flac'];
+    var LOSSY_EXT = ['mp3', 'm4a', 'aac', 'ogg', 'oga', 'opus'];
+    var LOSSY_MSG = 'Upload your master. Lossy files get transcoded twice and the artifacts compound.';
+
+    var ROLES = [
+        { v: 'songwriter', l: 'Songwriter' },
+        { v: 'producer', l: 'Producer' },
+        { v: 'co_producer', l: 'Co-producer' },
+        { v: 'additional_production', l: 'Additional production' },
+        { v: 'mixing_engineer', l: 'Mixing engineer' },
+        { v: 'mastering_engineer', l: 'Mastering engineer' },
+        { v: 'featured_performer', l: 'Featured performer' },
+        { v: 'musician', l: 'Musician' }
+    ];
+    var ORIGINS = [
+        { v: 'human', l: 'Human-created', d: 'No generative AI used in the master' },
+        { v: 'ai_assisted', l: 'AI-assisted', d: 'Generative AI used in production, but composition and performance are human' },
+        { v: 'ai_generated', l: 'AI-generated', d: 'The master was generated by a model' }
+    ];
+    var STEP_LABELS = ['License', 'Release', 'Tracks', 'Rights', 'Review'];
+
+    // ── State ───────────────────────────────────────────────────────────────
+    var RS = {
+        step: 0,
+        ready: false,
+        busy: false,
+        releaseId: null,
+        release: {},
+        tracks: [],
+        rights: { owns_master: null, exclusive_conflict: null, content_lawful_confirmed: false,
+                  master_authorization_url: null, conflict_consent_url: null, split_sheet_url: null },
+        artworkDims: null,
+        submissionRef: null,
+        seq: 0
+    };
+    function nextId() { RS.seq += 1; return 'l' + RS.seq; }
+
+    // ── Small helpers ───────────────────────────────────────────────────────
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+    function el(id) { return document.getElementById(id); }
+    function uid() {
+        return (window.AppState && AppState.currentUser) ? AppState.currentUser.id : null;
+    }
+    function trim(v) { return String(v == null ? '' : v).trim(); }
+    function csvToArr(v) {
+        return trim(v).split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+    }
+    function arrToCsv(a) { return (a && a.length) ? a.join(', ') : ''; }
+
+    function banner(msg, kind) {
+        var box = el('rwError');
+        if (!box) { if (window.showToast) showToast(msg); return; }
+        box.className = 'rw-banner ' + (kind === 'ok' ? 'rw-banner-ok' : 'rw-banner-err');
+        box.innerHTML = esc(msg);
+        box.style.display = 'block';
+        try { box.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (e) { /* older Safari: no smooth scroll, not worth failing over */ }
+    }
+    function bannerList(title, items) {
+        var box = el('rwError');
+        var html = '<strong>' + esc(title) + '</strong><ul>' +
+            items.map(function (i) { return '<li>' + esc(i) + '</li>'; }).join('') + '</ul>';
+        if (!box) { if (window.showToast) showToast(title); return; }
+        box.className = 'rw-banner rw-banner-err';
+        box.innerHTML = html;
+        box.style.display = 'block';
+        try { box.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (e) { /* see above */ }
+    }
+    function clearBanner() {
+        var box = el('rwError');
+        if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+    }
+
+    /* Every write goes through this. Returns true when the caller must stop. */
+    function dbFail(table, op, error, ctx) {
+        if (!error) return false;
+        console.error('[AIAD release] ' + op + ' ' + table + ':', error.message, error.code, error.details);
+        if (window.reportDbError) window.reportDbError(table, op, error, ctx || {});
+        banner((error.message || 'Database error') + (error.code ? ' [' + error.code + ']' : ''));
+        return true;
+    }
+
+    function busy(on, label) {
+        RS.busy = !!on;
+        var b = el('rwBusy');
+        if (b) {
+            b.textContent = label || 'Working…';
+            b.style.display = on ? 'flex' : 'none';
+        }
+    }
+
+    // ── Markdown → HTML (headings, bullets, paragraphs — all we author) ──────
+    function mdToHtml(md) {
+        var out = [], list = null;
+        var lines = String(md).split('\n');
+        function closeList() { if (list) { out.push('<ul>' + list.join('') + '</ul>'); list = null; } }
+        for (var i = 0; i < lines.length; i++) {
+            var ln = lines[i];
+            var t = ln.trim();
+            if (!t) { closeList(); continue; }
+            if (t.indexOf('### ') === 0) { closeList(); out.push('<h4>' + esc(t.slice(4)) + '</h4>'); continue; }
+            if (t.indexOf('## ') === 0) { closeList(); out.push('<h3>' + esc(t.slice(3)) + '</h3>'); continue; }
+            if (t.indexOf('# ') === 0) { closeList(); out.push('<h2>' + esc(t.slice(2)) + '</h2>'); continue; }
+            if (t.indexOf('- ') === 0) { if (!list) list = []; list.push('<li>' + esc(t.slice(2)) + '</li>'); continue; }
+            closeList();
+            out.push('<p>' + esc(t) + '</p>');
+        }
+        closeList();
+        return out.join('');
+    }
+
+    // ── Dates ───────────────────────────────────────────────────────────────
+    function addBusinessDays(from, n) {
+        var d = new Date(from.getTime());
+        var added = 0;
+        while (added < n) {
+            d.setDate(d.getDate() + 1);
+            var wd = d.getDay();
+            if (wd !== 0 && wd !== 6) added += 1;
+        }
+        return d;
+    }
+    function minGoLive() {
+        var d = addBusinessDays(new Date(), 3);
+        d.setHours(0, 0, 0, 0);
+        return d;
+    }
+    function toLocalInput(iso) {
+        if (!iso) return '';
+        var d = new Date(iso);
+        if (isNaN(d.getTime())) return '';
+        var p = function (n) { return String(n).padStart(2, '0'); };
+        return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) +
+            'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+    }
+    function toDateInput(v) {
+        if (!v) return '';
+        return String(v).slice(0, 10);
+    }
+
+    // ── File validation ─────────────────────────────────────────────────────
+    function extOf(name) {
+        var m = /\.([A-Za-z0-9]+)$/.exec(String(name || ''));
+        return m ? m[1].toLowerCase() : '';
+    }
+    function checkAudio(file) {
+        var e = extOf(file.name);
+        if (LOSSY_EXT.indexOf(e) !== -1) return LOSSY_MSG;
+        if (AUDIO_OK_EXT.indexOf(e) === -1) return 'WAV or FLAC only. "' + file.name + '" is a .' + (e || '?') + ' file.';
+        if (file.size > AUDIO_MAX_BYTES) return 'Max 500MB per track — "' + file.name + '" is ' + (file.size / 1048576).toFixed(0) + 'MB.';
+        return null;
+    }
+    /* Resolves { w, h } or rejects with a message. */
+    function imageDims(file) {
+        return new Promise(function (resolve, reject) {
+            var url = URL.createObjectURL(file);
+            var img = new Image();
+            img.onload = function () {
+                var d = { w: img.naturalWidth, h: img.naturalHeight };
+                URL.revokeObjectURL(url);
+                resolve(d);
+            };
+            img.onerror = function () {
+                URL.revokeObjectURL(url);
+                reject(new Error('Could not read that image. Use a JPG or PNG.'));
+            };
+            img.src = url;
+        });
+    }
+    function dimsFromUrl(url) {
+        return new Promise(function (resolve, reject) {
+            var img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = function () { resolve({ w: img.naturalWidth, h: img.naturalHeight }); };
+            img.onerror = function () { reject(new Error('Could not re-read the uploaded artwork.')); };
+            img.src = url;
+        });
+    }
+    /* Resolves seconds, or null when the browser can't decode the container.
+       Duration is nullable in the schema, so a null here is not fatal. */
+    function audioDuration(file) {
+        return new Promise(function (resolve) {
+            var url = URL.createObjectURL(file);
+            var a = document.createElement('audio');
+            var done = false;
+            var finish = function (v) {
+                if (done) return;
+                done = true;
+                URL.revokeObjectURL(url);
+                resolve(v);
+            };
+            a.preload = 'metadata';
+            a.onloadedmetadata = function () {
+                finish(isFinite(a.duration) && a.duration > 0 ? Math.round(a.duration) : null);
+            };
+            a.onerror = function () {
+                console.warn('[AIAD release] browser could not decode', file.name, '— duration left null');
+                finish(null);
+            };
+            setTimeout(function () { finish(null); }, 15000);
+            a.src = url;
+        });
+    }
+
+    // ── Storage ─────────────────────────────────────────────────────────────
+    function safeName(name) {
+        return String(name || 'file').replace(/[^A-Za-z0-9._-]/g, '_').slice(-80);
+    }
+    /* Uploads and returns a reference string.
+       Public bucket → an https URL. Private bucket → "bucket/path", resolved for
+       viewing by openDoc() below. Throws on failure so callers surface it. */
+    async function upload(bucket, path, file) {
+        var res = await window.db.storage.from(bucket).upload(path, file, {
+            contentType: file.type || 'application/octet-stream', upsert: true
+        });
+        if (res.error) {
+            console.error('[AIAD release] storage.upload ' + bucket, res.error.message);
+            if (window.reportDbError) window.reportDbError('storage.' + bucket, 'upload', res.error, { path: path });
+            throw new Error(res.error.message || 'Upload failed');
+        }
+        if (bucket === ART_BUCKET) {
+            var pub = window.db.storage.from(bucket).getPublicUrl(path);
+            return (pub && pub.data && pub.data.publicUrl) || (bucket + '/' + path);
+        }
+        return bucket + '/' + path;
+    }
+    async function openDoc(ref) {
+        if (!ref) return;
+        if (/^https?:\/\//.test(ref)) { window.open(ref, '_blank', 'noopener'); return; }
+        var slash = ref.indexOf('/');
+        var bucket = ref.slice(0, slash);
+        var path = ref.slice(slash + 1);
+        var res = await window.db.storage.from(bucket).createSignedUrl(path, 3600);
+        if (res.error) {
+            if (window.reportDbError) window.reportDbError('storage.' + bucket, 'sign', res.error, { path: path });
+            banner('Could not open that file: ' + (res.error.message || 'signing failed'));
+            return;
+        }
+        window.open(res.data.signedUrl, '_blank', 'noopener');
+    }
+    function docLabel(ref) {
+        if (!ref) return '';
+        var p = String(ref).split('/');
+        return decodeURIComponent(p[p.length - 1]);
+    }
+
+    // ── Load / resume ───────────────────────────────────────────────────────
+    async function loadAll() {
+        var u = uid();
+        if (!u) {
+            el('rwBody').innerHTML = '<div class="rw-card rw-empty">Sign in to submit a release.</div>';
+            return;
+        }
+        busy(true, 'Loading your release…');
+        clearBanner();
+
+        // Has this user already accepted v1.0?
+        var acc = await window.db.from('streaming_license_acceptances')
+            .select('id').eq('user_id', u).eq('agreement_version', AGREEMENT_VERSION).limit(1);
+        if (dbFail('streaming_license_acceptances', 'select', acc.error)) { busy(false); return; }
+        var accepted = !!(acc.data && acc.data.length);
+
+        // Resume the most recent editable release, if there is one.
+        var rel = await window.db.from('releases')
+            .select('*').eq('user_id', u)
+            .in('status', ['draft', 'changes_requested'])
+            .order('created_at', { ascending: false }).limit(1);
+        if (dbFail('releases', 'select', rel.error)) { busy(false); return; }
+
+        RS.tracks = [];
+        RS.releaseId = null;
+        RS.release = {};
+        RS.artworkDims = null;
+
+        if (rel.data && rel.data.length) {
+            RS.release = rel.data[0];
+            RS.releaseId = RS.release.id;
+            if (!(await loadTracks(RS.releaseId))) { busy(false); return; }
+            if (!(await loadRights(RS.releaseId))) { busy(false); return; }
+        } else {
+            // Prefill artist + label from the artist profile.
+            var prof = await window.db.from('artist_profiles')
+                .select('artist_name').eq('user_id', u).limit(1);
+            if (dbFail('artist_profiles', 'select', prof.error)) { busy(false); return; }
+            var an = (prof.data && prof.data[0] && prof.data[0].artist_name) || '';
+            RS.release = {
+                release_type: 'single', primary_artist_name: an, label_name: an,
+                early_access_hours: 0, parental_advisory: 'not_applicable',
+                territory_mode: 'worldwide', language: 'English', status: 'draft'
+            };
+        }
+
+        RS.ready = true;
+        RS.step = accepted ? Math.max(1, RS.step) : 0;
+        busy(false);
+        render();
+    }
+
+    async function loadTracks(releaseId) {
+        var t = await window.db.from('tracks')
+            .select('*').eq('release_id', releaseId).order('track_number', { ascending: true });
+        if (dbFail('tracks', 'select', t.error)) return false;
+        var rows = t.data || [];
+        RS.tracks = rows.map(function (r) {
+            return {
+                localId: nextId(), dbId: r.id,
+                title: r.title || '', version_subtitle: r.version_subtitle || '',
+                track_number: r.track_number || null, isrc: r.isrc || '',
+                explicit: !!r.explicit, lyrics_language: r.lyrics_language || '',
+                lyrics: r.lyrics || '',
+                preview_start_seconds: (r.preview_start_seconds == null ? 30 : r.preview_start_seconds),
+                contains_sample: !!r.contains_sample, sample_clearance_url: r.sample_clearance_url || null,
+                is_cover: !!r.is_cover, cover_original_writers: r.cover_original_writers || '',
+                origin: r.origin && r.origin !== 'unverified' ? r.origin : '',
+                origin_locked: !!r.origin_locked,
+                bucket: r.bucket || null, storage_path: r.storage_path || null,
+                duration_seconds: r.duration_seconds || null,
+                audioName: r.storage_path ? docLabel(r.storage_path) : '',
+                contributors: []
+            };
+        });
+        if (!RS.tracks.length) return true;
+
+        var ids = RS.tracks.map(function (x) { return x.dbId; });
+        var c = await window.db.from('track_contributors').select('*').in('track_id', ids);
+        if (dbFail('track_contributors', 'select', c.error)) return false;
+        (c.data || []).forEach(function (row) {
+            var tr = RS.tracks.filter(function (x) { return x.dbId === row.track_id; })[0];
+            if (!tr) return;
+            tr.contributors.push({
+                localId: nextId(), dbId: row.id, role: row.role,
+                legal_name: row.legal_name || '', stage_name: row.stage_name || '',
+                share_percent: (row.share_percent == null ? '' : String(row.share_percent)),
+                publisher_name: row.publisher_name || '', pro: row.pro || '',
+                ipi_cae: row.ipi_cae || '', instrument: row.instrument || ''
+            });
+        });
+        return true;
+    }
+
+    async function loadRights(releaseId) {
+        var r = await window.db.from('release_rights_declarations')
+            .select('*').eq('release_id', releaseId).limit(1);
+        if (dbFail('release_rights_declarations', 'select', r.error)) return false;
+        if (r.data && r.data.length) {
+            var d = r.data[0];
+            RS.rights = {
+                owns_master: d.owns_master, exclusive_conflict: d.exclusive_conflict,
+                content_lawful_confirmed: !!d.content_lawful_confirmed,
+                master_authorization_url: d.master_authorization_url || null,
+                conflict_consent_url: d.conflict_consent_url || null,
+                split_sheet_url: d.split_sheet_url || null,
+                signed_legal_name: d.signed_legal_name || ''
+            };
+        }
+        return true;
+    }
+
+    // ── Chrome ──────────────────────────────────────────────────────────────
+    function renderSteps() {
+        var wrap = el('rwSteps');
+        if (!wrap) return;
+        wrap.innerHTML = STEP_LABELS.map(function (l, i) {
+            var cls = 'rw-step' + (i === RS.step ? ' is-now' : (i < RS.step ? ' is-done' : ''));
+            var attr = i < RS.step ? ' onclick="AIADRelease.goto(' + i + ')" role="button" tabindex="0"' : '';
+            return '<div class="' + cls + '"' + attr + '><span class="rw-step-n">' + (i + 1) + '</span>' + esc(l) + '</div>';
+        }).join('');
+    }
+
+    function render() {
+        renderSteps();
+        var body = el('rwBody');
+        if (!body) return;
+        clearBanner();
+        if (RS.step === 0) body.innerHTML = viewLicense();
+        else if (RS.step === 1) body.innerHTML = viewRelease();
+        else if (RS.step === 2) body.innerHTML = viewTracks();
+        else if (RS.step === 3) body.innerHTML = viewRights();
+        else body.innerHTML = viewReview();
+        if (RS.step === 2) RS.tracks.forEach(function (t) { updateShareTotal(t.localId); });
+        try { el('artistDistributeView').scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) { /* non-critical */ }
+    }
+
+    // ── Step 0 — license gate ───────────────────────────────────────────────
+    function viewLicense() {
+        return '' +
+        '<div class="rw-card">' +
+          '<h2 class="rw-h">AIAD Streaming License Agreement v1.0</h2>' +
+          '<p class="rw-sub">Non-exclusive. AIAD takes 0% of your masters and 0% of your publishing. Read it, then sign below.</p>' +
+          '<div class="rw-legal" id="rwLegal">' + mdToHtml(LICENSE_MD) + '</div>' +
+          '<label class="rw-check"><input type="checkbox" id="rwLicRead"> <span>I have read and agree to the AIAD Streaming License Agreement v1.0</span></label>' +
+          '<label class="rw-check"><input type="checkbox" id="rwLicRights"> <span>I confirm I own or control all rights in the recordings I upload</span></label>' +
+          '<div class="rw-field">' +
+            '<label class="rw-label">Full legal name <span class="rw-req">●</span></label>' +
+            '<input class="rw-input" id="rwLicName" type="text" placeholder="As it appears on your tax documents" autocomplete="name">' +
+          '</div>' +
+          '<div class="rw-actions"><button class="rw-btn rw-btn-primary" onclick="AIADRelease.acceptLicense()">Accept and continue</button></div>' +
+        '</div>';
+    }
+
+    async function acceptLicense() {
+        if (RS.busy) return;
+        clearBanner();
+        var read = el('rwLicRead').checked;
+        var rights = el('rwLicRights').checked;
+        var name = trim(el('rwLicName').value);
+        var errs = [];
+        if (!read) errs.push('Tick the box confirming you have read and agree to the agreement.');
+        if (!rights) errs.push('Tick the box confirming you own or control the rights.');
+        if (name.length < 2) errs.push('Type your full legal name.');
+        if (errs.length) { bannerList('Can’t accept yet', errs); return; }
+
+        var u = uid();
+        if (!u) { banner('You are signed out. Sign in and try again.'); return; }
+
+        busy(true, 'Recording your acceptance…');
+        var ins = await window.db.from('streaming_license_acceptances').insert({
+            user_id: u,
+            agreement_version: AGREEMENT_VERSION,
+            signed_legal_name: name,
+            user_agent: (navigator && navigator.userAgent) || null
+        });
+        busy(false);
+        if (dbFail('streaming_license_acceptances', 'insert', ins.error)) return;
+
+        if (!RS.rights.signed_legal_name) RS.rights.signed_legal_name = name;
+        RS.step = 1;
+        render();
+        if (window.showToast) showToast('License accepted ✓');
+    }
+
+    // ── Step 1 — release info ───────────────────────────────────────────────
+    function opt(list, cur) {
+        return list.map(function (o) {
+            return '<option value="' + esc(o.v) + '"' + (String(cur) === String(o.v) ? ' selected' : '') + '>' + esc(o.l) + '</option>';
+        }).join('');
+    }
+    function field(label, req, inner, hint) {
+        return '<div class="rw-field"><label class="rw-label">' + esc(label) +
+            (req ? ' <span class="rw-req">●</span>' : '') + '</label>' + inner +
+            (hint ? '<div class="rw-hint">' + esc(hint) + '</div>' : '') + '</div>';
+    }
+    function txt(id, val, ph, type) {
+        return '<input class="rw-input" id="' + id + '" type="' + (type || 'text') + '" value="' + esc(val == null ? '' : val) + '" placeholder="' + esc(ph || '') + '">';
+    }
+
+    function viewRelease() {
+        var r = RS.release;
+        var minDate = minGoLive();
+        var art = r.artwork_url
+            ? '<div class="rw-art"><img src="' + esc(r.artwork_url) + '" alt="Release artwork"><div class="rw-art-meta">' +
+              (RS.artworkDims ? esc(RS.artworkDims.w + ' × ' + RS.artworkDims.h + ' px') : 'Uploaded') +
+              '</div></div>'
+            : '';
+        return '' +
+        '<div class="rw-card">' +
+          '<h2 class="rw-h">Release information</h2>' +
+          '<p class="rw-sub">Section 1 of the submission form. Fields marked ● are required.</p>' +
+          '<div class="rw-grid">' +
+            field('Release title', true, txt('rwTitle', r.title, 'Nothing Left to Say'), 'No ALL CAPS unless stylized, no "(Official Audio)", no featured artists in the title.') +
+            field('Version / subtitle', false, txt('rwVersion', r.version_subtitle, 'Deluxe, Acoustic, Radio Edit…')) +
+            field('Release type', true, '<select class="rw-input" id="rwType">' + opt([
+                { v: 'single', l: 'Single (1–3 tracks)' }, { v: 'ep', l: 'EP (4–6)' }, { v: 'album', l: 'Album (7+)' }
+            ], r.release_type || 'single') + '</select>') +
+            field('Primary artist', true, txt('rwArtist', r.primary_artist_name, ''), 'Must match your AIAD artist profile exactly.') +
+            field('Featured artists', false, txt('rwFeatured', arrToCsv(r.featured_artists), 'Comma separated'), 'Listed separately, never typed into the title.') +
+            field('Label name', true, txt('rwLabel', r.label_name, ''), 'Defaults to your artist name if you are independent.') +
+            field('UPC', false, txt('rwUpc', r.upc, ''), 'Leave blank and AIAD assigns one free.') +
+            field('Original release date', true, txt('rwOrigDate', toDateInput(r.original_release_date), '', 'date'), 'The date it first came out anywhere. If unreleased, same as go-live.') +
+            field('AIAD go-live date', true,
+                '<input class="rw-input" id="rwGoLive" type="datetime-local" value="' + esc(toLocalInput(r.go_live_at)) + '" min="' + esc(toLocalInput(minDate.toISOString())) + '">',
+                'Minimum 3 business days after submission for QC — earliest is ' + minDate.toLocaleDateString() + '.') +
+            field('Early access window', false, '<select class="rw-input" id="rwEarly">' + opt([
+                { v: '0', l: 'None' }, { v: '24', l: '24 hours' }, { v: '48', l: '48 hours' }, { v: '72', l: '72 hours' }
+            ], r.early_access_hours == null ? '0' : r.early_access_hours) + '</select>', 'Tier 2+ supporters get it early.') +
+            field('Primary genre', true, txt('rwGenre1', r.primary_genre, '')) +
+            field('Secondary genre', false, txt('rwGenre2', r.secondary_genre, '')) +
+            field('Language of release', true, txt('rwLang', r.language, 'English')) +
+            field('Parental advisory', true, '<select class="rw-input" id="rwAdvisory">' + opt([
+                { v: 'explicit', l: 'Explicit' }, { v: 'clean', l: 'Clean' }, { v: 'not_applicable', l: 'Not applicable' }
+            ], r.parental_advisory || 'not_applicable') + '</select>') +
+            field('Territory', true, '<select class="rw-input" id="rwTerritory" onchange="AIADRelease.syncTerritory()">' + opt([
+                { v: 'worldwide', l: 'Worldwide' }, { v: 'excluded', l: 'Worldwide except…' }
+            ], r.territory_mode || 'worldwide') + '</select>') +
+            '<div class="rw-field" id="rwExclWrap" style="display:' + (r.territory_mode === 'excluded' ? 'block' : 'none') + '">' +
+              '<label class="rw-label">Excluded countries</label>' +
+              txt('rwExcluded', arrToCsv(r.excluded_territories), 'US, CA, GB — comma separated') +
+            '</div>' +
+            field('℗ line', true, txt('rwPLine', r.p_line, '℗ 2026 Owner Name'), 'Sound recording owner.') +
+            field('© line', true, txt('rwCLine', r.c_line, '© 2026 Owner Name'), 'Composition owner.') +
+          '</div>' +
+          '<div class="rw-field rw-span">' +
+            '<label class="rw-label">Release artwork <span class="rw-req">●</span></label>' +
+            '<div class="rw-hint">3000 × 3000 px minimum, perfectly square, JPG or PNG, max 10MB.</div>' +
+            art +
+            '<input type="file" id="rwArtFile" accept="image/jpeg,image/png" class="rw-file" onchange="AIADRelease.uploadArtwork(this)">' +
+          '</div>' +
+          '<div class="rw-actions">' +
+            '<button class="rw-btn" onclick="AIADRelease.goto(0)">Back</button>' +
+            '<button class="rw-btn rw-btn-primary" onclick="AIADRelease.saveRelease(true)">Save and continue</button>' +
+            '<button class="rw-btn rw-btn-ghost" onclick="AIADRelease.saveRelease(false)">Save draft</button>' +
+          '</div>' +
+        '</div>';
+    }
+
+    function syncTerritory() {
+        var w = el('rwExclWrap');
+        if (w) w.style.display = el('rwTerritory').value === 'excluded' ? 'block' : 'none';
+    }
+
+    function collectRelease() {
+        var r = RS.release;
+        r.title = trim(el('rwTitle').value);
+        r.version_subtitle = trim(el('rwVersion').value) || null;
+        r.release_type = el('rwType').value;
+        r.primary_artist_name = trim(el('rwArtist').value);
+        r.featured_artists = csvToArr(el('rwFeatured').value);
+        r.label_name = trim(el('rwLabel').value) || null;
+        r.upc = trim(el('rwUpc').value) || null;
+        r.original_release_date = trim(el('rwOrigDate').value) || null;
+        var gl = trim(el('rwGoLive').value);
+        r.go_live_at = gl ? new Date(gl).toISOString() : null;
+        r.early_access_hours = parseInt(el('rwEarly').value, 10) || 0;
+        r.primary_genre = trim(el('rwGenre1').value) || null;
+        r.secondary_genre = trim(el('rwGenre2').value) || null;
+        r.language = trim(el('rwLang').value) || null;
+        r.parental_advisory = el('rwAdvisory').value;
+        r.territory_mode = el('rwTerritory').value;
+        r.excluded_territories = r.territory_mode === 'excluded' ? csvToArr(el('rwExcluded').value) : [];
+        r.p_line = trim(el('rwPLine').value) || null;
+        r.c_line = trim(el('rwCLine').value) || null;
+        return r;
+    }
+
+    function releaseErrors(r) {
+        var e = [];
+        if (!r.title) e.push('Release title is required.');
+        if (!r.primary_artist_name) e.push('Primary artist is required.');
+        if (!r.label_name) e.push('Label name is required — use your artist name if you are independent.');
+        if (!r.original_release_date) e.push('Original release date is required.');
+        if (!r.go_live_at) e.push('AIAD go-live date is required.');
+        else if (new Date(r.go_live_at) < minGoLive()) {
+            e.push('Go-live must be at least 3 business days out — earliest is ' + minGoLive().toLocaleDateString() + '.');
+        }
+        if (!r.primary_genre) e.push('Primary genre is required.');
+        if (!r.language) e.push('Language of release is required.');
+        if (!r.p_line) e.push('℗ line is required.');
+        if (!r.c_line) e.push('© line is required.');
+        if (r.territory_mode === 'excluded' && !(r.excluded_territories || []).length) {
+            e.push('You chose "Worldwide except…" — list the excluded countries or switch back to Worldwide.');
+        }
+        if (!r.artwork_url) e.push('Release artwork is required.');
+        return e;
+    }
+
+    async function saveRelease(advance) {
+        if (RS.busy) return;
+        clearBanner();
+        var r = collectRelease();
+        if (advance) {
+            var errs = releaseErrors(r);
+            if (errs.length) { bannerList('Fix these before continuing', errs); return; }
+        }
+        if (!r.title) { banner('A draft still needs a release title.'); return; }
+
+        var u = uid();
+        if (!u) { banner('You are signed out. Sign in and try again.'); return; }
+
+        var payload = {
+            user_id: u, title: r.title, version_subtitle: r.version_subtitle,
+            release_type: r.release_type, primary_artist_name: r.primary_artist_name || r.title,
+            featured_artists: r.featured_artists || [], label_name: r.label_name, upc: r.upc,
+            original_release_date: r.original_release_date, go_live_at: r.go_live_at,
+            early_access_hours: r.early_access_hours, primary_genre: r.primary_genre,
+            secondary_genre: r.secondary_genre, language: r.language,
+            parental_advisory: r.parental_advisory, territory_mode: r.territory_mode,
+            excluded_territories: r.excluded_territories || [], artwork_url: r.artwork_url || null,
+            p_line: r.p_line, c_line: r.c_line, status: 'draft', updated_at: new Date().toISOString()
+        };
+
+        busy(true, 'Saving release…');
+        var res;
+        if (RS.releaseId) {
+            res = await window.db.from('releases').update(payload).eq('id', RS.releaseId).select();
+        } else {
+            res = await window.db.from('releases').insert(payload).select();
+        }
+        busy(false);
+        if (dbFail('releases', RS.releaseId ? 'update' : 'insert', res.error)) return;
+        if (!res.data || !res.data.length) {
+            banner('The release did not save — no row came back. Check that you are signed in as the owner.');
+            return;
+        }
+        RS.release = res.data[0];
+        RS.releaseId = RS.release.id;
+
+        if (advance) { RS.step = 2; render(); }
+        else { banner('Draft saved.', 'ok'); if (window.showToast) showToast('Draft saved ✓'); }
+    }
+
+    async function uploadArtwork(input) {
+        var file = input.files && input.files[0];
+        if (!file) return;
+        clearBanner();
+        input.value = '';
+
+        var e = extOf(file.name);
+        if (ART_OK_EXT.indexOf(e) === -1) { banner('Artwork must be JPG or PNG.'); return; }
+        if (file.size > ART_MAX_BYTES) {
+            banner('Artwork is ' + (file.size / 1048576).toFixed(1) + 'MB — the limit is 10MB.');
+            return;
+        }
+
+        var dims;
+        try {
+            dims = await imageDims(file);
+        } catch (err) {
+            banner(err.message);
+            return;
+        }
+        if (dims.w !== dims.h) {
+            banner('Artwork must be perfectly square — this is ' + dims.w + ' × ' + dims.h + '. AIAD will not crop or pad on your behalf.');
+            return;
+        }
+        if (dims.w < ART_MIN_PX) {
+            banner('Artwork must be at least 3000 × 3000 px — this is ' + dims.w + ' × ' + dims.h + '.');
+            return;
+        }
+
+        var u = uid();
+        if (!u) { banner('You are signed out. Sign in and try again.'); return; }
+        busy(true, 'Uploading artwork…');
+        try {
+            var path = u + '/releases/' + (RS.releaseId || 'draft') + '/artwork-' + Date.now() + '.' + e;
+            RS.release.artwork_url = await upload(ART_BUCKET, path, file);
+            RS.artworkDims = dims;
+            busy(false);
+            // Keep the rest of the form as typed — only swap the preview back in.
+            collectRelease();
+            render();
+            banner('Artwork accepted — ' + dims.w + ' × ' + dims.h + '.', 'ok');
+        } catch (err) {
+            busy(false);
+            banner('Artwork upload failed: ' + err.message);
+        }
+    }
+
+    // ── Step 2 — tracks ─────────────────────────────────────────────────────
+    function newTrack() {
+        return {
+            localId: nextId(), dbId: null, title: '', version_subtitle: '',
+            track_number: RS.tracks.length + 1, isrc: '', explicit: false,
+            lyrics_language: '', lyrics: '', preview_start_seconds: 30,
+            contains_sample: false, sample_clearance_url: null,
+            is_cover: false, cover_original_writers: '',
+            origin: '', origin_locked: false,
+            bucket: null, storage_path: null, duration_seconds: null, audioName: '',
+            contributors: [
+                { localId: nextId(), dbId: null, role: 'songwriter', legal_name: '', stage_name: '', share_percent: '100', publisher_name: '', pro: '', ipi_cae: '', instrument: '' },
+                { localId: nextId(), dbId: null, role: 'producer', legal_name: '', stage_name: '', share_percent: '', publisher_name: '', pro: '', ipi_cae: '', instrument: '' }
+            ]
+        };
+    }
+    function trackById(id) {
+        return RS.tracks.filter(function (t) { return t.localId === id; })[0] || null;
+    }
+    function contribById(t, cid) {
+        return t.contributors.filter(function (c) { return c.localId === cid; })[0] || null;
+    }
+    function songwriters(t) {
+        return t.contributors.filter(function (c) { return c.role === 'songwriter'; });
+    }
+    function shareTotal(t) {
+        return songwriters(t).reduce(function (s, c) {
+            var n = parseFloat(c.share_percent);
+            return s + (isFinite(n) ? n : 0);
+        }, 0);
+    }
+
+    function setT(id, key, value) {
+        var t = trackById(id);
+        if (!t) return;
+        if (key === 'explicit' || key === 'contains_sample' || key === 'is_cover') t[key] = !!value;
+        else if (key === 'track_number' || key === 'preview_start_seconds') {
+            var n = parseInt(value, 10);
+            t[key] = isFinite(n) ? n : null;
+        } else t[key] = value;
+        if (key === 'is_cover') {
+            var w = el('rwCoverWrap-' + id);
+            if (w) w.style.display = t.is_cover ? 'block' : 'none';
+        }
+    }
+    function setC(tid, cid, key, value) {
+        var t = trackById(tid);
+        if (!t) return;
+        var c = contribById(t, cid);
+        if (!c) return;
+        c[key] = value;
+        if (key === 'share_percent') updateShareTotal(tid);
+        if (key === 'role') renderContribs(tid);
+    }
+    function updateShareTotal(tid) {
+        var t = trackById(tid);
+        var box = el('rwSw-' + tid);
+        if (!t || !box) return;
+        var total = shareTotal(t);
+        var ok = Math.abs(total - 100) < 0.0001;
+        box.className = 'rw-sharetotal ' + (ok ? 'is-ok' : 'is-bad');
+        box.textContent = 'Songwriter splits: ' + (Math.round(total * 100) / 100) + '% ' + (ok ? '✓' : '— must total exactly 100%');
+    }
+
+    function addTrack() {
+        RS.tracks.push(newTrack());
+        render();
+    }
+    function removeTrack(id) {
+        var t = trackById(id);
+        if (!t) return;
+        if (!window.confirm('Remove "' + (t.title || 'this track') + '" from the release?')) return;
+        if (t.dbId) {
+            // Unlink rather than delete — the recording may exist in the artist's library.
+            window.db.from('tracks').update({ release_id: null }).eq('id', t.dbId).then(function (res) {
+                if (res.error) dbFail('tracks', 'update', res.error, { unlink: t.dbId });
+            });
+        }
+        RS.tracks = RS.tracks.filter(function (x) { return x.localId !== id; });
+        RS.tracks.forEach(function (x, i) { x.track_number = i + 1; });
+        render();
+    }
+    function addContrib(tid, role) {
+        var t = trackById(tid);
+        if (!t) return;
+        t.contributors.push({
+            localId: nextId(), dbId: null, role: role || 'songwriter', legal_name: '', stage_name: '',
+            share_percent: role === 'songwriter' || !role ? '' : '', publisher_name: '', pro: '', ipi_cae: '', instrument: ''
+        });
+        renderContribs(tid);
+    }
+    function removeContrib(tid, cid) {
+        var t = trackById(tid);
+        if (!t) return;
+        var c = contribById(t, cid);
+        if (c && c.dbId) {
+            window.db.from('track_contributors').delete().eq('id', c.dbId).then(function (res) {
+                if (res.error) dbFail('track_contributors', 'delete', res.error, { id: c.dbId });
+            });
+        }
+        t.contributors = t.contributors.filter(function (x) { return x.localId !== cid; });
+        renderContribs(tid);
+    }
+
+    function contribRow(t, c) {
+        var isSw = c.role === 'songwriter';
+        var perf = c.role === 'featured_performer' || c.role === 'musician';
+        var b = 'AIADRelease.setC(\'' + t.localId + '\',\'' + c.localId + '\',';
+        return '<div class="rw-contrib' + (isSw ? ' is-sw' : '') + '">' +
+            '<select class="rw-input rw-role" onchange="' + b + '\'role\',this.value)">' + opt(ROLES, c.role) + '</select>' +
+            '<input class="rw-input" placeholder="Legal name" value="' + esc(c.legal_name) + '" oninput="' + b + '\'legal_name\',this.value)">' +
+            '<input class="rw-input" placeholder="Stage name (optional)" value="' + esc(c.stage_name) + '" oninput="' + b + '\'stage_name\',this.value)">' +
+            (isSw
+                ? '<input class="rw-input rw-narrow" type="number" min="0" max="100" step="0.01" placeholder="Split %" value="' + esc(c.share_percent) + '" oninput="' + b + '\'share_percent\',this.value)">' +
+                  '<input class="rw-input" placeholder="Publisher" value="' + esc(c.publisher_name) + '" oninput="' + b + '\'publisher_name\',this.value)">' +
+                  '<input class="rw-input rw-narrow" placeholder="PRO" value="' + esc(c.pro) + '" oninput="' + b + '\'pro\',this.value)">' +
+                  '<input class="rw-input rw-narrow" placeholder="IPI/CAE" value="' + esc(c.ipi_cae) + '" oninput="' + b + '\'ipi_cae\',this.value)">'
+                : '') +
+            (perf ? '<input class="rw-input" placeholder="Instrument / role" value="' + esc(c.instrument) + '" oninput="' + b + '\'instrument\',this.value)">' : '') +
+            '<button class="rw-x" title="Remove" onclick="AIADRelease.removeContrib(\'' + t.localId + '\',\'' + c.localId + '\')">×</button>' +
+            '</div>';
+    }
+
+    function contribsHtml(t) {
+        return t.contributors.map(function (c) { return contribRow(t, c); }).join('') +
+            '<div class="rw-contrib-add">' +
+              '<button class="rw-btn rw-btn-sm" onclick="AIADRelease.addContrib(\'' + t.localId + '\',\'songwriter\')">+ Songwriter</button>' +
+              '<button class="rw-btn rw-btn-sm" onclick="AIADRelease.addContrib(\'' + t.localId + '\',\'producer\')">+ Producer</button>' +
+              '<button class="rw-btn rw-btn-sm" onclick="AIADRelease.addContrib(\'' + t.localId + '\',\'mixing_engineer\')">+ Engineer</button>' +
+              '<button class="rw-btn rw-btn-sm" onclick="AIADRelease.addContrib(\'' + t.localId + '\',\'featured_performer\')">+ Performer</button>' +
+            '</div>' +
+            '<div class="rw-sharetotal" id="rwSw-' + t.localId + '"></div>' +
+            '<div class="rw-hint">Sole writer? That is 100% to you. No publisher? Enter “Self-published.” No PRO? Enter “None” — but you are leaving money on the table.</div>';
+    }
+    function renderContribs(tid) {
+        var t = trackById(tid);
+        var box = el('rwContribs-' + tid);
+        if (!t || !box) return;
+        box.innerHTML = contribsHtml(t);
+        updateShareTotal(tid);
+    }
+
+    function trackCard(t, idx) {
+        var b = 'AIADRelease.setT(\'' + t.localId + '\',';
+        var audio = t.storage_path
+            ? '<div class="rw-audio-ok">✓ ' + esc(t.audioName || 'master uploaded') +
+              (t.duration_seconds ? ' · ' + Math.floor(t.duration_seconds / 60) + ':' + String(t.duration_seconds % 60).padStart(2, '0') : '') +
+              '</div>'
+            : '<div class="rw-audio-none">No master uploaded yet</div>';
+        return '' +
+        '<div class="rw-track" id="rwTrack-' + t.localId + '">' +
+          '<div class="rw-track-head">' +
+            '<span class="rw-track-n">' + (idx + 1) + '</span>' +
+            '<span class="rw-track-title">' + esc(t.title || 'Untitled track') + '</span>' +
+            '<button class="rw-x" title="Remove track" onclick="AIADRelease.removeTrack(\'' + t.localId + '\')">×</button>' +
+          '</div>' +
+          '<div class="rw-grid">' +
+            field('Track number', true, '<input class="rw-input" type="number" min="1" value="' + esc(t.track_number == null ? '' : t.track_number) + '" oninput="' + b + '\'track_number\',this.value)">') +
+            field('Track title', true, '<input class="rw-input" value="' + esc(t.title) + '" oninput="' + b + '\'title\',this.value)">') +
+            field('Version / subtitle', false, '<input class="rw-input" value="' + esc(t.version_subtitle) + '" placeholder="Acoustic, Radio Edit…" oninput="' + b + '\'version_subtitle\',this.value)">') +
+            field('ISRC', false, '<input class="rw-input" value="' + esc(t.isrc) + '" oninput="' + b + '\'isrc\',this.value)">', 'Leave blank and AIAD assigns one. Never reuse an ISRC across recordings.') +
+            field('Explicit', true, '<select class="rw-input" onchange="' + b + '\'explicit\',this.value===\'1\')">' +
+                '<option value="0"' + (t.explicit ? '' : ' selected') + '>No</option>' +
+                '<option value="1"' + (t.explicit ? ' selected' : '') + '>Yes</option></select>') +
+            field('Language of lyrics', true, '<input class="rw-input" value="' + esc(t.lyrics_language) + '" placeholder="English, or Instrumental" oninput="' + b + '\'lyrics_language\',this.value)">') +
+            field('Preview start (seconds)', false, '<input class="rw-input" type="number" min="0" value="' + esc(t.preview_start_seconds == null ? 30 : t.preview_start_seconds) + '" oninput="' + b + '\'preview_start_seconds\',this.value)">', 'Where the 60s clip begins. Defaults to 0:30.') +
+            field('Contains a sample or interpolation', true, '<select class="rw-input" onchange="' + b + '\'contains_sample\',this.value===\'1\')">' +
+                '<option value="0"' + (t.contains_sample ? '' : ' selected') + '>No</option>' +
+                '<option value="1"' + (t.contains_sample ? ' selected' : '') + '>Yes</option></select>', 'If yes, you upload the signed clearance in step 4.') +
+            field('Is this a cover?', true, '<select class="rw-input" onchange="' + b + '\'is_cover\',this.value===\'1\')">' +
+                '<option value="0"' + (t.is_cover ? '' : ' selected') + '>No</option>' +
+                '<option value="1"' + (t.is_cover ? ' selected' : '') + '>Yes</option></select>') +
+            '<div class="rw-field" id="rwCoverWrap-' + t.localId + '" style="display:' + (t.is_cover ? 'block' : 'none') + '">' +
+              '<label class="rw-label">Original songwriters and publishers <span class="rw-req">●</span></label>' +
+              '<input class="rw-input" value="' + esc(t.cover_original_writers) + '" placeholder="Name (Publisher), Name (Publisher)" oninput="' + b + '\'cover_original_writers\',this.value)">' +
+            '</div>' +
+          '</div>' +
+          '<div class="rw-field rw-span">' +
+            '<label class="rw-label">Lyrics</label>' +
+            '<textarea class="rw-input rw-textarea" placeholder="Plain text, no timestamps." oninput="' + b + '\'lyrics\',this.value)">' + esc(t.lyrics) + '</textarea>' +
+          '</div>' +
+          '<div class="rw-field rw-span">' +
+            '<label class="rw-label">Master audio <span class="rw-req">●</span></label>' +
+            '<div class="rw-hint">WAV or FLAC only, max 500MB. Stored privately — never exposed at a public URL.</div>' +
+            audio +
+            '<input type="file" class="rw-file" accept=".wav,.flac,audio/wav,audio/x-wav,audio/flac" onchange="AIADRelease.uploadAudio(\'' + t.localId + '\',this)">' +
+          '</div>' +
+          '<div class="rw-credits">' +
+            '<h4 class="rw-h4">Track credits</h4>' +
+            '<div id="rwContribs-' + t.localId + '">' + contribsHtml(t) + '</div>' +
+          '</div>' +
+        '</div>';
+    }
+
+    function viewTracks() {
+        var body = RS.tracks.length
+            ? RS.tracks.map(trackCard).join('')
+            : '<div class="rw-empty">No tracks yet. Add the first one.</div>';
+        return '' +
+        '<div class="rw-card">' +
+          '<h2 class="rw-h">Tracks</h2>' +
+          '<p class="rw-sub">Section 2. At least one songwriter and one producer per track, and songwriter splits must total exactly 100%.</p>' +
+          body +
+          '<div class="rw-actions">' +
+            '<button class="rw-btn" onclick="AIADRelease.addTrack()">+ Add track</button>' +
+          '</div>' +
+          '<div class="rw-actions">' +
+            '<button class="rw-btn" onclick="AIADRelease.goto(1)">Back</button>' +
+            '<button class="rw-btn rw-btn-primary" onclick="AIADRelease.saveTracks(true)">Save and continue</button>' +
+            '<button class="rw-btn rw-btn-ghost" onclick="AIADRelease.saveTracks(false)">Save draft</button>' +
+          '</div>' +
+        '</div>';
+    }
+
+    async function uploadAudio(tid, input) {
+        var file = input.files && input.files[0];
+        if (!file) return;
+        input.value = '';
+        clearBanner();
+        var t = trackById(tid);
+        if (!t) return;
+
+        var bad = checkAudio(file);
+        if (bad) { banner(bad); return; }
+
+        var u = uid();
+        if (!u) { banner('You are signed out. Sign in and try again.'); return; }
+        if (!RS.releaseId) { banner('Save the release information first — step 2.'); return; }
+
+        busy(true, 'Uploading ' + file.name + '…');
+        var dur = await audioDuration(file);
+        try {
+            var path = u + '/releases/' + RS.releaseId + '/' + t.localId + '-' + Date.now() + '-' + safeName(file.name);
+            await upload(DOC_BUCKET, path, file);
+            t.bucket = DOC_BUCKET;
+            t.storage_path = path;
+            t.duration_seconds = dur;
+            t.audioName = file.name;
+            busy(false);
+            render();
+            banner('“' + file.name + '” uploaded.' + (dur ? '' : ' Duration could not be read from this file — QC will measure it.'), 'ok');
+        } catch (err) {
+            busy(false);
+            banner('Audio upload failed: ' + err.message);
+        }
+    }
+
+    function trackErrors() {
+        var e = [];
+        if (!RS.tracks.length) { e.push('Add at least one track.'); return e; }
+        RS.tracks.forEach(function (t, i) {
+            var n = 'Track ' + (i + 1) + (t.title ? ' (' + t.title + ')' : '') + ': ';
+            if (!trim(t.title)) e.push(n + 'title is required.');
+            if (t.track_number == null) e.push(n + 'track number is required.');
+            if (!trim(t.lyrics_language)) e.push(n + 'language of lyrics is required — use "Instrumental" if there are none.');
+            if (!t.storage_path) e.push(n + 'master audio is required.');
+            if (t.is_cover && !trim(t.cover_original_writers)) e.push(n + 'it is a cover, so the original writers are required.');
+
+            var sw = songwriters(t);
+            var prod = t.contributors.filter(function (c) {
+                return ['producer', 'co_producer', 'additional_production'].indexOf(c.role) !== -1;
+            });
+            if (!sw.length) e.push(n + 'at least one songwriter is required.');
+            if (!prod.length) e.push(n + 'at least one producer is required.');
+
+            sw.forEach(function (c, j) {
+                var w = n + 'songwriter ' + (j + 1) + ' ';
+                if (!trim(c.legal_name)) e.push(w + 'needs a legal name.');
+                if (trim(c.share_percent) === '' || !isFinite(parseFloat(c.share_percent))) e.push(w + 'needs a split %.');
+                if (!trim(c.publisher_name)) e.push(w + 'needs a publisher — "Self-published" is fine.');
+                if (!trim(c.pro)) e.push(w + 'needs a PRO — "None" is fine.');
+                if (!trim(c.ipi_cae)) e.push(w + 'needs an IPI/CAE number.');
+            });
+            prod.forEach(function (c, j) {
+                if (!trim(c.legal_name)) e.push(n + 'producer ' + (j + 1) + ' needs a name.');
+            });
+            var total = shareTotal(t);
+            if (sw.length && Math.abs(total - 100) > 0.0001) {
+                e.push(n + 'songwriter splits total ' + (Math.round(total * 100) / 100) + '%, not 100%.');
+            }
+        });
+        return e;
+    }
+
+    async function saveTracks(advance) {
+        if (RS.busy) return;
+        clearBanner();
+        if (!RS.releaseId) { banner('Save the release information first — step 2.'); return; }
+        if (advance) {
+            var errs = trackErrors();
+            if (errs.length) { bannerList('Fix these before continuing', errs); return; }
+        }
+        var u = uid();
+        if (!u) { banner('You are signed out. Sign in and try again.'); return; }
+
+        busy(true, 'Saving tracks…');
+        for (var i = 0; i < RS.tracks.length; i++) {
+            var t = RS.tracks[i];
+            if (!trim(t.title)) continue;
+            var payload = {
+                user_id: u, release_id: RS.releaseId, title: trim(t.title),
+                version_subtitle: trim(t.version_subtitle) || null,
+                track_number: t.track_number, isrc: trim(t.isrc) || null,
+                explicit: !!t.explicit, lyrics_language: trim(t.lyrics_language) || null,
+                lyrics: trim(t.lyrics) || null,
+                preview_start_seconds: t.preview_start_seconds == null ? 30 : t.preview_start_seconds,
+                contains_sample: !!t.contains_sample, is_cover: !!t.is_cover,
+                cover_original_writers: trim(t.cover_original_writers) || null,
+                bucket: t.bucket, storage_path: t.storage_path,
+                duration_seconds: t.duration_seconds,
+                source: 'uploaded', is_public: false,
+                genre: RS.release.primary_genre || null
+            };
+            var res;
+            if (t.dbId) res = await window.db.from('tracks').update(payload).eq('id', t.dbId).select();
+            else res = await window.db.from('tracks').insert(payload).select();
+            if (dbFail('tracks', t.dbId ? 'update' : 'insert', res.error, { track: t.title })) { busy(false); return; }
+            if (!res.data || !res.data.length) {
+                busy(false);
+                banner('Track “' + t.title + '” did not save — no row came back.');
+                return;
+            }
+            t.dbId = res.data[0].id;
+
+            if (!(await syncContribs(t))) { busy(false); return; }
+        }
+        busy(false);
+        if (advance) { RS.step = 3; render(); }
+        else { banner('Tracks saved.', 'ok'); if (window.showToast) showToast('Tracks saved ✓'); }
+    }
+
+    /* Replace the whole credit set for a track: delete what is gone, then insert
+       the current rows. Simpler than diffing and the volume is tiny. */
+    async function syncContribs(t) {
+        var del = await window.db.from('track_contributors').delete().eq('track_id', t.dbId);
+        if (dbFail('track_contributors', 'delete', del.error, { track: t.title })) return false;
+
+        var rows = t.contributors
+            .filter(function (c) { return trim(c.legal_name); })
+            .map(function (c) {
+                var share = parseFloat(c.share_percent);
+                return {
+                    track_id: t.dbId, role: c.role, legal_name: trim(c.legal_name),
+                    stage_name: trim(c.stage_name) || null,
+                    share_percent: (c.role === 'songwriter' && isFinite(share)) ? share : null,
+                    publisher_name: trim(c.publisher_name) || null,
+                    pro: trim(c.pro) || null, ipi_cae: trim(c.ipi_cae) || null,
+                    instrument: trim(c.instrument) || null
+                };
+            });
+        if (!rows.length) { t.contributors.forEach(function (c) { c.dbId = null; }); return true; }
+
+        var ins = await window.db.from('track_contributors').insert(rows).select();
+        if (dbFail('track_contributors', 'insert', ins.error, { track: t.title })) return false;
+        (ins.data || []).forEach(function (row, i) {
+            var local = t.contributors.filter(function (c) { return trim(c.legal_name); })[i];
+            if (local) local.dbId = row.id;
+        });
+        return true;
+    }
+
+    // ── Step 3 — rights and clearances ──────────────────────────────────────
+    function yesNo(id, cur, invert, handler) {
+        // invert=true renders No first (for "is there a conflict?" style questions).
+        var a = invert ? { v: 'no', l: 'No' } : { v: 'yes', l: 'Yes' };
+        var b = invert ? { v: 'yes', l: 'Yes' } : { v: 'no', l: 'No' };
+        var val = cur === true ? 'yes' : (cur === false ? 'no' : '');
+        return '<select class="rw-input" id="' + id + '" onchange="' + handler + '">' +
+            '<option value=""' + (val === '' ? ' selected' : '') + '>Choose…</option>' +
+            '<option value="' + a.v + '"' + (val === a.v ? ' selected' : '') + '>' + a.l + '</option>' +
+            '<option value="' + b.v + '"' + (val === b.v ? ' selected' : '') + '>' + b.l + '</option>' +
+            '</select>';
+    }
+    function docSlot(label, ref, onchangeCall) {
+        return (ref
+            ? '<div class="rw-audio-ok">✓ ' + esc(docLabel(ref)) +
+              ' <button class="rw-linkbtn" onclick="AIADRelease.openDoc(\'' + esc(ref) + '\')">view</button></div>'
+            : '<div class="rw-audio-none">' + esc(label) + '</div>') +
+            '<input type="file" class="rw-file" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" onchange="' + onchangeCall + '">';
+    }
+    function multiWriterTracks() {
+        return RS.tracks.filter(function (t) { return songwriters(t).length > 1; });
+    }
+
+    function viewRights() {
+        var R = RS.rights;
+        var needSplitSheet = multiWriterTracks().length > 0;
+        var perTrack = RS.tracks.map(function (t, i) {
+            var locked = t.origin_locked;
+            var originHtml = ORIGINS.map(function (o) {
+                var checked = t.origin === o.v ? ' checked' : '';
+                return '<label class="rw-radio' + (locked ? ' is-locked' : '') + '">' +
+                    '<input type="radio" name="rwOrigin-' + t.localId + '" value="' + o.v + '"' + checked +
+                    (locked ? ' disabled' : '') + ' onchange="AIADRelease.setT(\'' + t.localId + '\',\'origin\',this.value)">' +
+                    '<span><strong>' + esc(o.l) + '</strong><em>' + esc(o.d) + '</em></span></label>';
+            }).join('');
+            return '<div class="rw-track">' +
+                '<div class="rw-track-head"><span class="rw-track-n">' + (i + 1) + '</span>' +
+                '<span class="rw-track-title">' + esc(t.title || 'Untitled track') + '</span></div>' +
+                (t.contains_sample
+                    ? '<div class="rw-field rw-span"><label class="rw-label">Sample / interpolation clearance <span class="rw-req">●</span></label>' +
+                      '<div class="rw-hint">Signed clearance, required before go-live. “I’ll get it later” is not accepted.</div>' +
+                      docSlot('No clearance uploaded', t.sample_clearance_url, 'AIADRelease.uploadTrackDoc(\'' + t.localId + '\',this)') + '</div>'
+                    : '<div class="rw-note">No sample or interpolation declared.</div>') +
+                (t.is_cover
+                    ? '<div class="rw-note">Cover — original writers: ' + esc(t.cover_original_writers || '— not yet entered, go back to step 3') + '</div>'
+                    : '') +
+                '<div class="rw-field rw-span"><label class="rw-label">Origin declaration <span class="rw-req">●</span></label>' +
+                  '<div class="rw-hint">Only Human-created tracks are eligible for the AIAD Sync Library. Locked once saved. A false declaration is grounds for removal from both Streaming and Sync.</div>' +
+                  originHtml +
+                  (locked ? '<div class="rw-note">Locked — declared ' + esc(ORIGINS.filter(function (o) { return o.v === t.origin; }).map(function (o) { return o.l; })[0] || t.origin) + '.</div>' : '') +
+                '</div>' +
+              '</div>';
+        }).join('');
+
+        return '' +
+        '<div class="rw-card">' +
+          '<h2 class="rw-h">Rights and clearances</h2>' +
+          '<p class="rw-sub">Section 3. The first two questions cover every recording in this release.</p>' +
+          '<div class="rw-grid">' +
+            field('Do you own or exclusively control the master recordings?', true,
+                yesNo('rwOwnsMaster', R.owns_master, false, 'AIADRelease.setRights(\'owns_master\',this.value)')) +
+            field('Are they subject to an exclusive agreement that would prevent a non-exclusive license?', true,
+                yesNo('rwConflict', R.exclusive_conflict, true, 'AIADRelease.setRights(\'exclusive_conflict\',this.value)')) +
+          '</div>' +
+          '<div class="rw-field rw-span" id="rwMasterAuthWrap" style="display:' + (R.owns_master === false ? 'block' : 'none') + '">' +
+            '<label class="rw-label">Master ownership authorization <span class="rw-req">●</span></label>' +
+            '<div class="rw-hint">Upload the license or authorization from the owner.</div>' +
+            docSlot('No authorization uploaded', R.master_authorization_url, 'AIADRelease.uploadRightsDoc(\'master_authorization_url\',this)') +
+          '</div>' +
+          '<div class="rw-field rw-span" id="rwConsentWrap" style="display:' + (R.exclusive_conflict === true ? 'block' : 'none') + '">' +
+            '<label class="rw-label">Written consent from that party <span class="rw-req">●</span></label>' +
+            docSlot('No consent uploaded', R.conflict_consent_url, 'AIADRelease.uploadRightsDoc(\'conflict_consent_url\',this)') +
+          '</div>' +
+          '<div class="rw-field rw-span">' +
+            '<label class="rw-label">Split sheet' + (needSplitSheet ? ' <span class="rw-req">●</span>' : '') + '</label>' +
+            '<div class="rw-hint">' + (needSplitSheet
+                ? 'Required — ' + multiWriterTracks().length + ' track(s) have more than one writer. Signed by all writers.'
+                : 'Optional — no track has more than one writer.') + '</div>' +
+            docSlot('No split sheet uploaded', R.split_sheet_url, 'AIADRelease.uploadRightsDoc(\'split_sheet_url\',this)') +
+          '</div>' +
+          perTrack +
+          '<label class="rw-check"><input type="checkbox" id="rwLawful"' + (R.content_lawful_confirmed ? ' checked' : '') +
+            ' onchange="AIADRelease.setRights(\'content_lawful_confirmed\',this.checked)"> ' +
+            '<span>No track contains content that is unlawful, defamatory, or that incites violence or hatred against a protected group.</span></label>' +
+          '<div class="rw-actions">' +
+            '<button class="rw-btn" onclick="AIADRelease.goto(2)">Back</button>' +
+            '<button class="rw-btn rw-btn-primary" onclick="AIADRelease.saveRights(true)">Save and continue</button>' +
+            '<button class="rw-btn rw-btn-ghost" onclick="AIADRelease.saveRights(false)">Save draft</button>' +
+          '</div>' +
+        '</div>';
+    }
+
+    function setRights(key, value) {
+        if (key === 'content_lawful_confirmed') RS.rights[key] = !!value;
+        else RS.rights[key] = value === '' ? null : (value === 'yes');
+        if (key === 'owns_master') {
+            var w = el('rwMasterAuthWrap');
+            if (w) w.style.display = RS.rights.owns_master === false ? 'block' : 'none';
+        }
+        if (key === 'exclusive_conflict') {
+            var c = el('rwConsentWrap');
+            if (c) c.style.display = RS.rights.exclusive_conflict === true ? 'block' : 'none';
+        }
+    }
+
+    async function uploadRightsDoc(key, input) {
+        var file = input.files && input.files[0];
+        if (!file) return;
+        input.value = '';
+        clearBanner();
+        var u = uid();
+        if (!u) { banner('You are signed out. Sign in and try again.'); return; }
+        if (!RS.releaseId) { banner('Save the release information first.'); return; }
+        busy(true, 'Uploading ' + file.name + '…');
+        try {
+            var path = u + '/releases/' + RS.releaseId + '/rights/' + key + '-' + Date.now() + '-' + safeName(file.name);
+            RS.rights[key] = await upload(DOC_BUCKET, path, file);
+            busy(false);
+            render();
+            banner('“' + file.name + '” uploaded.', 'ok');
+        } catch (err) {
+            busy(false);
+            banner('Upload failed: ' + err.message);
+        }
+    }
+
+    async function uploadTrackDoc(tid, input) {
+        var file = input.files && input.files[0];
+        if (!file) return;
+        input.value = '';
+        clearBanner();
+        var t = trackById(tid);
+        if (!t) return;
+        var u = uid();
+        if (!u) { banner('You are signed out. Sign in and try again.'); return; }
+        if (!RS.releaseId) { banner('Save the release information first.'); return; }
+        busy(true, 'Uploading ' + file.name + '…');
+        try {
+            var path = u + '/releases/' + RS.releaseId + '/clearance/' + t.localId + '-' + Date.now() + '-' + safeName(file.name);
+            t.sample_clearance_url = await upload(DOC_BUCKET, path, file);
+            busy(false);
+            render();
+            banner('Clearance for “' + (t.title || 'track') + '” uploaded.', 'ok');
+        } catch (err) {
+            busy(false);
+            banner('Upload failed: ' + err.message);
+        }
+    }
+
+    function rightsErrors() {
+        var R = RS.rights, e = [];
+        if (R.owns_master === null || R.owns_master === undefined) e.push('Answer whether you own or control the masters.');
+        if (R.owns_master === false && !R.master_authorization_url) {
+            e.push('You answered No on master ownership — upload the authorization from the owner.');
+        }
+        if (R.exclusive_conflict === null || R.exclusive_conflict === undefined) e.push('Answer the exclusive-agreement question.');
+        if (R.exclusive_conflict === true && !R.conflict_consent_url) {
+            e.push('You declared an exclusive conflict — upload written consent from that party.');
+        }
+        if (!R.content_lawful_confirmed) e.push('Confirm the unlawful-content declaration.');
+        if (multiWriterTracks().length && !R.split_sheet_url) {
+            e.push('A split sheet is required — ' + multiWriterTracks().length + ' track(s) have more than one writer.');
+        }
+        RS.tracks.forEach(function (t, i) {
+            var n = 'Track ' + (i + 1) + (t.title ? ' (' + t.title + ')' : '') + ': ';
+            if (!t.origin) e.push(n + 'pick an origin declaration.');
+            if (t.contains_sample && !t.sample_clearance_url) e.push(n + 'sample declared — upload the signed clearance.');
+            if (t.is_cover && !trim(t.cover_original_writers)) e.push(n + 'cover declared — identify the original writers in step 3.');
+        });
+        return e;
+    }
+
+    async function saveRights(advance) {
+        if (RS.busy) return;
+        clearBanner();
+        if (!RS.releaseId) { banner('Save the release information first.'); return; }
+        if (advance) {
+            var errs = rightsErrors();
+            if (errs.length) { bannerList('Fix these before continuing', errs); return; }
+        }
+        busy(true, 'Saving declarations…');
+        var now = new Date().toISOString();
+        for (var i = 0; i < RS.tracks.length; i++) {
+            var t = RS.tracks[i];
+            if (!t.dbId) continue;
+            var patch = { sample_clearance_url: t.sample_clearance_url || null };
+            if (t.origin && !t.origin_locked) {
+                patch.origin = t.origin;
+                patch.origin_declared_at = now;
+                patch.origin_locked = true;
+            }
+            var res = await window.db.from('tracks').update(patch).eq('id', t.dbId).select();
+            if (dbFail('tracks', 'update', res.error, { track: t.title })) { busy(false); return; }
+            if (res.data && res.data.length) {
+                t.origin_locked = !!res.data[0].origin_locked;
+                t.origin = res.data[0].origin;
+            }
+        }
+        busy(false);
+        if (advance) { RS.step = 4; render(); }
+        else { banner('Declarations saved.', 'ok'); if (window.showToast) showToast('Saved ✓'); }
+    }
+
+    // ── Step 4 — review and submit ──────────────────────────────────────────
+    function row(k, v) {
+        return '<div class="rw-row"><span>' + esc(k) + '</span><strong>' + esc(v == null || v === '' ? '—' : v) + '</strong></div>';
+    }
+
+    function viewReview() {
+        if (RS.submissionRef) return viewDone();
+        var r = RS.release, R = RS.rights;
+        var tracks = RS.tracks.map(function (t, i) {
+            return '<div class="rw-row"><span>' + (i + 1) + '. ' + esc(t.title || 'Untitled') +
+                (t.version_subtitle ? ' (' + esc(t.version_subtitle) + ')' : '') + '</span><strong>' +
+                esc(songwriters(t).length + ' writer(s) · ' + (Math.round(shareTotal(t) * 100) / 100) + '%' +
+                    (t.storage_path ? ' · master ✓' : ' · no master')) + '</strong></div>';
+        }).join('');
+        return '' +
+        '<div class="rw-card">' +
+          '<h2 class="rw-h">Review and submit</h2>' +
+          '<p class="rw-sub">Last check before QC. Everything below is what AIAD receives.</p>' +
+          (r.artwork_url ? '<div class="rw-art"><img src="' + esc(r.artwork_url) + '" alt="Release artwork"></div>' : '') +
+          '<div class="rw-review">' +
+            row('Title', r.title + (r.version_subtitle ? ' (' + r.version_subtitle + ')' : '')) +
+            row('Type', r.release_type) +
+            row('Primary artist', r.primary_artist_name) +
+            row('Featured', arrToCsv(r.featured_artists)) +
+            row('Label', r.label_name) +
+            row('UPC', r.upc || 'AIAD will assign') +
+            row('Original release date', toDateInput(r.original_release_date)) +
+            row('Go live', r.go_live_at ? new Date(r.go_live_at).toLocaleString() : '') +
+            row('Early access', (r.early_access_hours || 0) + 'h') +
+            row('Genre', r.primary_genre + (r.secondary_genre ? ' / ' + r.secondary_genre : '')) +
+            row('Language', r.language) +
+            row('Parental advisory', r.parental_advisory) +
+            row('Territory', r.territory_mode === 'excluded' ? 'Worldwide except ' + arrToCsv(r.excluded_territories) : 'Worldwide') +
+            row('℗', r.p_line) + row('©', r.c_line) +
+            row('Owns masters', R.owns_master === true ? 'Yes' : (R.owns_master === false ? 'No — authorization uploaded' : '—')) +
+            row('Exclusive conflict', R.exclusive_conflict === true ? 'Yes — consent uploaded' : (R.exclusive_conflict === false ? 'No' : '—')) +
+            row('Split sheet', R.split_sheet_url ? docLabel(R.split_sheet_url) : (multiWriterTracks().length ? 'REQUIRED' : 'Not required')) +
+          '</div>' +
+          '<h4 class="rw-h4">Tracks</h4><div class="rw-review">' + tracks + '</div>' +
+          '<div class="rw-declaration">' +
+            '<h4 class="rw-h4">Declaration</h4>' +
+            '<p>I confirm that the information in this submission is accurate and complete, that I own or control all rights necessary to grant AIAD the license in the AIAD Streaming License Agreement, that all samples and interpolations are cleared, and that my origin declaration is truthful. I understand AIAD relies on these statements and that false statements may result in removal of my catalog and termination of my account.</p>' +
+            '<div class="rw-grid">' +
+              field('Full legal name', true, txt('rwDeclName', RS.rights.signed_legal_name || '', 'As it appears on your tax documents')) +
+              field('Date', true, '<input class="rw-input" type="text" value="' + esc(new Date().toLocaleDateString()) + '" disabled>') +
+            '</div>' +
+            '<label class="rw-check"><input type="checkbox" id="rwDeclAgree"> <span>I agree</span></label>' +
+          '</div>' +
+          '<div class="rw-actions">' +
+            '<button class="rw-btn" onclick="AIADRelease.goto(3)">Back</button>' +
+            '<button class="rw-btn rw-btn-primary" onclick="AIADRelease.submit()">Submit for QC</button>' +
+          '</div>' +
+        '</div>';
+    }
+
+    function viewDone() {
+        return '' +
+        '<div class="rw-card rw-done">' +
+          '<div class="rw-done-mark">✓</div>' +
+          '<h2 class="rw-h">Submitted</h2>' +
+          '<p class="rw-sub">“' + esc(RS.release.title || '') + '” is with QC.</p>' +
+          '<div class="rw-ref">' + esc(RS.submissionRef) + '</div>' +
+          '<p class="rw-sub">QC review takes 1–3 business days. AIAD checks audio, artwork, metadata, splits, and clearances. If something fails you get the specific reason and the specific fix, not a generic rejection. Then it goes live on your go-live date.</p>' +
+          '<div class="rw-actions">' +
+            '<button class="rw-btn rw-btn-primary" onclick="AIADRelease.downloadSheet()">Download submission sheet</button>' +
+            '<button class="rw-btn" onclick="AIADRelease.startAnother()">Start another release</button>' +
+          '</div>' +
+        '</div>';
+    }
+
+    function makeRef() {
+        var A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', s = '';
+        var c = window.crypto || window.msCrypto;
+        if (c && c.getRandomValues) {
+            var buf = new Uint32Array(6);
+            c.getRandomValues(buf);
+            for (var i = 0; i < 6; i++) s += A.charAt(buf[i] % A.length);
+        } else {
+            for (var j = 0; j < 6; j++) s += A.charAt(Math.floor(Math.random() * A.length));
+        }
+        return 'AIAD-' + s;
+    }
+
+    async function submit() {
+        if (RS.busy) return;
+        clearBanner();
+        var name = trim(el('rwDeclName').value);
+        var agreed = el('rwDeclAgree').checked;
+
+        var errs = releaseErrors(RS.release)
+            .concat(trackErrors())
+            .concat(rightsErrors());
+        if (!name) errs.push('Type your full legal name in the declaration.');
+        if (!agreed) errs.push('Tick “I agree” in the declaration.');
+
+        // Artwork dimensions: re-verify when this is a resumed draft and we never
+        // measured the file in this session.
+        if (RS.release.artwork_url && !RS.artworkDims) {
+            busy(true, 'Checking artwork…');
+            try {
+                RS.artworkDims = await dimsFromUrl(RS.release.artwork_url);
+            } catch (err) {
+                errs.push('Could not re-read the uploaded artwork to verify its size — re-upload it in step 2.');
+            }
+            busy(false);
+        }
+        if (RS.artworkDims) {
+            if (RS.artworkDims.w !== RS.artworkDims.h) {
+                errs.push('Artwork is ' + RS.artworkDims.w + ' × ' + RS.artworkDims.h + ' — it must be perfectly square.');
+            } else if (RS.artworkDims.w < ART_MIN_PX) {
+                errs.push('Artwork is ' + RS.artworkDims.w + ' × ' + RS.artworkDims.h + ' — the minimum is 3000 × 3000.');
+            }
+        }
+        if (errs.length) { bannerList('Submission blocked', errs); return; }
+
+        // Server-side split check — the authority, not the live total in the UI.
+        busy(true, 'Checking splits…');
+        var sp = await window.db.rpc('release_split_errors', { p_release_id: RS.releaseId });
+        busy(false);
+        if (dbFail('release_split_errors', 'rpc', sp.error)) return;
+        if (sp.data && sp.data.length) {
+            bannerList('Songwriter splits must total exactly 100%', sp.data.map(function (r) {
+                return '“' + (r.track_title || r.track_id) + '” totals ' + (Math.round(Number(r.total_share) * 100) / 100) + '%.';
+            }));
+            return;
+        }
+
+        var u = uid();
+        if (!u) { banner('You are signed out. Sign in and try again.'); return; }
+
+        busy(true, 'Submitting…');
+        var decl = {
+            release_id: RS.releaseId, user_id: u,
+            owns_master: RS.rights.owns_master,
+            master_authorization_url: RS.rights.master_authorization_url || null,
+            exclusive_conflict: RS.rights.exclusive_conflict,
+            conflict_consent_url: RS.rights.conflict_consent_url || null,
+            content_lawful_confirmed: !!RS.rights.content_lawful_confirmed,
+            split_sheet_url: RS.rights.split_sheet_url || null,
+            signed_legal_name: name,
+            agreement_version: AGREEMENT_VERSION,
+            signed_at: new Date().toISOString()
+        };
+        // release_id is UNIQUE, so a re-submit updates the existing declaration.
+        var existing = await window.db.from('release_rights_declarations')
+            .select('id').eq('release_id', RS.releaseId).limit(1);
+        if (dbFail('release_rights_declarations', 'select', existing.error)) { busy(false); return; }
+
+        var dres;
+        if (existing.data && existing.data.length) {
+            dres = await window.db.from('release_rights_declarations')
+                .update(decl).eq('id', existing.data[0].id).select();
+        } else {
+            dres = await window.db.from('release_rights_declarations').insert(decl).select();
+        }
+        if (dbFail('release_rights_declarations', existing.data && existing.data.length ? 'update' : 'insert', dres.error)) { busy(false); return; }
+
+        // submission_ref is UNIQUE — retry a few times on a collision.
+        var ref = null, last = null;
+        for (var attempt = 0; attempt < 5 && !ref; attempt++) {
+            var candidate = makeRef();
+            var ures = await window.db.from('releases').update({
+                status: 'submitted', submitted_at: new Date().toISOString(),
+                submission_ref: candidate, updated_at: new Date().toISOString()
+            }).eq('id', RS.releaseId).select();
+            if (!ures.error && ures.data && ures.data.length) {
+                ref = candidate;
+                RS.release = ures.data[0];
+                break;
+            }
+            last = ures.error;
+            if (ures.error && ures.error.code !== '23505') break;
+            if (!ures.error && (!ures.data || !ures.data.length)) break;
+        }
+        busy(false);
+        if (!ref) {
+            if (last) dbFail('releases', 'update', last);
+            else banner('Submission did not save — no row came back. Check that you are signed in as the owner.');
+            return;
+        }
+
+        RS.submissionRef = ref;
+        render();
+        if (window.showToast) showToast('Submitted — ' + ref);
+    }
+
+    function startAnother() {
+        RS.submissionRef = null;
+        RS.step = 1;
+        RS.releaseId = null;
+        RS.release = {};
+        RS.tracks = [];
+        RS.artworkDims = null;
+        RS.rights = { owns_master: null, exclusive_conflict: null, content_lawful_confirmed: false,
+                      master_authorization_url: null, conflict_consent_url: null, split_sheet_url: null,
+                      signed_legal_name: RS.rights.signed_legal_name || '' };
+        loadAll();
+    }
+
+    // ── Requirements modal ──────────────────────────────────────────────────
+    function showSpecs() {
+        var ov = el('rwSpecsOverlay');
+        if (ov) { ov.style.display = 'flex'; return; }
+        ov = document.createElement('div');
+        ov.id = 'rwSpecsOverlay';
+        ov.className = 'rw-overlay';
+        ov.innerHTML = '<div class="rw-modal">' +
+            '<div class="rw-modal-head"><h3>Delivery specifications</h3>' +
+            '<button class="rw-x" aria-label="Close" onclick="AIADRelease.hideSpecs()">×</button></div>' +
+            '<div class="rw-legal">' + mdToHtml(SPECS_MD) + '</div></div>';
+        ov.addEventListener('click', function (ev) { if (ev.target === ov) hideSpecs(); });
+        document.body.appendChild(ov);
+    }
+    function hideSpecs() {
+        var ov = el('rwSpecsOverlay');
+        if (ov) ov.style.display = 'none';
+    }
+
+    // ── Submission sheet download (teal pill FAB) ───────────────────────────
+    function buildSheet() {
+        var r = RS.release, R = RS.rights, L = [];
+        L.push('AIAD RELEASE SUBMISSION SHEET');
+        L.push('Generated ' + new Date().toISOString());
+        if (RS.submissionRef) L.push('Submission ref: ' + RS.submissionRef);
+        L.push('Status: ' + (r.status || 'draft'));
+        L.push('');
+        L.push('SECTION 1 — RELEASE');
+        L.push('Title: ' + (r.title || '') + (r.version_subtitle ? ' (' + r.version_subtitle + ')' : ''));
+        L.push('Type: ' + (r.release_type || ''));
+        L.push('Primary artist: ' + (r.primary_artist_name || ''));
+        L.push('Featured artists: ' + (arrToCsv(r.featured_artists) || '—'));
+        L.push('Label: ' + (r.label_name || ''));
+        L.push('UPC: ' + (r.upc || 'AIAD assigns'));
+        L.push('Original release date: ' + (toDateInput(r.original_release_date) || ''));
+        L.push('Go live: ' + (r.go_live_at || ''));
+        L.push('Early access: ' + (r.early_access_hours || 0) + 'h');
+        L.push('Genre: ' + (r.primary_genre || '') + (r.secondary_genre ? ' / ' + r.secondary_genre : ''));
+        L.push('Language: ' + (r.language || ''));
+        L.push('Parental advisory: ' + (r.parental_advisory || ''));
+        L.push('Territory: ' + (r.territory_mode === 'excluded' ? 'Worldwide except ' + arrToCsv(r.excluded_territories) : 'Worldwide'));
+        L.push('P line: ' + (r.p_line || ''));
+        L.push('C line: ' + (r.c_line || ''));
+        L.push('Artwork: ' + (r.artwork_url || '—') + (RS.artworkDims ? ' (' + RS.artworkDims.w + 'x' + RS.artworkDims.h + ')' : ''));
+        L.push('');
+        L.push('SECTION 2 — TRACKS');
+        RS.tracks.forEach(function (t, i) {
+            L.push('');
+            L.push((i + 1) + '. ' + (t.title || 'Untitled') + (t.version_subtitle ? ' (' + t.version_subtitle + ')' : ''));
+            L.push('   ISRC: ' + (t.isrc || 'AIAD assigns'));
+            L.push('   Explicit: ' + (t.explicit ? 'Yes' : 'No') + ' | Lyrics language: ' + (t.lyrics_language || ''));
+            L.push('   Preview start: ' + (t.preview_start_seconds == null ? 30 : t.preview_start_seconds) + 's');
+            L.push('   Duration: ' + (t.duration_seconds ? t.duration_seconds + 's' : 'unmeasured'));
+            L.push('   Master: ' + (t.storage_path ? t.bucket + '/' + t.storage_path : 'NOT UPLOADED'));
+            L.push('   Origin: ' + (t.origin || 'not declared') + (t.origin_locked ? ' (locked)' : ''));
+            L.push('   Sample: ' + (t.contains_sample ? 'Yes — clearance: ' + (t.sample_clearance_url || 'MISSING') : 'No'));
+            L.push('   Cover: ' + (t.is_cover ? 'Yes — ' + (t.cover_original_writers || 'writers not entered') : 'No'));
+            L.push('   Credits:');
+            t.contributors.forEach(function (c) {
+                if (!trim(c.legal_name)) return;
+                L.push('     - ' + c.role + ': ' + c.legal_name +
+                    (c.stage_name ? ' (' + c.stage_name + ')' : '') +
+                    (c.role === 'songwriter'
+                        ? ' | ' + (c.share_percent || '0') + '% | pub: ' + (c.publisher_name || '') +
+                          ' | PRO: ' + (c.pro || '') + ' | IPI: ' + (c.ipi_cae || '')
+                        : (c.instrument ? ' | ' + c.instrument : '')));
+            });
+            L.push('   Songwriter total: ' + (Math.round(shareTotal(t) * 100) / 100) + '%');
+        });
+        L.push('');
+        L.push('SECTION 3 — RIGHTS');
+        L.push('Owns masters: ' + (R.owns_master === true ? 'Yes' : (R.owns_master === false ? 'No' : 'not answered')));
+        L.push('Master authorization: ' + (R.master_authorization_url || '—'));
+        L.push('Exclusive conflict: ' + (R.exclusive_conflict === true ? 'Yes' : (R.exclusive_conflict === false ? 'No' : 'not answered')));
+        L.push('Conflict consent: ' + (R.conflict_consent_url || '—'));
+        L.push('Split sheet: ' + (R.split_sheet_url || '—'));
+        L.push('Content lawful confirmed: ' + (R.content_lawful_confirmed ? 'Yes' : 'No'));
+        L.push('Signed legal name: ' + (R.signed_legal_name || ''));
+        L.push('');
+        L.push('Agreement: AIAD Streaming License Agreement v' + AGREEMENT_VERSION);
+        return L.join('\n');
+    }
+
+    function downloadSheet() {
+        if (!RS.releaseId && !RS.tracks.length) {
+            banner('Nothing to download yet — fill in the release information first.');
+            return;
+        }
+        var name = 'AIAD-' + (RS.submissionRef || (RS.release.title || 'release').replace(/[^A-Za-z0-9]+/g, '-')) + '.txt';
+        var blob = new Blob([buildSheet()], { type: 'text/plain;charset=utf-8' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+        if (window.showToast) showToast('Submission sheet downloaded');
+    }
+
+    function buildFab() {
+        if (el('aiadReleaseDlBtn')) return;
+        var btn = document.createElement('button');
+        btn.id = 'aiadReleaseDlBtn';
+        btn.type = 'button';
+        btn.className = 'rw-fab';
+        btn.title = 'Download submission sheet';
+        btn.setAttribute('aria-label', 'Download submission sheet');
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Submission sheet</span>';
+        btn.addEventListener('click', downloadSheet);
+        document.body.appendChild(btn);
+    }
+    function syncFab() {
+        var btn = el('aiadReleaseDlBtn');
+        if (!btn) return;
+        var v = el('artistDistributeView');
+        btn.style.display = (v && v.classList.contains('active')) ? 'inline-flex' : 'none';
+    }
+
+    // ── Entry point ─────────────────────────────────────────────────────────
+    function goto(step) {
+        // Keep whatever is typed on the current step before swapping the DOM out.
+        if (RS.step === 1 && el('rwTitle')) collectRelease();
+        RS.step = step;
+        render();
+    }
+
+    function open() {
+        buildFab();
+        syncFab();
+        if (!RS.ready) loadAll();
+        else render();
+    }
+
+    window.AIADRelease = {
+        open: open, goto: goto, syncFab: syncFab,
+        acceptLicense: acceptLicense,
+        saveRelease: saveRelease, uploadArtwork: uploadArtwork, syncTerritory: syncTerritory,
+        addTrack: addTrack, removeTrack: removeTrack, setT: setT, setC: setC,
+        addContrib: addContrib, removeContrib: removeContrib,
+        uploadAudio: uploadAudio, saveTracks: saveTracks,
+        setRights: setRights, uploadRightsDoc: uploadRightsDoc, uploadTrackDoc: uploadTrackDoc,
+        saveRights: saveRights,
+        submit: submit, startAnother: startAnother, downloadSheet: downloadSheet,
+        openDoc: openDoc, showSpecs: showSpecs, hideSpecs: hideSpecs
+    };
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function () { buildFab(); syncFab(); });
+    } else { buildFab(); syncFab(); }
+    setInterval(syncFab, 1200);
 })();
 </script>
 </body>
