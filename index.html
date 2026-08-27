@@ -33828,7 +33828,7 @@ window.AIAD_PROMPTS = [
                     ? '<div class="rw-note">Cover — original writers: ' + esc(t.cover_original_writers || '— not yet entered, go back to step 3') + '</div>'
                     : '') +
                 '<div class="rw-field rw-span"><label class="rw-label">Origin declaration <span class="rw-req">●</span></label>' +
-                  '<div class="rw-hint">Only Human-created tracks are eligible for the AIAD Sync Library. Locked once saved. A false declaration is grounds for removal from both Streaming and Sync.</div>' +
+                  '<div class="rw-hint">Only Human-created tracks are eligible for the AIAD Sync Library. You can change this until you submit. Locked after submission. A false declaration is grounds for removal from both Streaming and Sync.</div>' +
                   originHtml +
                   (locked ? '<div class="rw-note">Locked — declared ' + esc(ORIGINS.filter(function (o) { return o.v === t.origin; }).map(function (o) { return o.l; })[0] || t.origin) + '.</div>' : '') +
                 '</div>' +
@@ -33966,13 +33966,12 @@ window.AIAD_PROMPTS = [
             var t = RS.tracks[i];
             if (!t.dbId) continue;
             var patch = { sample_clearance_url: t.sample_clearance_url || null };
-            // Intent: leave the declaration editable until submit, so only the value
-            // goes in here. NOTE the tracks trigger enforce_track_origin() currently
-            // overrides that — any UPDATE moving origin off 'unverified' sets
-            // origin_locked and origin_declared_at itself, so in practice the lock
-            // still lands here. The submit-time stamp below is the intended home and
-            // takes effect once the trigger is relaxed; the Step 3 helper text stays
-            // honest ("Locked once saved") until then.
+            // Value only. The declaration stays editable while the release is a
+            // draft; origin_declared_at and origin_locked are stamped in submit().
+            // enforce_track_origin() no longer locks on a plain origin change, so
+            // this write leaves the track revisable — but note the trigger DOES
+            // lock on INSERT with a non-'unverified' origin, which is why the
+            // insert payload in saveTracks() deliberately omits origin.
             if (t.origin && !t.origin_locked) patch.origin = t.origin;
             var res = await window.db.from('tracks').update(patch).eq('id', t.dbId).select();
             if (dbFail('tracks', 'update', res.error, { track: t.title })) { busy(false); return; }
