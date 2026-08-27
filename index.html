@@ -5,6 +5,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lora is the Plan PDF's heading face. Loaded on the page, not at print
+         time, so it is already cached when the print dialog renders. -->
+    <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#0A0A0A">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -3591,6 +3594,10 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                             <button class="primary-btn" onclick="openNewEventModal()" style="background:transparent;border:1px solid var(--border-default);color:var(--text-secondary);">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                                 Schedule Event
+                            </button>
+                            <button class="primary-btn" id="planExportBtn" onclick="AIADPlanExport.run()" title="Export your plan as a PDF" style="background:transparent;border:1px solid var(--border-default);color:var(--text-secondary);">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                Export
                             </button>
                         </div>
                     </div>
@@ -34584,6 +34591,423 @@ window.AIAD_PROMPTS = [
         document.addEventListener('DOMContentLoaded', function () { buildFab(); syncFab(); });
     } else { buildFab(); syncFab(); }
     setInterval(syncFab, 1200);
+})();
+</script>
+<style id="aiad-plan-print-css">
+/* ── Plan → PDF document ─────────────────────────────────────────────────────
+   Screen: the export node is never visible. Print: it is the only thing left. */
+#planPrintDoc { display: none; }
+
+@media print {
+  /* Hide the app, keep the document. Both are body children, so this is one rule. */
+  body > *:not(#planPrintDoc) { display: none !important; }
+  html, body {
+    display: block !important;
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  #planPrintDoc {
+    display: block !important;
+    position: static !important;
+    background: #fff;
+    color: #111;
+    /* Rules, bars and the mark are the document's structure, not decoration —
+       without this most browsers drop them and the page reads as loose text. */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  @page { size: letter; margin: 14mm; }
+}
+
+/* The document itself. Kept outside the print block so it can be proofed on
+   screen by unhiding #planPrintDoc, and so print inherits one set of rules. */
+#planPrintDoc .pd-page {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: #111;
+  background: #fff;
+  font-size: 9.5pt;
+  line-height: 1.5;
+  max-width: 7in;
+  margin: 0 auto;
+}
+#planPrintDoc h1, #planPrintDoc h2 {
+  font-family: 'Lora', Georgia, 'Times New Roman', serif;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+#planPrintDoc .pd-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+#planPrintDoc .pd-mark-svg { width: 118px; height: 28px; display: block; }
+#planPrintDoc .pd-head-right { display: flex; align-items: center; gap: 11px; text-align: right; }
+#planPrintDoc .pd-id { text-align: right; }
+#planPrintDoc .pd-name { font-size: 17pt; line-height: 1.15; }
+#planPrintDoc .pd-sub-line { font-size: 8pt; color: #666; margin-top: 2px; letter-spacing: 0.04em; text-transform: uppercase; }
+#planPrintDoc .pd-avatar {
+  width: 42px; height: 42px; border-radius: 50%;
+  object-fit: cover; flex-shrink: 0; border: 1px solid #ddd;
+}
+#planPrintDoc .pd-avatar-fallback {
+  display: flex; align-items: center; justify-content: center;
+  background: #111; color: #fff; font-weight: 600; font-size: 13pt;
+  font-family: 'Lora', Georgia, serif; border-color: #111;
+}
+
+#planPrintDoc .pd-rule { height: 2px; background: #111; margin: 12px 0 0; }
+#planPrintDoc .pd-doctitle {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin: 14px 0 18px;
+}
+#planPrintDoc .pd-doctitle h2 { font-size: 13pt; }
+#planPrintDoc .pd-doctitle span { font-size: 8pt; color: #666; }
+
+#planPrintDoc .pd-sec { margin-bottom: 20px; page-break-inside: avoid; break-inside: avoid; }
+#planPrintDoc .pd-h2 {
+  font-size: 8pt; text-transform: uppercase; letter-spacing: 0.14em;
+  font-family: 'Inter', sans-serif; font-weight: 700; color: #111;
+  padding-bottom: 5px; border-bottom: 1px solid #111; margin-bottom: 9px;
+}
+#planPrintDoc .pd-empty { color: #777; font-style: italic; margin: 0; }
+
+#planPrintDoc .pd-table { width: 100%; border-collapse: collapse; }
+#planPrintDoc .pd-table th {
+  text-align: left; font-size: 7pt; text-transform: uppercase; letter-spacing: 0.1em;
+  color: #777; font-weight: 600; padding: 0 8px 5px 0; border-bottom: 1px solid #ddd;
+}
+#planPrintDoc .pd-table td {
+  padding: 7px 8px 7px 0; border-bottom: 1px solid #eee; vertical-align: top;
+}
+#planPrintDoc .pd-table tr { page-break-inside: avoid; break-inside: avoid; }
+#planPrintDoc .pd-td-title { font-weight: 600; width: 46%; }
+#planPrintDoc .pd-sub { display: block; font-weight: 400; color: #666; font-size: 8pt; margin-top: 1px; }
+#planPrintDoc .pd-td-status { width: 17%; color: #333; }
+#planPrintDoc .pd-td-prog { width: 22%; white-space: nowrap; }
+#planPrintDoc .pd-td-date { width: 15%; white-space: nowrap; color: #333; }
+
+#planPrintDoc .pd-bar {
+  display: inline-block; width: 52px; height: 5px; border-radius: 3px;
+  background: #e4e4e4; vertical-align: middle; overflow: hidden;
+}
+#planPrintDoc .pd-bar-fill { display: block; height: 100%; background: #111; border-radius: 3px; }
+#planPrintDoc .pd-pct { font-size: 8pt; color: #333; margin-left: 7px; vertical-align: middle; }
+
+#planPrintDoc .pd-ms { list-style: none; margin: 0; padding: 0; columns: 2; column-gap: 26px; }
+#planPrintDoc .pd-ms li {
+  display: flex; justify-content: space-between; gap: 10px;
+  padding: 4px 0; border-bottom: 1px solid #f0f0f0;
+  break-inside: avoid; page-break-inside: avoid;
+}
+#planPrintDoc .pd-ms-name { font-weight: 500; }
+#planPrintDoc .pd-ms-date { color: #777; font-size: 8pt; white-space: nowrap; }
+
+#planPrintDoc .pd-foot {
+  display: flex; justify-content: space-between; gap: 16px;
+  margin-top: 26px; padding-top: 9px; border-top: 1px solid #ddd;
+  font-size: 7.5pt; color: #777;
+}
+
+</style>
+<script>
+/* ══════════════ PLAN → PDF ══════════════
+   Export the artist's Plan as a document they can send a manager or a label.
+   Deliberately no PDF library: a print stylesheet plus window.print() produces a
+   real PDF on desktop and on iOS Safari (Share → Print → pinch), keeps the text
+   selectable and searchable, and adds nothing to the bundle. jsPDF would add
+   ~300KB to a file that is already 2.5MB, to render type we can already render. */
+(function () {
+    'use strict';
+    if (window.AIADPlanExport) return;
+
+    var STATUS_LABEL = {
+        planning: 'Planning', 'in-progress': 'In progress',
+        completed: 'Completed', pending: 'Pending'
+    };
+    var TYPE_LABEL = {
+        release: 'Release', collab: 'Collaboration', community: 'Community',
+        content: 'Content', live: 'Live show', other: 'Other'
+    };
+
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+    var ACRONYMS = { ep: 'EP', lp: 'LP', pr: 'PR', tv: 'TV', ad: 'AD', dj: 'DJ', ar: 'A&R' };
+    function titleCase(s) {
+        return String(s || '').replace(/[-_]+/g, ' ').replace(/\S+/g, function (w) {
+            var k = w.toLowerCase();
+            return ACRONYMS[k] || (w.charAt(0).toUpperCase() + w.slice(1));
+        });
+    }
+    function statusLabel(s) { return STATUS_LABEL[s] || (s ? titleCase(s) : '—'); }
+    function typeLabel(t) { return TYPE_LABEL[t] || (t ? titleCase(t) : ''); }
+
+    /* Dates arrive as plain YYYY-MM-DD. Parsing that as-is gives UTC midnight, which
+       renders as the previous day west of Greenwich — pin it to local noon instead. */
+    function asDate(v) {
+        if (!v) return null;
+        var d = new Date(String(v).slice(0, 10) + 'T12:00:00');
+        return isNaN(d.getTime()) ? null : d;
+    }
+    function longDate(v) {
+        var d = asDate(v);
+        return d ? d.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+    }
+    function shortDate(v) {
+        var d = asDate(v);
+        return d ? d.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+    }
+
+    /* The same mark as the app header, re-cut for white paper: on screen it is a
+       white ring on black, here it is ink on white. Inline rather than the base64
+       copy in the header so it stays sharp at print resolution. */
+    var MARK =
+        '<svg class="pd-mark-svg" viewBox="0 0 420 100" xmlns="http://www.w3.org/2000/svg" fill="none" aria-label="AIAD">' +
+          '<circle cx="50" cy="50" r="44" stroke="#111111" stroke-width="2" fill="none"/>' +
+          '<circle cx="50" cy="50" r="34" fill="#111111"/>' +
+          '<rect x="18" y="41" width="64" height="18" rx="9" fill="#ffffff"/>' +
+          '<circle cx="36" cy="50" r="3.2" fill="#111111"/>' +
+          '<circle cx="64" cy="50" r="3.2" fill="#111111"/>' +
+          '<text x="112" y="70" font-family="Lora, Georgia, serif" font-weight="600" font-size="58" fill="#111111" letter-spacing="2">AIAD</text>' +
+        '</svg>';
+
+    function currentUid() {
+        if (typeof window.aiadResolvedUserId === 'function') {
+            var u = window.aiadResolvedUserId();
+            if (u) return u;
+        }
+        return (window.AppState && AppState.currentUser) ? AppState.currentUser.id : null;
+    }
+    function toast(m) { if (window.showToast) showToast(m); else console.warn('[AIAD plan]', m); }
+
+    /* Milestone copy lives in the Milestones markup and nowhere else, so read the
+       label straight off that row rather than keeping a second list in sync. The
+       rows are always in the DOM, just hidden when the view is inactive. */
+    function milestoneLabel(key) {
+        var row = document.getElementById('ms-' + key);
+        var t = row ? row.querySelector('.milestone-title') : null;
+        if (t && t.textContent.trim()) return t.textContent.trim();
+        return titleCase(key);
+    }
+
+    async function fetchAll(uid) {
+        var db = window.db;
+        var res = await Promise.all([
+            db.from('artist_profiles').select('artist_name,avatar_url,location,primary_genre').eq('user_id', uid).limit(1),
+            db.from('artist_projects').select('id,title,type,status,progress,target_date,description').eq('user_id', uid),
+            db.from('artist_schedule').select('id,title,type,event_date,notes').eq('user_id', uid),
+            db.from('artist_milestones').select('milestone_key,completed,completed_at').eq('user_id', uid)
+        ]);
+        var names = ['artist_profiles', 'artist_projects', 'artist_schedule', 'artist_milestones'];
+        var failed = [];
+        res.forEach(function (r, i) {
+            if (r.error) {
+                failed.push(names[i] + ': ' + r.error.message);
+                console.error('[AIAD plan export] ' + names[i], r.error.message, r.error.code);
+                if (window.reportDbError) window.reportDbError(names[i], 'select', r.error, { via: 'plan_export' });
+            }
+        });
+        // A silently half-empty document is worse than no document — the artist would
+        // send a label a plan with the schedule missing and never know.
+        if (failed.length) throw new Error(failed.join('; '));
+        return {
+            profile: (res[0].data && res[0].data[0]) || {},
+            projects: res[1].data || [],
+            events: res[2].data || [],
+            milestones: (res[3].data || []).filter(function (m) { return m.completed; })
+        };
+    }
+
+    function avatarBlock(profile, name) {
+        if (profile.avatar_url) {
+            return '<img class="pd-avatar" src="' + esc(profile.avatar_url) + '" alt="">';
+        }
+        var initials = String(name || 'A').trim().split(/\s+/).slice(0, 2)
+            .map(function (w) { return w.charAt(0).toUpperCase(); }).join('');
+        return '<div class="pd-avatar pd-avatar-fallback">' + esc(initials) + '</div>';
+    }
+
+    function projectsSection(projects) {
+        if (!projects.length) {
+            return '<section class="pd-sec"><h2 class="pd-h2">Projects</h2>' +
+                   '<p class="pd-empty">No projects recorded.</p></section>';
+        }
+        // Dated first, soonest at the top; undated fall to the end.
+        var rows = projects.slice().sort(function (a, b) {
+            if (!a.target_date && !b.target_date) return String(a.title || '').localeCompare(String(b.title || ''));
+            if (!a.target_date) return 1;
+            if (!b.target_date) return -1;
+            return String(a.target_date).localeCompare(String(b.target_date));
+        }).map(function (p) {
+            var pct = Math.max(0, Math.min(100, Number(p.progress) || 0));
+            return '<tr>' +
+                '<td class="pd-td-title">' + esc(p.title || 'Untitled') +
+                  (p.type ? '<span class="pd-sub">' + esc(titleCase(p.type)) + '</span>' : '') + '</td>' +
+                '<td class="pd-td-status">' + esc(statusLabel(p.status)) + '</td>' +
+                '<td class="pd-td-prog">' +
+                  '<span class="pd-bar"><span class="pd-bar-fill" style="width:' + pct + '%"></span></span>' +
+                  '<span class="pd-pct">' + pct + '%</span></td>' +
+                '<td class="pd-td-date">' + esc(shortDate(p.target_date)) + '</td>' +
+                '</tr>';
+        }).join('');
+        return '<section class="pd-sec"><h2 class="pd-h2">Projects</h2>' +
+            '<table class="pd-table"><thead><tr>' +
+              '<th>Project</th><th>Status</th><th>Progress</th><th>Target</th>' +
+            '</tr></thead><tbody>' + rows + '</tbody></table></section>';
+    }
+
+    function scheduleSection(events) {
+        if (!events.length) {
+            return '<section class="pd-sec"><h2 class="pd-h2">Schedule</h2>' +
+                   '<p class="pd-empty">Nothing scheduled.</p></section>';
+        }
+        var rows = events.slice().sort(function (a, b) {
+            return String(a.event_date || '').localeCompare(String(b.event_date || ''));
+        }).map(function (e) {
+            return '<tr>' +
+                '<td class="pd-td-date">' + esc(shortDate(e.event_date)) + '</td>' +
+                '<td class="pd-td-title">' + esc(e.title || 'Untitled') +
+                  (e.notes ? '<span class="pd-sub">' + esc(e.notes) + '</span>' : '') + '</td>' +
+                '<td class="pd-td-status">' + esc(typeLabel(e.type)) + '</td>' +
+                '</tr>';
+        }).join('');
+        return '<section class="pd-sec"><h2 class="pd-h2">Schedule</h2>' +
+            '<table class="pd-table"><thead><tr>' +
+              '<th>Date</th><th>Event</th><th>Type</th>' +
+            '</tr></thead><tbody>' + rows + '</tbody></table></section>';
+    }
+
+    function milestonesSection(milestones) {
+        if (!milestones.length) return '';
+        var items = milestones.slice().sort(function (a, b) {
+            return String(b.completed_at || '').localeCompare(String(a.completed_at || ''));
+        }).map(function (m) {
+            return '<li><span class="pd-ms-name">' + esc(milestoneLabel(m.milestone_key)) + '</span>' +
+                (m.completed_at ? '<span class="pd-ms-date">' + esc(shortDate(m.completed_at)) + '</span>' : '') +
+                '</li>';
+        }).join('');
+        return '<section class="pd-sec"><h2 class="pd-h2">Milestones reached</h2>' +
+            '<ul class="pd-ms">' + items + '</ul></section>';
+    }
+
+    function buildDoc(d) {
+        var name = d.profile.artist_name || (window.AppState && AppState.artistProfile && AppState.artistProfile.artistName) || 'Artist';
+        var sub = [d.profile.primary_genre, d.profile.location].filter(Boolean).map(titleCase).join(' · ');
+        return '<div class="pd-page">' +
+            '<header class="pd-head">' +
+              '<div class="pd-mark">' + MARK + '</div>' +
+              '<div class="pd-head-right">' +
+                avatarBlock(d.profile, name) +
+                '<div class="pd-id">' +
+                  '<h1 class="pd-name">' + esc(name) + '</h1>' +
+                  (sub ? '<div class="pd-sub-line">' + esc(sub) + '</div>' : '') +
+                '</div>' +
+              '</div>' +
+            '</header>' +
+            '<div class="pd-rule"></div>' +
+            '<div class="pd-doctitle"><h2>Plan</h2><span>' + esc(longDate(new Date().toISOString())) + '</span></div>' +
+            projectsSection(d.projects) +
+            scheduleSection(d.events) +
+            milestonesSection(d.milestones) +
+            '<footer class="pd-foot">' +
+              '<span>' + esc(name) + ' — plan as of ' + esc(longDate(new Date().toISOString())) + '</span>' +
+              '<span>aiad.studio</span>' +
+            '</footer>' +
+          '</div>';
+    }
+
+    /* Give the avatar a moment to decode — printing before it loads leaves a blank
+       square in the header. Capped so a dead image URL cannot hang the export. */
+    function imagesReady(root, ms) {
+        var imgs = [].slice.call(root.querySelectorAll('img'));
+        if (!imgs.length) return Promise.resolve();
+        return Promise.race([
+            Promise.all(imgs.map(function (img) {
+                if (img.complete) return Promise.resolve();
+                return new Promise(function (res) {
+                    img.addEventListener('load', res, { once: true });
+                    img.addEventListener('error', function () {
+                        console.warn('[AIAD plan export] avatar failed to load, printing without it');
+                        res();
+                    }, { once: true });
+                });
+            })),
+            new Promise(function (res) { setTimeout(res, ms || 2500); })
+        ]);
+    }
+
+    /* The document is display:none until printing, so nothing has ever painted a
+       Lora glyph and the browser has not fetched the file — the print preview would
+       quietly fall back to Georgia. Ask for the weights the document uses first. */
+    async function fontsReady() {
+        if (!document.fonts || !document.fonts.load) return;
+        try {
+            await Promise.all([
+                document.fonts.load('600 17pt Lora'),
+                document.fonts.load('400 10pt Lora')
+            ]);
+        } catch (e) {
+            console.warn('[AIAD plan export] Lora unavailable, headings fall back to Georgia:', e && e.message);
+        }
+    }
+
+    var busy = false;
+
+    async function exportPlan() {
+        if (busy) return;
+        var uid = currentUid();
+        if (!uid) { toast('Sign in to export your plan'); return; }
+        if (!window.db) { toast('Not connected — try again in a moment'); return; }
+
+        busy = true;
+        var btn = document.getElementById('planExportBtn');
+        var label = btn ? btn.innerHTML : null;
+        if (btn) { btn.disabled = true; btn.textContent = 'Preparing…'; }
+
+        // Claim and clear the node BEFORE fetching: if this run fails, the previous
+        // run's document must not linger in the DOM, where a manual Ctrl+P would
+        // print somebody's stale plan.
+        var host = document.getElementById('planPrintDoc');
+        if (!host) {
+            host = document.createElement('div');
+            host.id = 'planPrintDoc';
+            document.body.appendChild(host);   // direct child of body: the print rule hides its siblings
+        }
+        host.innerHTML = '';
+
+        try {
+            var data = await fetchAll(uid);
+            host.innerHTML = buildDoc(data);
+            await Promise.all([imagesReady(host, 2500), fontsReady()]);
+
+            var cleanup = function () {
+                window.removeEventListener('afterprint', cleanup);
+                if (host && host.parentNode) host.innerHTML = '';
+            };
+            window.addEventListener('afterprint', cleanup);
+            // Safari fires afterprint unreliably; sweep up regardless.
+            setTimeout(cleanup, 60000);
+
+            window.print();
+        } catch (err) {
+            console.error('[AIAD plan export]', err);
+            toast('Could not build your plan: ' + (err.message || 'unknown error'));
+            host.innerHTML = '';
+        } finally {
+            busy = false;
+            if (btn) { btn.disabled = false; if (label !== null) btn.innerHTML = label; }
+        }
+    }
+
+    window.AIADPlanExport = { run: exportPlan };
 })();
 </script>
 </body>
