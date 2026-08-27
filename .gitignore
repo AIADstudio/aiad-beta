@@ -1,3 +1,6 @@
 
 # Local Claude tooling
 .claude/
+
+# macOS
+.DS_Store

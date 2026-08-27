@@ -32758,10 +32758,12 @@ window.AIAD_PROMPTS = [
     // ── Config ──────────────────────────────────────────────────────────────
     var AGREEMENT_VERSION = '1.0';
     // Artwork must resolve to a plain URL for players and cards, so it goes in the
-    // public bucket. Masters and legal documents go in the private one — per
+    // public bucket. Masters and legal documents go to release-deliveries: private,
+    // 500MB cap, RLS scoped to the <uid>/ prefix with founder read for QC — per
     // delivery-specs.md the original file is never exposed at a public URL.
+    // The Sync Library has its own private bucket; this flow must never write there.
     var ART_BUCKET = 'artist-media';
-    var DOC_BUCKET = 'sync-masters';
+    var DOC_BUCKET = 'release-deliveries';
 
     var ART_MIN_PX = 3000;
     var ART_MAX_BYTES = 10 * 1024 * 1024;
@@ -33960,16 +33962,18 @@ window.AIAD_PROMPTS = [
             if (errs.length) { bannerList('Fix these before continuing', errs); return; }
         }
         busy(true, 'Saving declarations…');
-        var now = new Date().toISOString();
         for (var i = 0; i < RS.tracks.length; i++) {
             var t = RS.tracks[i];
             if (!t.dbId) continue;
             var patch = { sample_clearance_url: t.sample_clearance_url || null };
-            if (t.origin && !t.origin_locked) {
-                patch.origin = t.origin;
-                patch.origin_declared_at = now;
-                patch.origin_locked = true;
-            }
+            // Intent: leave the declaration editable until submit, so only the value
+            // goes in here. NOTE the tracks trigger enforce_track_origin() currently
+            // overrides that — any UPDATE moving origin off 'unverified' sets
+            // origin_locked and origin_declared_at itself, so in practice the lock
+            // still lands here. The submit-time stamp below is the intended home and
+            // takes effect once the trigger is relaxed; the Step 3 helper text stays
+            // honest ("Locked once saved") until then.
+            if (t.origin && !t.origin_locked) patch.origin = t.origin;
             var res = await window.db.from('tracks').update(patch).eq('id', t.dbId).select();
             if (dbFail('tracks', 'update', res.error, { track: t.title })) { busy(false); return; }
             if (res.data && res.data.length) {
@@ -34138,6 +34142,23 @@ window.AIAD_PROMPTS = [
             dres = await window.db.from('release_rights_declarations').insert(decl).select();
         }
         if (dbFail('release_rights_declarations', existing.data && existing.data.length ? 'update' : 'insert', dres.error)) { busy(false); return; }
+
+        // Origin declarations lock HERE, at submit — the artist can revise them for
+        // as long as the release is a draft. Done before the release is stamped
+        // submitted so a failure leaves the release editable rather than half-locked.
+        var lockedAt = new Date().toISOString();
+        for (var ti = 0; ti < RS.tracks.length; ti++) {
+            var tk = RS.tracks[ti];
+            if (!tk.dbId || tk.origin_locked) continue;
+            var lres = await window.db.from('tracks').update({
+                origin: tk.origin, origin_declared_at: lockedAt, origin_locked: true
+            }).eq('id', tk.dbId).select();
+            if (dbFail('tracks', 'update', lres.error, { track: tk.title, op: 'origin_lock' })) { busy(false); return; }
+            if (lres.data && lres.data.length) {
+                tk.origin_locked = !!lres.data[0].origin_locked;
+                tk.origin = lres.data[0].origin;
+            }
+        }
 
         // submission_ref is UNIQUE — retry a few times on a collision.
         var ref = null, last = null;
