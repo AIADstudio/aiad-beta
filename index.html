@@ -38,6 +38,10 @@
     ]}
     </script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Resumable (TUS) uploads for release masters. Pinned: a silent major bump
+         would change the upload path for 40-100MB files. Optional at runtime —
+         the wizard falls back to a single POST if this fails to load. -->
+    <script src="https://cdn.jsdelivr.net/npm/tus-js-client@4.3.1/dist/tus.min.js"></script>
 
     
 
@@ -32692,6 +32696,12 @@ window.AIAD_PROMPTS = [
 #artistDistributeView .rw-sharetotal.is-bad{background:rgba(239,68,68,0.11);color:#fca5a5;}
 #artistDistributeView .rw-audio-ok{font-size:0.8rem;color:#6ee7b7;padding:7px 0;}
 #artistDistributeView .rw-audio-none{font-size:0.8rem;color:var(--text-muted,rgba(255,255,255,0.4));padding:7px 0;}
+#artistDistributeView .rw-prog{margin:8px 0 4px;}
+#artistDistributeView .rw-prog-track{height:6px;border-radius:999px;background:rgba(255,255,255,0.08);overflow:hidden;}
+#artistDistributeView .rw-prog-fill{height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,var(--teal,#00B4D8),var(--magenta-dark,#E040FB));transition:width 180ms linear;}
+#artistDistributeView .rw-prog-label{font-size:0.73rem;color:var(--text-muted,rgba(255,255,255,0.4));margin-top:5px;font-variant-numeric:tabular-nums;}
+#artistDistributeView .rw-resume{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:8px 0;padding:9px 12px;border-radius:9px;background:rgba(245,158,11,0.09);border:1px solid rgba(245,158,11,0.3);}
+#artistDistributeView .rw-resume span{font-size:0.79rem;color:#fcd34d;}
 #artistDistributeView .rw-art{margin:10px 0;}
 #artistDistributeView .rw-art img{width:150px;height:150px;object-fit:cover;border-radius:10px;border:1px solid var(--border-default,rgba(255,255,255,0.08));display:block;}
 #artistDistributeView .rw-art-meta{font-size:0.73rem;color:var(--text-muted,rgba(255,255,255,0.4));margin-top:6px;}
@@ -32765,10 +32775,20 @@ window.AIAD_PROMPTS = [
     var ART_BUCKET = 'artist-media';
     var DOC_BUCKET = 'release-deliveries';
 
-    var ART_MIN_PX = 3000;
-    var ART_MAX_BYTES = 10 * 1024 * 1024;
+    // Every size ceiling in the wizard lives here and nowhere else — the UI strings
+    // below are generated from it, so the number is changed once. audioBytes is
+    // refreshed from the bucket's own file_size_limit on load where that is readable.
+    var LIMITS = {
+        audioBytes: 500 * 1024 * 1024,
+        artworkBytes: 10 * 1024 * 1024,
+        artMinPx: 3000,
+        // Supabase's resumable endpoint requires exactly 6MB chunks, which also makes
+        // 6MB the sensible point to stop bothering with a single POST.
+        tusChunk: 6 * 1024 * 1024,
+        source: 'config'
+    };
+    var ART_MIN_PX = LIMITS.artMinPx;
     var ART_OK_EXT = ['jpg', 'jpeg', 'png'];
-    var AUDIO_MAX_BYTES = 500 * 1024 * 1024;
     var AUDIO_OK_EXT = ['wav', 'flac'];
     var LOSSY_EXT = ['mp3', 'm4a', 'aac', 'ogg', 'oga', 'opus'];
     var LOSSY_MSG = 'Upload your master. Lossy files get transcoded twice and the artifacts compound.';
@@ -32817,6 +32837,12 @@ window.AIAD_PROMPTS = [
         return (window.AppState && AppState.currentUser) ? AppState.currentUser.id : null;
     }
     function trim(v) { return String(v == null ? '' : v).trim(); }
+    /* Human size. Trims a trailing .0 so the 500MB ceiling reads "500MB". */
+    function mb(bytes) {
+        var n = Number(bytes) || 0;
+        if (n < 1048576) return Math.max(1, Math.round(n / 1024)) + 'KB';
+        return (n / 1048576).toFixed(1).replace(/\.0$/, '') + 'MB';
+    }
     function csvToArr(v) {
         return trim(v).split(',').map(function (s) { return s.trim(); }).filter(Boolean);
     }
@@ -32921,7 +32947,7 @@ window.AIAD_PROMPTS = [
         var e = extOf(file.name);
         if (LOSSY_EXT.indexOf(e) !== -1) return LOSSY_MSG;
         if (AUDIO_OK_EXT.indexOf(e) === -1) return 'WAV or FLAC only. "' + file.name + '" is a .' + (e || '?') + ' file.';
-        if (file.size > AUDIO_MAX_BYTES) return 'Max 500MB per track — "' + file.name + '" is ' + (file.size / 1048576).toFixed(0) + 'MB.';
+        if (file.size > LIMITS.audioBytes) return 'Max ' + mb(LIMITS.audioBytes) + ' per track — "' + file.name + '" is ' + mb(file.size) + '.';
         return null;
     }
     /* Resolves { w, h } or rejects with a message. */
@@ -32999,6 +33025,114 @@ window.AIAD_PROMPTS = [
         }
         return bucket + '/' + path;
     }
+    /* The bucket's own file_size_limit is the real ceiling; LIMITS.audioBytes is a
+       mirror of it. storage.buckets has RLS on with no SELECT policy, so artists
+       normally cannot read it — that is not an error, we just keep the configured
+       value and say so in the console. */
+    async function refreshLimits() {
+        try {
+            if (!window.db || !window.db.storage || !window.db.storage.getBucket) return;
+            var res = await window.db.storage.getBucket(DOC_BUCKET);
+            if (res.error || !res.data) {
+                console.info('[AIAD release] bucket limit not readable (' +
+                    ((res.error && res.error.message) || 'no data') + ') — using configured ' + mb(LIMITS.audioBytes));
+                return;
+            }
+            var lim = Number(res.data.file_size_limit);
+            if (isFinite(lim) && lim > 0) {
+                LIMITS.audioBytes = lim;
+                LIMITS.source = 'bucket';
+                console.info('[AIAD release] audio ceiling from bucket: ' + mb(lim));
+            }
+        } catch (e) {
+            console.info('[AIAD release] bucket limit lookup failed: ' + e.message +
+                ' — using configured ' + mb(LIMITS.audioBytes));
+        }
+    }
+
+    function supaUrl() {
+        if (typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL) return SUPABASE_URL;
+        if (window.db && window.db.storage && window.db.storage.url) {
+            return String(window.db.storage.url).replace(/\/storage\/v1\/?$/, '');
+        }
+        return null;
+    }
+
+    /* Resumable upload against Supabase's TUS endpoint. Resolves the same
+       "<bucket>/<path>" reference upload() returns. onProgress gets
+       (bytesSent, bytesTotal, uploadUrl) — the url is what makes Resume possible. */
+    function tusUpload(bucket, path, file, onProgress, resumeUrl) {
+        return new Promise(function (resolve, reject) {
+            if (!window.tus || !window.tus.Upload) { reject(new Error('__NO_TUS__')); return; }
+            var base = supaUrl();
+            if (!base) { reject(new Error('Storage endpoint unavailable.')); return; }
+            window.db.auth.getSession().then(function (s) {
+                var token = s && s.data && s.data.session && s.data.session.access_token;
+                if (!token) { reject(new Error('You are signed out. Sign in and try again.')); return; }
+                var up = new window.tus.Upload(file, {
+                    endpoint: base + '/storage/v1/upload/resumable',
+                    uploadUrl: resumeUrl || undefined,
+                    retryDelays: [0, 1000, 3000, 6000, 12000],
+                    headers: { authorization: 'Bearer ' + token, 'x-upsert': 'true' },
+                    uploadDataDuringCreation: true,
+                    removeFingerprintOnSuccess: true,
+                    chunkSize: LIMITS.tusChunk,
+                    metadata: {
+                        bucketName: bucket,
+                        objectName: path,
+                        contentType: file.type || 'application/octet-stream',
+                        cacheControl: '3600'
+                    },
+                    onError: function (err) { reject(err); },
+                    onProgress: function (sent, total) {
+                        if (onProgress) onProgress(sent, total, up.url);
+                    },
+                    onSuccess: function () { resolve(bucket + '/' + path); }
+                });
+                if (resumeUrl) { up.start(); return; }
+                // A fingerprinted attempt from an earlier session can be picked up even
+                // after a reload, as long as the artist re-selects the same file.
+                up.findPreviousUploads().then(function (prev) {
+                    if (prev && prev.length) up.resumeFromPreviousUpload(prev[0]);
+                    up.start();
+                }, function (e) {
+                    console.warn('[AIAD release] findPreviousUploads failed, starting fresh:', e && e.message);
+                    up.start();
+                });
+            }, function (e) { reject(e); });
+        });
+    }
+
+    /* One generic "upload failed" message hides two very different situations, so
+       separate them: an over-limit file is terminal, a dropped connection is not. */
+    function classifyUploadError(err) {
+        var status = 0;
+        try {
+            if (err && err.originalResponse && typeof err.originalResponse.getStatus === 'function') {
+                status = err.originalResponse.getStatus();
+            }
+        } catch (e) {
+            console.warn('[AIAD release] could not read upload response status:', e && e.message);
+        }
+        if (!status && err) status = Number(err.statusCode || err.status || 0) || 0;
+        var msg = String((err && err.message) || '');
+        if (status === 413 || /payload too large|entity too large|maximum allowed size|exceeded.*size/i.test(msg)) {
+            // Never suggest compressing or converting — delivery-specs.md requires a
+            // lossless master, so "make it smaller" is not a fix the artist may apply.
+            return { kind: 'too_large', resumable: false,
+                     text: 'This file exceeds the current upload limit. Contact support.' };
+        }
+        if (status === 401 || status === 403 || /signed out|sign in|jwt|token/i.test(msg)) {
+            return { kind: 'auth', resumable: true, text: 'Your session expired during the upload — sign in again.' };
+        }
+        // Everything statusless lands here, so check the auth case above first:
+        // a rejected getSession() is not a dropped connection.
+        if (!status || /network|failed to fetch|load failed|connection|aborted|timeout|offline|chunk/i.test(msg)) {
+            return { kind: 'network', resumable: true, text: 'The connection dropped during the upload.' };
+        }
+        return { kind: 'other', resumable: true, text: msg || 'Upload failed.' };
+    }
+
     async function openDoc(ref) {
         if (!ref) return;
         if (/^https?:\/\//.test(ref)) { window.open(ref, '_blank', 'noopener'); return; }
@@ -33266,7 +33400,7 @@ window.AIAD_PROMPTS = [
           '</div>' +
           '<div class="rw-field rw-span">' +
             '<label class="rw-label">Release artwork <span class="rw-req">●</span></label>' +
-            '<div class="rw-hint">3000 × 3000 px minimum, perfectly square, JPG or PNG, max 10MB.</div>' +
+            '<div class="rw-hint">' + LIMITS.artMinPx + ' × ' + LIMITS.artMinPx + ' px minimum, perfectly square, JPG or PNG, max ' + mb(LIMITS.artworkBytes) + '.</div>' +
             art +
             '<input type="file" id="rwArtFile" accept="image/jpeg,image/png" class="rw-file" onchange="AIADRelease.uploadArtwork(this)">' +
           '</div>' +
@@ -33381,8 +33515,8 @@ window.AIAD_PROMPTS = [
 
         var e = extOf(file.name);
         if (ART_OK_EXT.indexOf(e) === -1) { banner('Artwork must be JPG or PNG.'); return; }
-        if (file.size > ART_MAX_BYTES) {
-            banner('Artwork is ' + (file.size / 1048576).toFixed(1) + 'MB — the limit is 10MB.');
+        if (file.size > LIMITS.artworkBytes) {
+            banner('Artwork is ' + mb(file.size) + ' — the limit is ' + mb(LIMITS.artworkBytes) + '.');
             return;
         }
 
@@ -33430,6 +33564,7 @@ window.AIAD_PROMPTS = [
             is_cover: false, cover_original_writers: '',
             origin: '', origin_locked: false,
             bucket: null, storage_path: null, duration_seconds: null, audioName: '',
+            uploading: false, progress: 0, resumeUrl: null, pendingFile: null, uploadPath: null,
             contributors: [
                 { localId: nextId(), dbId: null, role: 'songwriter', legal_name: '', stage_name: '', share_percent: '100', publisher_name: '', pro: '', ipi_cae: '', instrument: '' },
                 { localId: nextId(), dbId: null, role: 'producer', legal_name: '', stage_name: '', share_percent: '', publisher_name: '', pro: '', ipi_cae: '', instrument: '' }
@@ -33603,9 +33738,19 @@ window.AIAD_PROMPTS = [
           '</div>' +
           '<div class="rw-field rw-span">' +
             '<label class="rw-label">Master audio <span class="rw-req">●</span></label>' +
-            '<div class="rw-hint">WAV or FLAC only, max 500MB. Stored privately — never exposed at a public URL.</div>' +
+            '<div class="rw-hint">WAV or FLAC only, max ' + mb(LIMITS.audioBytes) + '. Stored privately — never exposed at a public URL.</div>' +
             audio +
-            '<input type="file" class="rw-file" accept=".wav,.flac,audio/wav,audio/x-wav,audio/flac" onchange="AIADRelease.uploadAudio(\'' + t.localId + '\',this)">' +
+            '<div class="rw-prog" id="rwProg-' + t.localId + '" style="display:' + (t.uploading ? 'block' : 'none') + '">' +
+              '<div class="rw-prog-track"><div class="rw-prog-fill" id="rwProgFill-' + t.localId + '" style="width:' + (t.progress || 0) + '%"></div></div>' +
+              '<div class="rw-prog-label" id="rwProgLabel-' + t.localId + '"></div>' +
+            '</div>' +
+            ((t.resumeUrl || t.pendingFile) && !t.storage_path && !t.uploading
+              ? '<div class="rw-resume"><span>Interrupted at ' + Math.round(t.progress || 0) + '%.</span>' +
+                '<button class="rw-btn rw-btn-sm" onclick="AIADRelease.resumeAudio(\'' + t.localId + '\')">Resume upload</button></div>'
+              : '') +
+            '<input type="file" class="rw-file" accept=".wav,.flac,audio/wav,audio/x-wav,audio/flac"' +
+              (t.uploading ? ' disabled' : '') +
+              ' onchange="AIADRelease.uploadAudio(\'' + t.localId + '\',this)">' +
           '</div>' +
           '<div class="rw-credits">' +
             '<h4 class="rw-h4">Track credits</h4>' +
@@ -33634,6 +33779,39 @@ window.AIAD_PROMPTS = [
         '</div>';
     }
 
+    function setProgress(tid, sent, total) {
+        var wrap = el('rwProg-' + tid);
+        if (!wrap) return;
+        wrap.style.display = 'block';
+        var pct = total ? Math.min(100, (sent / total) * 100) : 0;
+        var fill = el('rwProgFill-' + tid);
+        var lab = el('rwProgLabel-' + tid);
+        if (fill) fill.style.width = pct.toFixed(1) + '%';
+        if (lab) lab.textContent = mb(sent) + ' of ' + mb(total) + ' · ' + Math.round(pct) + '%';
+    }
+
+    /* Masters are 40-100MB. A single POST at that size restarts from zero on any
+       blip, so anything past one TUS chunk goes through the resumable endpoint.
+       Small files, and the case where tus-js-client did not load, take the plain
+       POST — legal documents always do, they are a few hundred KB. */
+    async function putAudio(t, file, path, resumeUrl) {
+        var big = file.size > LIMITS.tusChunk;
+        if (big && !(window.tus && window.tus.Upload)) {
+            console.warn('[AIAD release] tus-js-client unavailable — single POST for ' + mb(file.size));
+        }
+        if (!big || !(window.tus && window.tus.Upload)) {
+            setProgress(t.localId, 0, file.size);
+            var ref = await upload(DOC_BUCKET, path, file);
+            setProgress(t.localId, file.size, file.size);
+            return ref;
+        }
+        return await tusUpload(DOC_BUCKET, path, file, function (sent, total, url) {
+            if (url) t.resumeUrl = url;
+            t.progress = total ? (sent / total) * 100 : 0;
+            setProgress(t.localId, sent, total);
+        }, resumeUrl || null);
+    }
+
     async function uploadAudio(tid, input) {
         var file = input.files && input.files[0];
         if (!file) return;
@@ -33645,25 +33823,77 @@ window.AIAD_PROMPTS = [
         var bad = checkAudio(file);
         if (bad) { banner(bad); return; }
 
+        t.pendingFile = file;
+        t.resumeUrl = null;
+        t.uploadPath = null;
+        t.progress = 0;
+        await runAudioUpload(t, false);
+    }
+
+    async function resumeAudio(tid) {
+        var t = trackById(tid);
+        if (!t) return;
+        if (!t.pendingFile) {
+            banner('That file is no longer held in this tab — choose it again and the upload will pick up where it left off.');
+            return;
+        }
+        clearBanner();
+        await runAudioUpload(t, true);
+    }
+
+    async function runAudioUpload(t, isResume) {
+        if (RS.busy) return;
         var u = uid();
         if (!u) { banner('You are signed out. Sign in and try again.'); return; }
         if (!RS.releaseId) { banner('Save the release information first — step 2.'); return; }
+        var file = t.pendingFile;
+        if (!file) return;
 
-        busy(true, 'Uploading ' + file.name + '…');
-        var dur = await audioDuration(file);
+        // Reuse the path on resume, otherwise the server has nothing to append to.
+        if (!isResume || !t.uploadPath) {
+            t.uploadPath = u + '/releases/' + RS.releaseId + '/' + t.localId + '-' + Date.now() + '-' + safeName(file.name);
+        }
+        t.uploading = true;
+        render();
+        busy(true, (isResume ? 'Resuming ' : 'Uploading ') + file.name + '…');
+        setProgress(t.localId, isResume ? (file.size * (t.progress || 0) / 100) : 0, file.size);
+
+        var dur = t.duration_seconds || await audioDuration(file);
         try {
-            var path = u + '/releases/' + RS.releaseId + '/' + t.localId + '-' + Date.now() + '-' + safeName(file.name);
-            await upload(DOC_BUCKET, path, file);
+            await putAudio(t, file, t.uploadPath, isResume ? t.resumeUrl : null);
             t.bucket = DOC_BUCKET;
-            t.storage_path = path;
+            t.storage_path = t.uploadPath;
             t.duration_seconds = dur;
             t.audioName = file.name;
+            t.uploading = false;
+            t.progress = 100;
+            t.resumeUrl = null;
+            t.pendingFile = null;
             busy(false);
             render();
             banner('“' + file.name + '” uploaded.' + (dur ? '' : ' Duration could not be read from this file — QC will measure it.'), 'ok');
         } catch (err) {
+            t.uploading = false;
             busy(false);
-            banner('Audio upload failed: ' + err.message);
+            var c = classifyUploadError(err);
+            console.error('[AIAD release] audio upload failed [' + c.kind + ']:', (err && err.message) || err);
+            if (window.reportDbError) {
+                window.reportDbError('storage.' + DOC_BUCKET, 'upload',
+                    { message: (err && err.message) || String(err), code: c.kind },
+                    { path: t.uploadPath, bytes: file.size, resumed: !!isResume });
+            }
+            if (!c.resumable) {
+                t.resumeUrl = null;
+                t.pendingFile = null;
+                t.progress = 0;
+                render();
+                banner(c.text);
+                return;
+            }
+            render();
+            banner(c.text + (t.resumeUrl
+                ? ' Nothing was lost — press Resume to continue from ' + Math.round(t.progress || 0) + '%.'
+                : ' Press Resume to try again.'));
         }
     }
 
@@ -34332,6 +34562,7 @@ window.AIAD_PROMPTS = [
     function open() {
         buildFab();
         syncFab();
+        if (!LIMITS._checked) { LIMITS._checked = true; refreshLimits(); }
         if (!RS.ready) loadAll();
         else render();
     }
@@ -34342,7 +34573,7 @@ window.AIAD_PROMPTS = [
         saveRelease: saveRelease, uploadArtwork: uploadArtwork, syncTerritory: syncTerritory,
         addTrack: addTrack, removeTrack: removeTrack, setT: setT, setC: setC,
         addContrib: addContrib, removeContrib: removeContrib,
-        uploadAudio: uploadAudio, saveTracks: saveTracks,
+        uploadAudio: uploadAudio, resumeAudio: resumeAudio, saveTracks: saveTracks,
         setRights: setRights, uploadRightsDoc: uploadRightsDoc, uploadTrackDoc: uploadTrackDoc,
         saveRights: saveRights,
         submit: submit, startAnother: startAnother, downloadSheet: downloadSheet,
