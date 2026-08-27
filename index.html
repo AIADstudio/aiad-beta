@@ -32941,8 +32941,9 @@ window.AIAD_PROMPTS = [
     }
     function dimsFromUrl(url) {
         return new Promise(function (resolve, reject) {
+            // No crossOrigin: naturalWidth/Height need no CORS grant, and asking for
+            // one makes the load fail outright when the bucket does not echo the header.
             var img = new Image();
-            img.crossOrigin = 'anonymous';
             img.onload = function () { resolve({ w: img.naturalWidth, h: img.naturalHeight }); };
             img.onerror = function () { reject(new Error('Could not re-read the uploaded artwork.')); };
             img.src = url;
@@ -33504,7 +33505,7 @@ window.AIAD_PROMPTS = [
         if (!t) return;
         t.contributors.push({
             localId: nextId(), dbId: null, role: role || 'songwriter', legal_name: '', stage_name: '',
-            share_percent: role === 'songwriter' || !role ? '' : '', publisher_name: '', pro: '', ipi_cae: '', instrument: ''
+            share_percent: '', publisher_name: '', pro: '', ipi_cae: '', instrument: ''
         });
         renderContribs(tid);
     }
