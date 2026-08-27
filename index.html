@@ -32587,6 +32587,13 @@ window.AIAD_PROMPTS = [
 #artistDistributeView .rw-prog-label{font-size:0.73rem;color:var(--text-muted,rgba(255,255,255,0.4));margin-top:5px;font-variant-numeric:tabular-nums;}
 #artistDistributeView .rw-resume{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:8px 0;padding:9px 12px;border-radius:9px;background:rgba(245,158,11,0.09);border:1px solid rgba(245,158,11,0.3);}
 #artistDistributeView .rw-resume span{font-size:0.79rem;color:#fcd34d;}
+#artistDistributeView .rw-deriv{display:flex;flex-direction:column;gap:2px;margin:9px 0 4px;padding:9px 13px;border-radius:9px;font-size:0.79rem;line-height:1.5;border:1px solid transparent;}
+#artistDistributeView .rw-deriv strong{font-weight:600;}
+#artistDistributeView .rw-deriv span{font-size:0.74rem;opacity:0.85;}
+#artistDistributeView .rw-deriv.is-ready{background:rgba(16,185,129,0.09);border-color:rgba(16,185,129,0.3);color:#6ee7b7;}
+#artistDistributeView .rw-deriv.is-work{background:rgba(255,255,255,0.04);border-color:var(--border-default,rgba(255,255,255,0.09));color:var(--text-secondary,rgba(255,255,255,0.6));}
+#artistDistributeView .rw-deriv.is-qc{background:rgba(239,68,68,0.09);border-color:rgba(239,68,68,0.33);color:#fca5a5;}
+#artistDistributeView .rw-deriv.is-none{background:transparent;border-color:transparent;color:var(--text-muted,rgba(255,255,255,0.4));padding-left:0;}
 #artistDistributeView .rw-payout{border:1px solid var(--border-default,rgba(255,255,255,0.09));border-radius:11px;overflow:hidden;margin:12px 0 4px;}
 #artistDistributeView .rw-payout-row{display:flex;justify-content:space-between;gap:14px;align-items:center;padding:8px 13px;font-size:0.81rem;color:var(--text-secondary,rgba(255,255,255,0.62));border-bottom:1px solid var(--border-default,rgba(255,255,255,0.06));}
 #artistDistributeView .rw-payout-row:last-child{border-bottom:none;}
@@ -33140,6 +33147,10 @@ window.AIAD_PROMPTS = [
                 duration_seconds: r.duration_seconds || null,
                 purchasable: r.purchasable !== false,
                 min_price_cents: (r.min_price_cents == null ? null : Number(r.min_price_cents)),
+                derivatives_status: r.derivatives_status || 'pending',
+                true_peak_dbtp: (r.true_peak_dbtp == null ? null : Number(r.true_peak_dbtp)),
+                leading_silence_ms: (r.leading_silence_ms == null ? null : Number(r.leading_silence_ms)),
+                loudness_lufs: (r.loudness_lufs == null ? null : Number(r.loudness_lufs)),
                 audioName: r.storage_path ? docLabel(r.storage_path) : '',
                 contributors: []
             };
@@ -33484,6 +33495,7 @@ window.AIAD_PROMPTS = [
             bucket: null, storage_path: null, duration_seconds: null, audioName: '',
             uploading: false, progress: 0, resumeUrl: null, pendingFile: null, uploadPath: null,
             purchasable: true, min_price_cents: null,
+            derivatives_status: 'pending', true_peak_dbtp: null, leading_silence_ms: null, loudness_lufs: null,
             contributors: [
                 { localId: nextId(), dbId: null, role: 'songwriter', legal_name: '', stage_name: '', share_percent: '100', publisher_name: '', pro: '', ipi_cae: '', instrument: '' },
                 { localId: nextId(), dbId: null, role: 'producer', legal_name: '', stage_name: '', share_percent: '', publisher_name: '', pro: '', ipi_cae: '', instrument: '' }
@@ -33616,6 +33628,46 @@ window.AIAD_PROMPTS = [
         updateShareTotal(tid);
     }
 
+    /* Mirrors the media worker's QC gates. There is no qc_reason column, so the
+       reason is rebuilt from the measurements the worker stored — which means the
+       artist sees the actual figure rather than "QC failed". Keep these thresholds
+       identical to TRUE_PEAK_CEILING_DBTP / MAX_LEADING_SILENCE_MS in the worker. */
+    var TRUE_PEAK_CEILING_DBTP = -1.0;
+    var MAX_LEADING_SILENCE_MS = 5000;
+
+    function qcReason(t) {
+        if (t.true_peak_dbtp != null && t.true_peak_dbtp > TRUE_PEAK_CEILING_DBTP) {
+            return 'True peak ' + t.true_peak_dbtp.toFixed(1) + ' dBTP exceeds the ' +
+                   TRUE_PEAK_CEILING_DBTP.toFixed(1) + ' dBTP ceiling';
+        }
+        if (t.leading_silence_ms != null && t.leading_silence_ms > MAX_LEADING_SILENCE_MS) {
+            return (t.leading_silence_ms / 1000).toFixed(1) + 's of leading silence exceeds the 5.0s limit';
+        }
+        return 'Quality control did not pass';
+    }
+
+    function derivativeState(t) {
+        var s = t.derivatives_status || 'pending';
+        if (!t.storage_path) return { cls: 'is-none', label: 'No master uploaded', detail: '' };
+        if (s === 'ready') {
+            var d = [];
+            if (t.loudness_lufs != null) d.push(t.loudness_lufs.toFixed(1) + ' LUFS');
+            if (t.true_peak_dbtp != null) d.push(t.true_peak_dbtp.toFixed(1) + ' dBTP true peak');
+            return { cls: 'is-ready', label: 'Ready — FLAC and MP3 320 prepared', detail: d.join(' · ') };
+        }
+        if (s === 'qc_failed') return { cls: 'is-qc', label: 'QC failed', detail: qcReason(t) };
+        if (s === 'failed') return { cls: 'is-qc', label: 'Preparation failed', detail: 'AIAD has been notified — no action needed from you.' };
+        if (s === 'processing') return { cls: 'is-work', label: 'Processing', detail: 'Measuring and encoding your master.' };
+        return { cls: 'is-work', label: 'Queued', detail: 'Waiting to be processed.' };
+    }
+
+    function derivativeBadge(t) {
+        var d = derivativeState(t);
+        return '<div class="rw-deriv ' + d.cls + '">' +
+            '<strong>' + esc(d.label) + '</strong>' +
+            (d.detail ? '<span>' + esc(d.detail) + '</span>' : '') + '</div>';
+    }
+
     function trackCard(t, idx) {
         var b = 'AIADRelease.setT(\'' + t.localId + '\',';
         var audio = t.storage_path
@@ -33659,6 +33711,7 @@ window.AIAD_PROMPTS = [
             '<label class="rw-label">Master audio <span class="rw-req">●</span></label>' +
             '<div class="rw-hint">WAV or FLAC only, max ' + mb(LIMITS.audioBytes) + '. Stored privately — never exposed at a public URL.</div>' +
             audio +
+            (t.storage_path ? derivativeBadge(t) : '') +
             '<div class="rw-prog" id="rwProg-' + t.localId + '" style="display:' + (t.uploading ? 'block' : 'none') + '">' +
               '<div class="rw-prog-track"><div class="rw-prog-fill" id="rwProgFill-' + t.localId + '" style="width:' + (t.progress || 0) + '%"></div></div>' +
               '<div class="rw-prog-label" id="rwProgLabel-' + t.localId + '"></div>' +
@@ -34489,13 +34542,19 @@ window.AIAD_PROMPTS = [
         var tracks = RS.tracks.map(function (t, i) {
             var p = t.min_price_cents == null ? '' : (t.min_price_cents / 100).toFixed(2);
             var b = 'AIADRelease.setPrice(\'track\',\'' + t.localId + '\',';
+            var ready = t.derivatives_status === 'ready';
             return '<div class="rw-track">' +
                 '<div class="rw-track-head"><span class="rw-track-n">' + (i + 1) + '</span>' +
                 '<span class="rw-track-title">' + esc(t.title || 'Untitled track') + '</span></div>' +
+                (ready ? '' : derivativeBadge(t)) +
                 '<div class="rw-grid">' +
-                  field('Sell this track', false, '<select class="rw-input" onchange="' + b + '\'purchasable\',this.value===\'1\')">' +
-                    '<option value="1"' + (t.purchasable !== false ? ' selected' : '') + '>Yes</option>' +
-                    '<option value="0"' + (t.purchasable === false ? ' selected' : '') + '>No</option></select>') +
+                  field('Sell this track', false, '<select class="rw-input"' + (ready ? '' : ' disabled') +
+                    ' onchange="' + b + '\'purchasable\',this.value===\'1\')">' +
+                    (ready
+                      ? '<option value="1"' + (t.purchasable !== false ? ' selected' : '') + '>Yes</option>' +
+                        '<option value="0"' + (t.purchasable === false ? ' selected' : '') + '>No</option>'
+                      : '<option>Preparing files</option>') + '</select>',
+                    ready ? '' : 'Selling opens once the FLAC and MP3 are prepared.') +
                   field('Minimum price', true,
                     '<input class="rw-input" type="number" min="' + (MIN_TRACK_CENTS / 100) + '" step="0.01" value="' + esc(p) +
                     '" placeholder="' + (MIN_TRACK_CENTS / 100).toFixed(2) + '" oninput="' + b + '\'min_price_cents\',this.value)">',
