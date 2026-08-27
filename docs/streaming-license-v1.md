@@ -1,5 +1,5 @@
 # AIAD Streaming License Agreement
-AIAD Studio Inc. — Artist Content License for the AIAD Streaming Layer. Version 1.0.
+AIAD Studio Inc. — Artist Content License for the AIAD Streaming Layer. Version 1.1.
 
 ## Read this first
 This is not a record deal and not a distribution deal.
@@ -29,12 +29,14 @@ You retain 100% ownership of your masters and 100% of your publishing. This Agre
 4.2 AIAD does not pay a per-stream rate. Streams on AIAD are not a revenue event on their own — they are a benefit fans receive for supporting you.
 4.3 Plays, unique listeners, save/skip behavior, and geographic data are visible in your dashboard in near real time, and you can export all of it at any time, free.
 4.4 You are an independent contractor and responsible for your own taxes. AIAD will collect a W-9 or W-8BEN through its payment processor and issue tax forms where required by law.
+4.5 Purchases. Fans may buy your Recordings as permanent downloads at prices you set, at or above the platform minimum. AIAD retains 8% of the sale price. Payment processing fees and the statutory mechanical under 5.5 are deducted from the sale. The remainder is yours.
 
 ## 5. Publishing, mechanicals, and performance royalties
 5.1 You must identify, for every Recording, all songwriters, their splits totaling 100%, their publishers, and their PRO and IPI/CAE numbers. This is a condition of delivery.
-5.2 AIAD is responsible for licensing and paying the Composition side of the Streaming Layer — mechanical royalties via the MLC blanket license in the United States and equivalent bodies elsewhere, and public performance royalties via ASCAP, BMI, SESAC, GMR, and international societies. These are paid to publishers and PROs, not through AIAD. AIAD will report usage as those licenses require.
+5.2 AIAD is responsible for licensing and paying the Composition side of the Streaming Layer — mechanical royalties via the MLC blanket license in the United States and equivalent bodies elsewhere, and public performance royalties via ASCAP, BMI, SESAC, GMR, and international societies. AIAD will report usage as those licenses require. This obligation covers streaming only.
 5.3 You warrant that the songwriter and publisher information you supply is accurate and that the Compositions are correctly registered. If a Composition is unregistered or misregistered, royalties may be delayed or unmatched, and that is not AIAD's liability.
 5.4 If a Recording is a cover, you must say so at submission and identify the original writers. If it contains a sample or interpolation, you must upload written clearance before the Recording will go live.
+5.5 Permanent downloads. A permanent download is a separate covered activity under Section 115 and carries a fixed statutory royalty per copy sold, rather than a share of revenue. Where you offer a Recording for purchase, the statutory mechanical due on each copy is deducted from the sale proceeds before your share is calculated, and AIAD remits it to the MLC on your behalf. The amount is shown on every sale in your dashboard. Where you own the composition outright, this amount is paid to you.
 
 ## 6. Your warranties
 6.1 You own or exclusively control all rights in each Recording, including the rights of all featured artists, producers, musicians, and engineers, and you have the authority to grant this license.
