@@ -37,7 +37,7 @@
     {"@context":"https://schema.org","@graph":[
       {"@type":"Organization","@id":"https://www.aiad.studio/#org","name":"AIAD","url":"https://www.aiad.studio/","logo":"https://www.aiad.studio/icon-512.png","description":"AI platform for artists and creators: music and visual generation, TV/film sync licensing via real music supervisors, IP ownership, fan monetization, analytics, and collaboration."},
       {"@type":"WebSite","@id":"https://www.aiad.studio/#website","url":"https://www.aiad.studio/","name":"AIAD","publisher":{"@id":"https://www.aiad.studio/#org"}},
-      {"@type":"SoftwareApplication","name":"AIAD","operatingSystem":"Web","applicationCategory":"MultimediaApplication","url":"https://www.aiad.studio/","description":"AI platform where artists generate music and visuals, land TV/film syncs through real music supervisors, own 100% of their work, and monetize their fans.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD","description":"60-day free trial with 150 AI credits, then 30% off any tier for life."}}
+      {"@type":"SoftwareApplication","name":"AIAD","operatingSystem":"Web","applicationCategory":"MultimediaApplication","url":"https://www.aiad.studio/","description":"AI platform where artists generate music and visuals, land TV/film syncs through real music supervisors, own 100% of their work, and monetize their fans.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD","description":"7-day free trial. Plans from $29/month; annual billing charges 10 months for 12."}}
     ]}
     </script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -17304,12 +17304,20 @@ Only capture real, meaningful decisions — not questions or general discussion.
             AppState.userRole = role;
             try { localStorage.setItem('aiad_user_role', role); } catch (e) {}
 
-            // Founding collaborator: first 100 collaborators are free-forever + verified (pending approval).
+            // Founding collaborator: first 100 collaborators are free through the founding
+            // window (profiles.founding_free_until, 30 Sept 2026) + verified (pending
+            // approval). What they pay after that is not defined anywhere yet — the toast
+            // deliberately promises only the window, not a rate beyond it.
             if (role === 'collaborator') {
                 try {
                     const { data: spot } = await db.rpc('claim_founding_spot', { p_user: user.id, p_role: 'collaborator' });
                     if (typeof spot === 'number' && spot > 0) {
-                        showToast(`🎉 You're Founding Collaborator #${spot} — free for life!`, 4000);
+                        {
+                            // Term comes from the same constant the artist surfaces use,
+                            // so the two programmes cannot drift to different dates.
+                            const _until = (window.AIADPricing && AIADPricing.endLabel()) || '30 September';
+                            showToast(`🎉 You're Founding Collaborator #${spot} — free until ${_until}.`, 4000);
+                        }
                     } else {
                         showToast('Email verified — welcome to AIAD');
                     }
