@@ -1349,81 +1349,17 @@ html, body {
             <div class="content">
                 <div class="tier-page-header">
                     <h1 class="headline headline-sm">Choose your plan</h1>
-                    <p class="tier-page-subtext">You can change this anytime. Nothing is locked in.</p>
+                    <p class="tier-page-subtext">Switch or cancel anytime.</p>
                 </div>
 
-                <div class="subscription-tiers" role="radiogroup" aria-label="Select subscription tier">
-
-                    <div class="tier-card" role="radio" aria-checked="false" tabindex="0" data-value="starter" onclick="selectTier(this)">
-                        <div class="tier-card-content">
-                            <div class="tier-card-radio"><div class="tier-card-radio-inner"></div></div>
-                            <div class="tier-card-text">
-                                <div class="tier-card-header">
-                                    <span class="tier-card-name">Starter</span>
-                                    <span class="tier-card-badge">$29/mo</span>
-                                </div>
-                                <p class="tier-card-positioning">For artists just getting started.</p>
-                                <div class="tier-card-features">
-                                    <span class="tier-feature">✦ 10 music tracks/mo</span>
-                                    <span class="tier-feature">15 AI images/mo</span>
-                                    <span class="tier-feature">20 songwriting generations/mo</span>
-                                    <span class="tier-feature">30 AI Agent messages/mo</span>
-                                    <span class="tier-feature">5 merch designs/mo</span>
-                                    <span class="tier-feature">Fan Q&A included</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="tier-card tier-card-featured" role="radio" aria-checked="false" tabindex="-1" data-value="pro" onclick="selectTier(this)">
-                        <div class="tier-card-featured-badge">Most Popular</div>
-                        <div class="tier-card-content">
-                            <div class="tier-card-radio"><div class="tier-card-radio-inner"></div></div>
-                            <div class="tier-card-text">
-                                <div class="tier-card-header">
-                                    <span class="tier-card-name">Pro</span>
-                                    <span class="tier-card-badge">$59/mo</span>
-                                </div>
-                                <p class="tier-card-positioning">For artists actively building momentum.</p>
-                                <div class="tier-card-features">
-                                    <span class="tier-feature">✦ 40 music tracks/mo</span>
-                                    <span class="tier-feature">60 AI images/mo</span>
-                                    <span class="tier-feature">Unlimited songwriting</span>
-                                    <span class="tier-feature">100 AI Agent messages/mo</span>
-                                    <span class="tier-feature">20 merch designs/mo</span>
-                                    <span class="tier-feature">✦ Commercial rights included</span>
-                                    <span class="tier-feature">Collaborator network access</span>
-                                    <span class="tier-feature">Social analytics (Spotify, IG)</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="tier-card" role="radio" aria-checked="false" tabindex="-1" data-value="studio" onclick="selectTier(this)">
-                        <div class="tier-card-content">
-                            <div class="tier-card-radio"><div class="tier-card-radio-inner"></div></div>
-                            <div class="tier-card-text">
-                                <div class="tier-card-header">
-                                    <span class="tier-card-name">Studio</span>
-                                    <span class="tier-card-badge elite">$149/mo</span>
-                                </div>
-                                <p class="tier-card-positioning">For serious working artists.</p>
-                                <div class="tier-card-features">
-                                    <span class="tier-feature">✦ Unlimited music tracks</span>
-                                    <span class="tier-feature">Unlimited AI images</span>
-                                    <span class="tier-feature">Unlimited everything</span>
-                                    <span class="tier-feature">Priority generation queue</span>
-                                    <span class="tier-feature">All social platform analytics</span>
-                                    <span class="tier-feature">Sync library listing</span>
-                                    <span class="tier-feature">✦ Dedicated support</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <!-- Cards come from AIADPricing so the deck, the app and the database
+                     cannot drift apart again. This screen used to hardcode Studio at
+                     $149 and post data-value="pro", which the legacy alias map resolved
+                     to artist_premier — the wrong plan. -->
+                <div id="aiadPricingMountOnboarding"></div>
 
                 <div class="actions">
-                    <button class="btn-primary btn-artist" id="tierBtn" disabled onclick="handleTierContinue()"><span>Continue</span></button>
+                    <button class="btn-primary btn-artist" id="tierBtn" onclick="handleTierContinue()"><span>Continue</span></button>
                     <button class="btn-secondary" onclick="navigateTo('artist-goals')">← Back</button>
                 </div>
             </div>
@@ -10559,8 +10495,18 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     document.querySelector('.footer').style.display = '';
                 }
 
+                if (pageId === 'subscription-tier') {
+                    (async function () {
+                        if (!window.AIADPricing) return;
+                        await AIADPricing.loadState();
+                        AIADPricing.renderCards(document.getElementById('aiadPricingMountOnboarding'), {
+                            founding: AIADPricing.state().founding,
+                            onSelect: function (key) { AppState.selectedTier = key; }
+                        });
+                        AppState.selectedTier = AIADPricing.selected();   // Professional, pre-selected
+                    })();
+                }
                 if (pageId === 'agent') populateSuggestions();
-                if (pageId === 'subscription-tier') suggestTierBasedOnProfile();
                 if (pageId === 'fan-discovery') populateArtistCards();
                 if (pageId === 'fan-preferences') { setTimeout(() => populateFanGenreChips(), 50); }
                 if (pageId === 'fan-profile') { setTimeout(() => validateFanProfile(), 50); }
@@ -12155,36 +12101,13 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             handleArrowNavigation(event, card, cards, selectTier);
         }
 
-        function suggestTierBasedOnProfile() {
-            const level = AppState.artistProfile.artistLevel;
-            const tierMap = {
-                'starter': 'starter',
-                'pro': 'builder',
-                'established': 'established'
-            };
-            const suggestedTier = tierMap[level] || 'starter';
+        /* suggestTierBasedOnProfile() lived here. It wrote to #tierSuggestion,
+           #tierSuggestionText and #tierChangeLink — none of which have ever existed
+           in this file, so it threw a TypeError on every visit to the tier screen and
+           aborted the rest of navigateTo(). It also carried a fourth set of plan names
+           ("Builder"). The renderer pre-selects Professional and marks it most
+           popular, which is what the suggestion was reaching for. */
 
-            const suggestionEl = document.getElementById('tierSuggestion');
-            const suggestionText = document.getElementById('tierSuggestionText');
-            const tierNames = {
-                'starter': 'Starter',
-                'builder': 'Builder',
-                'pro': 'Pro',
-                'established': 'Established'
-            };
-            suggestionText.textContent = `Based on your profile, we suggest the ${tierNames[suggestedTier]} tier`;
-            suggestionEl.style.display = 'inline-flex';
-
-            const tierCards = document.querySelectorAll('.tier-card');
-            tierCards.forEach(card => {
-                card.classList.remove('suggested');
-                if (card.dataset.value === suggestedTier) {
-                    card.classList.add('suggested');
-                }
-            });
-
-            document.getElementById('tierChangeLink').style.display = 'block';
-        }
 
         function showAllTiers() {
 
@@ -26568,69 +26491,31 @@ function toggleAgeRange(btn) {
         // match public.ai_allowance_for_plan() (20/150/500/2000). These previously showed
         // $30/$80/$150 and "Unlimited", none of which was what the customer was charged
         // or granted.
-        const TIERS = [
-            { key:null,              name:'Free',        m:0,  credits:'20 credits/mo' },
-            { key:'artist_starter',  name:'Starter',     m:29, credits:'150 credits/mo' },
-            { key:'artist_pro',      name:'Pro',         m:59, credits:'500 credits/mo' },
-            { key:'artist_premier',  name:'Established', m:99, credits:'2,000 credits/mo' },
-        ];
         async function renderPricing() {
-            // Two separate mounts (artist settings + onboarding step 2). They used to
-            // share one id, so getElementById always resolved to the settings div and
-            // the onboarding "Choose your plan" step rendered into a hidden element.
+            // Delegates to AIADPricing so settings, onboarding and the deck cannot
+            // disagree. The body this replaced had two defects: it billed the founding
+            // discount as "30% off for life" (the term is 12 months), and it applied
+            // that discount to the yearly price as well as the monthly one, when yearly
+            // already carries two free months and is not discounted again.
             const mounts = document.querySelectorAll('.aiad-pricing-mount');
-            if (!mounts.length) return;
-            const s = sess();
-            let currentPlan = 'free', founding = false;
-            if (s) {
-                const rows = await rest(`profiles?select=plan,founding_member&id=eq.${s.user.id}`);
-                const row = Array.isArray(rows) ? rows[0] : null;
-                currentPlan = row?.plan || 'free';
-                founding = !!row?.founding_member;
-            }
-            // Founding spots left (artists).
-            let spotsLeft = null;
-            try { const c = await rpc('founding_member_count', { p_role:'artist' }); if (typeof c === 'number') spotsLeft = Math.max(0, 100 - c); } catch (e) {}
-
-            const iv = window.__aiadBillingInterval;
-            const banner = founding
-                ? `<div class="aiad-founding-banner">🎉 You're a <strong>Founding Member</strong> — 30% off for life is locked in.</div>`
-                : (spotsLeft !== null && spotsLeft > 0
-                    ? `<div class="aiad-founding-banner">🔥 <strong>Founding offer:</strong> first 100 subscribers get <strong>30% off for life</strong>. ${spotsLeft} spots left.</div>`
-                    : '');
-
-            const cards = TIERS.map(t => {
-                const isCurrent = (t.key || 'free') === currentPlan;
-                let priceHtml, sub;
-                if (t.m === 0) { priceHtml = 'Free'; sub = t.credits; }
-                else if (iv === 'year') {
-                    const yr = t.m * 10;
-                    const disc = founding ? Math.round(yr * 0.7) : yr;
-                    priceHtml = `$${disc}<span style="font-size:0.7rem;color:var(--text-hint);">/yr</span>`;
-                    sub = `${t.credits} · 2 months free${founding?' · founding 30% off':''}`;
-                } else {
-                    const disc = founding ? Math.round(t.m * 0.7) : t.m;
-                    priceHtml = `$${disc}<span style="font-size:0.7rem;color:var(--text-hint);">/mo</span>`;
-                    sub = founding ? `${t.credits} · founding 30% off` : t.credits;
-                }
-                let btn;
-                if (isCurrent) btn = `<button class="aiad-plan-btn ghost" disabled>Current</button>`;
-                else if (t.m === 0) btn = `<button class="aiad-plan-btn ghost" disabled>—</button>`;
-                else btn = `<button class="aiad-plan-btn" onclick="window.startCheckout('${t.key}','${iv}')">${currentPlan==='free'?'Choose':'Switch'}</button>`;
-                return `<div class="aiad-plan ${isCurrent?'current':''}"><div class="aiad-plan-name">${t.name}</div><div class="aiad-plan-price">${priceHtml}</div><div class="aiad-plan-sub">${sub}</div>${btn}</div>`;
-            }).join('');
-
-            const html = `
-                ${banner}
-                <div class="aiad-price-toggle">
-                    <button class="${iv==='month'?'active':''}" onclick="window.__setInterval('month')">Monthly</button>
-                    <button class="${iv==='year'?'active':''}" onclick="window.__setInterval('year')">Annual <span style="opacity:.8;">(2 mo free)</span></button>
-                </div>
-                <div class="aiad-plan-grid">${cards}</div>
-                <p style="font-size:0.72rem;color:var(--text-hint);margin-top:10px;">Manage or cancel anytime from <a href="#" onclick="window.openBillingPortal();return false;" style="color:var(--teal,#06b6d4);">the billing portal</a>.</p>`;
-            mounts.forEach((m) => { m.innerHTML = html; });
+            if (!mounts.length || !window.AIADPricing) return;
+            await AIADPricing.loadState();
+            const st = AIADPricing.state();
+            mounts.forEach(function (m) {
+                AIADPricing.renderCards(m, {
+                    founding: st.founding,
+                    currentPlan: st.plan,
+                    cta: function (p) { return st.plan === 'free' ? 'Choose ' + p.name : 'Switch to ' + p.name; },
+                    onCta: function (key, iv) {
+                        if (window.startCheckout) window.startCheckout(key, iv === 'year' ? 'year' : 'month');
+                    }
+                });
+                const foot = document.createElement('p');
+                foot.style.cssText = 'font-size:0.72rem;color:var(--text-hint);margin-top:12px;';
+                foot.innerHTML = 'Manage or cancel anytime from <a href="#" onclick="window.openBillingPortal();return false;" style="color:var(--teal-light);">billing</a>.';
+                m.appendChild(foot);
+            });
         }
-        window.__setInterval = (iv) => { window.__aiadBillingInterval = iv; renderPricing(); };
         window.aiadRenderPricing = renderPricing;
 
         // ── Founder verification console (only for founder@aiad.studio) ──
@@ -28409,7 +28294,7 @@ Be direct and concrete with real industry insight — never generic filler. When
                     <div id="aiadObStep2" style="display:none;background:#0d0f17;border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:20px;">
                         <div style="text-align:center;margin-bottom:14px;">
                             <div style="font-size:1.15rem;font-weight:700;color:#fff;">Choose your plan</div>
-                            <p style="color:#94a3b8;font-size:0.82rem;margin:4px 0 0;">Every paid plan starts with a <strong style="color:#fff;">30-day free trial</strong> — 150 credits to use however you like. No card needed to start.</p>
+                            <p style="color:#94a3b8;font-size:0.82rem;margin:4px 0 0;">Pick the plan you want<strong style="color:#fff;"></strong> — 150 credits to use however you like. No card needed to start.</p>
                         </div>
                         <div id="aiadPlanGrid"></div>
                         <div id="aiadPlanMsg" style="font-size:0.8rem;color:#f59e0b;margin-top:10px;min-height:16px;text-align:center;"></div>
@@ -28608,31 +28493,24 @@ Be direct and concrete with real industry insight — never generic filler. When
         };
         function aiadRenderPlanGrid(dash) {
             const host = document.getElementById('aiadPlanGrid');
-            if (!host) return;
-            const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
-                ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-            host.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;">'
-                + AIAD_PLANS.map((p) => {
-                    const paid = p.key !== 'free';
-                    return '<div style="position:relative;background:' + (p.popular ? 'rgba(236,72,153,0.09)' : 'rgba(255,255,255,0.02)')
-                        + ';border:1px solid ' + (p.popular ? 'rgba(236,72,153,0.55)' : 'rgba(255,255,255,0.10)')
-                        + ';border-radius:13px;padding:16px 14px;display:flex;flex-direction:column;">'
-                        + (p.popular ? '<div style="position:absolute;top:-9px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#ec4899,#d946ef);color:#fff;font-size:0.6rem;font-weight:800;letter-spacing:.08em;padding:3px 10px;border-radius:999px;white-space:nowrap;">MOST POPULAR</div>' : '')
-                        + '<div style="font-size:0.95rem;font-weight:700;color:#fff;">' + esc(p.name) + '</div>'
-                        + '<div style="font-size:1.5rem;font-weight:800;color:#fff;margin:2px 0 1px;">$' + p.price
-                        + (p.price ? '<span style="font-size:0.75rem;font-weight:500;color:#64748b;">/mo</span>' : '') + '</div>'
-                        + '<div style="font-size:0.8rem;color:#cbd5e1;">' + p.credits.toLocaleString() + ' credits/mo</div>'
-                        + '<div style="font-size:0.72rem;color:#64748b;margin-top:2px;flex:1;">' + esc(aiadPlanUsage(p.credits)) + '</div>'
-                        + '<button data-plan="' + p.key + '" style="width:100%;margin-top:12px;border:none;border-radius:9px;padding:10px;font-size:0.85rem;font-weight:700;cursor:pointer;'
-                        + (paid ? 'background:linear-gradient(135deg,#ec4899,#d946ef);color:#fff;' : 'background:transparent;color:#cbd5e1;border:1px solid rgba(255,255,255,0.18);')
-                        + '">' + (paid ? 'Start 30-day trial' : 'Continue on Free') + '</button>'
-                        + '</div>';
-                }).join('')
-                + '</div>'
-                + '<p style="font-size:0.7rem;color:#64748b;text-align:center;margin:12px 0 0;">During any trial you get 150 credits. A song costs 12 credits, an image 3.</p>';
-            host.querySelectorAll('button[data-plan]').forEach((b) => {
-                b.addEventListener('click', () => window.aiadChoosePlan(b.dataset.plan, dash, b));
-            });
+            if (!host || !window.AIADPricing) return;
+            // Same three cards as every other pricing surface. No Free card and no
+            // skip: a plan is required to finish onboarding.
+            AIADPricing.renderCards(host, { founding: AIADPricing.state().founding });
+            let cta = document.getElementById('aiadPlanCta');
+            if (!cta) {
+                cta = document.createElement('button');
+                cta.id = 'aiadPlanCta';
+                cta.type = 'button';
+                cta.style.cssText = 'width:100%;margin-top:14px;border:none;border-radius:10px;padding:12px;'
+                    + 'font-size:0.9rem;font-weight:700;cursor:pointer;font-family:inherit;'
+                    + 'background:linear-gradient(135deg,#ec4899,#d946ef);color:#fff;';
+                host.parentNode.insertBefore(cta, host.nextSibling);
+            }
+            cta.textContent = AIADPricing.windowOpen()
+                ? 'Continue — free until ' + AIADPricing.endLabel()
+                : 'Start free trial';
+            cta.onclick = function () { window.aiadChoosePlan(AIADPricing.selected(), dash, cta); };
         }
 
         // subscription_status is the durable record that the plan step was completed:
@@ -28644,29 +28522,26 @@ Be direct and concrete with real industry insight — never generic filler. When
             const orig = btn ? btn.textContent : '';
             if (btn) { btn.disabled = true; btn.textContent = 'Setting up…'; }
             try {
-                if (planKey === 'free') {
-                    // Never call start_artist_trial for Free — it rejects anything but the
-                    // three paid keys. Free is recorded directly instead.
-                    const s = sess();
-                    if (!s) throw new Error('Please sign in again');
-                    await rest('artist_profiles?on_conflict=user_id', {
-                        method: 'POST',
-                        headers: { 'Prefer': 'resolution=merge-duplicates' },
-                        body: JSON.stringify({ user_id: s.user.id, subscription_status: 'free', updated_at: new Date().toISOString() }),
-                    });
-                    window.aiadFinishOnboarding(dash, true);
-                    return;
-                }
+                // No Free branch any more: onboarding requires a plan, so the only
+                // path out of this step is a trial on one of the three paid keys.
                 const res = await rpc('start_artist_trial', { p_plan: planKey });
                 if (!res || res.error || !res.status) throw new Error((res && (res.message || res.error)) || 'Could not start your trial');
                 const ends = res.trial_ends_at ? new Date(res.trial_ends_at) : null;
-                const plan = AIAD_PLANS.find((p) => p.key === planKey);
+                // Trial length is whatever start_artist_trial actually granted — never a
+                // number typed in here, which would go stale the moment the RPC changes.
+                const days = ends ? Math.max(1, Math.round((ends - Date.now()) / 86400000)) : null;
+                const plan = (window.AIADPricing && AIADPricing.plan(planKey)) || null;
+                const founding = !!(window.AIADPricing && AIADPricing.state().founding && AIADPricing.windowOpen());
                 const copy = document.getElementById('aiadTrialCopy');
                 if (copy) {
-                    copy.innerHTML = '30 days of <strong style="color:#fff;">' + (plan ? plan.name : 'your plan')
-                        + '</strong> with 150 credits'
+                    copy.innerHTML = (days ? days + ' days' : 'Your trial') + ' of <strong style="color:#fff;">'
+                        + (plan ? plan.name : 'your plan') + '</strong>'
                         + (ends ? ', through <strong style="color:#fff;">' + ends.toLocaleDateString() + '</strong>' : '')
-                        + '. After that ' + (plan ? plan.name + ' is $' + plan.price + '/mo' : 'your plan renews') + '.';
+                        + '. ' + (plan
+                            ? (founding
+                                ? AIADPricing.foundingCopy(plan)
+                                : 'After that ' + plan.name + ' is $' + plan.monthly + '/mo.')
+                            : 'After that your plan renews.');
                 }
                 document.getElementById('aiadObStep2').style.display = 'none';
                 document.getElementById('aiadObStepCard').style.display = 'block';
@@ -35008,6 +34883,349 @@ window.AIAD_PROMPTS = [
     }
 
     window.AIADPlanExport = { run: exportPlan };
+})();
+</script>
+<style id="aiad-pricing-css">
+/* ── Plan cards + founding countdown ─────────────────────────────────────── */
+.pt-strip {
+  background: linear-gradient(90deg, rgba(217,70,239,0.14), rgba(6,182,212,0.14));
+  border: 1px solid rgba(217,70,239,0.32); border-radius: 11px;
+  padding: 11px 15px; margin-bottom: 16px;
+  font-size: 0.83rem; color: var(--text-secondary, rgba(255,255,255,0.7)); line-height: 1.5;
+}
+.pt-strip strong { color: var(--text-primary, #fff); }
+
+.pt-toggle { display: inline-flex; gap: 4px; padding: 4px; margin-bottom: 18px;
+  background: rgba(255,255,255,0.05); border-radius: 999px; }
+.pt-toggle button {
+  border: none; background: transparent; cursor: pointer; font-family: inherit;
+  color: var(--text-muted, rgba(255,255,255,0.5)); font-size: 0.82rem; font-weight: 600;
+  padding: 8px 18px; border-radius: 999px; transition: all 150ms ease;
+}
+.pt-toggle button.active { background: var(--text-primary, #fff); color: #0a0a0a; }
+.pt-toggle button span { font-weight: 500; opacity: 0.75; font-size: 0.74rem; }
+.pt-toggle button.active span { opacity: 0.6; }
+
+.pt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); gap: 13px; }
+.pt-card {
+  position: relative; cursor: pointer; display: flex; flex-direction: column;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border-default, rgba(255,255,255,0.09));
+  border-radius: 15px; padding: 20px 17px 17px; transition: all 160ms ease;
+}
+.pt-card:hover { border-color: var(--border-hover, rgba(255,255,255,0.2)); }
+.pt-card.is-popular { border-color: rgba(217,70,239,0.45); }
+.pt-card.is-selected {
+  border-color: var(--teal-light, #00D4FF);
+  background: rgba(0,212,255,0.06);
+  box-shadow: 0 0 0 1px var(--teal-light, #00D4FF);
+}
+.pt-badge {
+  position: absolute; top: -9px; left: 50%; transform: translateX(-50%);
+  background: linear-gradient(135deg, #ec4899, #d946ef); color: #fff;
+  font-size: 0.6rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase;
+  padding: 3px 11px; border-radius: 999px; white-space: nowrap;
+}
+.pt-radio {
+  position: absolute; top: 16px; right: 15px; width: 17px; height: 17px; border-radius: 50%;
+  border: 1.5px solid var(--border-hover, rgba(255,255,255,0.25));
+  display: flex; align-items: center; justify-content: center;
+}
+.pt-card.is-selected .pt-radio { border-color: var(--teal-light, #00D4FF); }
+.pt-radio span { width: 9px; height: 9px; border-radius: 50%; background: transparent; }
+.pt-card.is-selected .pt-radio span { background: var(--teal-light, #00D4FF); }
+
+.pt-name { font-size: 0.95rem; font-weight: 700; color: var(--text-primary, #fff); }
+.pt-price { margin: 5px 0 2px; color: var(--text-primary, #fff); }
+.pt-price strong { font-size: 1.65rem; font-weight: 800; letter-spacing: -0.02em; }
+.pt-was { color: var(--text-hint, rgba(255,255,255,0.35)); font-size: 0.95rem; font-weight: 500; margin-right: 2px; }
+.pt-unit { font-size: 0.74rem; font-weight: 500; color: var(--text-muted, rgba(255,255,255,0.45)); }
+.pt-note { font-size: 0.71rem; color: var(--text-muted, rgba(255,255,255,0.45)); line-height: 1.45; margin-top: 2px; }
+.pt-note-founding { color: #f0abfc; }
+.pt-credits { font-size: 0.8rem; color: var(--text-secondary, rgba(255,255,255,0.65)); margin-top: 7px; font-weight: 500; }
+.pt-pos { font-size: 0.75rem; color: var(--text-muted, rgba(255,255,255,0.45)); margin: 5px 0 10px; line-height: 1.45; }
+.pt-features { list-style: none; margin: 0; padding: 0; flex: 1; }
+.pt-features li {
+  font-size: 0.75rem; color: var(--text-secondary, rgba(255,255,255,0.6));
+  padding: 3px 0 3px 15px; position: relative; line-height: 1.45;
+}
+.pt-features li::before {
+  content: '✓'; position: absolute; left: 0; top: 3px;
+  color: var(--teal-light, #00D4FF); font-size: 0.7rem; font-weight: 700;
+}
+
+/* Dashboard countdown strip */
+.aiad-founding-strip {
+  display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap;
+  background: linear-gradient(90deg, rgba(217,70,239,0.13), rgba(6,182,212,0.13));
+  border: 1px solid rgba(217,70,239,0.3); border-radius: 12px;
+  padding: 11px 16px; margin: 0 0 18px;
+  font-size: 0.82rem; color: var(--text-secondary, rgba(255,255,255,0.65)); line-height: 1.45;
+}
+.aiad-founding-strip strong { color: var(--text-primary, #fff); font-weight: 700; }
+.aiad-founding-strip .fs-count {
+  margin-left: auto; font-weight: 700; color: var(--teal-light, #00D4FF);
+  white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.aiad-founding-strip.is-urgent { border-color: rgba(245,158,11,0.45); }
+.aiad-founding-strip.is-urgent .fs-count { color: #fcd34d; }
+@media (max-width: 768px) {
+  .aiad-founding-strip .fs-count { margin-left: 0; }
+}
+
+</style>
+<script>
+/* ══════════════ PRICING — one table, every surface ══════════════
+   Three names existed for the same three plans: the deck said Starter /
+   Professional / Studio, the database says artist_starter / artist_pro /
+   artist_premier, and the app variously said Pro, Established and Studio —
+   with the old onboarding screen pricing Studio at $149. The keys are
+   load-bearing (Stripe, profiles.plan, ai_allowance_for_plan) so they stay;
+   the displayed names follow the deck, and they are defined here only. */
+(function () {
+    'use strict';
+    if (window.AIADPricing) return;
+
+    var FOUNDING_END = Date.parse('2026-09-30T23:59:59Z');   // same instant as claim_founding_spot
+    var FOUNDING_SPOTS = 100;
+    var FOUNDING_DISCOUNT = 0.30;      // monthly only, 12 months, after the free window
+    var FOUNDING_DISCOUNT_MONTHS = 12;
+    var YEARLY_MONTHS_CHARGED = 10;    // pay 10, get 12
+
+    var PLANS = [
+        { key: 'artist_starter', name: 'Starter', monthly: 29, credits: 150,
+          positioning: 'For artists just getting started.',
+          features: ['150 credits a month', 'Music, images and songwriting', 'AIAD Agent', 'Fan Q&A'] },
+        { key: 'artist_pro', name: 'Professional', monthly: 59, credits: 500, popular: true,
+          positioning: 'For artists actively building momentum.',
+          features: ['500 credits a month', 'Commercial rights included', 'Collaborator network', 'Social analytics'] },
+        { key: 'artist_premier', name: 'Studio', monthly: 99, credits: 2000,
+          positioning: 'For serious working artists.',
+          features: ['2,000 credits a month', 'Priority generation queue', 'Sync library listing', 'Dedicated support'] }
+    ];
+
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+    function plan(key) { return PLANS.filter(function (p) { return p.key === key; })[0] || null; }
+
+    // ── Prices ──────────────────────────────────────────────────────────────
+    function yearly(p) { return p.monthly * YEARLY_MONTHS_CHARGED; }
+    function foundingMonthly(p) { return Math.round(p.monthly * (1 - FOUNDING_DISCOUNT)); }
+    /* The founding discount is on the MONTHLY rate only. Yearly already carries
+       two free months, so it is not discounted again for founding members. */
+    function priceFor(p, interval, founding) {
+        if (interval === 'year') return { amount: yearly(p), was: null, unit: '/yr' };
+        return founding
+            ? { amount: foundingMonthly(p), was: p.monthly, unit: '/mo' }
+            : { amount: p.monthly, was: null, unit: '/mo' };
+    }
+
+    // ── Founding window ─────────────────────────────────────────────────────
+    function windowOpen() { return Date.now() <= FOUNDING_END; }
+    function daysLeft() {
+        return Math.max(0, Math.ceil((FOUNDING_END - Date.now()) / 86400000));
+    }
+    function endLabel() {
+        return new Date(FOUNDING_END).toLocaleDateString('en-US', { day: 'numeric', month: 'long' });
+    }
+
+    var state = { founding: false, foundingNumber: null, spotsLeft: null, plan: 'free', loaded: false };
+
+    async function loadState() {
+        var db = window.db;
+        var uid = (typeof window.aiadResolvedUserId === 'function' && window.aiadResolvedUserId())
+               || (window.AppState && AppState.currentUser && AppState.currentUser.id) || null;
+        if (!db || !uid) { state.loaded = true; return state; }
+
+        var prof = await db.from('profiles')
+            .select('plan,founding_member,founding_number').eq('id', uid).limit(1);
+        if (prof.error) {
+            console.warn('[AIAD pricing] profile read failed:', prof.error.message);
+            if (window.reportDbError) window.reportDbError('profiles', 'select', prof.error, { via: 'pricing' });
+        } else if (prof.data && prof.data[0]) {
+            state.plan = prof.data[0].plan || 'free';
+            state.founding = !!prof.data[0].founding_member;
+            state.foundingNumber = prof.data[0].founding_number || null;
+        }
+
+        var cnt = await db.rpc('founding_member_count', { p_role: 'artist' });
+        if (cnt.error) {
+            // Not fatal — the cards still render, they just cannot show spots left.
+            console.warn('[AIAD pricing] founding_member_count failed:', cnt.error.message);
+        } else if (typeof cnt.data === 'number') {
+            state.spotsLeft = Math.max(0, FOUNDING_SPOTS - cnt.data);
+        }
+        state.loaded = true;
+        return state;
+    }
+
+    /* What a founding member actually pays, said plainly. Free first, then the
+       discounted rate, then full price — three phases, so say all three. */
+    function foundingCopy(p) {
+        return 'Free until ' + endLabel() + ', then $' + foundingMonthly(p) + '/mo for '
+             + FOUNDING_DISCOUNT_MONTHS + ' months, then $' + p.monthly + '/mo.';
+    }
+
+    // ── Cards ───────────────────────────────────────────────────────────────
+    var selected = 'artist_pro';       // Professional is the founding default
+    var interval = 'month';
+
+    function cardHtml(p, opts) {
+        var founding = opts.founding && windowOpen();
+        var pr = priceFor(p, interval, founding);
+        var isSel = selected === p.key;
+        return '<div class="pt-card' + (isSel ? ' is-selected' : '') + (p.popular ? ' is-popular' : '') + '"' +
+            ' role="radio" aria-checked="' + (isSel ? 'true' : 'false') + '" tabindex="' + (isSel ? '0' : '-1') + '"' +
+            ' data-plan="' + esc(p.key) + '">' +
+            (p.popular ? '<div class="pt-badge">Most popular</div>' : '') +
+            '<div class="pt-radio"><span></span></div>' +
+            '<div class="pt-name">' + esc(p.name) + '</div>' +
+            '<div class="pt-price">' +
+              (pr.was ? '<s class="pt-was">$' + pr.was + '</s> ' : '') +
+              '<strong>$' + pr.amount + '</strong><span class="pt-unit">' + pr.unit + '</span>' +
+            '</div>' +
+            (interval === 'year'
+              ? '<div class="pt-note">' + YEARLY_MONTHS_CHARGED + ' months, 12 months of access</div>'
+              : (founding ? '<div class="pt-note pt-note-founding">' + esc(foundingCopy(p)) + '</div>' : '')) +
+            '<div class="pt-credits">' + p.credits.toLocaleString() + ' credits a month</div>' +
+            '<p class="pt-pos">' + esc(p.positioning) + '</p>' +
+            '<ul class="pt-features">' +
+              p.features.map(function (f) { return '<li>' + esc(f) + '</li>'; }).join('') +
+            '</ul>' +
+            (opts.cta
+              ? '<button type="button" class="pt-cta" data-cta="' + esc(p.key) + '"' +
+                (opts.currentPlan === p.key ? ' disabled' : '') + '>' +
+                esc(opts.currentPlan === p.key ? 'Current plan' : opts.cta(p, interval, founding)) +
+                '</button>'
+              : '') +
+            '</div>';
+    }
+
+    function renderCards(host, opts) {
+        if (!host) return;
+        opts = opts || {};
+        var founding = opts.founding !== undefined ? opts.founding : state.founding;
+        var banner = '';
+        if (founding && windowOpen()) {
+            banner = '<div class="pt-strip">You\'re a Founding Artist' +
+                (state.foundingNumber ? ' — #' + state.foundingNumber : '') +
+                '. Free until ' + esc(endLabel()) + ', then 30% off for ' + FOUNDING_DISCOUNT_MONTHS +
+                ' months. <strong>' + daysLeft() + ' days left.</strong></div>';
+        } else if (windowOpen() && state.spotsLeft !== null && state.spotsLeft > 0) {
+            banner = '<div class="pt-strip">Founding programme closes ' + esc(endLabel()) +
+                ' — <strong>' + state.spotsLeft + ' of ' + FOUNDING_SPOTS + ' spots left.</strong></div>';
+        }
+        host.innerHTML = banner +
+            '<div class="pt-toggle" role="group" aria-label="Billing interval">' +
+              '<button type="button" data-iv="month" class="' + (interval === 'month' ? 'active' : '') + '">Monthly</button>' +
+              '<button type="button" data-iv="year" class="' + (interval === 'year' ? 'active' : '') + '">Yearly <span>2 months free</span></button>' +
+            '</div>' +
+            '<div class="pt-grid" role="radiogroup" aria-label="Choose your plan">' +
+              PLANS.map(function (p) { return cardHtml(p, { founding: founding }); }).join('') +
+            '</div>';
+
+        host.querySelectorAll('.pt-toggle button').forEach(function (b) {
+            b.addEventListener('click', function () { interval = b.dataset.iv; renderCards(host, opts); });
+        });
+        host.querySelectorAll('.pt-card').forEach(function (c) {
+            var pick = function () { selected = c.dataset.plan; renderCards(host, opts); if (opts.onSelect) opts.onSelect(selected, interval); };
+            c.addEventListener('click', pick);
+            c.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); }
+            });
+        });
+        if (opts.cta && opts.onCta) {
+            host.querySelectorAll('.pt-cta').forEach(function (b) {
+                b.addEventListener('click', function (ev) {
+                    ev.stopPropagation();          // the whole card is a radio
+                    opts.onCta(b.dataset.cta, interval);
+                });
+            });
+        }
+        if (opts.onSelect) opts.onSelect(selected, interval);
+    }
+
+    // ── Dashboard countdown ─────────────────────────────────────────────────
+    /* Founding artists were given a free window with no indication anywhere that
+       it ends. This is the only surface that tells them. */
+    function renderCountdown() {
+        var existing = document.getElementById('aiadFoundingStrip');
+        if (!windowOpen() || (!state.founding && !(state.spotsLeft > 0))) {
+            if (existing) existing.remove();
+            return;
+        }
+        var dash = document.getElementById('artistDashboard');
+        var main = dash ? dash.querySelector('.dash-main') : null;
+        if (!main) return;
+
+        var d = daysLeft();
+        var p = plan(state.plan) || plan('artist_pro');
+        var html, cls;
+        if (state.founding) {
+            cls = 'is-member' + (d <= 7 ? ' is-urgent' : '');
+            html = '<strong>Founding Artist' + (state.foundingNumber ? ' #' + state.foundingNumber : '') + '</strong>' +
+                '<span>Free until ' + esc(endLabel()) + ' — then $' + foundingMonthly(p) + '/mo for ' +
+                FOUNDING_DISCOUNT_MONTHS + ' months on ' + esc(p.name) + '.</span>' +
+                '<span class="fs-count">' + d + ' day' + (d === 1 ? '' : 's') + ' left</span>';
+        } else {
+            cls = '';
+            html = '<strong>Founding programme</strong>' +
+                '<span>Closes ' + esc(endLabel()) + '. Free until then, then 30% off for 12 months.</span>' +
+                '<span class="fs-count">' + state.spotsLeft + ' of ' + FOUNDING_SPOTS + ' spots left · ' + d + ' days</span>';
+        }
+        if (!existing) {
+            existing = document.createElement('div');
+            existing.id = 'aiadFoundingStrip';
+            main.insertBefore(existing, main.firstChild);
+        }
+        existing.className = 'aiad-founding-strip ' + cls;
+        existing.innerHTML = html;
+    }
+
+    async function init() {
+        try {
+            await loadState();
+            renderCountdown();
+        } catch (e) {
+            console.warn('[AIAD pricing] init failed:', e && e.message);
+        }
+    }
+
+    /* The artist dashboard is entered from two places (jumpToDashboard and
+       switchDashboard). Rather than patch both, watch for it the way the other
+       floating surfaces in this file do. State loads once; after that the strip
+       is cheap to re-render and the day count stays correct across a long session. */
+    var watching = false;
+    function watch() {
+        if (watching) return;
+        watching = true;
+        setInterval(function () {
+            var dash = document.getElementById('artistDashboard');
+            var live = dash && dash.classList.contains('active');
+            if (!live) return;
+            if (!state.loaded) { init(); return; }
+            renderCountdown();
+        }, 2000);
+    }
+
+    window.AIADPricing = {
+        PLANS: PLANS, plan: plan,
+        windowOpen: windowOpen, daysLeft: daysLeft, endLabel: endLabel,
+        yearly: yearly, foundingMonthly: foundingMonthly, priceFor: priceFor,
+        foundingCopy: foundingCopy,
+        state: function () { return state; },
+        loadState: loadState, renderCards: renderCards, renderCountdown: renderCountdown,
+        init: init,
+        selected: function () { return selected; },
+        interval: function () { return interval; },
+        setSelected: function (k) { if (plan(k)) selected = k; }
+    };
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watch);
+    else watch();
 })();
 </script>
 </body>
