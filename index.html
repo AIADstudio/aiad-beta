@@ -12137,6 +12137,36 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             localStorage.setItem('aiad_subscription_tier', AppState.selectedTier);
             localStorage.setItem('aiad_ai_credits', AppState.aiCreditsRemaining);
 
+            // This screen used to write nothing to the server. An artist finishing here
+            // arrived with no plan and no trial, and the onboarding gate below then made
+            // them choose all over again — the picked tier was simply discarded. Persist
+            // it, so the gate sees subscription_status='trialing' and lets them through.
+            const ARTIST_PLAN_KEYS = ['artist_starter', 'artist_pro', 'artist_premier'];
+            if (ARTIST_PLAN_KEYS.indexOf(AppState.selectedTier) !== -1) {
+                let signedIn = false;
+                try {
+                    const sres = await window.db.auth.getSession();
+                    signedIn = !!(sres && sres.data && sres.data.session);
+                } catch (e) {
+                    console.warn('[Subscription] session lookup failed:', e && e.message);
+                }
+                if (signedIn) {
+                    const tres = await window.db.rpc('start_artist_trial', { p_plan: AppState.selectedTier });
+                    if (tres.error) {
+                        console.error('[Subscription] start_artist_trial:', tres.error.message, tres.error.code);
+                        if (window.reportDbError) window.reportDbError('start_artist_trial', 'rpc', tres.error, { plan: AppState.selectedTier });
+                        showToast('Could not start your plan: ' + tres.error.message);
+                        return;   // never route on to a dashboard having saved nothing
+                    }
+                    try { localStorage.removeItem('aiad_pending_plan'); } catch (e) {}
+                } else {
+                    // Reached before sign-in on some industry paths, where the RPC cannot
+                    // run. Carry the choice forward so onboarding preselects it rather
+                    // than asking a second time.
+                    try { localStorage.setItem('aiad_pending_plan', AppState.selectedTier); } catch (e) {}
+                }
+            }
+
             if (AppState.userIndustry) {
                 localStorage.setItem('aiad_user_industry', AppState.userIndustry);
             }
@@ -28457,23 +28487,9 @@ Be direct and concrete with real industry insight — never generic filler. When
         // Credit costs are real, from ai_cost_for(): a song costs 12 credits and a
         // standard image 3 (a pro image is 6). The per-tier counts below are derived
         // from the allowance, not guessed, so they hold up if someone checks.
-        const AIAD_SONG_COST  = 12;
-        const AIAD_IMAGE_COST = 3;
-        const AIAD_PLANS = [
-            { key: 'free',            name: 'Free',        price: 0,  credits: 20 },
-            { key: 'artist_starter',  name: 'Starter',     price: 29, credits: 150 },
-            { key: 'artist_pro',      name: 'Pro',         price: 59, credits: 500, popular: true },
-            { key: 'artist_premier',  name: 'Established', price: 99, credits: 2000 },
-        ];
-        function aiadPlanUsage(credits) {
-            const n = (x, word) => x + ' ' + word + (x === 1 ? '' : 's');
-            // Rounded down to a round number above 100 rather than special-casing one
-            // value: it always understates the real allowance, so the claim stays true,
-            // and 2000/3 reads as 660 instead of 666.
-            const round = (x) => (x >= 100 ? Math.floor(x / 10) * 10 : x);
-            return 'up to ' + n(round(Math.floor(credits / AIAD_SONG_COST)), 'song') + ' or '
-                 + n(round(Math.floor(credits / AIAD_IMAGE_COST)), 'image') + ' a month';
-        }
+        /* AIAD_PLANS, aiadPlanUsage and their two credit-cost constants lived here —
+           the last duplicate plan table, still listing a Free tier and calling
+           artist_premier "Established". Every surface reads AIADPricing.PLANS now. */
         window.aiadShowObPricing = function (dash) {
             const stats = document.getElementById('aiadObStepStats'); if (stats) stats.style.display = 'none';
             const step1 = document.getElementById('aiadObStep1'); if (step1) step1.style.display = 'none';
@@ -28496,6 +28512,9 @@ Be direct and concrete with real industry insight — never generic filler. When
             if (!host || !window.AIADPricing) return;
             // Same three cards as every other pricing surface. No Free card and no
             // skip: a plan is required to finish onboarding.
+            let pending = null;
+            try { pending = localStorage.getItem('aiad_pending_plan'); } catch (e) {}
+            if (pending && AIADPricing.plan(pending)) AIADPricing.setSelected(pending);
             AIADPricing.renderCards(host, { founding: AIADPricing.state().founding });
             let cta = document.getElementById('aiadPlanCta');
             if (!cta) {
@@ -28512,10 +28531,6 @@ Be direct and concrete with real industry insight — never generic filler. When
                 : 'Start free trial';
             cta.onclick = function () { window.aiadChoosePlan(AIADPricing.selected(), dash, cta); };
         }
-
-        // subscription_status is the durable record that the plan step was completed:
-        // 'none' (the column default) means it wasn't. start_artist_trial sets 'trialing';
-        // choosing Free writes 'free' here so a reload doesn't re-gate them.
         window.aiadChoosePlan = async function (planKey, dash, btn) {
             const msg = document.getElementById('aiadPlanMsg');
             if (msg) msg.textContent = '';
@@ -28525,6 +28540,7 @@ Be direct and concrete with real industry insight — never generic filler. When
                 // No Free branch any more: onboarding requires a plan, so the only
                 // path out of this step is a trial on one of the three paid keys.
                 const res = await rpc('start_artist_trial', { p_plan: planKey });
+                try { localStorage.removeItem('aiad_pending_plan'); } catch (e) {}
                 if (!res || res.error || !res.status) throw new Error((res && (res.message || res.error)) || 'Could not start your trial');
                 const ends = res.trial_ends_at ? new Date(res.trial_ends_at) : null;
                 // Trial length is whatever start_artist_trial actually granted — never a
