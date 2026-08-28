@@ -13111,7 +13111,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         const YOUTUBE_SCOPES = 'https://www.googleapis.com/auth/youtube.readonly';
 
         function connectYouTube() {
-            const state = 'youtube_' + Math.random().toString(36).substring(2);
+            const state = oauthState('youtube_');
             localStorage.setItem('youtube_oauth_state', state);
             const params = new URLSearchParams({
                 client_id: YOUTUBE_CLIENT_ID,
@@ -13248,8 +13248,15 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             btn.disabled = false; btn.textContent = orig;
         };
 
+        // The whole job of the OAuth state value is to be unguessable — an attacker
+        // who can predict it can complete a link in someone else's browser.
+        // Math.random() is not a CSPRNG and was giving about 11 characters of it.
+        function oauthState(prefix) {
+            return (prefix || '') + crypto.randomUUID().replace(/-/g, '');
+        }
+
         function connectSpotify() {
-            const state = Math.random().toString(36).substring(2);
+            const state = oauthState();
             localStorage.setItem('spotify_oauth_state', state);
             const params = new URLSearchParams({
                 client_id: SPOTIFY_CLIENT_ID,
