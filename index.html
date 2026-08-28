@@ -17513,11 +17513,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
             const prompt = document.getElementById('merchAIPrompt').value.trim();
             if (!prompt) { showToast('Describe your design first'); return; }
 
-            if (!await checkAndConsumeAICredits('merchDesign')) {
-                showAICreditUpsell();
-                return;
-            }
-
+            // Credits are charged by creative-studio itself, from the JWT it
+            // verifies. Charging here as well would bill twice.
             const btn = document.getElementById('merchGenerateBtnText');
             const btnEl = btn.closest('button');
             btn.textContent = 'Generating design...';
@@ -18657,12 +18654,19 @@ Only capture real, meaningful decisions — not questions or general discussion.
             selectedAssetType = type;
         }
 
+        // Sends the signed-in user's access token, NOT the anon key. creative-studio
+        // derives the user from this token and charges the credit itself, so the anon
+        // key would now come back 401 — and rightly: it identifies nobody.
         async function callCreativeStudio(tool, prompt, extra = {}) {
+            const sess = (typeof window.__aiadSession === 'function') ? window.__aiadSession() : null;
+            if (!sess || !sess.access_token) {
+                throw new Error('Sign in to use the Creative Studio.');
+            }
             const response = await fetch('https://uapiytquwuhtewqieegx.supabase.co/functions/v1/creative-studio', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                    'Authorization': `Bearer ${sess.access_token}`,
                 },
                 body: JSON.stringify({
                     tool,
@@ -18672,12 +18676,27 @@ Only capture real, meaningful decisions — not questions or general discussion.
                     ...extra
                 })
             });
-            if (!response.ok) {
-                const txt = await response.text();
-                console.error('[AIAD] creative-studio error:', response.status, txt);
-                throw new Error('Generation failed: ' + response.status);
+
+            let data = null;
+            try { data = await response.json(); } catch (e) { data = null; }
+
+            if (response.status === 402) {
+                // Out of credits. The server charged nothing, so there is nothing to
+                // undo — just tell the artist and offer the top-up.
+                if (typeof showAICreditUpsell === 'function') showAICreditUpsell();
+                const err = new Error('You are out of credits.');
+                err.insufficientCredits = true;
+                throw err;
             }
-            return await response.json();
+            if (!response.ok) {
+                console.error('[AIAD] creative-studio error:', response.status, data);
+                throw new Error((data && data.error) || ('Generation failed: ' + response.status));
+            }
+            // The server is the only thing that knows the real balance now.
+            if (data && typeof data.remaining === 'number' && typeof updateCreditsDisplay === 'function') {
+                updateCreditsDisplay(data.remaining);
+            }
+            return data;
         }
 
         // ── Studio History (localStorage) ────────────────────────────────────
@@ -19115,11 +19134,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
             const prompt = document.getElementById('songwritingInput').value.trim();
             if (!prompt) { showToast('Add a prompt first'); return; }
 
-            if (!await checkAndConsumeAICredits('songwriting')) {
-                showAICreditUpsell();
-                return;
-            }
-
+            // Credits are charged by creative-studio itself, from the JWT it
+            // verifies. Charging here as well would bill twice.
             const genre = document.getElementById('songGenre').value;
             const mood = document.getElementById('songMood').value;
             const perspective = document.getElementById('songPerspective').value;
@@ -19230,11 +19246,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
             const prompt = document.getElementById('mixmediaInput').value.trim();
             if (!prompt) { showToast('Describe what you want first'); return; }
 
-            if (!await checkAndConsumeAICredits('mixMedia')) {
-                showAICreditUpsell();
-                return;
-            }
-
+            // Credits are charged by creative-studio itself, from the JWT it
+            // verifies. Charging here as well would bill twice.
             const btn = document.getElementById('mixmediaBtnText');
             const btnEl = btn?.closest('button');
             if (btn) btn.textContent = 'Generating artwork...';
