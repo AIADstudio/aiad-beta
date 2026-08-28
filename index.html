@@ -26859,10 +26859,17 @@ Be direct and concrete with real industry insight — never generic filler. When
         function _fashProfile() { try { return JSON.parse(localStorage.getItem('aiad_fashion_profile') || '{}'); } catch (e) { return {}; } }
         function fashBrand() { const p = _fashProfile(); return (window.AppState && AppState.artistProfile && AppState.artistProfile.brandName) || p.brandName || p.name || 'your label'; }
         function fashFocus() { const p = _fashProfile(); return p.focus || 'ready-to-wear'; }
+        // creative-studio now identifies the user from this token and charges the
+        // credit itself, so the old anon-key fallback would only ever earn a 401.
+        // Say that plainly instead of letting it read as a generation failure.
         async function fashCall(tool, prompt, extra) {
             const s = sess();
-            const r = await fetch(`${SUPA}/functions/v1/creative-studio`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + (s ? s.access_token : anon()), 'apikey': anon(), 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ tool, prompt, brand: fashBrand(), focus: fashFocus() }, extra || {})) });
-            return await r.json().catch(() => ({ error: 'bad response' }));
+            if (!s || !s.access_token) return { error: 'Sign in to generate designs.' };
+            const r = await fetch(`${SUPA}/functions/v1/creative-studio`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon(), 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ tool, prompt, brand: fashBrand(), focus: fashFocus() }, extra || {})) });
+            const d = await r.json().catch(() => ({ error: 'bad response' }));
+            if (r.status === 402) return { error: 'You are out of credits.', insufficientCredits: true };
+            if (d && typeof d.remaining === 'number' && typeof updateCreditsDisplay === 'function') updateCreditsDisplay(d.remaining);
+            return d;
         }
         async function saveFashionDesign(kind, prompt, url, style) {
             const s = sess(); if (!s) return;
