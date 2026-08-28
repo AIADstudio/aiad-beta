@@ -32570,11 +32570,7 @@ window.AIAD_PROMPTS = [
   background:linear-gradient(135deg,var(--teal,#00B4D8),var(--magenta-dark,#E040FB));color:#fff;font-size:0.72rem;font-weight:700;flex-shrink:0;}
 #artistDistributeView .rw-track-title{flex:1;min-width:0;font-weight:600;font-size:0.95rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 #artistDistributeView .rw-credits{margin-top:16px;padding-top:14px;border-top:1px dashed var(--border-default,rgba(255,255,255,0.08));}
-#artistDistributeView .rw-contrib{display:flex;gap:7px;flex-wrap:wrap;align-items:center;padding:7px 0;}
-#artistDistributeView .rw-contrib .rw-input{flex:1 1 130px;width:auto;min-width:0;}
-#artistDistributeView .rw-contrib .rw-narrow{flex:0 1 92px;}
-#artistDistributeView .rw-contrib .rw-role{flex:0 1 150px;}
-#artistDistributeView .rw-contrib.is-sw{border-left:2px solid rgba(0,212,255,0.4);padding-left:9px;}
+#artistDistributeView .rw-contrib-top .rw-narrow{flex:0 1 92px;}
 #artistDistributeView .rw-contrib-add{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0;}
 #artistDistributeView .rw-sharetotal{font-size:0.79rem;font-weight:700;padding:8px 12px;border-radius:8px;display:inline-block;margin:6px 0;}
 #artistDistributeView .rw-sharetotal.is-ok{background:rgba(16,185,129,0.11);color:#6ee7b7;}
@@ -32604,12 +32600,17 @@ window.AIAD_PROMPTS = [
 #artistDistributeView .rw-contrib-top{display:flex;gap:7px;flex-wrap:wrap;align-items:center;}
 #artistDistributeView .rw-contrib-top .rw-input{flex:1 1 130px;width:auto;min-width:0;}
 #artistDistributeView .rw-contrib-top .rw-role{flex:0 1 150px;}
-#artistDistributeView .rw-contrib-sw{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 12px;margin:10px 0 0 9px;padding-left:11px;border-left:2px solid rgba(0,212,255,0.35);}
+#artistDistributeView .rw-contrib-sw{display:grid;grid-template-columns:90px minmax(120px,1.2fr) minmax(130px,1.3fr) 140px;gap:8px 10px;align-items:start;margin:8px 0 0 9px;padding-left:11px;border-left:2px solid rgba(0,212,255,0.35);}
+@media (max-width:900px){#artistDistributeView .rw-contrib-sw{grid-template-columns:90px 1fr;}}
+@media (max-width:560px){#artistDistributeView .rw-contrib-sw{grid-template-columns:1fr;}}
 #artistDistributeView .rw-sub-field{display:flex;flex-direction:column;gap:4px;min-width:0;}
-#artistDistributeView .rw-sub-wide{grid-column:span 2;}
+/* Single-line fields must render as single-line fields regardless of what the
+   grid row height ends up being. */
+#artistDistributeView .rw-sub-field > .rw-input{flex:none;height:44px;box-sizing:border-box;}
+#artistDistributeView .rw-sub-field{align-self:start;}
 #artistDistributeView .rw-sub-field > span{font-size:0.71rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted,rgba(255,255,255,0.42));}
-#artistDistributeView .rw-sub-help{display:block;font-style:normal;font-size:0.7rem;line-height:1.45;color:var(--text-hint,rgba(255,255,255,0.32));margin-top:3px;}
-@media (max-width:768px){#artistDistributeView .rw-sub-wide{grid-column:span 1;}}
+#artistDistributeView .rw-sub-help{display:block;font-style:normal;font-size:0.69rem;line-height:1.3;color:var(--text-hint,rgba(255,255,255,0.32));margin-top:4px;}
+
 #artistDistributeView .rw-payout{border:1px solid var(--border-default,rgba(255,255,255,0.09));border-radius:11px;overflow:hidden;margin:12px 0 4px;}
 #artistDistributeView .rw-payout-row{display:flex;justify-content:space-between;gap:14px;align-items:center;padding:8px 13px;font-size:0.81rem;color:var(--text-secondary,rgba(255,255,255,0.62));border-bottom:1px solid var(--border-default,rgba(255,255,255,0.06));}
 #artistDistributeView .rw-payout-row:last-child{border-bottom:none;}
@@ -32630,6 +32631,9 @@ window.AIAD_PROMPTS = [
 #artistDistributeView .rw-dest-head input{margin-top:3px;accent-color:var(--teal,#00B4D8);flex-shrink:0;width:16px;height:16px;}
 #artistDistributeView .rw-dest-head strong{display:block;font-size:0.92rem;color:var(--text-primary,#fff);}
 #artistDistributeView .rw-dest-head em{display:block;font-style:normal;font-size:0.78rem;color:var(--text-muted,rgba(255,255,255,0.45));margin-top:3px;line-height:1.5;}
+#artistDistributeView .rw-dest-pitch{margin:9px 0 0 27px;padding:10px 13px;border-radius:9px;background:rgba(0,212,255,0.07);border:1px solid rgba(0,212,255,0.2);font-size:0.79rem;line-height:1.55;color:var(--text-secondary,rgba(255,255,255,0.72));}
+#artistDistributeView .rw-dest-gate{margin:11px 0 0 27px;max-width:360px;}
+#artistDistributeView .rw-dest-gate .rw-label{display:block;margin-bottom:5px;text-transform:none;letter-spacing:0;font-size:0.78rem;color:var(--text-secondary,rgba(255,255,255,0.6));}
 #artistDistributeView .rw-dest-meta{font-size:0.76rem;color:#6ee7b7;margin:9px 0 0 27px;}
 #artistDistributeView .rw-dest-inner{margin:12px 0 0 27px;}
 #artistDistributeView .rw-dest-block{margin:11px 0 0 27px;padding:11px 13px;border-radius:9px;background:rgba(245,158,11,0.09);border:1px solid rgba(245,158,11,0.32);font-size:0.79rem;line-height:1.55;color:#fcd34d;}
@@ -33250,8 +33254,18 @@ window.AIAD_PROMPTS = [
     }
 
     // ── Step 0 — license gate ───────────────────────────────────────────────
+    function pitchHtml() {
+        return '<div class="rw-pitch">' +
+            '<h3>' + esc(STREAMING_PITCH[0]) + '</h3>' +
+            STREAMING_PITCH.slice(1).map(function (p) { return '<p>' + esc(p) + '</p>'; }).join('') +
+        '</div>';
+    }
+
     function viewLicense() {
+        // The case for doing any of this belongs before the agreement, not on step 5
+        // after the artist has already filled in four screens.
         return '' +
+        pitchHtml() +
         '<div class="rw-card">' +
           '<h2 class="rw-h">AIAD Streaming License Agreement v1.1</h2>' +
           '<p class="rw-sub">Non-exclusive. AIAD takes 0% of your masters and 0% of your publishing. Read it, then sign below.</p>' +
@@ -33715,6 +33729,24 @@ window.AIAD_PROMPTS = [
         '</div>';
     }
 
+    /* The long-form answer lives here, one click away, so the field itself stays a
+       single line. Nine lines of wrapped help under a 150px column was more vertical
+       bulk than every input on the row combined. */
+    var HELP_TEXT = {
+        pro: 'A performing rights organization is the group that collects your songwriting ' +
+             'royalties when your music gets played — ASCAP and BMI are the big two in the US. ' +
+             'If you have never signed up with one, choose “Not sure / none”. You can add it ' +
+             'later and it will not hold up your release.',
+        ipi: 'Your IPI (sometimes called CAE) is the number your PRO uses to identify you as a ' +
+             'writer. You will find it in your ASCAP or BMI account. It is optional here — ' +
+             'supplying it just helps your royalties match to you faster.'
+    };
+    function helpDot(key) {
+        return '<button type="button" class="rw-info" title="' + esc(HELP_TEXT[key] || '') +
+               '" onclick="event.preventDefault();AIADRelease.explain(\'' + key + '\')">?</button>';
+    }
+    function explain(key) { banner(HELP_TEXT[key] || '', 'ok'); }
+
     function primaryArtistName() {
         return trim(RS.release.primary_artist_name) ||
                (window.AppState && AppState.artistProfile && AppState.artistProfile.artistName) || '';
@@ -33784,19 +33816,16 @@ window.AIAD_PROMPTS = [
                   '<label class="rw-sub-field"><span>Publisher</span>' +
                     '<input class="rw-input" list="rwPublishers" value="' + esc(c.publisher_name) +
                     '" oninput="' + b + '\'publisher_name\',this.value)"></label>' +
-                  '<label class="rw-sub-field rw-sub-wide"><span>Performing rights organization</span>' +
+                  '<label class="rw-sub-field"><span>Performing rights org' + helpDot('pro') + '</span>' +
                     selectFrom(PRO_OPTIONS, proValue, b + '\'pro\',this.value)') +
                     (proIsOther
                       ? '<input class="rw-input" style="margin-top:6px;" placeholder="Which one?" value="' +
                         esc(c.pro_other || '') + '" oninput="' + b + '\'pro_other\',this.value)">'
                       : '') +
-                    '<em class="rw-sub-help">The group that collects your songwriting royalties when your ' +
-                    'music gets played. If you’ve never signed up with one, choose “Not sure / none” — ' +
-                    'you can add it later and it won’t hold up your release.</em></label>' +
-                  '<label class="rw-sub-field"><span>IPI / CAE</span>' +
+                    '<em class="rw-sub-help">Collects your songwriting royalties. Not sure? Leave it.</em></label>' +
+                  '<label class="rw-sub-field"><span>IPI / CAE' + helpDot('ipi') + '</span>' +
                     '<input class="rw-input" value="' + esc(c.ipi_cae) + '" oninput="' + b + '\'ipi_cae\',this.value)">' +
-                    '<em class="rw-sub-help">Optional. Find it in your PRO account, or add it later — ' +
-                    'it helps your royalties match faster.</em></label>' +
+                    '<em class="rw-sub-help">Optional — add it later, it won’t hold up your release.</em></label>' +
                 '</div>'
               : '') +
             '</div>';
@@ -33970,7 +33999,7 @@ window.AIAD_PROMPTS = [
         return '' +
         '<div class="rw-card">' +
           '<h2 class="rw-h">Tracks</h2>' +
-          '<p class="rw-sub">Section 2. At least one songwriter and one producer per track, and songwriter splits must total exactly 100%.</p>' +
+          '<p class="rw-sub">Section 2. Each track needs one songwriter with a legal name, and the songwriter splits must total exactly 100%. Everything else can wait.</p>' +
           body +
           '<div class="rw-actions">' +
             '<button class="rw-btn" onclick="AIADRelease.addTrack()">+ Add track</button>' +
@@ -34488,19 +34517,22 @@ window.AIAD_PROMPTS = [
         var D = RS.dest;
         var gate = D.already_distributed;
 
-        var pitch = '<div class="rw-pitch">' +
-            '<h3>' + esc(STREAMING_PITCH[0]) + '</h3>' +
-            STREAMING_PITCH.slice(1).map(function (p) { return '<p>' + esc(p) + '</p>'; }).join('') +
-        '</div>';
-
         // (b) AIAD Distribution, behind the duplicate-delivery gate
-        var distInner = '';
+        // The gate only governs this one option, so it lives inside this one card
+        // rather than floating between two checkboxes belonging to neither.
+        var distInner = '<div class="rw-dest-gate">' +
+            '<label class="rw-label">Is any recording on this release currently distributed through another distributor?</label>' +
+            '<select class="rw-input" onchange="AIADRelease.setDest(\'already_distributed\', this.value)">' +
+              '<option value=""' + (gate === null ? ' selected' : '') + '>Choose…</option>' +
+              '<option value="no"' + (gate === false ? ' selected' : '') + '>No</option>' +
+              '<option value="yes"' + (gate === true ? ' selected' : '') + '>Yes</option>' +
+            '</select></div>';
         if (gate === true) {
-            distInner = '<div class="rw-dest-block">Each recording can only be delivered through one distributor. ' +
+            distInner += '<div class="rw-dest-block">Each recording can only be delivered through one distributor. ' +
                 'Duplicate delivery causes DSP takedowns and withheld royalties. Take it down there first, ' +
                 'or choose “Already distributed elsewhere”.</div>';
         } else if (D.aiad_distribution) {
-            distInner = '<label class="rw-check rw-dest-inner"><input type="checkbox"' +
+            distInner += '<label class="rw-check rw-dest-inner"><input type="checkbox"' +
                 (D.exclusivity_confirmed ? ' checked' : '') +
                 ' onchange="AIADRelease.setDest(\'exclusivity_confirmed\', this.checked)"> ' +
                 '<span>I confirm no recording on this release is currently delivered by another distributor, ' +
@@ -34530,18 +34562,13 @@ window.AIAD_PROMPTS = [
         '<div class="rw-card">' +
           '<h2 class="rw-h">Where this release goes</h2>' +
           '<p class="rw-sub">Pick at least one. These are independent — streaming on AIAD does not stop you distributing anywhere else.</p>' +
-          pitch +
           destCard('aiad_streaming', 'AIAD Streaming', 'Non-exclusive. Your music stays on every other platform.',
                    D.aiad_streaming, false,
+                   '<div class="rw-dest-pitch">' +
+                     'A $10 pledge here earns you $8.61 — about 3,000 Spotify streams.<br>' +
+                     'No threshold, no pro-rata pool, no cut of your masters or publishing.' +
+                   '</div>' +
                    '<div class="rw-dest-meta">Free — included in your subscription.</div>') +
-          '<div class="rw-field rw-span">' +
-            '<label class="rw-label">Is any recording on this release currently distributed through another distributor? <span class="rw-req">●</span></label>' +
-            '<select class="rw-input" onchange="AIADRelease.setDest(\'already_distributed\', this.value)">' +
-              '<option value=""' + (gate === null ? ' selected' : '') + '>Choose…</option>' +
-              '<option value="no"' + (gate === false ? ' selected' : '') + '>No</option>' +
-              '<option value="yes"' + (gate === true ? ' selected' : '') + '>Yes</option>' +
-            '</select>' +
-          '</div>' +
           destCard('aiad_distribution', 'Worldwide DSPs via AIAD Distribution',
                    'Spotify, Apple Music, YouTube Music, Amazon, TikTok, 150+ more. 2–5 business days per DSP.',
                    D.aiad_distribution, gate !== false, distInner) +
@@ -35256,6 +35283,7 @@ window.AIAD_PROMPTS = [
         setRights: setRights, uploadRightsDoc: uploadRightsDoc, uploadTrackDoc: uploadTrackDoc,
         setDest: setDest, saveDestinations: saveDestinations,
         setPrice: setPrice, savePricing: savePricing, explainMechanical: explainMechanical,
+        explain: explain,
         saveRights: saveRights,
         submit: submit, startAnother: startAnother, downloadSheet: downloadSheet,
         openDoc: openDoc, showSpecs: showSpecs, hideSpecs: hideSpecs
