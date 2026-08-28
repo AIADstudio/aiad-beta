@@ -553,4 +553,10 @@ grant execute on function public.video_tier_durations(text)                 to a
 grant execute on function public.video_credit_balance(uuid)                 to authenticated;
 grant execute on function public.reserve_video_credits(uuid, text, numeric, text, text) to authenticated;
 -- settle and refund are service-role only: they are called by the FAL webhook,
--- never by a browser. No grant to authenticated on purpose.
+-- never by a browser.
+--
+-- WARNING: omitting a grant is NOT the same as denying one. Postgres grants
+-- EXECUTE on every new function to PUBLIC, and Supabase's default privileges also
+-- grant it to anon by name, so both roles could call these until the explicit
+-- revokes in docs/sql/publish-flow.sql. Verify with has_function_privilege()
+-- rather than assuming.

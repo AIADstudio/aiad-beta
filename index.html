@@ -3456,6 +3456,8 @@ html, body {
                     <div class="dash-nav-item" id="navStore" data-view="store" onclick="showArtistView('store')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg><span> Store</span></div>
                     <div class="dash-nav-item" id="navPayouts" data-view="payouts" onclick="showArtistView('payouts')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg><span> Payouts</span></div>
                     <div class="dash-nav-item" id="navDistribute" onclick="showArtistView('distribute')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5"/><polyline points="5 12 12 5 19 12"/><line x1="4" y1="21" x2="20" y2="21"/></svg><span> Distribute</span></div>
+                    <div class="dash-nav-item" id="navLibrary" data-view="library" onclick="showArtistView('library')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span>Library</span></div>
+                    <div class="dash-nav-item" id="navReviewQueue" data-view="review" style="display:none;" onclick="showArtistView('review')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span>Review queue</span><span id="navReviewCount" class="lb-navcount"></span></div>
                     <div class="dash-nav-item dash-nav-dropdown" onclick="toggleCreativeStudio()">
                         <svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
                         <span>Creative Studio</span>
@@ -3466,8 +3468,7 @@ html, body {
                         <div class="dash-nav-subitem" onclick="showArtistView('songwriting');"><svg class="dash-nav-subicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/></svg> Songwriting</div>
                         <div class="dash-nav-subitem" onclick="showArtistView('mixmedia');"><svg class="dash-nav-subicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg> Mix-Media</div>
                         <div class="dash-nav-subitem" onclick="showArtistView('merch'); restoreLastMerchDesign();"><svg class="dash-nav-subicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0"/></svg> Merch</div>
-                        <div class="dash-nav-subitem" onclick="showArtistView('synclibrary');"><svg class="dash-nav-subicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/><path d="M21 15l-5-5-5 5"/></svg> Sync Library</div>
-                    </div>
+                                            </div>
                 </nav>
                 </aside>
             <main class="dash-main">
@@ -5063,6 +5064,10 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     </div>
                     <div id="payoutsBody"></div>
                 </div>
+
+                <div class="dash-view" id="artistLibraryView"></div>
+
+                <div class="dash-view" id="artistReviewView"></div>
 
                 <div class="dash-view" id="artistDistributeView">
                     <div class="view-header">
@@ -14178,7 +14183,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             try { history.replaceState(null, '', '#artist/' + view); } catch (e) {}
             try { window.aiadTrackTool && window.aiadTrackTool('artist:' + view); } catch (e) {}
 
-            const allViews = ['artistPlanView', 'artistHomeView', 'artistPostsView', 'artistSupportersView', 'artistProjectsView', 'artistRevenueView', 'artistScheduleView', 'artistCollaboratorsView', 'artistMusicView', 'artistSongwritingView', 'artistMixMediaView', 'artistMerchView', 'artistSyncLibraryView', 'artistMilestonesView', 'artistAnalyticsView', 'artistMyStatsView', 'artistAgentsView', 'artistInboxView', 'artistSettingsView', 'artistStoreView', 'artistPayoutsView', 'artistDistributeView'];
+            const allViews = ['artistLibraryView', 'artistReviewView', 'artistPlanView', 'artistHomeView', 'artistPostsView', 'artistSupportersView', 'artistProjectsView', 'artistRevenueView', 'artistScheduleView', 'artistCollaboratorsView', 'artistMusicView', 'artistSongwritingView', 'artistMixMediaView', 'artistMerchView', 'artistSyncLibraryView', 'artistMilestonesView', 'artistAnalyticsView', 'artistMyStatsView', 'artistAgentsView', 'artistInboxView', 'artistSettingsView', 'artistStoreView', 'artistPayoutsView', 'artistDistributeView'];
             allViews.forEach(v => {
                 const el = document.getElementById(v);
                 if (el) el.classList.remove('active');
@@ -14223,7 +14228,9 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 'settings': 'artistSettingsView',
                 'store': 'artistStoreView',
                 'payouts': 'artistPayoutsView',
-                'distribute': 'artistDistributeView'
+                'distribute': 'artistDistributeView',
+                'library': 'artistLibraryView',
+                'review': 'artistReviewView'
             };
 
             const viewId = viewIdMap[view];
@@ -14342,6 +14349,14 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 viewEl.classList.add('active');
                 const _nd = document.getElementById('navDistribute'); if (_nd) _nd.classList.add('active');
                 setTimeout(() => { if (window.AIADRelease) AIADRelease.open(); }, 60);
+            } else if (view === 'library') {
+                viewEl.classList.add('active');
+                markNav('library');
+                setTimeout(() => { if (window.AIADLibrary) AIADLibrary.open(); }, 40);
+            } else if (view === 'review') {
+                viewEl.classList.add('active');
+                markNav('review');
+                setTimeout(() => { if (window.AIADReview) AIADReview.open(); }, 40);
             } else if (view === 'settings') {
                 viewEl.classList.add('active');
                 // Auto-populate settings from AppState first (instant)
@@ -37353,6 +37368,718 @@ window.AIAD_PROMPTS = [
     else installHooks();
 })();
 </script>
+<style>
+/* ── Library + review queue ─────────────────────────────────────────────── */
+#artistLibraryView .lb-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 20px;border-bottom:1px solid var(--border-default,rgba(255,255,255,0.08));padding-bottom:10px;}
+#artistLibraryView .lb-tab{background:none;border:1px solid transparent;border-radius:999px;padding:7px 14px;font-size:0.8rem;color:var(--text-muted,rgba(255,255,255,0.4));cursor:pointer;white-space:nowrap;}
+#artistLibraryView .lb-tab:hover{color:var(--text-secondary,rgba(255,255,255,0.62));}
+#artistLibraryView .lb-tab.active{color:var(--teal-light,#00D4FF);border-color:var(--teal,#00B4D8);background:rgba(0,180,216,0.08);}
+.lb-panel{padding-bottom:60px;}
+.lb-group{margin-bottom:28px;}
+.lb-group-title{font-size:0.78rem;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--text-secondary,rgba(255,255,255,0.62));margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.lb-count{font-size:0.7rem;color:var(--text-hint,rgba(255,255,255,0.3));background:rgba(255,255,255,0.06);border-radius:999px;padding:1px 7px;}
+.lb-card{background:rgba(255,255,255,0.03);border:1px solid var(--border-default,rgba(255,255,255,0.08));border-radius:12px;padding:16px;margin-bottom:12px;}
+.lb-card-head{display:flex;gap:14px;align-items:flex-start;}
+.lb-art{width:64px;height:64px;border-radius:8px;object-fit:cover;flex:none;background:rgba(255,255,255,0.05);}
+.lb-art-empty{background:linear-gradient(135deg,rgba(255,255,255,0.07),rgba(255,255,255,0.02));}
+.lb-card-meta{flex:1;min-width:0;}
+.lb-card-title{font-size:0.95rem;font-weight:600;color:var(--text-primary,#fff);}
+.lb-card-sub,.lb-card-status{font-size:0.75rem;color:var(--text-muted,rgba(255,255,255,0.4));margin-top:2px;}
+.lb-card-status{color:var(--teal-light,#00D4FF);}
+.lb-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+.lb-chip{font-size:0.64rem;padding:2px 8px;border-radius:999px;border:1px solid rgba(255,255,255,0.14);color:var(--text-muted,rgba(255,255,255,0.45));white-space:nowrap;}
+.lb-chip-live{border-color:rgba(52,211,153,0.5);color:#34d399;}
+.lb-chip-ready{border-color:rgba(52,211,153,0.5);color:#34d399;}
+.lb-chip-pending,.lb-chip-processing,.lb-chip-submitted,.lb-chip-in_review{border-color:rgba(251,191,36,0.45);color:#fbbf24;}
+.lb-chip-qc_failed,.lb-chip-failed,.lb-chip-rejected{border-color:rgba(248,113,113,0.5);color:#f87171;}
+.lb-tracks{margin-top:12px;border-top:1px solid rgba(255,255,255,0.06);padding-top:8px;}
+.lb-row{display:flex;align-items:center;gap:12px;padding:8px 0;}
+.lb-play{width:32px;height:32px;flex:none;border-radius:50%;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.04);color:var(--text-secondary,rgba(255,255,255,0.62));cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;}
+.lb-play:hover{color:var(--teal-light,#00D4FF);border-color:var(--teal,#00B4D8);}
+.lb-play svg{width:12px;height:12px;margin-left:2px;}
+.lb-row-main{flex:1;min-width:0;}
+.lb-row-title{font-size:0.85rem;color:var(--text-primary,#fff);display:flex;align-items:center;gap:8px;}
+.lb-row-sub{font-size:0.72rem;color:var(--text-muted,rgba(255,255,255,0.4));}
+.lb-stats{display:flex;gap:12px;font-size:0.7rem;color:var(--text-hint,rgba(255,255,255,0.3));margin-top:3px;}
+.lb-badge{font-size:0.6rem;padding:1px 6px;border-radius:999px;text-transform:uppercase;letter-spacing:0.04em;}
+.lb-badge-ai{background:rgba(255,102,255,0.14);color:var(--magenta-light,#FF66FF);border:1px solid rgba(255,102,255,0.3);}
+.lb-notes{margin-top:12px;background:rgba(248,113,113,0.07);border:1px solid rgba(248,113,113,0.25);border-radius:8px;padding:12px;}
+.lb-notes-label{font-size:0.68rem;text-transform:uppercase;letter-spacing:0.05em;color:#f87171;margin-bottom:4px;}
+.lb-notes-body{font-size:0.82rem;color:var(--text-secondary,rgba(255,255,255,0.62));line-height:1.5;white-space:pre-wrap;}
+.lb-empty,.lb-note{font-size:0.82rem;color:var(--text-muted,rgba(255,255,255,0.4));padding:18px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;line-height:1.55;}
+.lb-note{margin-bottom:14px;}
+.lb-error{font-size:0.82rem;color:#f87171;background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.25);border-radius:10px;padding:14px;margin-bottom:14px;}
+.lb-navcount{margin-left:auto;font-size:0.65rem;background:var(--magenta,#FF00FF);color:#fff;border-radius:999px;padding:1px 6px;}
+/* review queue */
+.rv-row{display:flex;gap:12px;align-items:center;padding:12px;border:1px solid var(--border-default,rgba(255,255,255,0.08));border-radius:10px;margin-bottom:10px;cursor:pointer;background:rgba(255,255,255,0.02);}
+.rv-row:hover{border-color:var(--teal,#00B4D8);}
+.rv-thumb{width:48px;height:48px;border-radius:6px;object-fit:cover;flex:none;}
+.rv-row-main{flex:1;min-width:0;}
+.rv-row-title{font-size:0.9rem;font-weight:600;color:var(--text-primary,#fff);}
+.rv-dim{font-size:0.74rem;color:var(--text-muted,rgba(255,255,255,0.4));line-height:1.6;}
+.rv-back{background:none;border:none;color:var(--teal-light,#00D4FF);font-size:0.8rem;cursor:pointer;padding:0 0 14px;}
+.rv-head{display:flex;gap:16px;align-items:flex-start;margin-bottom:20px;}
+.rv-art{width:96px;height:96px;border-radius:10px;object-fit:cover;flex:none;}
+.rv-head h2{font-size:1.05rem;margin:0 0 4px;color:var(--text-primary,#fff);}
+.rv-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px;margin-bottom:22px;}
+.rv-label{font-size:0.7rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-secondary,rgba(255,255,255,0.62));margin:0 0 6px;}
+.rv-track{border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:12px;margin-bottom:8px;background:rgba(255,255,255,0.02);}
+.rv-track-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:0.85rem;color:var(--text-primary,#fff);margin-bottom:4px;}
+.rv-credits{font-size:0.74rem;color:var(--text-secondary,rgba(255,255,255,0.62));margin-top:6px;line-height:1.6;}
+.rv-warn{display:inline-block;margin-left:8px;color:#f87171;font-size:0.72rem;}
+.rv-actions{display:flex;gap:10px;flex-wrap:wrap;margin:22px 0 10px;}
+.rv-btn{padding:9px 16px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.04);color:var(--text-secondary,rgba(255,255,255,0.62));font-size:0.82rem;cursor:pointer;}
+.rv-btn:hover{border-color:var(--teal,#00B4D8);color:var(--teal-light,#00D4FF);}
+.rv-approve{border-color:rgba(52,211,153,0.45);color:#34d399;}
+.rv-reject{border-color:rgba(248,113,113,0.45);color:#f87171;}
+.rv-publish{border-color:var(--magenta,#FF00FF);color:var(--magenta-light,#FF66FF);}
+.rv-msg{font-size:0.82rem;color:#34d399;background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.25);border-radius:10px;padding:12px;margin-bottom:14px;}
+</style>
+
+<script>
+/* ══════════════ LIBRARY + FOUNDER REVIEW QUEUE ══════════════
+   One place for everything an artist has made. Five tabs over the same two
+   tables, sharing one track row so anything is auditionable from anywhere.
+
+   The row hands off to the existing bottom bar (playTrackById / window._trackData)
+   rather than owning audio itself — there is one player on this page and this is
+   not it. */
+(function () {
+    'use strict';
+
+    var LS = { tab: 'releases', tracks: [], releases: [], dests: {}, plays: {},
+               comments: {}, loaded: false, busy: false, err: '' };
+
+    function db() { return window.db; }
+    function uid() {
+        var s = (typeof window.__aiadSession === 'function') ? window.__aiadSession() : null;
+        return (s && s.user && s.user.id) || null;
+    }
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+    function host() { return document.getElementById('artistLibraryView'); }
+
+    /* Every failed query is surfaced. A Library that silently renders "nothing here"
+       when the query actually errored is worse than one that says it broke. */
+    function fail(what, error) {
+        if (!error) return false;
+        LS.err = what + ': ' + (error.message || String(error));
+        console.error('[AIAD library]', what, error);
+        return true;
+    }
+
+    function fmtDur(s) {
+        s = Number(s || 0);
+        if (!s) return '';
+        var m = Math.floor(s / 60), r = Math.floor(s % 60);
+        return m + ':' + (r < 10 ? '0' : '') + r;
+    }
+    function fmtDate(d) {
+        if (!d) return '';
+        try { return new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }); }
+        catch (e) { return ''; }
+    }
+
+    var ORIGIN_LABEL = { human: 'Human', ai_assisted: 'AI-assisted', ai_generated: 'AI-generated', unverified: 'Unverified' };
+    var DERIV_LABEL = {
+        not_applicable: '', pending: 'Queued', processing: 'Transcoding',
+        ready: 'Ready', failed: 'Transcode failed', qc_failed: 'Needs a new master'
+    };
+
+    // ── The shared row ──────────────────────────────────────────────────────
+    // Registers into window._trackData so the bottom bar can pick it up, exactly
+    // as the Creative Studio rows do.
+    function registerForPlayer(t) {
+        if (!window._trackData) window._trackData = {};
+        window._trackData[t.id] = {
+            trackId: t.id,
+            title: t.title || 'Untitled',
+            audioUrl: t.url || '',
+            storage_path: t.storage_path || null,
+            bucket: t.bucket || null,
+            imageUrl: t._cover || '',
+            tags: [], blobUrl: null
+        };
+    }
+
+    function trackRow(t, opts) {
+        opts = opts || {};
+        registerForPlayer(t);
+        var deriv = DERIV_LABEL[t.derivatives_status] || '';
+        var badge = '';
+        if (t.origin && t.origin !== 'human') {
+            badge = '<span class="lb-badge lb-badge-ai">' + esc(ORIGIN_LABEL[t.origin] || t.origin) + '</span>';
+        }
+        var derivChip = deriv
+            ? '<span class="lb-chip lb-chip-' + esc(t.derivatives_status) + '">' + esc(deriv) + '</span>' : '';
+        var stats = '';
+        if (opts.stats) {
+            var p = LS.plays[t.id] || { plays: 0, listeners: 0 };
+            var c = LS.comments[t.id] || 0;
+            stats = '<div class="lb-stats">' +
+                '<span>' + p.plays + ' play' + (p.plays === 1 ? '' : 's') + '</span>' +
+                '<span>' + p.listeners + ' listener' + (p.listeners === 1 ? '' : 's') + '</span>' +
+                '<span>' + c + ' comment' + (c === 1 ? '' : 's') + '</span>' +
+            '</div>';
+        }
+        return '<div class="lb-row">' +
+            '<button class="lb-play" title="Play" onclick="AIADLibrary.play(\'' + esc(t.id) + '\')">' +
+              '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"/></svg></button>' +
+            '<div class="lb-row-main">' +
+              '<div class="lb-row-title">' + esc(t.title || 'Untitled') + badge + '</div>' +
+              '<div class="lb-row-sub">' +
+                (t.track_number ? 'Track ' + t.track_number + ' · ' : '') +
+                (fmtDur(t.duration_seconds) ? fmtDur(t.duration_seconds) + ' · ' : '') +
+                esc(ORIGIN_LABEL[t.origin] || '') +
+              '</div>' + stats +
+            '</div>' +
+            derivChip +
+        '</div>';
+    }
+
+    function play(trackId) {
+        if (typeof window.playTrackById === 'function') { window.playTrackById(trackId); return; }
+        if (window.showToast) showToast('Player not ready yet — try again in a moment.');
+    }
+
+    // ── Data ────────────────────────────────────────────────────────────────
+    async function loadAll(force) {
+        if (LS.loaded && !force) return true;
+        var u = uid();
+        if (!u) { LS.err = 'Sign in to see your library.'; return false; }
+        LS.busy = true; LS.err = ''; render();
+
+        var rel = await db().from('releases')
+            .select('id,title,release_type,artwork_url,status,go_live_at,review_notes,submitted_at,created_at')
+            .eq('user_id', u).order('created_at', { ascending: false });
+        if (fail('releases', rel.error)) { LS.busy = false; render(); return false; }
+        LS.releases = rel.data || [];
+
+        var tr = await db().from('tracks')
+            .select('id,title,release_id,derivatives_status,plays,duration_seconds,origin,source,' +
+                    'storage_path,bucket,url,track_number,is_public,created_at')
+            .eq('user_id', u).order('created_at', { ascending: false });
+        if (fail('tracks', tr.error)) { LS.busy = false; render(); return false; }
+        LS.tracks = tr.data || [];
+
+        LS.dests = {};
+        var ids = LS.releases.map(function (r) { return r.id; });
+        if (ids.length) {
+            var d = await db().from('release_destinations')
+                .select('release_id,destination,status').in('release_id', ids);
+            if (fail('release_destinations', d.error)) { LS.busy = false; render(); return false; }
+            (d.data || []).forEach(function (x) {
+                (LS.dests[x.release_id] = LS.dests[x.release_id] || []).push(x);
+            });
+        }
+
+        // Plays and unique listeners come from play_events, not tracks.plays: the
+        // counter column cannot answer "how many different people".
+        LS.plays = {};
+        var pe = await db().from('play_events')
+            .select('track_id,listener_id').eq('artist_id', u).limit(10000);
+        if (pe.error) {
+            console.warn('[AIAD library] play_events unavailable:', pe.error.message);
+        } else {
+            var seen = {};
+            (pe.data || []).forEach(function (e) {
+                var slot = LS.plays[e.track_id] = LS.plays[e.track_id] || { plays: 0, listeners: 0 };
+                slot.plays += 1;
+                var k = e.track_id + '|' + (e.listener_id || 'anon');
+                if (!seen[k]) { seen[k] = 1; slot.listeners += 1; }
+            });
+        }
+
+        LS.comments = {};
+        var tids = LS.tracks.map(function (t) { return t.id; });
+        if (tids.length) {
+            var cm = await db().from('track_comments').select('track_id').in('track_id', tids).limit(10000);
+            if (cm.error) {
+                console.warn('[AIAD library] track_comments unavailable:', cm.error.message);
+            } else {
+                (cm.data || []).forEach(function (c) {
+                    LS.comments[c.track_id] = (LS.comments[c.track_id] || 0) + 1;
+                });
+            }
+        }
+
+        LS.loaded = true; LS.busy = false; render();
+        return true;
+    }
+
+    // ── Grouping ────────────────────────────────────────────────────────────
+    function tracksFor(relId) {
+        return LS.tracks.filter(function (t) { return t.release_id === relId; })
+            .sort(function (a, b) { return (a.track_number || 0) - (b.track_number || 0); });
+    }
+    function releaseGroup(r) {
+        var ts = tracksFor(r.id);
+        if (ts.some(function (t) { return t.derivatives_status === 'qc_failed'; })) return 'qc';
+        if (r.status === 'live') return 'live';
+        if (r.status === 'approved') return 'scheduled';
+        if (r.status === 'submitted' || r.status === 'in_review') return 'review';
+        if (r.status === 'changes_requested') return 'changes';
+        if (r.status === 'rejected') return 'rejected';
+        return 'draft';
+    }
+    var GROUP_ORDER = ['qc', 'changes', 'live', 'scheduled', 'review', 'draft', 'rejected'];
+    var GROUP_LABEL = {
+        qc: 'Needs a new master', changes: 'Changes requested', live: 'Live',
+        scheduled: 'Scheduled', review: 'In review', draft: 'Draft', rejected: 'Rejected'
+    };
+
+    // Where the release actually is, in the artist's words rather than the DB's.
+    function statusLine(r) {
+        if (r.status === 'live') return 'Live';
+        if (r.status === 'approved') {
+            return r.go_live_at
+                ? 'Approved — live on ' + fmtDate(r.go_live_at)
+                : 'Approved — awaiting a go-live date';
+        }
+        if (r.status === 'submitted') return 'Submitted — waiting for review';
+        if (r.status === 'in_review') return 'In review';
+        if (r.status === 'changes_requested') return 'Changes requested';
+        if (r.status === 'rejected') return 'Rejected';
+        return 'Draft';
+    }
+
+    function destChips(relId) {
+        var d = LS.dests[relId] || [];
+        if (!d.length) return '';
+        return d.map(function (x) {
+            var name = x.destination === 'aiad_streaming' ? 'AIAD Streaming'
+                     : x.destination === 'aiad_distribution' ? 'DSPs'
+                     : 'External';
+            return '<span class="lb-chip lb-chip-' + esc(x.status) + '">' + esc(name) + ' · ' + esc(x.status) + '</span>';
+        }).join('');
+    }
+
+    function releaseCard(r) {
+        var ts = tracksFor(r.id);
+        var plays = ts.reduce(function (n, t) { return n + ((LS.plays[t.id] || {}).plays || 0); }, 0);
+        var art = r.artwork_url
+            ? '<img class="lb-art" src="' + esc(r.artwork_url) + '" alt="">'
+            : '<div class="lb-art lb-art-empty"></div>';
+        var notes = (r.status === 'changes_requested' || r.status === 'rejected') && r.review_notes
+            ? '<div class="lb-notes"><div class="lb-notes-label">What needs fixing</div>' +
+              '<div class="lb-notes-body">' + esc(r.review_notes) + '</div></div>'
+            : '';
+        return '<div class="lb-card">' +
+            '<div class="lb-card-head">' + art +
+              '<div class="lb-card-meta">' +
+                '<div class="lb-card-title">' + esc(r.title || 'Untitled') + '</div>' +
+                '<div class="lb-card-sub">' + esc(r.release_type || '') + ' · ' +
+                  ts.length + ' track' + (ts.length === 1 ? '' : 's') + ' · ' + plays + ' play' + (plays === 1 ? '' : 's') + '</div>' +
+                '<div class="lb-card-status">' + esc(statusLine(r)) + '</div>' +
+                '<div class="lb-chips">' + destChips(r.id) + '</div>' +
+              '</div>' +
+            '</div>' + notes +
+            '<div class="lb-tracks">' + ts.map(function (t) { return trackRow(t); }).join('') + '</div>' +
+        '</div>';
+    }
+
+    // ── Tabs ────────────────────────────────────────────────────────────────
+    var TABS = [
+        { id: 'releases', label: 'Releases' },
+        { id: 'streaming', label: 'Streaming' },
+        { id: 'sync', label: 'Sync Library' },
+        { id: 'private', label: 'Private' },
+        { id: 'ai', label: 'AI Generated' }
+    ];
+
+    function empty(msg) { return '<div class="lb-empty">' + esc(msg) + '</div>'; }
+
+    function viewReleases() {
+        var withRel = LS.releases;
+        if (!withRel.length) return empty('No releases yet. Distribute is where they start.');
+        var buckets = {};
+        withRel.forEach(function (r) { (buckets[releaseGroup(r)] = buckets[releaseGroup(r)] || []).push(r); });
+        return GROUP_ORDER.filter(function (g) { return buckets[g]; }).map(function (g) {
+            return '<div class="lb-group"><div class="lb-group-title">' + esc(GROUP_LABEL[g]) +
+                   ' <span class="lb-count">' + buckets[g].length + '</span></div>' +
+                   buckets[g].map(releaseCard).join('') + '</div>';
+        }).join('');
+    }
+
+    function viewStreaming() {
+        // The subset a fan can actually press play on: the release is live, the
+        // streaming destination is live, and the derivatives exist.
+        var liveIds = {};
+        LS.releases.forEach(function (r) {
+            if (r.status !== 'live') return;
+            var d = LS.dests[r.id] || [];
+            if (d.some(function (x) { return x.destination === 'aiad_streaming' && x.status === 'live'; })) {
+                liveIds[r.id] = r;
+            }
+        });
+        var rows = LS.tracks.filter(function (t) {
+            return t.release_id && liveIds[t.release_id] && t.derivatives_status === 'ready';
+        });
+        if (!rows.length) {
+            return empty('Nothing is live on the streaming layer yet. Tracks appear here once a release goes live and its masters have finished transcoding.');
+        }
+        return '<div class="lb-group">' + rows.map(function (t) { return trackRow(t, { stats: true }); }).join('') + '</div>';
+    }
+
+    function viewPrivate() {
+        var rows = LS.tracks.filter(function (t) { return !t.release_id; });
+        if (!rows.length) return empty('Nothing private here. Demos and works in progress live in this tab.');
+        return '<div class="lb-note">Demos, works in progress and library uploads. These are not queued for transcoding — that only happens when a track joins a release.</div>' +
+               '<div class="lb-group">' + rows.map(function (t) { return trackRow(t); }).join('') + '</div>';
+    }
+
+    function viewAI() {
+        var rows = LS.tracks.filter(function (t) {
+            return t.origin === 'ai_assisted' || t.origin === 'ai_generated';
+        });
+        if (!rows.length) return empty('No AI-assisted or AI-generated tracks.');
+        return '<div class="lb-note">The same tracks as the other tabs, filtered by how they were made. ' +
+               'AI-generated tracks are not eligible for the Sync Library, which takes human-created masters only.</div>' +
+               '<div class="lb-group">' + rows.map(function (t) { return trackRow(t); }).join('') + '</div>';
+    }
+
+    /* Sync Library is MOVED, not rebuilt: the existing view element is relocated
+       into this panel the first time the tab is opened. One copy, all its existing
+       wiring intact. */
+    function mountSync() {
+        var panel = document.getElementById('lbPanel');
+        var sync = document.getElementById('artistSyncLibraryView');
+        if (!panel || !sync) return;
+        if (sync.parentNode !== panel) panel.appendChild(sync);
+        sync.classList.add('active');
+        sync.style.display = '';
+    }
+    function unmountSync() {
+        var sync = document.getElementById('artistSyncLibraryView');
+        if (sync) { sync.classList.remove('active'); sync.style.display = 'none'; }
+    }
+
+    function render() {
+        var el = host();
+        if (!el) return;
+        var tabs = TABS.map(function (t) {
+            return '<button class="lb-tab' + (LS.tab === t.id ? ' active' : '') +
+                   '" onclick="AIADLibrary.setTab(\'' + t.id + '\')">' + esc(t.label) + '</button>';
+        }).join('');
+
+        var body;
+        if (LS.busy) body = '<div class="lb-empty">Loading your library…</div>';
+        else if (LS.err) body = '<div class="lb-error">' + esc(LS.err) + '</div>';
+        else if (LS.tab === 'releases') body = viewReleases();
+        else if (LS.tab === 'streaming') body = viewStreaming();
+        else if (LS.tab === 'private') body = viewPrivate();
+        else if (LS.tab === 'ai') body = viewAI();
+        else body = '';
+
+        el.innerHTML =
+            '<div class="view-header"><div>' +
+              '<h1 class="view-title">Library</h1>' +
+              '<p class="view-subtitle">Everything you have made, in one place.</p>' +
+            '</div></div>' +
+            '<div class="lb-tabs">' + tabs + '</div>' +
+            '<div id="lbPanel" class="lb-panel">' + body + '</div>';
+
+        if (LS.tab === 'sync') mountSync(); else unmountSync();
+    }
+
+    function setTab(id) {
+        LS.tab = id;
+        render();
+        if (id !== 'sync' && !LS.loaded) loadAll();
+    }
+
+    async function open() {
+        render();
+        await loadAll();
+    }
+
+    window.AIADLibrary = {
+        open: open, setTab: setTab, play: play,
+        reload: function () { return loadAll(true); },
+        state: function () { return LS; }
+    };
+})();
+</script>
+
+<script>
+/* ══════════════ FOUNDER REVIEW QUEUE ══════════════
+   The only way a release moves from 'submitted' to 'live' without SQL.
+
+   Every decision goes through founder_release_action(), which owns the state
+   machine and refuses invalid transitions. Nothing here writes releases directly,
+   so the queue and the cron job cannot disagree about what "live" means. */
+(function () {
+    'use strict';
+
+    var RV = { rows: [], detail: null, busy: false, err: '', msg: '' };
+
+    function db() { return window.db; }
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+    function host() { return document.getElementById('artistReviewView'); }
+    function fail(what, error) {
+        if (!error) return false;
+        RV.err = what + ': ' + (error.message || String(error));
+        console.error('[AIAD review]', what, error);
+        return true;
+    }
+    function fmt(d) {
+        if (!d) return '—';
+        try { return new Date(d).toLocaleString(); } catch (e) { return String(d); }
+    }
+
+    async function isFounder() {
+        var r = await db().rpc('is_founder');
+        if (r.error) { console.warn('[AIAD review] is_founder:', r.error.message); return false; }
+        return r.data === true;
+    }
+
+    async function load() {
+        RV.busy = true; RV.err = ''; render();
+        var q = await db().from('releases')
+            .select('id,user_id,title,version_subtitle,release_type,primary_artist_name,featured_artists,' +
+                    'label_name,upc,artwork_url,p_line,c_line,primary_genre,secondary_genre,language,' +
+                    'parental_advisory,territory_mode,excluded_territories,status,go_live_at,' +
+                    'original_release_date,submitted_at,submission_ref,review_notes,early_access_hours')
+            .in('status', ['submitted', 'in_review'])
+            .order('submitted_at', { ascending: false, nullsFirst: false });
+        if (fail('releases', q.error)) { RV.busy = false; render(); return; }
+        RV.rows = q.data || [];
+        RV.busy = false;
+        render();
+        updateNavCount();
+    }
+
+    function updateNavCount() {
+        var el = document.getElementById('navReviewCount');
+        if (el) el.textContent = RV.rows.length ? String(RV.rows.length) : '';
+    }
+
+    // The full picture for one release, loaded on demand rather than for the whole
+    // queue: tracks, credits, splits, rights and destinations are a lot of rows.
+    async function openDetail(id) {
+        RV.busy = true; RV.msg = ''; RV.err = ''; render();
+        var rel = RV.rows.filter(function (r) { return r.id === id; })[0];
+        if (!rel) { RV.busy = false; render(); return; }
+
+        var t = await db().from('tracks')
+            .select('id,title,track_number,duration_seconds,derivatives_status,origin,source,explicit,' +
+                    'isrc,loudness_lufs,true_peak_dbtp,leading_silence_ms,is_cover,contains_sample,' +
+                    'owns_master,storage_path,bucket,url,min_price_cents')
+            .eq('release_id', id).order('track_number', { ascending: true });
+        if (fail('tracks', t.error)) { RV.busy = false; render(); return; }
+        var tracks = t.data || [];
+
+        var contribs = [];
+        if (tracks.length) {
+            var c = await db().from('track_contributors')
+                .select('track_id,name,role,split_percent,ipi_cae,pro,publisher_name')
+                .in('track_id', tracks.map(function (x) { return x.id; }));
+            if (fail('track_contributors', c.error)) { RV.busy = false; render(); return; }
+            contribs = c.data || [];
+        }
+
+        var rd = await db().from('release_rights_declarations').select('*').eq('release_id', id).limit(1);
+        if (fail('release_rights_declarations', rd.error)) { RV.busy = false; render(); return; }
+
+        var d = await db().from('release_destinations')
+            .select('destination,status,external_distributor,external_release_url,exclusivity_confirmed,notes')
+            .eq('release_id', id);
+        if (fail('release_destinations', d.error)) { RV.busy = false; render(); return; }
+
+        RV.detail = {
+            rel: rel, tracks: tracks, contribs: contribs,
+            rights: (rd.data && rd.data[0]) || null, dests: d.data || []
+        };
+        RV.busy = false;
+        render();
+    }
+
+    function closeDetail() { RV.detail = null; RV.msg = ''; render(); }
+
+    async function act(id, action) {
+        var notes = null;
+        if (action === 'request_changes' || action === 'reject') {
+            notes = window.prompt(action === 'reject'
+                ? 'Why is this rejected? The artist sees this verbatim.'
+                : 'What does the artist need to fix? They see this verbatim.');
+            if (notes === null) return;                      // cancelled
+        }
+        if (action === 'publish_now' &&
+            !window.confirm('Publish now, ignoring the scheduled go-live date?')) return;
+
+        RV.busy = true; RV.err = ''; RV.msg = ''; render();
+        var r = await db().rpc('founder_release_action', {
+            p_release_id: id, p_action: action, p_notes: notes
+        });
+        RV.busy = false;
+        if (fail('founder_release_action', r.error)) { render(); return; }
+
+        // Returns a table, so PostgREST gives an array — an empty one would mean the
+        // function returned no row, which is a real failure, not a silent success.
+        var out = Array.isArray(r.data) ? r.data[0] : r.data;
+        if (!out) { RV.err = 'The action returned no result. Nothing was changed.'; render(); return; }
+        RV.msg = out.message || (out.ok ? 'Done.' : 'Refused.');
+        if (out.ok) { RV.detail = null; await load(); } else { render(); }
+    }
+
+    function trackLine(t, contribs) {
+        var mine = contribs.filter(function (c) { return c.track_id === t.id; });
+        var splits = mine.filter(function (c) { return c.split_percent != null; });
+        var total = splits.reduce(function (n, c) { return n + Number(c.split_percent || 0); }, 0);
+        var splitWarn = splits.length && Math.abs(total - 100) > 0.01
+            ? '<span class="rv-warn">splits total ' + total + '%</span>' : '';
+        return '<div class="rv-track">' +
+            '<div class="rv-track-head">' +
+              '<strong>' + (t.track_number || '?') + '. ' + esc(t.title || 'Untitled') + '</strong>' +
+              '<span class="lb-chip lb-chip-' + esc(t.derivatives_status) + '">' + esc(t.derivatives_status || '—') + '</span>' +
+              '<span class="rv-dim">' + esc(t.origin || '') + (t.explicit ? ' · explicit' : '') + '</span>' +
+            '</div>' +
+            '<div class="rv-dim">' +
+              (t.isrc ? 'ISRC ' + esc(t.isrc) + ' · ' : '') +
+              (t.loudness_lufs != null ? t.loudness_lufs + ' LUFS · ' : '') +
+              (t.true_peak_dbtp != null ? t.true_peak_dbtp + ' dBTP · ' : '') +
+              (t.leading_silence_ms != null ? t.leading_silence_ms + 'ms lead' : '') +
+            '</div>' +
+            (mine.length
+              ? '<div class="rv-credits">' + mine.map(function (c) {
+                    return esc(c.name || '?') + ' — ' + esc(c.role || '?') +
+                        (c.split_percent != null ? ' (' + c.split_percent + '%)' : '') +
+                        (c.pro ? ' · ' + esc(c.pro) : '') +
+                        (c.publisher_name ? ' · ' + esc(c.publisher_name) : '');
+                }).join('<br>') + splitWarn + '</div>'
+              : '<div class="rv-dim">No credits declared.</div>') +
+        '</div>';
+    }
+
+    function detailView() {
+        var D = RV.detail, r = D.rel;
+        var art = r.artwork_url
+            ? '<img class="rv-art" src="' + esc(r.artwork_url) + '" alt="">'
+            : '<div class="rv-art lb-art-empty"></div>';
+        var rights = D.rights
+            ? ['owns_master', 'exclusive_conflict', 'content_lawful_confirmed', 'signed_legal_name']
+                .filter(function (k) { return D.rights[k] != null; })
+                .map(function (k) { return '<div>' + esc(k) + ': <strong>' + esc(String(D.rights[k])) + '</strong></div>'; })
+                .join('')
+            : '<div class="rv-dim">No rights declaration on file.</div>';
+
+        return '<div class="rv-detail">' +
+            '<button class="rv-back" onclick="AIADReview.closeDetail()">← Back to queue</button>' +
+            (RV.msg ? '<div class="rv-msg">' + esc(RV.msg) + '</div>' : '') +
+            (RV.err ? '<div class="lb-error">' + esc(RV.err) + '</div>' : '') +
+            '<div class="rv-head">' + art +
+              '<div>' +
+                '<h2>' + esc(r.title || 'Untitled') + (r.version_subtitle ? ' (' + esc(r.version_subtitle) + ')' : '') + '</h2>' +
+                '<div class="rv-dim">' + esc(r.primary_artist_name || '') +
+                  (r.label_name ? ' · ' + esc(r.label_name) : '') + ' · ' + esc(r.release_type || '') + '</div>' +
+                '<div class="rv-dim">Submitted ' + esc(fmt(r.submitted_at)) +
+                  (r.submission_ref ? ' · ' + esc(r.submission_ref) : '') + '</div>' +
+                '<div class="rv-dim">Go live ' + esc(fmt(r.go_live_at)) + '</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="rv-grid">' +
+              '<div><div class="rv-label">Metadata</div>' +
+                '<div class="rv-dim">' +
+                  'UPC ' + esc(r.upc || '—') + '<br>' +
+                  'Genre ' + esc(r.primary_genre || '—') + (r.secondary_genre ? ' / ' + esc(r.secondary_genre) : '') + '<br>' +
+                  'Language ' + esc(r.language || '—') + '<br>' +
+                  'Advisory ' + esc(r.parental_advisory || '—') + '<br>' +
+                  'Territory ' + esc(r.territory_mode || '—') +
+                    (r.excluded_territories && r.excluded_territories.length ? ' (' + esc(r.excluded_territories.join(', ')) + ')' : '') + '<br>' +
+                  esc(r.p_line || '—') + '<br>' + esc(r.c_line || '—') +
+                '</div></div>' +
+              '<div><div class="rv-label">Rights</div>' + rights + '</div>' +
+              '<div><div class="rv-label">Destinations</div>' +
+                (D.dests.length ? D.dests.map(function (x) {
+                    return '<div class="rv-dim">' + esc(x.destination) + ' — ' + esc(x.status) +
+                        (x.external_distributor ? ' (' + esc(x.external_distributor) + ')' : '') + '</div>';
+                }).join('') : '<div class="rv-dim">None chosen.</div>') +
+              '</div>' +
+            '</div>' +
+            '<div class="rv-label">Tracks (' + D.tracks.length + ')</div>' +
+            (D.tracks.length
+              ? D.tracks.map(function (t) { return trackLine(t, D.contribs); }).join('')
+              : '<div class="lb-error">No tracks on this release. It should not have been submittable.</div>') +
+            '<div class="rv-actions">' +
+              '<button class="rv-btn rv-approve" onclick="AIADReview.act(\'' + esc(r.id) + '\',\'approve\')">Approve</button>' +
+              '<button class="rv-btn" onclick="AIADReview.act(\'' + esc(r.id) + '\',\'request_changes\')">Request changes</button>' +
+              '<button class="rv-btn rv-reject" onclick="AIADReview.act(\'' + esc(r.id) + '\',\'reject\')">Reject</button>' +
+              '<button class="rv-btn rv-publish" onclick="AIADReview.act(\'' + esc(r.id) + '\',\'publish_now\')">Publish now</button>' +
+            '</div>' +
+            '<div class="rv-dim">Approving schedules the release for its go-live date. Publish now overrides that date.</div>' +
+        '</div>';
+    }
+
+    function queueView() {
+        if (!RV.rows.length) return '<div class="lb-empty">Nothing waiting for review.</div>';
+        return RV.rows.map(function (r) {
+            return '<div class="rv-row" onclick="AIADReview.openDetail(\'' + esc(r.id) + '\')">' +
+                (r.artwork_url ? '<img class="rv-thumb" src="' + esc(r.artwork_url) + '" alt="">' : '<div class="rv-thumb lb-art-empty"></div>') +
+                '<div class="rv-row-main">' +
+                  '<div class="rv-row-title">' + esc(r.title || 'Untitled') + '</div>' +
+                  '<div class="rv-dim">' + esc(r.primary_artist_name || '') + ' · ' + esc(r.release_type || '') +
+                    ' · submitted ' + esc(fmt(r.submitted_at)) + '</div>' +
+                '</div>' +
+                '<span class="lb-chip lb-chip-' + esc(r.status) + '">' + esc(r.status) + '</span>' +
+            '</div>';
+        }).join('');
+    }
+
+    function render() {
+        var el = host();
+        if (!el) return;
+        var body;
+        if (RV.busy) body = '<div class="lb-empty">Loading…</div>';
+        else if (RV.detail) body = detailView();
+        else if (RV.err) body = '<div class="lb-error">' + esc(RV.err) + '</div>' + queueView();
+        else body = (RV.msg ? '<div class="rv-msg">' + esc(RV.msg) + '</div>' : '') + queueView();
+
+        el.innerHTML =
+            '<div class="view-header"><div>' +
+              '<h1 class="view-title">Review queue</h1>' +
+              '<p class="view-subtitle">Releases waiting to be approved, changed or rejected.</p>' +
+            '</div></div>' + body;
+    }
+
+    async function open() {
+        render();
+        if (!(await isFounder())) {
+            var el = host();
+            if (el) el.innerHTML = '<div class="lb-error">This queue is founder-only.</div>';
+            return;
+        }
+        await load();
+    }
+
+    // Reveal the nav item only for the founder. The queue is gated server-side by
+    // is_founder() regardless; this just keeps it out of everyone else's sidebar.
+    async function maybeShowNav() {
+        try {
+            if (!window.db || typeof window.__aiadSession !== 'function') return;
+            var s = window.__aiadSession();
+            if (!s || !s.user) return;
+            if (!(await isFounder())) return;
+            var el = document.getElementById('navReviewQueue');
+            if (el) el.style.display = '';
+            await load();
+        } catch (e) { console.warn('[AIAD review] nav check', e); }
+    }
+
+    window.AIADReview = {
+        open: open, load: load, openDetail: openDetail, closeDetail: closeDetail,
+        act: act, state: function () { return RV; }
+    };
+    setTimeout(maybeShowNav, 2500);
+})();
+</script>
+
 </body>
 
 
