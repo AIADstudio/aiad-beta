@@ -8292,6 +8292,17 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                         <div style="color:var(--text-muted);font-size:0.85rem;padding:20px;text-align:center;">Loading...</div>
                     </div>
 
+                    <!-- Listen: the streaming catalogue, beneath creator discovery -->
+                    <div id="listenSection" class="lx">
+                        <div class="lx-head">
+                            <h2 class="lx-h2">Listen</h2>
+                            <p class="lx-sub">Everything live on the AIAD Streaming Layer. A pledge to any artist unlocks all of it.</p>
+                        </div>
+                        <div id="listenPlaylists" class="lx-playlists"></div>
+                        <div id="listenGrid"></div>
+                        <div id="listenDetail" style="display:none;"></div>
+                    </div>
+
                     </div><!-- /main -->
                     <div class="studio-agent-col" style="position:sticky;top:24px;">
                         <div class="studio-agent-header"><div class="studio-agent-dot"></div><span class="studio-agent-name">AIAD · Discover</span></div>
@@ -22301,8 +22312,14 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 <button onclick="globalSeekRelative(-10)" style="background:transparent;border:none;color:var(--text-secondary);cursor:pointer;padding:4px;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg>
                 </button>
+                <button id="lxPrev" onclick="AIADListen.prev()" title="Previous" style="background:transparent;border:none;color:var(--text-secondary);cursor:pointer;padding:4px;">
+                    <svg viewBox="0 0 24 24" fill="currentColor" style="width:15px;height:15px;"><polygon points="19 20 9 12 19 4 19 20"/><rect x="4" y="4" width="2.5" height="16"/></svg>
+                </button>
                 <button id="bottomPlayBtn" onclick="globalTogglePlay()" style="width:36px;height:36px;border-radius:50%;background:var(--teal);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#000;flex-shrink:0;">
                     <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                </button>
+                <button id="lxNext" onclick="AIADListen.next()" title="Next" style="background:transparent;border:none;color:var(--text-secondary);cursor:pointer;padding:4px;">
+                    <svg viewBox="0 0 24 24" fill="currentColor" style="width:15px;height:15px;"><polygon points="5 4 15 12 5 20 5 4"/><rect x="17.5" y="4" width="2.5" height="16"/></svg>
                 </button>
                 <button onclick="globalSeekRelative(10)" style="background:transparent;border:none;color:var(--text-secondary);cursor:pointer;padding:4px;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
@@ -22310,8 +22327,14 @@ Only capture real, meaningful decisions — not questions or general discussion.
             </div>
 
             <div style="flex:2;min-width:0;">
-                <div onclick="seekGlobalTrack(event)" style="height:3px;background:rgba(255,255,255,0.1);border-radius:2px;cursor:pointer;position:relative;">
-                    <div id="bottomProgress" style="height:100%;width:0%;background:var(--teal);border-radius:2px;pointer-events:none;transition:width 0.5s linear;"></div>
+                <!-- Waveform when the track has peaks, the original bar when it does not. -->
+                <div id="lxWaveBarWrap" style="display:none;">
+                    <canvas id="lxWaveBar" height="34" onclick="AIADListen.waveSeek(event)" style="display:block;width:100%;height:34px;cursor:pointer;"></canvas>
+                </div>
+                <div id="bottomProgressWrap">
+                    <div onclick="seekGlobalTrack(event)" style="height:3px;background:rgba(255,255,255,0.1);border-radius:2px;cursor:pointer;position:relative;">
+                        <div id="bottomProgress" style="height:100%;width:0%;background:var(--teal);border-radius:2px;pointer-events:none;transition:width 0.5s linear;"></div>
+                    </div>
                 </div>
                 <div style="display:flex;justify-content:space-between;margin-top:3px;">
                     <span id="bottomCurrent" style="font-size:0.6rem;color:var(--text-muted);">0:00</span>
@@ -23365,6 +23388,12 @@ function showFanView(view) {
     const viewId = viewMap[view] || null;
     const viewEl = viewId ? document.getElementById(viewId) : null;
     if (!viewEl) { showDemoPreview(view.charAt(0).toUpperCase() + view.slice(1)); return; }
+    if (viewId === 'fanDiscoverView') {
+        setTimeout(function () {
+            try { if (window.AIADListen) AIADListen.open(); }
+            catch (e) { console.warn('[AIAD listen] open failed:', e && e.message); }
+        }, 60);
+    }
     document.querySelectorAll('#fanDashboard .dash-view').forEach(v => v.classList.remove('active'));
     viewEl.classList.add('active');
     const rs = document.getElementById('fanSidebar');
@@ -36204,6 +36233,967 @@ window.AIAD_PROMPTS = [
             return out;
         }
     };
+})();
+</script>
+<style id="aiad-listen-css">
+/* ── Listen: catalogue, waveform, comments, playlists ───────────────────── */
+.lx{margin-top:34px;padding-top:26px;border-top:1px solid var(--border-default,rgba(255,255,255,0.08));}
+.lx-head{margin-bottom:16px;}
+.lx-h2{font-size:1.25rem;font-weight:700;margin:0 0 4px;letter-spacing:-0.01em;}
+.lx-h3{font-size:0.74rem;font-weight:700;text-transform:uppercase;letter-spacing:0.13em;color:var(--text-muted,rgba(255,255,255,0.42));margin:0 0 10px;}
+.lx-sub{font-size:0.86rem;color:var(--text-secondary,rgba(255,255,255,0.62));margin:0;line-height:1.55;}
+.lx-empty{padding:44px 20px;text-align:center;color:var(--text-muted,rgba(255,255,255,0.42));font-size:0.88rem;
+  border:1px dashed var(--border-default,rgba(255,255,255,0.1));border-radius:14px;display:flex;flex-direction:column;gap:6px;}
+.lx-empty strong{color:var(--text-secondary,rgba(255,255,255,0.7));font-size:0.95rem;}
+.lx-empty-sm{padding:14px 0;color:var(--text-muted,rgba(255,255,255,0.4));font-size:0.82rem;}
+.lx-filters{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:16px;}
+.lx-chip{background:rgba(255,255,255,0.04);border:1px solid var(--border-default,rgba(255,255,255,0.09));color:var(--text-secondary,rgba(255,255,255,0.6));
+  border-radius:999px;padding:6px 14px;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:inherit;transition:all 150ms ease;}
+.lx-chip.is-on{background:var(--text-primary,#fff);color:#0a0a0a;border-color:transparent;}
+.lx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px;}
+.lx-card{background:transparent;border:none;padding:0;cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:7px;font-family:inherit;}
+.lx-art{width:100%;aspect-ratio:1;object-fit:cover;border-radius:11px;display:block;
+  border:1px solid var(--border-default,rgba(255,255,255,0.08));transition:transform 180ms ease;}
+.lx-card:hover .lx-art{transform:translateY(-3px);}
+.lx-art-none{background:linear-gradient(135deg,rgba(0,180,216,0.16),rgba(224,64,251,0.16));}
+.lx-card-title{font-size:0.87rem;font-weight:600;color:var(--text-primary,#fff);line-height:1.3;}
+.lx-card-artist{font-size:0.78rem;color:var(--text-muted,rgba(255,255,255,0.45));}
+.lx-back{background:none;border:none;color:var(--text-secondary,rgba(255,255,255,0.6));font-size:0.83rem;cursor:pointer;padding:0 0 14px;font-family:inherit;}
+.lx-back:hover{color:var(--teal-light,#00D4FF);}
+.lx-rel-head{display:flex;gap:22px;flex-wrap:wrap;margin-bottom:20px;}
+.lx-rel-art{width:190px;height:190px;object-fit:cover;border-radius:14px;flex-shrink:0;border:1px solid var(--border-default,rgba(255,255,255,0.08));}
+.lx-rel-meta{flex:1;min-width:220px;}
+.lx-rel-meta h2{font-family:'Lora',Georgia,serif;font-size:1.7rem;font-weight:600;margin:0 0 4px;letter-spacing:-0.01em;}
+.lx-rel-artist{font-size:1rem;color:var(--text-secondary,rgba(255,255,255,0.7));margin-bottom:3px;}
+.lx-rel-sub{font-size:0.78rem;color:var(--text-muted,rgba(255,255,255,0.42));text-transform:uppercase;letter-spacing:0.07em;}
+.lx-rel-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px;}
+.lx-btn{background:rgba(255,255,255,0.05);border:1px solid var(--border-default,rgba(255,255,255,0.09));border-radius:9px;
+  padding:9px 16px;color:var(--text-primary,#fff);font-size:0.81rem;font-weight:600;font-family:inherit;cursor:pointer;transition:all 150ms ease;}
+.lx-btn:hover:not(:disabled){border-color:var(--border-hover,rgba(255,255,255,0.2));background:rgba(255,255,255,0.09);}
+.lx-btn:disabled{opacity:0.45;cursor:default;}
+.lx-btn-primary{background:linear-gradient(135deg,var(--teal,#00B4D8),var(--magenta-dark,#E040FB));border-color:transparent;color:#fff;}
+.lx-link{background:none;border:none;color:var(--teal-light,#00D4FF);font-size:inherit;cursor:pointer;text-decoration:underline;font-family:inherit;padding:0 3px;}
+.lx-note{margin-top:13px;padding:10px 13px;border-radius:9px;background:rgba(0,212,255,0.07);border:1px solid rgba(0,212,255,0.2);
+  font-size:0.8rem;color:var(--text-secondary,rgba(255,255,255,0.7));}
+.lx-wave-wrap{position:relative;margin:8px 0 18px;}
+.lx-wave{display:block;width:100%;height:96px;cursor:pointer;}
+.lx-markers{position:absolute;left:0;right:0;bottom:-9px;height:14px;pointer-events:none;}
+.lx-marker{position:absolute;top:0;width:11px;height:11px;margin-left:-5px;border-radius:50%;pointer-events:auto;cursor:pointer;
+  background:var(--magenta-light,#FF66FF);border:2px solid var(--bg-primary,#0A0A0A);padding:0;}
+.lx-marker.is-hidden{background:var(--text-muted,rgba(255,255,255,0.4));}
+.lx-tracks{display:flex;flex-direction:column;}
+.lx-track{display:flex;align-items:center;gap:13px;padding:11px 0;border-bottom:1px solid var(--border-default,rgba(255,255,255,0.06));}
+.lx-play{width:32px;height:32px;border-radius:50%;flex-shrink:0;background:rgba(255,255,255,0.07);
+  border:1px solid var(--border-default,rgba(255,255,255,0.1));color:var(--text-primary,#fff);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;padding:0;}
+.lx-play svg{width:11px;height:11px;margin-left:1px;}
+.lx-play:hover:not(:disabled){background:var(--teal,#00B4D8);color:#04141a;border-color:transparent;}
+.lx-play:disabled{opacity:0.35;cursor:default;}
+.lx-play.sm{width:26px;height:26px;}
+.lx-track-n{font-size:0.75rem;color:var(--text-muted,rgba(255,255,255,0.35));width:16px;text-align:right;font-variant-numeric:tabular-nums;}
+.lx-track-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.lx-track-title{font-size:0.9rem;font-weight:600;color:var(--text-primary,#fff);}
+.lx-e{font-style:normal;font-size:0.58rem;padding:1px 4px;border-radius:3px;background:rgba(255,255,255,0.12);color:var(--text-muted,rgba(255,255,255,0.5));vertical-align:middle;}
+.lx-track-credits{font-size:0.73rem;color:var(--text-muted,rgba(255,255,255,0.4));display:flex;gap:11px;flex-wrap:wrap;}
+.lx-track-state{font-size:0.72rem;color:#fcd34d;}
+.lx-track-dur{font-size:0.78rem;color:var(--text-muted,rgba(255,255,255,0.4));font-variant-numeric:tabular-nums;}
+.lx-comments{margin-top:26px;}
+.lx-comment-list{display:flex;flex-direction:column;gap:9px;margin-bottom:14px;}
+.lx-comment{display:flex;align-items:center;gap:11px;font-size:0.84rem;color:var(--text-secondary,rgba(255,255,255,0.7));}
+.lx-comment.is-hidden{opacity:0.5;}
+.lx-at{background:rgba(0,212,255,0.14);border:none;color:var(--teal-light,#00D4FF);border-radius:5px;padding:2px 7px;
+  font-size:0.72rem;font-weight:700;cursor:pointer;font-variant-numeric:tabular-nums;font-family:inherit;flex-shrink:0;}
+.lx-comment-body{flex:1;min-width:0;}
+.lx-comment-form{display:flex;gap:9px;}
+.lx-input{flex:1;min-width:0;background:rgba(255,255,255,0.04);border:1px solid var(--border-default,rgba(255,255,255,0.09));
+  border-radius:9px;padding:10px 13px;color:var(--text-primary,#fff);font-size:0.85rem;font-family:inherit;outline:none;}
+.lx-input:disabled{opacity:0.55;}
+.lx-input:focus{border-color:rgba(0,212,255,0.5);}
+.lx-playlists{margin-bottom:24px;}
+.lx-pl-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;}
+.lx-pl-list{display:flex;flex-direction:column;gap:7px;}
+.lx-pl{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:10px;cursor:grab;
+  background:rgba(255,255,255,0.02);border:1px solid var(--border-default,rgba(255,255,255,0.07));}
+.lx-pl-title{flex:1;min-width:0;font-size:0.86rem;font-weight:600;}
+.lx-pl-vis{font-size:0.71rem;color:var(--text-muted,rgba(255,255,255,0.4));text-transform:uppercase;letter-spacing:0.07em;}
+.lx-lines{margin-top:22px;font-size:0.72rem;color:var(--text-hint,rgba(255,255,255,0.3));}
+@media (max-width:768px){
+  .lx-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;}
+  .lx-rel-art{width:130px;height:130px;}
+  .lx-wave{height:64px;}
+}
+</style>
+
+<script>
+/* ══════════════ LISTEN — fan catalogue, waveform player, comments, playlists ══════════════
+   Playback never touches release-deliveries directly: every URL is minted by the
+   stream-token edge function, which checks the pledge and writes the play_event. The
+   bucket keeps its RLS untouched.
+
+   This extends the existing bottom bar rather than adding a second player — it wraps
+   loadGlobalTrack / onGlobalTimeUpdate / onGlobalEnded and leaves artist-library
+   playback on window.trackAudioUrl() exactly as it was. */
+(function () {
+    'use strict';
+    if (window.AIADListen) return;
+
+    var SUPA = (typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL) || '';
+    var TTL_REFRESH_MARGIN_MS = 20000;      // re-mint this far before the 300s URL dies
+
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+    function el(id) { return document.getElementById(id); }
+    function toast(m) { if (window.showToast) showToast(m); else console.warn('[AIAD listen]', m); }
+    function fmt(s) {
+        s = Math.max(0, Math.floor(Number(s) || 0));
+        return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+    }
+    function money(c) { return '$' + ((Number(c) || 0) / 100).toFixed(2).replace(/\.00$/, ''); }
+
+    function dbFail(table, op, error, ctx) {
+        if (!error) return false;
+        console.error('[AIAD listen] ' + op + ' ' + table + ':', error.message, error.code, error.details);
+        if (window.reportDbError) window.reportDbError(table, op, error, ctx || {});
+        toast((error.message || 'Something went wrong') + (error.code ? ' [' + error.code + ']' : ''));
+        return true;
+    }
+
+    var S = {
+        releases: [], genre: '', entitled: false, uid: null,
+        release: null, tracks: [], comments: [], playlists: [],
+        queue: [], queueIndex: -1, loaded: false
+    };
+
+    async function session() {
+        try {
+            var r = await window.db.auth.getSession();
+            return (r && r.data && r.data.session) || null;
+        } catch (e) {
+            console.warn('[AIAD listen] session lookup failed:', e && e.message);
+            return null;
+        }
+    }
+
+    // ── stream-token ────────────────────────────────────────────────────────
+    /* Returns { ok, data } or { ok:false, reason, status }. Never throws at callers —
+       the reasons are the whole point (a 403 opens the pledge tiers, a 409 says the
+       file is still being prepared). */
+    async function mintStreamUrl(trackId, source) {
+        var s = await session();
+        if (!s) return { ok: false, reason: 'signed_out', status: 401 };
+        var res;
+        try {
+            res = await fetch(SUPA + '/functions/v1/stream-token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + s.access_token },
+                body: JSON.stringify({ track_id: trackId, source: source || 'stream', session_id: sessionId() })
+            });
+        } catch (e) {
+            console.error('[AIAD listen] stream-token unreachable:', e && e.message);
+            return { ok: false, reason: 'network', status: 0 };
+        }
+        var body = await res.json().catch(function () { return {}; });
+        if (!res.ok) {
+            console.warn('[AIAD listen] stream-token ' + res.status + ':', body.reason || body.error);
+            return { ok: false, reason: body.reason || 'error', status: res.status, error: body.error };
+        }
+        return { ok: true, data: body };
+    }
+
+    var _sid = null;
+    function sessionId() {
+        if (_sid) return _sid;
+        try {
+            _sid = sessionStorage.getItem('aiad_listen_sid');
+            if (!_sid) {
+                _sid = 'l' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+                sessionStorage.setItem('aiad_listen_sid', _sid);
+            }
+        } catch (e) { _sid = 'l' + Date.now().toString(36); }
+        return _sid;
+    }
+
+    /* sendBeacon cannot set an Authorization header, and stream-token requires a JWT,
+       so the close call uses fetch({keepalive:true}) — the modern equivalent that does
+       carry headers and still survives the page going away. */
+    function closePlayEvent(playEventId, msPlayed, completed, useKeepalive) {
+        if (!playEventId) return;
+        session().then(function (s) {
+            if (!s) return;
+            var opts = {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + s.access_token },
+                body: JSON.stringify({ play_event_id: playEventId, ms_played: Math.round(msPlayed || 0), completed: !!completed })
+            };
+            if (useKeepalive) opts.keepalive = true;
+            fetch(SUPA + '/functions/v1/stream-token/close', opts).catch(function (e) {
+                console.warn('[AIAD listen] close play_event failed:', e && e.message);
+            });
+        });
+    }
+
+    // ── entitlement ─────────────────────────────────────────────────────────
+    async function refreshEntitlement() {
+        var uid = (window.AppState && AppState.currentUser && AppState.currentUser.id) || null;
+        S.uid = uid;
+        if (!uid) { S.entitled = false; return false; }
+        var r = await window.db.rpc('has_streaming_access', { p_user: uid });
+        if (r.error) {
+            console.warn('[AIAD listen] has_streaming_access failed:', r.error.message);
+            S.entitled = false;     // fail closed in the UI; the server decides anyway
+            return false;
+        }
+        S.entitled = r.data === true;
+        return S.entitled;
+    }
+
+    function openPledge() {
+        if (typeof window.openTierSelectionModal === 'function') {
+            openTierSelectionModal((S.release && S.release.primary_artist_name) || 'this artist');
+        } else {
+            toast('Pledge to any artist to listen in full.');
+        }
+    }
+
+    // ── catalogue ───────────────────────────────────────────────────────────
+    async function loadCatalogue() {
+        var host = el('listenGrid');
+        if (!host) return;
+        host.innerHTML = '<div class="lx-empty">Loading…</div>';
+
+        // Live releases that were actually published to AIAD Streaming. The inner join
+        // on release_destinations is what makes "live" mean listenable.
+        var r = await window.db.from('releases')
+            .select('id,title,primary_artist_name,artwork_url,primary_genre,secondary_genre,go_live_at,user_id,' +
+                    'release_destinations!inner(destination,status)')
+            .eq('status', 'live')
+            .eq('release_destinations.destination', 'aiad_streaming')
+            .eq('release_destinations.status', 'live')
+            .order('go_live_at', { ascending: false });
+        if (dbFail('releases', 'select', r.error, { via: 'catalogue' })) {
+            host.innerHTML = '<div class="lx-empty">Could not load the catalogue. ' + esc(r.error.message) + '</div>';
+            return;
+        }
+        S.releases = r.data || [];
+        renderCatalogue();
+    }
+
+    function renderCatalogue() {
+        var host = el('listenGrid');
+        if (!host) return;
+        var list = S.genre
+            ? S.releases.filter(function (x) { return x.primary_genre === S.genre || x.secondary_genre === S.genre; })
+            : S.releases;
+
+        var genres = {};
+        S.releases.forEach(function (x) {
+            if (x.primary_genre) genres[x.primary_genre] = 1;
+            if (x.secondary_genre) genres[x.secondary_genre] = 1;
+        });
+        var chips = Object.keys(genres).sort();
+
+        var filter = chips.length
+            ? '<div class="lx-filters">' +
+                '<button class="lx-chip' + (S.genre ? '' : ' is-on') + '" onclick="AIADListen.setGenre(\'\')">All</button>' +
+                chips.map(function (g) {
+                    return '<button class="lx-chip' + (S.genre === g ? ' is-on' : '') + '" onclick="AIADListen.setGenre(' +
+                        JSON.stringify(g).replace(/"/g, '&quot;') + ')">' + esc(g) + '</button>';
+                }).join('') +
+              '</div>'
+            : '';
+
+        if (!S.releases.length) {
+            host.innerHTML = '<div class="lx-empty"><strong>No releases yet</strong>' +
+                '<span>The catalogue opens when the first artist goes live.</span></div>';
+            return;
+        }
+        if (!list.length) {
+            host.innerHTML = filter + '<div class="lx-empty"><strong>Nothing in ' + esc(S.genre) + ' yet</strong>' +
+                '<span>Try another genre.</span></div>';
+            return;
+        }
+        host.innerHTML = filter + '<div class="lx-grid">' + list.map(function (x) {
+            return '<button class="lx-card" onclick="AIADListen.openRelease(' + JSON.stringify(x.id).replace(/"/g, '&quot;') + ')">' +
+                (x.artwork_url
+                    ? '<img class="lx-art" src="' + esc(x.artwork_url) + '" alt="" loading="lazy">'
+                    : '<span class="lx-art lx-art-none"></span>') +
+                '<span class="lx-card-title">' + esc(x.title || 'Untitled') + '</span>' +
+                '<span class="lx-card-artist">' + esc(x.primary_artist_name || '') + '</span>' +
+            '</button>';
+        }).join('') + '</div>';
+    }
+
+    function setGenre(g) { S.genre = g || ''; renderCatalogue(); }
+
+    // ── release detail ──────────────────────────────────────────────────────
+    async function openRelease(id) {
+        var host = el('listenDetail');
+        var grid = el('listenGrid');
+        if (!host) return;
+        host.style.display = 'block';
+        if (grid) grid.style.display = 'none';
+        host.innerHTML = '<div class="lx-empty">Loading…</div>';
+
+        var rel = await window.db.from('releases')
+            .select('id,title,primary_artist_name,artwork_url,primary_genre,p_line,c_line,go_live_at,user_id,purchasable,min_price_cents,pwyw')
+            .eq('id', id).maybeSingle();
+        if (dbFail('releases', 'select', rel.error, { via: 'release_detail' })) return;
+        if (!rel.data) { host.innerHTML = '<div class="lx-empty">That release is not available.</div>'; return; }
+        S.release = rel.data;
+
+        var tr = await window.db.from('tracks')
+            .select('id,title,track_number,duration_seconds,derivatives_status,purchasable,min_price_cents,preview_start_seconds,waveform_peaks,explicit')
+            .eq('release_id', id).order('track_number', { ascending: true });
+        if (dbFail('tracks', 'select', tr.error, { via: 'release_detail' })) return;
+        S.tracks = tr.data || [];
+
+        var ids = S.tracks.map(function (t) { return t.id; });
+        S.credits = {};
+        if (ids.length) {
+            var cr = await window.db.from('track_contributors')
+                .select('track_id,role,legal_name,stage_name').in('track_id', ids);
+            if (dbFail('track_contributors', 'select', cr.error, { via: 'release_detail' })) return;
+            (cr.data || []).forEach(function (c) {
+                (S.credits[c.track_id] = S.credits[c.track_id] || []).push(c);
+            });
+        }
+
+        // What this fan already owns, so Buy becomes Download.
+        S.owned = {};
+        if (S.uid && ids.length) {
+            var pu = await window.db.from('purchases')
+                .select('id,track_id,release_id,status').eq('buyer_id', S.uid).eq('status', 'paid');
+            if (dbFail('purchases', 'select', pu.error, { via: 'release_detail' })) return;
+            (pu.data || []).forEach(function (p) {
+                if (p.track_id) S.owned[p.track_id] = p.id;
+                if (p.release_id === id) S.owned['__release'] = p.id;
+            });
+        }
+        renderRelease();
+    }
+
+    function creditLine(trackId) {
+        var list = S.credits[trackId] || [];
+        if (!list.length) return '';
+        var by = {};
+        list.forEach(function (c) { (by[c.role] = by[c.role] || []).push(c.stage_name || c.legal_name); });
+        var order = ['songwriter', 'producer', 'co_producer', 'additional_production', 'featured_performer', 'musician', 'mixing_engineer', 'mastering_engineer'];
+        var label = { songwriter: 'Written by', producer: 'Produced by', co_producer: 'Co-produced by',
+                      additional_production: 'Additional production', featured_performer: 'Featuring',
+                      musician: 'Musicians', mixing_engineer: 'Mixed by', mastering_engineer: 'Mastered by' };
+        return order.filter(function (r) { return by[r]; })
+            .map(function (r) { return '<span>' + esc(label[r]) + ' ' + esc(by[r].join(', ')) + '</span>'; }).join('');
+    }
+
+    function trackRow(t, i) {
+        var ready = t.derivatives_status === 'ready';
+        var owned = S.owned && S.owned[t.id];
+        var buyable = ready && t.purchasable !== false && t.min_price_cents;
+        return '<div class="lx-track" id="lxTrack-' + esc(t.id) + '">' +
+            '<button class="lx-play" ' + (ready ? '' : 'disabled ') +
+              'onclick="AIADListen.playTrack(' + JSON.stringify(t.id).replace(/"/g, '&quot;') + ')" aria-label="Play">' +
+              '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>' +
+            '<span class="lx-track-n">' + (t.track_number || i + 1) + '</span>' +
+            '<span class="lx-track-main">' +
+              '<span class="lx-track-title">' + esc(t.title || 'Untitled') +
+                (t.explicit ? ' <em class="lx-e">E</em>' : '') + '</span>' +
+              '<span class="lx-track-credits">' + creditLine(t.id) + '</span>' +
+              (ready ? '' : '<span class="lx-track-state">' +
+                  (t.derivatives_status === 'qc_failed' ? 'Not available — the master did not pass QC'
+                                                        : 'Preparing files…') + '</span>') +
+            '</span>' +
+            '<span class="lx-track-dur">' + (t.duration_seconds ? fmt(t.duration_seconds) : '') + '</span>' +
+            (owned
+              ? '<button class="lx-btn" onclick="AIADListen.download(' + JSON.stringify(owned).replace(/"/g, '&quot;') +
+                ',' + JSON.stringify(t.id).replace(/"/g, '&quot;') + ')">Download</button>'
+              : (buyable
+                  ? '<button class="lx-btn" onclick="AIADListen.buyTrack(' + JSON.stringify(t.id).replace(/"/g, '&quot;') + ')">' +
+                    money(t.min_price_cents) + '</button>'
+                  : (ready ? '' : '<button class="lx-btn" disabled>Preparing files</button>'))) +
+        '</div>';
+    }
+
+    function renderRelease() {
+        var host = el('listenDetail');
+        var r = S.release;
+        if (!host || !r) return;
+        var relOwned = S.owned && S.owned['__release'];
+        var anyReady = S.tracks.some(function (t) { return t.derivatives_status === 'ready'; });
+
+        host.innerHTML =
+        '<button class="lx-back" onclick="AIADListen.closeRelease()">← All releases</button>' +
+        '<div class="lx-rel-head">' +
+          (r.artwork_url ? '<img class="lx-rel-art" src="' + esc(r.artwork_url) + '" alt="">' : '<div class="lx-rel-art lx-art-none"></div>') +
+          '<div class="lx-rel-meta">' +
+            '<h2>' + esc(r.title || 'Untitled') + '</h2>' +
+            '<div class="lx-rel-artist">' + esc(r.primary_artist_name || '') + '</div>' +
+            '<div class="lx-rel-sub">' + esc([r.primary_genre, r.go_live_at ? new Date(r.go_live_at).getFullYear() : ''].filter(Boolean).join(' · ')) + '</div>' +
+            '<div class="lx-rel-actions">' +
+              (anyReady ? '<button class="lx-btn lx-btn-primary" onclick="AIADListen.playRelease()">Play</button>' : '') +
+              (relOwned
+                ? '<button class="lx-btn" onclick="AIADListen.downloadRelease()">Download release</button>'
+                : (r.purchasable !== false && r.min_price_cents && anyReady
+                    ? '<button class="lx-btn" onclick="AIADListen.buyRelease()">Buy release ' + money(r.min_price_cents) + '</button>'
+                    : (anyReady ? '' : '<button class="lx-btn" disabled>Preparing files</button>'))) +
+              '<button class="lx-btn" onclick="AIADListen.addReleaseToPlaylist()">Add to playlist</button>' +
+            '</div>' +
+            (S.entitled ? '' : '<div class="lx-note">You’re hearing 60-second previews. ' +
+              '<button class="lx-link" onclick="AIADListen.openPledge()">Pledge to listen in full</button>.</div>') +
+          '</div>' +
+        '</div>' +
+        '<div class="lx-wave-wrap"><canvas id="lxWave" class="lx-wave" height="96"></canvas>' +
+          '<div id="lxMarkers" class="lx-markers"></div></div>' +
+        '<div class="lx-tracks">' + (S.tracks.length
+            ? S.tracks.map(trackRow).join('')
+            : '<div class="lx-empty">No tracks on this release yet.</div>') + '</div>' +
+        '<div class="lx-comments" id="lxComments"></div>' +
+        (r.p_line || r.c_line
+          ? '<div class="lx-lines">' + esc([r.p_line, r.c_line].filter(Boolean).join(' · ')) + '</div>' : '');
+
+        drawWave(null);
+        renderComments();
+    }
+
+    function closeRelease() {
+        var host = el('listenDetail');
+        var grid = el('listenGrid');
+        if (host) { host.style.display = 'none'; host.innerHTML = ''; }
+        if (grid) grid.style.display = 'block';
+        S.release = null;
+    }
+
+    // ── waveform ────────────────────────────────────────────────────────────
+    /* The peaks array is the thing that makes this not a generic audio player, so it
+       is drawn from real data or not at all — when waveform_peaks is null the caller
+       falls back to the plain bar the bottom bar already had. */
+    var wavePeaks = null;
+    function drawWave(peaks, progress) {
+        if (peaks !== undefined && peaks !== null) wavePeaks = peaks;
+        [el('lxWave'), el('lxWaveBar')].forEach(function (cv) {
+            if (!cv) return;
+            var host = cv.parentElement;
+            var w = Math.max(80, Math.floor(host.getBoundingClientRect().width));
+            var h = cv.height || 40;
+            var dpr = window.devicePixelRatio || 1;
+            if (cv.width !== Math.floor(w * dpr)) { cv.width = Math.floor(w * dpr); cv.style.width = w + 'px'; }
+            cv.style.height = h + 'px';
+            var ctx = cv.getContext('2d');
+            if (!ctx) return;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, w, h);
+            var pk = wavePeaks;
+            if (!pk || !pk.length) return;                     // caller shows the bar instead
+            var pct = Math.max(0, Math.min(1, Number(progress) || 0));
+            var bars = Math.min(pk.length, Math.max(40, Math.floor(w / 3)));
+            var step = pk.length / bars;
+            var bw = w / bars;
+            for (var i = 0; i < bars; i++) {
+                var v = 0, from = Math.floor(i * step), to = Math.max(from + 1, Math.floor((i + 1) * step));
+                for (var j = from; j < to && j < pk.length; j++) v = Math.max(v, Number(pk[j]) || 0);
+                var bh = Math.max(1.5, v * (h - 4));
+                ctx.fillStyle = (i / bars) <= pct ? 'rgba(0,212,255,0.95)' : 'rgba(255,255,255,0.20)';
+                ctx.fillRect(i * bw, (h - bh) / 2, Math.max(1, bw - 1), bh);
+            }
+        });
+    }
+    function waveSeek(ev) {
+        var cv = ev.currentTarget;
+        var rect = cv.getBoundingClientRect();
+        var pct = (ev.clientX - rect.left) / rect.width;
+        var a = el('globalAudioPlayer');
+        if (a && a.duration) a.currentTime = Math.max(0, Math.min(1, pct)) * a.duration;
+    }
+    function hasWave() { return !!(wavePeaks && wavePeaks.length); }
+
+    // ── fan playback ────────────────────────────────────────────────────────
+    var fan = { playEventId: null, expiresAt: 0, trackId: null, source: 'stream',
+                previewUntil: 0, startedAt: 0, refreshing: false };
+
+    async function playTrack(trackId, opts) {
+        opts = opts || {};
+        var t = S.tracks.filter(function (x) { return x.id === trackId; })[0] || null;
+        if (t && t.derivatives_status !== 'ready') {
+            toast(t.derivatives_status === 'qc_failed'
+                ? 'That track did not pass quality control and is not available.'
+                : 'That track is still being prepared.');
+            return false;
+        }
+        var wantPreview = !S.entitled;
+        var r = await mintStreamUrl(trackId, wantPreview ? 'preview' : 'stream');
+        if (!r.ok) {
+            if (r.reason === 'no_active_pledge') { openPledge(); return false; }
+            if (r.reason === 'signed_out') { toast('Sign in to listen.'); return false; }
+            if (r.reason === 'not_ready') { toast('That track is still being prepared.'); return false; }
+            if (r.reason === 'qc_failed') { toast('That track did not pass quality control.'); return false; }
+            toast(r.error || 'Could not start playback.');
+            return false;
+        }
+        var d = r.data;
+
+        // Close the previous event before replacing it, or the play we are leaving
+        // records zero listening time.
+        flushFanEvent(false);
+
+        fan.playEventId = d.play_event_id || null;
+        fan.expiresAt = Date.now() + (Number(d.expires_in) || 300) * 1000;
+        fan.trackId = trackId;
+        fan.source = d.preview ? 'preview' : 'stream';
+        fan.startedAt = Date.now();
+        fan.previewUntil = d.preview && d.client_must_clip
+            ? (Number(d.preview_start_seconds) || 0) + (Number(d.preview_duration_seconds) || 60)
+            : 0;
+
+        wavePeaks = (t && t.waveform_peaks) || d.waveform_peaks || null;
+        applyWaveMode();
+
+        window.loadGlobalTrack({
+            trackId: trackId,
+            title: (d.track && d.track.title) || (t && t.title) || 'Track',
+            imageUrl: (d.release && d.release.artwork_url) || (S.release && S.release.artwork_url) || '',
+            audioUrl: d.url,
+            source: 'uploaded',
+            __fan: true
+        });
+
+        // A clipped preview served from the full file has to be held to its window.
+        if (d.preview && d.client_must_clip) {
+            var a = el('globalAudioPlayer');
+            var start = Number(d.preview_start_seconds) || 0;
+            var seek = function () { try { a.currentTime = start; } catch (e) {} a.removeEventListener('loadedmetadata', seek); };
+            a.addEventListener('loadedmetadata', seek);
+        }
+        renderComments();
+        return true;
+    }
+
+    /* Swaps the bottom bar between the canvas waveform and the plain progress bar the
+       player already had, depending on whether this track has peaks. */
+    function applyWaveMode() {
+        var bar = el('lxWaveBarWrap');
+        var old = el('bottomProgressWrap');
+        if (!bar || !old) return;
+        var on = hasWave();
+        bar.style.display = on ? 'block' : 'none';
+        old.style.display = on ? 'none' : 'block';
+        if (on) drawWave(undefined, 0);
+    }
+
+    function flushFanEvent(completed) {
+        if (!fan.playEventId) return;
+        var a = el('globalAudioPlayer');
+        var ms = a ? a.currentTime * 1000 : 0;
+        closePlayEvent(fan.playEventId, ms, completed, false);
+        fan.playEventId = null;
+    }
+
+    /* A 300s URL will die under a 4-minute track. Re-mint just before it does and swap
+       the src in place, preserving position — the listener should never notice. */
+    async function refreshIfExpiring() {
+        if (!fan.trackId || fan.refreshing) return;
+        if (Date.now() < fan.expiresAt - TTL_REFRESH_MARGIN_MS) return;
+        fan.refreshing = true;
+        try {
+            var r = await mintStreamUrl(fan.trackId, fan.source);
+            if (!r.ok) { console.warn('[AIAD listen] URL refresh failed:', r.reason); return; }
+            var a = el('globalAudioPlayer');
+            if (!a) return;
+            var at = a.currentTime, wasPlaying = !a.paused;
+            a.src = r.data.url;
+            fan.expiresAt = Date.now() + (Number(r.data.expires_in) || 300) * 1000;
+            var resume = function () {
+                try { a.currentTime = at; } catch (e) {}
+                if (wasPlaying) Promise.resolve(a.play()).catch(function (e) {
+                    console.warn('[AIAD listen] resume after refresh failed:', e && e.message);
+                });
+                a.removeEventListener('loadedmetadata', resume);
+            };
+            a.addEventListener('loadedmetadata', resume);
+        } finally {
+            fan.refreshing = false;
+        }
+    }
+
+    // ── queue ───────────────────────────────────────────────────────────────
+    function setQueue(trackIds, startIndex) {
+        S.queue = (trackIds || []).slice();
+        S.queueIndex = typeof startIndex === 'number' ? startIndex : 0;
+        renderQueueControls();
+    }
+    function playQueueAt(i) {
+        if (i < 0 || i >= S.queue.length) return false;
+        S.queueIndex = i;
+        renderQueueControls();
+        return playTrack(S.queue[i]);
+    }
+    function next() { return playQueueAt(S.queueIndex + 1); }
+    function prev() {
+        var a = el('globalAudioPlayer');
+        if (a && a.currentTime > 3) { a.currentTime = 0; return true; }   // first press restarts
+        return playQueueAt(S.queueIndex - 1);
+    }
+    function renderQueueControls() {
+        var p = el('lxPrev'), n = el('lxNext');
+        if (p) p.disabled = S.queueIndex <= 0 && !(el('globalAudioPlayer') || {}).currentTime;
+        if (n) n.disabled = S.queueIndex >= S.queue.length - 1;
+    }
+
+    function playRelease() {
+        var ready = S.tracks.filter(function (t) { return t.derivatives_status === 'ready'; });
+        if (!ready.length) { toast('Nothing on this release is ready to play yet.'); return; }
+        setQueue(ready.map(function (t) { return t.id; }), 0);
+        playQueueAt(0);
+    }
+
+    // ── timestamped comments ────────────────────────────────────────────────
+    async function loadComments(trackId) {
+        if (!trackId) { S.comments = []; return; }
+        // RLS decides what comes back: hidden rows reach only their author, the
+        // track's artist and the founder.
+        var r = await window.db.from('track_comments')
+            .select('id,track_id,author_id,at_ms,body,hidden,created_at')
+            .eq('track_id', trackId).order('at_ms', { ascending: true });
+        if (dbFail('track_comments', 'select', r.error, { track: trackId })) { S.comments = []; return; }
+        S.comments = r.data || [];
+    }
+
+    async function renderComments() {
+        var host = el('lxComments');
+        if (!host) return;
+        var trackId = fan.trackId || (S.tracks[0] && S.tracks[0].id) || null;
+        if (!trackId) { host.innerHTML = ''; return; }
+        await loadComments(trackId);
+
+        var isArtist = !!(S.release && S.uid && S.release.user_id === S.uid);
+        var dur = (el('globalAudioPlayer') || {}).duration || 0;
+
+        var markers = S.comments.map(function (c) {
+            var pct = dur ? Math.max(0, Math.min(100, (c.at_ms / 1000 / dur) * 100)) : 0;
+            return '<button class="lx-marker' + (c.hidden ? ' is-hidden' : '') + '" style="left:' + pct.toFixed(2) + '%" ' +
+                'title="' + esc(c.body) + '" onclick="AIADListen.seekTo(' + Number(c.at_ms) + ')"></button>';
+        }).join('');
+        var mk = el('lxMarkers');
+        if (mk) mk.innerHTML = markers;
+
+        var list = S.comments.length
+            ? S.comments.map(function (c) {
+                return '<div class="lx-comment' + (c.hidden ? ' is-hidden' : '') + '">' +
+                    '<button class="lx-at" onclick="AIADListen.seekTo(' + Number(c.at_ms) + ')">' + fmt(c.at_ms / 1000) + '</button>' +
+                    '<span class="lx-comment-body">' + esc(c.body) + (c.hidden ? ' <em>(hidden)</em>' : '') + '</span>' +
+                    (isArtist && !c.hidden
+                      ? '<button class="lx-link" onclick="AIADListen.hideComment(' + JSON.stringify(c.id).replace(/"/g, '&quot;') + ')">Hide</button>'
+                      : '') +
+                '</div>';
+              }).join('')
+            : '<div class="lx-empty-sm">No comments yet.</div>';
+
+        host.innerHTML = '<h3 class="lx-h3">Comments</h3>' +
+            '<div class="lx-comment-list">' + list + '</div>' +
+            (S.entitled
+              ? '<div class="lx-comment-form">' +
+                  '<input id="lxCommentInput" class="lx-input" maxlength="500" placeholder="Say something at ' +
+                    fmt(((el('globalAudioPlayer') || {}).currentTime) || 0) + '…">' +
+                  '<button class="lx-btn lx-btn-primary" onclick="AIADListen.postComment()">Post</button>' +
+                '</div>'
+              : '<div class="lx-comment-form">' +
+                  '<input class="lx-input" disabled placeholder="Pledge to join the conversation">' +
+                  '<button class="lx-btn" onclick="AIADListen.openPledge()">Pledge</button>' +
+                '</div>');
+    }
+
+    function seekTo(atMs) {
+        var a = el('globalAudioPlayer');
+        if (a && a.duration) a.currentTime = Math.max(0, Number(atMs) / 1000);
+    }
+
+    async function postComment() {
+        var input = el('lxCommentInput');
+        if (!input) return;
+        var body = String(input.value || '').trim();
+        if (!body) { toast('Write something first.'); return; }
+        var trackId = fan.trackId || (S.tracks[0] && S.tracks[0].id);
+        if (!trackId) { toast('Play a track to comment on it.'); return; }
+        // The position at the moment of posting is the anchor — that is the whole point.
+        var atMs = Math.round((((el('globalAudioPlayer') || {}).currentTime) || 0) * 1000);
+        var r = await window.db.from('track_comments')
+            .insert({ track_id: trackId, author_id: S.uid, at_ms: atMs, body: body })
+            .select('id').maybeSingle();
+        if (dbFail('track_comments', 'insert', r.error, { track: trackId })) return;
+        input.value = '';
+        renderComments();
+    }
+
+    /* Artists hide; nobody edits. The body column is trigger-protected, so an edit
+       control here would only produce a confusing failure. */
+    async function hideComment(id) {
+        var r = await window.db.from('track_comments').update({ hidden: true }).eq('id', id).select('id').maybeSingle();
+        if (dbFail('track_comments', 'update', r.error, { comment: id })) return;
+        if (!r.data) { toast('That comment could not be hidden — it may not be on your track.'); return; }
+        renderComments();
+    }
+
+    // ── playlists ───────────────────────────────────────────────────────────
+    async function loadPlaylists() {
+        if (!S.uid) { S.playlists = []; return; }
+        var r = await window.db.from('playlists')
+            .select('id,title,description,is_public,cover_url').eq('owner_id', S.uid)
+            .order('updated_at', { ascending: false });
+        if (dbFail('playlists', 'select', r.error)) { S.playlists = []; return; }
+        S.playlists = r.data || [];
+    }
+
+    async function createPlaylist() {
+        if (!S.uid) { toast('Sign in to make a playlist.'); return; }
+        var title = window.prompt('Playlist name');
+        if (!title || !title.trim()) return;
+        var isPublic = window.confirm('Make this playlist public? OK for public, Cancel for private.');
+        var r = await window.db.from('playlists')
+            .insert({ owner_id: S.uid, title: title.trim(), is_public: isPublic })
+            .select('id,title,is_public').maybeSingle();
+        if (dbFail('playlists', 'insert', r.error)) return;
+        await loadPlaylists();
+        renderPlaylists();
+        toast('Playlist created.');
+        return r.data;
+    }
+
+    async function addTrackToPlaylist(trackId, playlistId) {
+        // position goes on the end; unique(playlist_id,track_id) makes a repeat a no-op
+        var pos = await window.db.from('playlist_tracks')
+            .select('position').eq('playlist_id', playlistId)
+            .order('position', { ascending: false }).limit(1);
+        if (dbFail('playlist_tracks', 'select', pos.error)) return false;
+        var nextPos = (pos.data && pos.data[0] ? Number(pos.data[0].position) : 0) + 1;
+        var r = await window.db.from('playlist_tracks')
+            .insert({ playlist_id: playlistId, track_id: trackId, position: nextPos }).select('id').maybeSingle();
+        if (r.error && r.error.code === '23505') { toast('Already in that playlist.'); return true; }
+        if (dbFail('playlist_tracks', 'insert', r.error)) return false;
+        return true;
+    }
+
+    async function addReleaseToPlaylist() {
+        if (!S.uid) { toast('Sign in to make a playlist.'); return; }
+        await loadPlaylists();
+        var names = S.playlists.map(function (p, i) { return (i + 1) + '. ' + p.title; }).join('\n');
+        var pick = window.prompt('Add to which playlist?\n\n' + (names || '(none yet)') + '\n\nType a number, or "new".', 'new');
+        if (pick === null) return;
+        var target = null;
+        if (String(pick).trim().toLowerCase() === 'new') target = await createPlaylist();
+        else target = S.playlists[parseInt(pick, 10) - 1];
+        if (!target) { toast('No playlist chosen.'); return; }
+        var ready = S.tracks.filter(function (t) { return t.derivatives_status === 'ready'; });
+        if (!ready.length) { toast('Nothing on this release is ready yet.'); return; }
+        for (var i = 0; i < ready.length; i++) {
+            if (!(await addTrackToPlaylist(ready[i].id, target.id))) return;
+        }
+        toast('Added ' + ready.length + ' track' + (ready.length === 1 ? '' : 's') + ' to ' + target.title + '.');
+    }
+
+    async function playPlaylist(playlistId) {
+        var r = await window.db.from('playlist_tracks')
+            .select('track_id,position,tracks!inner(id,title,derivatives_status,waveform_peaks)')
+            .eq('playlist_id', playlistId).order('position', { ascending: true });
+        if (dbFail('playlist_tracks', 'select', r.error, { playlist: playlistId })) return;
+        var ready = (r.data || []).filter(function (x) { return x.tracks && x.tracks.derivatives_status === 'ready'; });
+        if (!ready.length) { toast('Nothing in that playlist is ready to play yet.'); return; }
+        S.tracks = ready.map(function (x) { return x.tracks; });
+        setQueue(ready.map(function (x) { return x.track_id; }), 0);
+        playQueueAt(0);
+    }
+
+    /* Drag to reorder. position is rewritten for the whole list in one pass so the
+       sequence stays dense and predictable rather than drifting into fractions. */
+    async function reorderPlaylist(playlistId, orderedTrackIds) {
+        for (var i = 0; i < orderedTrackIds.length; i++) {
+            var r = await window.db.from('playlist_tracks')
+                .update({ position: i + 1 })
+                .eq('playlist_id', playlistId).eq('track_id', orderedTrackIds[i]).select('id').maybeSingle();
+            if (dbFail('playlist_tracks', 'update', r.error, { playlist: playlistId, track: orderedTrackIds[i] })) return false;
+        }
+        return true;
+    }
+
+    function renderPlaylists() {
+        var host = el('listenPlaylists');
+        if (!host) return;
+        host.innerHTML = '<div class="lx-pl-head"><h3 class="lx-h3">Your playlists</h3>' +
+            '<button class="lx-btn" onclick="AIADListen.createPlaylist()">New playlist</button></div>' +
+            (S.playlists.length
+              ? '<div class="lx-pl-list" id="lxPlList">' + S.playlists.map(function (p) {
+                    return '<div class="lx-pl" draggable="true" data-id="' + esc(p.id) + '">' +
+                        '<button class="lx-play sm" onclick="AIADListen.playPlaylist(' + JSON.stringify(p.id).replace(/"/g, '&quot;') + ')">' +
+                          '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>' +
+                        '<span class="lx-pl-title">' + esc(p.title) + '</span>' +
+                        '<span class="lx-pl-vis">' + (p.is_public ? 'Public' : 'Private') + '</span>' +
+                    '</div>';
+                }).join('') + '</div>'
+              : '<div class="lx-empty-sm">No playlists yet.</div>');
+    }
+
+    // ── buy / download ──────────────────────────────────────────────────────
+    async function buy(kind, id, minCents) {
+        var s = await session();
+        if (!s) { toast('Sign in to buy.'); return; }
+        if (!window.startCheckout) { toast('Checkout is not configured yet.'); return; }
+        // PWYW defaults to the artist's minimum; the server re-checks it either way.
+        var amount = minCents;
+        if (S.release && S.release.pwyw !== false) {
+            var typed = window.prompt('Name your price (minimum ' + money(minCents) + ')', (minCents / 100).toFixed(2));
+            if (typed === null) return;
+            var c = Math.round(parseFloat(typed) * 100);
+            if (!isFinite(c) || c < minCents) { toast('Minimum is ' + money(minCents) + '.'); return; }
+            amount = c;
+        }
+        try {
+            await window.startCheckout(kind === 'track' ? 'track_purchase' : 'release_purchase',
+                                       'payment', { kind: kind, id: id, amount_cents: amount });
+        } catch (e) {
+            console.error('[AIAD listen] checkout failed:', e);
+            toast('Could not start checkout: ' + (e.message || e));
+        }
+    }
+    function buyTrack(trackId) {
+        var t = S.tracks.filter(function (x) { return x.id === trackId; })[0];
+        if (!t) return;
+        buy('track', trackId, Number(t.min_price_cents) || 0);
+    }
+    function buyRelease() {
+        if (!S.release) return;
+        buy('release', S.release.id, Number(S.release.min_price_cents) || 0);
+    }
+
+    async function download(purchaseId, trackId, format) {
+        var s = await session();
+        if (!s) { toast('Sign in to download.'); return; }
+        var res;
+        try {
+            res = await fetch(SUPA + '/functions/v1/download-token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + s.access_token },
+                body: JSON.stringify({ purchase_id: purchaseId, track_id: trackId, format: format || 'mp3_320' })
+            });
+        } catch (e) {
+            console.error('[AIAD listen] download-token unreachable:', e && e.message);
+            toast('Could not reach the download service.');
+            return;
+        }
+        var body = await res.json().catch(function () { return {}; });
+        if (!res.ok || !body.url) {
+            console.warn('[AIAD listen] download-token ' + res.status + ':', body.reason || body.error);
+            toast(body.error || 'Could not create a download link.');
+            return;
+        }
+        window.location.href = body.url;
+        if (typeof body.remaining === 'number') {
+            toast(body.remaining + ' download' + (body.remaining === 1 ? '' : 's') + ' left for this file.');
+        }
+    }
+    async function downloadRelease() {
+        var pid = S.owned && S.owned['__release'];
+        if (!pid) { toast('You do not own this release.'); return; }
+        var ready = S.tracks.filter(function (t) { return t.derivatives_status === 'ready'; });
+        if (!ready.length) { toast('Nothing is ready to download yet.'); return; }
+        // One grant per track; browsers refuse a burst of navigations, so take the first
+        // and tell them the rest are on the track rows.
+        await download(pid, ready[0].id, 'mp3_320');
+        if (ready.length > 1) toast('Download the other tracks from their rows.');
+    }
+
+    // ── hook the existing player ────────────────────────────────────────────
+    /* Wrapping, not replacing. Artist-library playback keeps window.trackAudioUrl()
+       and every existing behaviour; only tracks loaded with __fan get the fan path. */
+    function installHooks() {
+        if (window.__aiadListenHooked) return;
+        window.__aiadListenHooked = true;
+
+        var origLoad = window.loadGlobalTrack;
+        if (typeof origLoad === 'function') {
+            window.loadGlobalTrack = function (track) {
+                if (!track || !track.__fan) {
+                    // Artist-library play: drop any fan state so a stale play_event is
+                    // not later closed against the wrong track.
+                    flushFanEvent(false);
+                    fan.trackId = null; wavePeaks = null; applyWaveMode();
+                }
+                return origLoad.apply(this, arguments);
+            };
+        }
+
+        var origTime = window.onGlobalTimeUpdate;
+        window.onGlobalTimeUpdate = function () {
+            if (typeof origTime === 'function') { try { origTime.apply(this, arguments); } catch (e) { console.warn('[AIAD listen] base timeupdate:', e && e.message); } }
+            var a = el('globalAudioPlayer');
+            if (!a) return;
+            if (hasWave() && a.duration) drawWave(undefined, a.currentTime / a.duration);
+            if (fan.trackId) {
+                refreshIfExpiring();
+                // Hold an unclipped preview to its 60 seconds.
+                if (fan.previewUntil && a.currentTime >= fan.previewUntil) {
+                    a.pause();
+                    flushFanEvent(false);
+                    openPledge();
+                }
+            }
+        };
+
+        var origEnded = window.onGlobalEnded;
+        window.onGlobalEnded = function () {
+            if (typeof origEnded === 'function') { try { origEnded.apply(this, arguments); } catch (e) { console.warn('[AIAD listen] base ended:', e && e.message); } }
+            flushFanEvent(true);
+            if (S.queue.length && S.queueIndex < S.queue.length - 1) next();
+        };
+
+        var a = el('globalAudioPlayer');
+        if (a) {
+            a.addEventListener('pause', function () { if (fan.trackId) flushFanEvent(false); });
+            a.addEventListener('play', function () { renderQueueControls(); });
+        }
+        // keepalive rather than sendBeacon: the close endpoint needs an Authorization
+        // header, which sendBeacon cannot set.
+        window.addEventListener('pagehide', function () {
+            if (!fan.playEventId) return;
+            var p = el('globalAudioPlayer');
+            closePlayEvent(fan.playEventId, p ? p.currentTime * 1000 : 0, false, true);
+            fan.playEventId = null;
+        });
+        window.addEventListener('resize', function () { if (hasWave()) drawWave(undefined, lastPct()); });
+    }
+    function lastPct() {
+        var a = el('globalAudioPlayer');
+        return a && a.duration ? a.currentTime / a.duration : 0;
+    }
+
+    // ── mount ───────────────────────────────────────────────────────────────
+    async function open() {
+        installHooks();
+        var host = el('listenSection');
+        if (!host) return;
+        await refreshEntitlement();
+        if (!S.loaded) {
+            S.loaded = true;
+            await loadPlaylists();
+        }
+        renderPlaylists();
+        await loadCatalogue();
+    }
+
+    window.AIADListen = {
+        open: open, loadCatalogue: loadCatalogue, setGenre: setGenre,
+        openRelease: openRelease, closeRelease: closeRelease,
+        playTrack: playTrack, playRelease: playRelease, playPlaylist: playPlaylist,
+        next: next, prev: prev, setQueue: setQueue,
+        seekTo: seekTo, postComment: postComment, hideComment: hideComment,
+        createPlaylist: createPlaylist, addReleaseToPlaylist: addReleaseToPlaylist,
+        addTrackToPlaylist: addTrackToPlaylist, reorderPlaylist: reorderPlaylist,
+        buyTrack: buyTrack, buyRelease: buyRelease, download: download, downloadRelease: downloadRelease,
+        openPledge: openPledge, waveSeek: waveSeek, drawWave: drawWave,
+        state: function () { return S; }
+    };
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', installHooks);
+    else installHooks();
 })();
 </script>
 </body>
