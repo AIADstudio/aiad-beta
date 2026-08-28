@@ -154,9 +154,18 @@ create policy "Anon can read public artist profiles" on public.artist_profiles
 
 -- Column grants bind anon only; `authenticated` keeps full access, so the
 -- signed-in select('*') paths for a user's own profile are unaffected.
+--
+-- Grants are ADDITIVE: a later, narrower grant does not remove an earlier wider
+-- one. My first version of this included is_founding_artist and founding_number,
+-- which had to be revoked by name afterwards. This is the settled set.
 revoke select on public.artist_profiles from anon;
 grant select (
-  id, user_id, artist_name, tagline, short_bio, full_bio, location,
-  avatar_url, primary_genre, username, store_title,
-  is_founding_artist, founding_number, is_public, created_at
+  id, user_id, username, artist_name, avatar_url, location, primary_genre,
+  short_bio, full_bio, tagline, store_title, follower_count, is_public, created_at
 ) on public.artist_profiles to anon;
+revoke select (is_founding_artist, founding_number) on public.artist_profiles from anon;
+
+-- OPEN, not fixed here: the "Authenticated can read artist profiles" policy is
+-- `qual: true` and `authenticated` holds TABLE-wide SELECT, so any signed-in user
+-- can read every artist's subscription_status, trial_started_at, trial_ends_at and
+-- founding_rate_active. Column grants cannot narrow a table-wide grant.

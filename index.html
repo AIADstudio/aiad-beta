@@ -31661,18 +31661,31 @@ window.AIAD_PROMPTS = [
     };
 
     // ── Read ───────────────────────────────────────────────────────────────
+    /* profiles is the source of truth for an avatar, but it has no anon read policy,
+       so signed out this returned nothing and every public profile and Discover row
+       lost its picture. artist_profiles.avatar_url carries the same value and IS
+       readable signed out, so it is the fallback rather than opening up profiles —
+       the narrower surface wins. */
     window.aiadAvatarFor = async function (userId) {
         if (!userId) return '';
         if (mem.has(userId)) return mem.get(userId);
         const c = client();
         if (!c) return '';
+        let url = '';
         try {
             const { data, error } = await c.from('profiles').select('avatar_url').eq('id', userId).maybeSingle();
-            if (error) { console.warn('[AIAD] avatar read:', error.message); return ''; }
-            const url = (data && data.avatar_url) || '';
-            mem.set(userId, url);
-            return url;
-        } catch (e) { return ''; }
+            if (error) console.warn('[AIAD] avatar read:', error.message);
+            url = (data && data.avatar_url) || '';
+        } catch (e) { url = ''; }
+        if (!url) {
+            try {
+                const { data: ap } = await c.from('artist_profiles')
+                    .select('avatar_url').eq('user_id', userId).maybeSingle();
+                url = (ap && ap.avatar_url) || '';
+            } catch (e) { url = ''; }
+        }
+        mem.set(userId, url);
+        return url;
     };
 
     // Batch form for list renders — one query for a whole feed rather than one per row.
@@ -31686,8 +31699,21 @@ window.AIAD_PROMPTS = [
         if (!c) return out;
         try {
             const { data, error } = await c.from('profiles').select('id,avatar_url').in('id', missing);
-            if (error) { console.warn('[AIAD] avatar batch read:', error.message); return out; }
-            (data || []).forEach((r) => { mem.set(r.id, r.avatar_url || ''); out[r.id] = r.avatar_url || ''; });
+            if (error) console.warn('[AIAD] avatar batch read:', error.message);
+            (data || []).forEach((r) => { if (r.avatar_url) { mem.set(r.id, r.avatar_url); out[r.id] = r.avatar_url; } });
+
+            // Signed out, profiles returns nothing at all. artist_profiles carries the
+            // same avatar and is readable by anon, so fill the gaps from there rather
+            // than widening the profiles policy.
+            const stillMissing = missing.filter((id) => !out[id]);
+            if (stillMissing.length) {
+                const { data: aps, error: apErr } = await c.from('artist_profiles')
+                    .select('user_id,avatar_url').in('user_id', stillMissing);
+                if (apErr) console.warn('[AIAD] avatar fallback read:', apErr.message);
+                (aps || []).forEach((r) => {
+                    if (r.avatar_url) { mem.set(r.user_id, r.avatar_url); out[r.user_id] = r.avatar_url; }
+                });
+            }
             missing.forEach((id) => { if (!(id in out)) { mem.set(id, ''); out[id] = ''; } });
         } catch (e) {}
         return out;
