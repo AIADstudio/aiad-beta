@@ -32552,6 +32552,22 @@ window.AIAD_PROMPTS = [
 #artistDistributeView .rw-field{display:flex;flex-direction:column;gap:6px;min-width:0;}
 #artistDistributeView .rw-label{font-size:0.74rem;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted,rgba(255,255,255,0.4));}
 #artistDistributeView .rw-req{color:var(--magenta-light,#FF66FF);}
+/* Structured ℗/© rows: the symbol is fixed text, the year is a select and only the
+   owner name is typed. The © name collapses to a mirror of ℗ while "Same as ℗" is on. */
+#artistDistributeView .rw-cr .rw-cr-row{display:flex;align-items:center;gap:8px;}
+#artistDistributeView .rw-cr-sym{flex:none;width:30px;text-align:center;font-size:1.05rem;
+  color:var(--text-secondary,rgba(255,255,255,0.62));user-select:none;}
+#artistDistributeView .rw-cr-year{flex:none;width:96px;}
+#artistDistributeView .rw-cr-name{flex:1 1 auto;min-width:0;}
+#artistDistributeView .rw-cr-mirror{flex:1 1 auto;min-width:0;padding:0 12px;height:44px;display:flex;
+  align-items:center;border:1px solid var(--border-subtle,rgba(255,255,255,0.08));border-radius:10px;
+  background:rgba(255,255,255,0.02);color:var(--text-hint,rgba(255,255,255,0.42));
+  font-size:0.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#artistDistributeView .rw-cr-same{margin-top:8px;font-size:0.8rem;}
+#artistDistributeView .rw-info{margin-left:6px;width:16px;height:16px;padding:0;line-height:14px;
+  border-radius:50%;border:1px solid var(--border-subtle,rgba(255,255,255,0.2));background:none;
+  color:var(--text-hint,rgba(255,255,255,0.45));font-size:0.66rem;cursor:pointer;vertical-align:middle;}
+#artistDistributeView .rw-info:hover{color:var(--teal,#00B4D8);border-color:var(--teal,#00B4D8);}
 #artistDistributeView .rw-hint{font-size:0.73rem;color:var(--text-hint,rgba(255,255,255,0.3));line-height:1.5;}
 #artistDistributeView .rw-input{width:100%;box-sizing:border-box;background:rgba(255,255,255,0.04);border:1px solid var(--border-default,rgba(255,255,255,0.08));
   border-radius:9px;padding:10px 12px;color:var(--text-primary,#fff);font-size:0.85rem;font-family:inherit;outline:none;transition:border-color 150ms ease;}
@@ -32784,6 +32800,9 @@ window.AIAD_PROMPTS = [
         tracks: [],
         rights: { owns_master: null, exclusive_conflict: null, content_lawful_confirmed: false,
                   master_authorization_url: null, conflict_consent_url: null, split_sheet_url: null },
+        // The ℗/© editing state. releases.p_line / c_line still store one assembled
+        // string; these are the parts it is built from and parsed back into.
+        lines: { pYear: '', pName: '', cYear: '', cName: '', cSame: true },
         artworkDims: null,
         // destDefaults() is a hoisted function declaration, so this is safe here and
         // means the step can never render against a null. loadAll() re-seeds it, but
@@ -33150,6 +33169,13 @@ window.AIAD_PROMPTS = [
         RS.artworkDims = null;
         RS.dest = destDefaults();
 
+        // The profile name prefills the artist, the label and both copyright owners,
+        // so it is needed whether or not there is a draft to resume.
+        var prof = await window.db.from('artist_profiles')
+            .select('artist_name').eq('user_id', u).limit(1);
+        if (dbFail('artist_profiles', 'select', prof.error)) { busy(false); return; }
+        var an = (prof.data && prof.data[0] && prof.data[0].artist_name) || '';
+
         if (rel.data && rel.data.length) {
             RS.release = rel.data[0];
             RS.releaseId = RS.release.id;
@@ -33157,17 +33183,13 @@ window.AIAD_PROMPTS = [
             if (!(await loadRights(RS.releaseId))) { busy(false); return; }
             if (!(await loadDestinations(RS.releaseId))) { busy(false); return; }
         } else {
-            // Prefill artist + label from the artist profile.
-            var prof = await window.db.from('artist_profiles')
-                .select('artist_name').eq('user_id', u).limit(1);
-            if (dbFail('artist_profiles', 'select', prof.error)) { busy(false); return; }
-            var an = (prof.data && prof.data[0] && prof.data[0].artist_name) || '';
             RS.release = {
                 release_type: 'single', primary_artist_name: an, label_name: an,
                 early_access_hours: 0, parental_advisory: 'not_applicable',
                 territory_mode: 'worldwide', language: 'English', status: 'draft'
             };
         }
+        seedCopyrightLines(an);
 
         // Publishers this artist has used before, for the combobox. A failure here
         // only costs the suggestions, so it warns rather than blocking the wizard.
@@ -33355,6 +33377,102 @@ window.AIAD_PROMPTS = [
         return '<input class="rw-input" id="' + id + '" type="' + (type || 'text') + '" value="' + esc(val == null ? '' : val) + '" placeholder="' + esc(ph || '') + '">';
     }
 
+    var COPY_HELP = {
+        p: 'The ℗ line names whoever owns the master recording — the actual audio file. ' +
+           'If you paid for the session and nobody else has a claim on the recording, that is you. ' +
+           'A label, or a producer on a work-for-hire deal, may own it instead.',
+        c: 'The © line names whoever owns the composition — the melody and the lyrics, as distinct ' +
+           'from the recording of them. If you wrote the song, that is you, even if someone else ' +
+           'owns the recording. Co-writers share it.'
+    };
+
+    /* Stored as one string but never typed as one. "℗ 2026 Hardy Muanza" is parsed
+       back into year + name when a draft is resumed, so an existing release edits in
+       the same fields it was created in. */
+    function parseLine(value, symbol) {
+        var m = String(value || '').replace(symbol, '').trim().match(/^(\d{4})\s+(.*)$/);
+        if (m) return { year: m[1], name: m[2].trim() };
+        return { year: '', name: String(value || '').replace(symbol, '').trim() };
+    }
+    function yearOptions(selected) {
+        var now = new Date().getFullYear();
+        var out = [];
+        for (var y = now; y >= now - 30; y--) {
+            out.push('<option value="' + y + '"' + (String(selected) === String(y) ? ' selected' : '') + '>' + y + '</option>');
+        }
+        return out.join('');
+    }
+
+    function copyrightRow(which) {
+        var L = RS.lines;
+        var isP = which === 'p';
+        var year = isP ? L.pYear : L.cYear;
+        var name = isP ? L.pName : L.cName;
+        var sym = isP ? '℗' : '©';
+        var help = isP ? 'The recording. Who owns the audio file itself.'
+                       : 'The song. Who wrote the melody and lyrics.';
+        var sameChecked = L.cSame !== false;
+
+        return '<div class="rw-field rw-span rw-cr">' +
+            '<label class="rw-label">' + sym + ' line <span class="rw-req">●</span>' +
+              '<button type="button" class="rw-info" title="' + esc(COPY_HELP[which]) +
+              '" onclick="event.preventDefault();AIADRelease.explainCopyright(\'' + which + '\')">?</button>' +
+            '</label>' +
+            '<div class="rw-cr-row">' +
+              '<span class="rw-cr-sym" aria-hidden="true">' + sym + '</span>' +
+              '<select class="rw-input rw-cr-year" id="rw' + (isP ? 'P' : 'C') + 'Year"' +
+                (!isP && sameChecked ? ' disabled' : '') + '>' +
+                // While mirroring, the disabled select must show the ℗ year, not the
+                // stale © one, or it contradicts what will actually be stored.
+                yearOptions(!isP && sameChecked ? L.pYear : year) + '</select>' +
+              (isP
+                ? '<input class="rw-input rw-cr-name" id="rwPName" placeholder="Owner name" value="' + esc(name) +
+                    '" oninput="AIADRelease.mirrorPName(this.value)">'
+                : (sameChecked
+                    ? '<span class="rw-cr-mirror">' + esc(L.pName || 'same as ℗') + '</span>'
+                    : '<input class="rw-input rw-cr-name" id="rwCName" placeholder="Owner name" value="' + esc(name) + '">')) +
+            '</div>' +
+            (isP ? '' :
+              '<label class="rw-check rw-cr-same"><input type="checkbox" id="rwCSame"' + (sameChecked ? ' checked' : '') +
+              ' onchange="AIADRelease.setSameAsP(this.checked)"> <span>Same as ℗</span></label>') +
+            '<div class="rw-hint">' + esc(help) + '</div>' +
+        '</div>';
+    }
+
+    function explainCopyright(which) { banner(COPY_HELP[which] || '', 'ok'); }
+
+    /* Keeps the mirrored © text in step with the ℗ name as it is typed, without a
+       re-render that would move the caret. */
+    function mirrorPName(value) {
+        RS.lines.pName = trim(value);
+        var m = document.querySelector('#artistDistributeView .rw-cr-mirror');
+        if (m) m.textContent = RS.lines.pName || 'same as ℗';
+    }
+
+    /* Unticking reveals the © name field; ticking mirrors ℗. Collect first so the
+       ℗ name typed a moment ago is not lost by the re-render. */
+    function setSameAsP(checked) {
+        collectRelease();
+        RS.lines.cSame = !!checked;
+        render();
+    }
+
+    /* A resumed draft parses its stored strings back apart; a new one starts on the
+       current year with the profile name in both slots. "Same as ℗" stays ticked
+       unless the saved lines actually disagree. */
+    function seedCopyrightLines(artistName) {
+        var now = String(new Date().getFullYear());
+        var p = parseLine(RS.release.p_line, '℗');
+        var c = parseLine(RS.release.c_line, '©');
+        RS.lines = {
+            pYear: p.year || now,
+            pName: p.name || artistName || '',
+            cYear: c.year || p.year || now,
+            cName: c.name || p.name || artistName || '',
+            cSame: !RS.release.c_line || (c.name === p.name && c.year === p.year)
+        };
+    }
+
     function viewRelease() {
         var r = RS.release;
         var minDate = minGoLive();
@@ -33408,8 +33526,8 @@ window.AIAD_PROMPTS = [
               '<label class="rw-label">Excluded countries</label>' +
               txt('rwExcluded', arrToCsv(r.excluded_territories), 'US, CA, GB — comma separated') +
             '</div>' +
-            field('℗ line', true, txt('rwPLine', r.p_line, '℗ 2026 Owner Name'), 'Sound recording owner.') +
-            field('© line', true, txt('rwCLine', r.c_line, '© 2026 Owner Name'), 'Composition owner.') +
+            copyrightRow('p') +
+            copyrightRow('c') +
           '</div>' +
           '<div class="rw-field rw-span">' +
             '<label class="rw-label">Release artwork <span class="rw-req">●</span></label>' +
@@ -33449,8 +33567,18 @@ window.AIAD_PROMPTS = [
         r.parental_advisory = el('rwAdvisory').value;
         r.territory_mode = el('rwTerritory').value;
         r.excluded_territories = r.territory_mode === 'excluded' ? csvToArr(el('rwExcluded').value) : [];
-        r.p_line = trim(el('rwPLine').value) || null;
-        r.c_line = trim(el('rwCLine').value) || null;
+        // The stored value stays the assembled string — "℗ 2026 Hardy Muanza" —
+        // so nothing downstream of releases.p_line / c_line changes.
+        var L = RS.lines;
+        if (el('rwPYear')) L.pYear = el('rwPYear').value;
+        if (el('rwPName')) L.pName = trim(el('rwPName').value);
+        if (el('rwCSame')) L.cSame = el('rwCSame').checked;
+        if (el('rwCYear')) L.cYear = el('rwCYear').value;
+        if (el('rwCName')) L.cName = trim(el('rwCName').value);
+        r.p_line = L.pName ? ('℗ ' + L.pYear + ' ' + L.pName) : null;
+        var cName = L.cSame ? L.pName : L.cName;
+        var cYear = L.cSame ? L.pYear : L.cYear;
+        r.c_line = cName ? ('© ' + cYear + ' ' + cName) : null;
         return r;
     }
 
@@ -33466,8 +33594,8 @@ window.AIAD_PROMPTS = [
         }
         if (!r.primary_genre) e.push('Primary genre is required.');
         if (!r.language) e.push('Language of release is required.');
-        if (!r.p_line) e.push('℗ line is required.');
-        if (!r.c_line) e.push('© line is required.');
+        if (!r.p_line) e.push('Name the ℗ owner — who owns the recording.');
+        if (!r.c_line) e.push('Name the © owner — who wrote the song.');
         if (r.territory_mode === 'excluded' && !(r.excluded_territories || []).length) {
             e.push('You chose "Worldwide except…" — list the excluded countries or switch back to Worldwide.');
         }
@@ -34724,8 +34852,33 @@ window.AIAD_PROMPTS = [
     /* Platform minimums. The database only checks >= 0, so these are enforced here
        AND again in the checkout edge function — a price posted straight to checkout
        must never be trusted because this screen agreed with it. */
-    var MIN_RELEASE_CENTS = 700;
     var MIN_TRACK_CENTS = 200;
+    var MAX_RELEASE_FLOOR_CENTS = 700;
+
+    /* The release floor is derived, not fixed: a single priced at the old flat $7
+       was asking more for one track than the same track cost on its own. It keys off
+       release_type — the field the artist already set on step 1 — rather than
+       re-counting tracks, so the two can never disagree. */
+    function releaseFloorCents() {
+        var type = RS.release.release_type || 'single';
+        if (type === 'album') return MAX_RELEASE_FLOOR_CENTS;
+        if (type === 'ep') {
+            var n = Math.max(1, RS.tracks.length);
+            return Math.min(MIN_TRACK_CENTS * n, MAX_RELEASE_FLOOR_CENTS);
+        }
+        // Single: never less than the dearest track it contains, or buying the
+        // release would undercut buying a track out of it.
+        var top = MIN_TRACK_CENTS;
+        RS.tracks.forEach(function (t) {
+            var c = Number(t.min_price_cents);
+            if (isFinite(c) && c > top) top = c;
+        });
+        return top;
+    }
+    function releaseFloorReason() {
+        var type = RS.release.release_type || 'single';
+        return type === 'album' ? 'album' : (type === 'ep' ? 'EP' : 'single');
+    }
     var STRIPE_PCT = 0.029;
     var STRIPE_FIXED_CENTS = 30;
     var AIAD_PCT = 0.08;
@@ -34826,6 +34979,7 @@ window.AIAD_PROMPTS = [
     function viewPricing() {
         var r = RS.release;
         var relPrice = r.min_price_cents == null ? '' : (r.min_price_cents / 100).toFixed(2);
+        var relFloor = releaseFloorCents();
 
         var tracks = RS.tracks.map(function (t, i) {
             var p = t.min_price_cents == null ? '' : (t.min_price_cents / 100).toFixed(2);
@@ -34866,9 +35020,9 @@ window.AIAD_PROMPTS = [
               '<option value="1"' + (r.purchasable !== false ? ' selected' : '') + '>Yes</option>' +
               '<option value="0"' + (r.purchasable === false ? ' selected' : '') + '>No</option></select>') +
             field('Minimum price', true,
-              '<input class="rw-input" type="number" min="' + (MIN_RELEASE_CENTS / 100) + '" step="0.01" value="' + esc(relPrice) +
-              '" placeholder="' + (MIN_RELEASE_CENTS / 100).toFixed(2) + '" oninput="AIADRelease.setPrice(\'release\',null,\'min_price_cents\',this.value)">',
-              'Platform minimum ' + money(MIN_RELEASE_CENTS) + '.') +
+              '<input class="rw-input" type="number" min="' + (relFloor / 100) + '" step="0.01" value="' + esc(relPrice) +
+              '" placeholder="' + (relFloor / 100).toFixed(2) + '" oninput="AIADRelease.setPrice(\'release\',null,\'min_price_cents\',this.value)">',
+              'Minimum ' + money(relFloor) + ' — ' + releaseFloorReason() + '.') +
             field('Pay what you want', false, '<select class="rw-input" onchange="AIADRelease.setPrice(\'release\',null,\'pwyw\',this.value===\'1\')">' +
               '<option value="1"' + (r.pwyw !== false ? ' selected' : '') + '>Yes — fans may pay more</option>' +
               '<option value="0"' + (r.pwyw === false ? ' selected' : '') + '>No — fixed price</option></select>') +
@@ -34888,8 +35042,9 @@ window.AIAD_PROMPTS = [
         var r = RS.release, e = [];
         if (r.purchasable !== false) {
             if (r.min_price_cents == null) e.push('Set a minimum price for the release, or turn selling off.');
-            else if (r.min_price_cents < MIN_RELEASE_CENTS) {
-                e.push('Release minimum is ' + money(MIN_RELEASE_CENTS) + ' — ' + money(r.min_price_cents) + ' is below it.');
+            else if (r.min_price_cents < releaseFloorCents()) {
+                e.push('Release minimum is ' + money(releaseFloorCents()) + ' for a ' + releaseFloorReason() +
+                       ' — ' + money(r.min_price_cents) + ' is below it.');
             }
         }
         RS.tracks.forEach(function (t, i) {
@@ -35311,6 +35466,8 @@ window.AIAD_PROMPTS = [
         uploadAudio: uploadAudio, resumeAudio: resumeAudio, saveTracks: saveTracks,
         setRights: setRights, uploadRightsDoc: uploadRightsDoc, uploadTrackDoc: uploadTrackDoc,
         setDest: setDest, saveDestinations: saveDestinations,
+        setSameAsP: setSameAsP, explainCopyright: explainCopyright,
+        mirrorPName: mirrorPName,
         setPrice: setPrice, savePricing: savePricing, explainMechanical: explainMechanical,
         explain: explain,
         saveRights: saveRights,

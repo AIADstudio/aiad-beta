@@ -17,8 +17,10 @@ Pre-save / early access window — Tier 2+ supporters get it up to 72h before pu
 ● Language of release.
 ● Parental advisory — Explicit / Clean / Not applicable.
 ● Territory — Worldwide (default) or list excluded countries.
-● ℗ line — e.g. "℗ 2026 [owner name]" — sound recording owner.
-● © line — e.g. "© 2026 [owner name]" — composition owner.
+● ℗ owner — the recording. Who owns the audio file itself. Entered as a year and
+  a name; stored as "℗ 2026 [owner name]".
+● © owner — the song. Who wrote the melody and lyrics. Defaults to the same
+  year and name as ℗; untick "Same as ℗" when they differ.
 ● Release artwork — see Delivery Specs.
 
 ## SECTION 2 — Per track
