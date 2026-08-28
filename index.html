@@ -34853,30 +34853,22 @@ window.AIAD_PROMPTS = [
        AND again in the checkout edge function — a price posted straight to checkout
        must never be trusted because this screen agreed with it. */
     var MIN_TRACK_CENTS = 200;
-    var MAX_RELEASE_FLOOR_CENTS = 700;
+    var ALBUM_FLOOR_CENTS = 700;
+    var EP_CAP_CENTS = 1200;
 
-    /* The release floor is derived, not fixed: a single priced at the old flat $7
-       was asking more for one track than the same track cost on its own. It keys off
-       release_type — the field the artist already set on step 1 — rather than
-       re-counting tracks, so the two can never disagree. */
+    /* Mirrors public.release_price_floor_cents(uuid), which is the authority — a
+       before-insert-or-update trigger on releases rejects anything under it. This
+       exists only so the artist is told while typing instead of after submitting,
+       so it must agree with the SQL exactly, including the flat single floor and
+       the fallback for an unrecognised type. */
     function releaseFloorCents() {
-        var type = RS.release.release_type || 'single';
-        if (type === 'album') return MAX_RELEASE_FLOOR_CENTS;
-        if (type === 'ep') {
-            var n = Math.max(1, RS.tracks.length);
-            return Math.min(MIN_TRACK_CENTS * n, MAX_RELEASE_FLOOR_CENTS);
-        }
-        // Single: never less than the dearest track it contains, or buying the
-        // release would undercut buying a track out of it.
-        var top = MIN_TRACK_CENTS;
-        RS.tracks.forEach(function (t) {
-            var c = Number(t.min_price_cents);
-            if (isFinite(c) && c > top) top = c;
-        });
-        return top;
+        var type = RS.release.release_type;
+        if (type === 'album') return ALBUM_FLOOR_CENTS;
+        if (type === 'ep') return Math.min(Math.max(1, RS.tracks.length) * MIN_TRACK_CENTS, EP_CAP_CENTS);
+        return MIN_TRACK_CENTS;
     }
     function releaseFloorReason() {
-        var type = RS.release.release_type || 'single';
+        var type = RS.release.release_type;
         return type === 'album' ? 'album' : (type === 'ep' ? 'EP' : 'single');
     }
     var STRIPE_PCT = 0.029;
