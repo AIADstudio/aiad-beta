@@ -25,8 +25,9 @@ alter table public.ai_credits
 
 
 -- ── 2. Plan allowances absorb the monthly video grant ──────────────────────
--- Starter +100, Pro +250, Premier +500. Supervisor and collaborator plans are
--- unchanged: they do not have the video tool.
+-- The monthly video grant is absorbed into the single shared allowance:
+-- free +0, starter +100, pro +250, premier +600. Supervisor and collaborator
+-- plans are unchanged: they do not have the video tool.
 create or replace function public.ai_allowance_for_plan(p text)
 returns integer
 language sql
@@ -34,9 +35,9 @@ immutable
 set search_path to 'public'
 as $function$
   select case p
-    when 'artist_starter'      then 250   -- was 150
-    when 'artist_pro'          then 750   -- was 500
-    when 'artist_premier'      then 2500  -- was 2000
+    when 'artist_starter'      then 250   -- 150 + 100 video
+    when 'artist_pro'          then 750   -- 500 + 250 video
+    when 'artist_premier'      then 2600  -- 2000 + 600 video
     when 'supervisor_standard' then 500
     when 'supervisor_pro'      then 2000
     when 'collaborator'        then 150
@@ -62,14 +63,17 @@ as $function$
   end;                       -- than silently charging zero
 $function$;
 
--- The models do NOT accept arbitrary durations. Probed against FAL on 2026-08-27:
---   draft     (wan 2.2 5B)          -> we drive num_frames, so we offer 5s
---   standard  (kling 1.6 standard)  -> duration literal '5' or '10'
---   premium   (kling 2.5-turbo pro) -> duration literal '5' or '10'
---   cinematic (veo3)                -> duration literal '4s', '6s' or '8s'
--- Per-second pricing is therefore our retail abstraction over a fixed menu, and
--- reserve refuses a duration the tier cannot actually deliver rather than
--- charging for seconds the model will never produce.
+-- The models do NOT accept arbitrary durations. Probed against FAL on 2026-08-27.
+-- Per-second pricing is our retail abstraction over a fixed menu, and reserve
+-- refuses a duration the tier cannot deliver rather than charging for seconds the
+-- model will never produce.
+--
+-- Ladder and real cost, confirmed against fal's pricing page on 2026-08-27 with
+-- audio OFF (artists bring their own music, and audio doubles the veo rate):
+--   draft     wan/v2.2-5b        $0.15 flat per video   vs  $0.15/s retail
+--   standard  kling 1.6 standard $0.056/s               vs  $0.25/s retail
+--   premium   veo3.1/fast        $0.10/s                vs  $0.45/s retail
+--   cinematic veo3.1             $0.20/s                vs  $0.75/s retail
 create or replace function public.video_tier_durations(p_tier text)
 returns integer[]
 language sql
@@ -77,10 +81,10 @@ immutable
 set search_path to 'public'
 as $function$
   select case p_tier
-    when 'draft'     then array[5]
-    when 'standard'  then array[5, 10]
-    when 'premium'   then array[5, 10]
-    when 'cinematic' then array[4, 6, 8]
+    when 'draft'     then array[5]          -- we drive num_frames
+    when 'standard'  then array[5, 10]      -- duration literal '5' | '10'
+    when 'premium'   then array[4, 6, 8]    -- duration literal '4s' | '6s' | '8s'
+    when 'cinematic' then array[4, 6, 8]    -- duration literal '4s' | '6s' | '8s'
     else null
   end;
 $function$;
@@ -172,7 +176,11 @@ set search_path to 'public'
 as $function$
 declare v_plan text; v_allow int; v_rec public.ai_credits%rowtype;
 begin
-  if auth.uid() is not null and p_user <> auth.uid() then raise exception 'forbidden'; end if;
+  if auth.uid() is distinct from p_user
+     and current_user not in ('service_role', 'postgres', 'supabase_admin')
+  then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
   select plan into v_plan from public.profiles where id = p_user;
   v_allow := public.effective_allowance(p_user, coalesce(v_plan, 'free'));
   select * into v_rec from public.ai_credits where user_id = p_user;
@@ -212,7 +220,14 @@ declare
   v_cost int; v_plan text; v_allow int; v_rec public.ai_credits%rowtype;
   v_from_allow int := 0; v_from_purch int := 0; v_job uuid; v_total int;
 begin
-  if auth.uid() is not null and p_user <> auth.uid() then raise exception 'forbidden'; end if;
+  -- `auth.uid() is not null and ...` would SKIP the check entirely for any caller
+  -- with no JWT. Assume nothing about callers: a mismatch is refused, and only the
+  -- named service roles are allowed to act for another user.
+  if auth.uid() is distinct from p_user
+     and current_user not in ('service_role', 'postgres', 'supabase_admin')
+  then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
 
   v_cost := public.video_credit_cost(p_tier, p_seconds);
   if v_cost is null then
@@ -491,7 +506,47 @@ end;
 $function$;
 
 
--- ── 11. Grants ─────────────────────────────────────────────────────────────
+-- ── 11. Refunds respect the bucket split ───────────────────────────────────
+-- spend_ai_credit takes allowance first, then purchased. refund_ai_credit put
+-- everything back into balance, which would let a user convert expiring allowance
+-- credits into non-expiring purchased ones by failing generations on purpose.
+-- Filling allowance up to its ceiling and spilling the rest into purchased is the
+-- exact inverse of how the spend was taken.
+create or replace function public.refund_ai_credit(p_user uuid, p_action text)
+returns void
+language plpgsql
+security definer
+set search_path to 'public'
+as $function$
+declare
+  plan_txt text; allow int; cost int; rec public.ai_credits%rowtype;
+  give_allow int; give_purch int;
+begin
+  select plan into plan_txt from public.profiles where id = p_user;
+  allow := public.effective_allowance(p_user, coalesce(plan_txt,'free'));
+  if allow >= 999999 then return; end if;   -- unlimited users are never charged
+  cost := public.ai_cost_for(p_action);
+
+  select * into rec from public.ai_credits where user_id = p_user for update;
+  if not found then return; end if;
+
+  give_allow := least(cost, greatest(allow - rec.balance, 0));
+  give_purch := cost - give_allow;
+
+  update public.ai_credits
+     set balance           = balance + give_allow,
+         purchased_balance = purchased_balance + give_purch,
+         updated_at        = now()
+   where user_id = p_user;
+
+  insert into public.ai_credit_transactions(
+    user_id, delta, from_allowance, from_purchased, reason, note)
+  values (p_user, cost, give_allow, give_purch, 'refund', p_action);
+end;
+$function$;
+
+
+-- ── 12. Grants ─────────────────────────────────────────────────────────────
 grant execute on function public.video_credit_rate(text)                    to authenticated;
 grant execute on function public.video_credit_cost(text, numeric)           to authenticated;
 grant execute on function public.video_tier_durations(text)                 to authenticated;
