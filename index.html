@@ -34853,23 +34853,27 @@ window.AIAD_PROMPTS = [
        AND again in the checkout edge function — a price posted straight to checkout
        must never be trusted because this screen agreed with it. */
     var MIN_TRACK_CENTS = 200;
-    var ALBUM_FLOOR_CENTS = 700;
-    var EP_CAP_CENTS = 1200;
+    var RELEASE_CAP_CENTS = 1200;
 
     /* Mirrors public.release_price_floor_cents(uuid), which is the authority — a
        before-insert-or-update trigger on releases rejects anything under it. This
        exists only so the artist is told while typing instead of after submitting,
-       so it must agree with the SQL exactly, including the flat single floor and
-       the fallback for an unrecognised type. */
+       so it must agree with the SQL exactly.
+
+       Track count alone, $2.00 each, capped at $12.00. release_type deliberately
+       plays no part: keying off it made the floor non-monotonic, so a long EP
+       floored higher than the same record relabelled an album. */
     function releaseFloorCents() {
-        var type = RS.release.release_type;
-        if (type === 'album') return ALBUM_FLOOR_CENTS;
-        if (type === 'ep') return Math.min(Math.max(1, RS.tracks.length) * MIN_TRACK_CENTS, EP_CAP_CENTS);
-        return MIN_TRACK_CENTS;
+        var n = RS.tracks.length;
+        if (!(n >= 1)) return MIN_TRACK_CENTS;
+        return Math.min(n * MIN_TRACK_CENTS, RELEASE_CAP_CENTS);
     }
     function releaseFloorReason() {
-        var type = RS.release.release_type;
-        return type === 'album' ? 'album' : (type === 'ep' ? 'EP' : 'single');
+        var n = RS.tracks.length;
+        if (!(n >= 1)) return 'no tracks yet';
+        var phrase = n === 1 ? '1 track' : n + ' tracks';
+        // Past the cap the count stops explaining the number on its own.
+        return n * MIN_TRACK_CENTS > RELEASE_CAP_CENTS ? phrase + ', capped' : phrase;
     }
     var STRIPE_PCT = 0.029;
     var STRIPE_FIXED_CENTS = 30;
@@ -35035,7 +35039,7 @@ window.AIAD_PROMPTS = [
         if (r.purchasable !== false) {
             if (r.min_price_cents == null) e.push('Set a minimum price for the release, or turn selling off.');
             else if (r.min_price_cents < releaseFloorCents()) {
-                e.push('Release minimum is ' + money(releaseFloorCents()) + ' for a ' + releaseFloorReason() +
+                e.push('Release minimum is ' + money(releaseFloorCents()) + ' with ' + releaseFloorReason() +
                        ' — ' + money(r.min_price_cents) + ' is below it.');
             }
         }
