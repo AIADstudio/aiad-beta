@@ -12213,7 +12213,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     </div>
                     <div class="artist-actions">
                         <button class="artist-action-btn" onclick="event.stopPropagation(); saveArtist('${artist.name}')">Save</button>
-                        <button class="artist-action-btn primary" onclick="event.stopPropagation(); goToArtistFromOnboarding('${artist.id}')">View Profile</button>
+                        <button class="artist-action-btn primary" onclick="event.stopPropagation(); goToArtistFromOnboarding('${artist.user_id || artist.id}')">View Profile</button>
                     </div>
                 </div>
             `).join('');
@@ -20940,10 +20940,10 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 const ids = data.map(d => d.artist_id);
                 const { data: profiles } = await db.from('artist_profiles')
                     .select('id, user_id, artist_name, tagline, primary_genre, location')
-                    .in('id', ids);
+                    .in('user_id', ids);
                 await window.aiadFillAvatars(profiles);
                 const pMap = {};
-                (profiles || []).forEach(p => pMap[p.id] = p);
+                (profiles || []).forEach(p => pMap[p.user_id] = p);
 
                 const supporting = data.filter(d => d.status === 'active' && d.amount > 0);
                 const following = data.filter(d => !d.amount || d.amount === 0 || d.status === 'following');
@@ -20955,7 +20955,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     const name = p.artist_name || 'Artist';
                     const av = p.avatar_url || '';
                     const isSup = d.status === 'active' && d.amount > 0;
-                    const pid = p.id || d.artist_id;
+                    const pid = p.user_id || d.artist_id;
                     const avatarEl = (av && (av.startsWith('http') || av.startsWith('data:')))
                         ? '<img src="' + av + '" style="width:64px;height:64px;border-radius:50%;object-fit:cover;margin-bottom:12px;">'
                         : '<div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#0d2f3f,#1a4a5e);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1rem;color:var(--teal-light);margin-bottom:12px;">' + (name[0] || 'A').toUpperCase() + '</div>';
@@ -21032,7 +21032,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 const postArtistIds = [...new Set(posts.map(p => p.user_id))];
                 const { data: profiles } = await db.from('artist_profiles')
                     .select('id, user_id, artist_name')
-                    .in('id', postArtistIds);
+                    .in('user_id', postArtistIds);
                 await window.aiadFillAvatars(profiles);
                 const aMap = {};
                 (profiles || []).forEach(p => { aMap[p.id] = p; if (p.user_id) aMap[p.user_id] = p; });
@@ -21259,7 +21259,10 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 targetDiv.innerHTML = '<div style="display:flex;flex-direction:column;gap:12px;">' + artists.map(a => {
                     const name = a.artist_name || 'Artist';
                     const av = a.avatar_url || '';
-                    const pid = a.id || a.user_id || '';
+                    // user_id, not artist_profiles.id: this feeds both the profile
+                    // link and the followed check against fan_support.artist_id,
+                    // which stores user ids.
+                    const pid = a.user_id || '';
                     const isFollowed = followedIds.includes(pid);
                     const avatarEl = (av && (av.startsWith('http') || av.startsWith('data:')))
                         ? '<img src="' + av + '" style="width:52px;height:52px;border-radius:50%;object-fit:cover;flex-shrink:0;">'
@@ -23520,9 +23523,9 @@ async function loadFanSupportGrid() {
             return;
         }
         const ids = data.map(s => s.artist_id).filter(Boolean);
-        const { data: profiles } = await db.from('artist_profiles').select('id,artist_name').in('id', ids);
+        const { data: profiles } = await db.from('artist_profiles').select('user_id,artist_name').in('user_id', ids);
         const nameMap = {};
-        (profiles||[]).forEach(p => { nameMap[p.id] = p.artist_name; });
+        (profiles||[]).forEach(p => { nameMap[p.user_id] = p.artist_name; });
         grid.innerHTML = data.slice(0,4).map(s => {
             const n = nameMap[s.artist_id] || 'Artist';
             const init = n[0]?.toUpperCase() || '?';
@@ -23765,9 +23768,9 @@ async function loadFanCreators() {
         const { data: profiles } = await db
             .from('artist_profiles')
             .select('id,user_id,artist_name,tagline,location')
-            .in('id', artistIds);
+            .in('user_id', artistIds);
         const profileMap = {};
-        (profiles||[]).forEach(p => { profileMap[p.id] = p; });
+        (profiles||[]).forEach(p => { profileMap[p.user_id] = p; });
 
         // profiles is the avatar source, so this reads it directly rather than
         // taking artist_profiles' copy and patching the gaps from profiles after.
@@ -23805,7 +23808,9 @@ function _buildCreatorCard(d) {
     const init = name[0].toUpperCase();
     const av   = p.avatar_url || '';
     const isSupporting = d.status === 'active' && d.amount > 0;
-    const pid  = p.id || p.user_id || d.artist_id || '';
+    // user_id is the only identifier routing carries: artist_profiles.id is a
+    // synthetic key that matches user_id for exactly one row in the table.
+    const pid  = p.user_id || d.artist_id || '';
     const badge = isSupporting
         ? `<div style="position:absolute;top:10px;right:10px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="var(--teal-light)"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg></div>` : '';
     const avatarEl = (av && (av.startsWith('http') || av.startsWith('data:')))
@@ -23934,7 +23939,7 @@ function _buildDiscoverCard(a) {
     const tagline  = _escDiscover(a.tagline || a.short_bio || '');
     const loc      = _escDiscover(a.location || '');
     const av       = a.avatar_url || '';
-    const artistId = _escDiscover(a.id || a.user_id || '');
+    const artistId = _escDiscover(a.user_id || '');
     const init     = _escDiscover(rawName.slice(0,1).toUpperCase());
     // Names reach the inline handlers as JS string literals, so a quote or backslash in
     // one would otherwise break out of the attribute.
@@ -23993,7 +23998,7 @@ async function loadFanDiscover() { setTimeout(()=>_execDiscoverSearch(),100); }
             const e = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
             if (!rows.length) { box.innerHTML = '<div style="padding:16px;color:var(--text-muted);font-size:0.85rem;">No artists found</div>'; box.style.display = 'block'; return; }
             box.innerHTML = rows.map((r) => {
-                const p = idMap[r.username] || {}; const id = p.id || ''; const name = r.name || r.username || 'Artist';
+                const p = idMap[r.username] || {}; const id = p.user_id || ''; const name = r.name || r.username || 'Artist';
                 const av = r.avatar || p.avatar_url || ''; const isMe = id && id === me; const isF = following.has(id);
                 const jsName = e(JSON.stringify(name).slice(1, -1));
                 const avatar = (av && (av.indexOf('http') === 0 || av.indexOf('data:') === 0))
@@ -24111,35 +24116,67 @@ async function loadHomeFeed() {
     }
 }
 
-async function loadArtistPage(artistId) {
-    const uid = aiadResolvedUserId();
-    if (!uid) return;
-    if(!artistId) return;
+/* Every element on this page, blanked. Called before each load so nothing can
+   survive from the previously-viewed artist — that is how one artist's store came
+   to render under another artist's name. */
+function clearArtistPage(loadingLabel) {
+    const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt || ''; };
+    const html = (id, v) => { const el = document.getElementById(id); if (el) el.innerHTML = v || ''; };
+    set('fanArtistName', loadingLabel || '');
+    set('fanArtistGenre', '');
+    set('fanArtistLocation', '');
+    set('fanArtistBio', '');
+    html('fanArtistPosts', '');
+    html('fanArtistStore', '');
+    html('fanArtistMusic', '');
+    const img = document.getElementById('fanArtistAvatarImg');
+    if (img) { img.src = ''; img.style.display = 'none'; }
+    ['fanArtistFollowBtn', 'fanArtistSupportBtn'].forEach((id) => {
+        const b = document.getElementById(id);
+        if (b) b.style.display = '';
+    });
+}
+
+function renderArtistNotFound() {
+    clearArtistPage('Artist not found');
+    const bio = document.getElementById('fanArtistBio');
+    if (bio) bio.textContent = 'This artist page is not available. It may have been removed, or the link may be out of date.';
+    // Nothing to follow or support, so do not offer either.
+    ['fanArtistFollowBtn', 'fanArtistSupportBtn'].forEach((id) => {
+        const b = document.getElementById(id);
+        if (b) b.style.display = 'none';
+    });
+}
+
+/* Takes the AUTH user id, and nothing else. artist_profiles.id is a synthetic
+   primary key that happens to equal user_id for exactly one of 25 rows, so routing
+   by it missed every artist but that one — and the signed-in user's stale page was
+   what remained on screen. */
+async function loadArtistPage(artistUserId) {
+    // A signed-out fan must be able to open an artist page: this used to return
+    // early when there was no session, so the whole view never rendered.
+    const uid = (typeof aiadResolvedUserId === 'function') ? aiadResolvedUserId() : null;
+    if(!artistUserId) return;
     showFanView('artist');
+    clearArtistPage('Loading...');
     const nameEl=document.getElementById('fanArtistName');
     const avatarImg=document.getElementById('fanArtistAvatarImg');
-    const postsEl=document.getElementById('fanArtistPosts');
-    if(nameEl)nameEl.textContent='Loading...';
-    if(avatarImg){avatarImg.src='';avatarImg.style.display='none';}
-    if(postsEl)postsEl.innerHTML='';
-    if(artistId==='indiigo') artistId='ed9c7f5c-9c3c-4999-8bba-468d5ba9d935';
+    if(artistUserId==='indiigo') artistUserId='ed9c7f5c-9c3c-4999-8bba-468d5ba9d935';
+    const artistId = artistUserId;
     let profile=null;
-    if(artistId.includes('-')) {
-        try {
-            const { data: d1, error: e1 } = await db.from('artist_profiles')
-                .select('id,user_id,artist_name,tagline,short_bio,full_bio,location,is_public')
-                .eq('id', artistId).maybeSingle();
-            console.log('[AIAD] artist profile fetch:', d1 ? 'found: '+d1.artist_name : 'null', 'error:', e1?.message || 'none');
-            if (d1) profile = d1;
-        } catch(e) { console.warn('[AIAD] fetch error:', e); }
-    }
-    if(!profile){try{const q='%'+artistId+'%';const{data}=await db.from('artist_profiles').select('*').ilike('artist_name',q).eq('is_public',true).limit(1);profile=data?.[0]||null;}catch(e){}}
+    try {
+        const { data: d1, error: e1 } = await db.from('artist_profiles')
+            .select('id,user_id,artist_name,tagline,short_bio,full_bio,location,is_public')
+            .eq('user_id', artistUserId).maybeSingle();
+        if (e1) console.warn('[AIAD] artist profile fetch:', e1.message);
+        if (d1) profile = d1;
+    } catch(e) { console.warn('[AIAD] fetch error:', e); }
     // A hidden page is not-found to everyone but its owner, who still needs to see
     // it to check what they have turned off. RLS returns the row to any signed-in
     // user, so this is presentation, not a security boundary — the enforcement that
     // matters is in the RPCs.
     if (profile && profile.is_public === false && profile.user_id !== uid) profile = null;
-    if(!profile){if(nameEl)nameEl.textContent='Artist not found';return;}
+    if(!profile){renderArtistNotFound();return;}
     const name=profile.artist_name||'Artist';
     const genre=profile.tagline||'';
     const loc=profile.location||'';
@@ -24161,7 +24198,11 @@ async function loadArtistPage(artistId) {
         if (!AppState._cachedArtistAvatars) AppState._cachedArtistAvatars = {};
         AppState._cachedArtistAvatars[artistId] = av;
     }
-    const pid=profile.id||profile.user_id||artistId;
+    // Feeds loadStorefront() and AIADArtistMusic.load(), both of which key on the
+    // auth user id: products.artist_id and releases.user_id are user ids, not
+    // artist_profiles.id. Preferring profile.id here is what rendered one
+    // artist's store under another artist's name.
+    const pid=profile.user_id||artistId;
     if(nameEl)nameEl.textContent=name;
     const genreEl=document.getElementById('fanArtistGenre');const locEl=document.getElementById('fanArtistLocation');const bioEl=document.getElementById('fanArtistBio');
     if(genreEl)genreEl.textContent=genre;if(locEl)locEl.textContent=loc;if(bioEl)bioEl.textContent=bio;

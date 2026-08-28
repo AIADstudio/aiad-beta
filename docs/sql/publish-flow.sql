@@ -139,3 +139,24 @@ grant  execute on function public.video_credit_balance(uuid) to authenticated;
 -- Scheduler:
 --   select cron.schedule('publish-due-releases', '*/5 * * * *',
 --                        $$select public.publish_due_releases();$$);
+
+
+-- ── Public artist page readability (applied 2026-08-27) ────────────────────
+-- artist_profiles granted SELECT only to `authenticated`, so a signed-out fan
+-- could not resolve any artist and every public profile rendered "Artist not
+-- found". The table also holds commercial state (subscription_status, trial
+-- dates, founding_rate_active) that has no business being world-readable, so
+-- this is a row policy AND a column grant.
+drop policy if exists "Anon can read public artist profiles" on public.artist_profiles;
+create policy "Anon can read public artist profiles" on public.artist_profiles
+  for select to anon
+  using (is_public is not false);
+
+-- Column grants bind anon only; `authenticated` keeps full access, so the
+-- signed-in select('*') paths for a user's own profile are unaffected.
+revoke select on public.artist_profiles from anon;
+grant select (
+  id, user_id, artist_name, tagline, short_bio, full_bio, location,
+  avatar_url, primary_genre, username, store_title,
+  is_founding_artist, founding_number, is_public, created_at
+) on public.artist_profiles to anon;
