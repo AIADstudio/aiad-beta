@@ -8426,6 +8426,11 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                         <p id="fanArtistBio" style="font-size:0.88rem;line-height:1.7;color:var(--text-secondary);margin:0;"></p>
                     </div>
 
+                    <!-- Music — filled by AIADArtistMusic.load(). Renders nothing at
+                         all when the artist has no live releases, rather than an
+                         empty shell. -->
+                    <div id="fanArtistMusic"></div>
+
                     <!-- Storefront — filled by loadStorefront(); stays empty when the
                          artist has no active products, so it costs nothing visually. -->
                     <div id="fanArtistStore"></div>
@@ -24197,6 +24202,7 @@ async function loadArtistPage(artistId) {
     }
     _loadArtistFanPosts(pid,name,av);
     // pid is the artist's user id, which is what products.artist_id holds.
+    try { if (window.AIADArtistMusic) AIADArtistMusic.load(pid); } catch(e) {}
     try { if (window.loadStorefront) loadStorefront(pid, 'fanArtistStore'); } catch(e) {}
 }
 
@@ -29318,12 +29324,20 @@ Be direct and concrete with real industry insight — never generic filler. When
 (function(){
   var SU='https://uapiytquwuhtewqieegx.supabase.co';
   var ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhcGl5dHF1d3VodGV3cWllZWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NzcwMTksImV4cCI6MjA4OTI1MzAxOX0.BLs2RdStghm0_cF8t70cBTX1GWcowGRwID7TAG8Mg38';
-  var LOC_IDS=['obLocation','collabLocation','fanLocation','srLocation','fanArtistLocation'];
+  // Onboarding/signup location INPUTS only. fanArtistLocation was in this list and
+  // is not a form field at all — it is the <span> that shows an artist's city in the
+  // public profile header, so this poller was injecting a ZIP box onto every public
+  // profile, next to the location, every 1.5 seconds.
+  var LOC_IDS=['obLocation','collabLocation','fanLocation','srLocation'];
   function ensureZip(){
     try{
       LOC_IDS.forEach(function(id){
         var loc=document.getElementById(id);
-        if(loc && !document.getElementById(id+'Zip')){
+        // Belt and braces: only ever attach next to a real text input. An id
+        // collision with a display element must not put a form field on a page
+        // that has no form.
+        if(!loc || loc.tagName!=='INPUT') return;
+        if(!document.getElementById(id+'Zip')){
           var zip=document.createElement('input');
           zip.id=id+'Zip'; zip.placeholder='ZIP / Postal code (optional)';
           zip.setAttribute('autocomplete','postal-code'); zip.setAttribute('inputmode','text');
@@ -37361,6 +37375,7 @@ window.AIAD_PROMPTS = [
         addTrackToPlaylist: addTrackToPlaylist, reorderPlaylist: reorderPlaylist,
         buyTrack: buyTrack, buyRelease: buyRelease, download: download, downloadRelease: downloadRelease,
         openPledge: openPledge, waveSeek: waveSeek, drawWave: drawWave,
+        refreshEntitlement: refreshEntitlement,
         state: function () { return S; }
     };
 
@@ -37526,7 +37541,8 @@ window.AIAD_PROMPTS = [
             '</div>';
         }
         return '<div class="lb-row">' +
-            '<button class="lb-play" title="Play" onclick="AIADLibrary.play(\'' + esc(t.id) + '\')">' +
+            '<button class="lb-play" title="Play" onclick="' + (opts.play || 'AIADLibrary.play') +
+              '(\'' + esc(t.id) + '\')">' +
               '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"/></svg></button>' +
             '<div class="lb-row-main">' +
               '<div class="lb-row-title">' + esc(t.title || 'Untitled') + badge + '</div>' +
@@ -37798,6 +37814,10 @@ window.AIAD_PROMPTS = [
 
     window.AIADLibrary = {
         open: open, setTab: setTab, play: play,
+        // Exported so the public artist page renders the same row rather than a third
+        // copy of it. It passes its own play handler, because a fan's playback has to
+        // go through stream-token for entitlement, not straight at storage.
+        trackRow: trackRow, registerForPlayer: registerForPlayer,
         reload: function () { return loadAll(true); },
         state: function () { return LS; }
     };
@@ -38077,6 +38097,178 @@ window.AIAD_PROMPTS = [
         act: act, state: function () { return RV; }
     };
     setTimeout(maybeShowNav, 2500);
+})();
+</script>
+
+<style>
+/* ── Public artist page: music ──────────────────────────────────────────── */
+#fanArtistMusic{margin-bottom:22px;}
+#fanArtistMusic .am-head{margin-bottom:8px;font-size:0.72rem;font-weight:700;color:var(--text-muted,rgba(255,255,255,0.4));text-transform:uppercase;letter-spacing:0.07em;}
+#fanArtistMusic .am-card{border:1px solid var(--border-default,rgba(255,255,255,0.08));border-radius:12px;background:rgba(255,255,255,0.03);margin-bottom:10px;overflow:hidden;}
+#fanArtistMusic .am-card-head{display:flex;gap:12px;align-items:center;padding:12px;cursor:pointer;}
+#fanArtistMusic .am-card-head:hover{background:rgba(255,255,255,0.02);}
+#fanArtistMusic .am-art{width:56px;height:56px;border-radius:8px;object-fit:cover;flex:none;background:rgba(255,255,255,0.05);}
+#fanArtistMusic .am-meta{flex:1;min-width:0;}
+#fanArtistMusic .am-title{font-size:0.9rem;font-weight:600;color:var(--text-primary,#fff);}
+#fanArtistMusic .am-sub{font-size:0.74rem;color:var(--text-muted,rgba(255,255,255,0.4));margin-top:2px;text-transform:capitalize;}
+#fanArtistMusic .am-caret{color:var(--text-muted,rgba(255,255,255,0.4));font-size:0.8rem;transition:transform 150ms ease;flex:none;}
+#fanArtistMusic .am-caret.open{transform:rotate(180deg);}
+#fanArtistMusic .am-tracks{padding:0 12px 8px;border-top:1px solid rgba(255,255,255,0.06);}
+</style>
+
+<script>
+/* ══════════════ PUBLIC ARTIST PAGE — MUSIC ══════════════
+   The fan-facing artist page rendered a store and posts but no music, so a fan who
+   tapped Support had no way to hear anything first.
+
+   Everything here is borrowed rather than rebuilt: the row comes from
+   AIADLibrary.trackRow, and playback goes through AIADListen.playTrack, which mints
+   a stream-token, applies the pledge entitlement (preview vs full) and hands off to
+   the same bottom bar as the catalogue. There is one player on this page and this is
+   not it.
+
+   Visibility is entirely derived: a release shows when it is live AND its
+   aiad_streaming destination is live, and its tracks show when RLS lets them
+   through. Nothing here sets tracks.is_public. */
+(function () {
+    'use strict';
+
+    var AM = { artistId: null, releases: [], tracks: {}, open: {}, busy: false };
+
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+    function host() { return document.getElementById('fanArtistMusic'); }
+    function fmtDur(s) {
+        s = Number(s || 0);
+        if (!s) return '';
+        var m = Math.floor(s / 60), r = Math.floor(s % 60);
+        return m + ':' + (r < 10 ? '0' : '') + r;
+    }
+
+    async function load(artistId) {
+        var el = host();
+        if (!el || !artistId || !window.db) return;
+        AM.artistId = artistId;
+        AM.releases = []; AM.tracks = {}; AM.open = {};
+        el.innerHTML = '';
+
+        // Live releases whose streaming destination is also live. The inner join on
+        // release_destinations is what makes "live" mean "actually playable" rather
+        // than merely approved.
+        var rel = await window.db.from('releases')
+            .select('id,title,release_type,artwork_url,go_live_at,' +
+                    'release_destinations!inner(destination,status)')
+            .eq('user_id', artistId)
+            .eq('status', 'live')
+            .eq('release_destinations.destination', 'aiad_streaming')
+            .eq('release_destinations.status', 'live')
+            .order('go_live_at', { ascending: false });
+        if (rel.error) {
+            console.warn('[AIAD artist music] releases:', rel.error.message);
+            return;                                   // no section rather than a broken one
+        }
+        AM.releases = rel.data || [];
+        if (!AM.releases.length) return;               // no live music: no section at all
+
+        var ids = AM.releases.map(function (r) { return r.id; });
+        var tr = await window.db.from('tracks')
+            .select('id,title,track_number,duration_seconds,release_id,derivatives_status')
+            .in('release_id', ids)
+            .eq('derivatives_status', 'ready')
+            .order('track_number', { ascending: true });
+        if (tr.error) {
+            console.warn('[AIAD artist music] tracks:', tr.error.message);
+            return;
+        }
+        (tr.data || []).forEach(function (t) {
+            (AM.tracks[t.release_id] = AM.tracks[t.release_id] || []).push(t);
+        });
+
+        // A live release whose tracks are all still transcoding has nothing to play.
+        AM.releases = AM.releases.filter(function (r) { return (AM.tracks[r.id] || []).length; });
+        if (!AM.releases.length) return;
+
+        // Open the first release, so the section is never a row of closed doors.
+        AM.open[AM.releases[0].id] = true;
+        render();
+    }
+
+    function render() {
+        var el = host();
+        if (!el) return;
+        if (!AM.releases.length) { el.innerHTML = ''; return; }
+
+        el.innerHTML =
+            '<div class="am-head">Music</div>' +
+            AM.releases.map(function (r) {
+                var ts = AM.tracks[r.id] || [];
+                var yr = r.go_live_at ? new Date(r.go_live_at).getFullYear() : '';
+                var isOpen = !!AM.open[r.id];
+                var art = r.artwork_url
+                    ? '<img class="am-art" src="' + esc(r.artwork_url) + '" alt="">'
+                    : '<div class="am-art lb-art-empty"></div>';
+                return '<div class="am-card">' +
+                    '<div class="am-card-head" onclick="AIADArtistMusic.toggle(\'' + esc(r.id) + '\')">' +
+                      art +
+                      '<div class="am-meta">' +
+                        '<div class="am-title">' + esc(r.title || 'Untitled') + '</div>' +
+                        '<div class="am-sub">' +
+                          esc(r.release_type || '') + (yr ? ' · ' + yr : '') + ' · ' +
+                          ts.length + ' track' + (ts.length === 1 ? '' : 's') +
+                        '</div>' +
+                      '</div>' +
+                      '<span class="am-caret' + (isOpen ? ' open' : '') + '">▾</span>' +
+                    '</div>' +
+                    (isOpen
+                      ? '<div class="am-tracks">' + ts.map(function (t) {
+                            return window.AIADLibrary && AIADLibrary.trackRow
+                                ? AIADLibrary.trackRow(t, { play: 'AIADArtistMusic.play' })
+                                : fallbackRow(t);
+                        }).join('') + '</div>'
+                      : '') +
+                '</div>';
+            }).join('');
+    }
+
+    // Only reached if the Library module has not loaded; keeps the page working
+    // rather than rendering a release with no way into it.
+    function fallbackRow(t) {
+        return '<div class="lb-row">' +
+            '<button class="lb-play" onclick="AIADArtistMusic.play(\'' + esc(t.id) + '\')">' +
+              '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"/></svg></button>' +
+            '<div class="lb-row-main">' +
+              '<div class="lb-row-title">' + (t.track_number || '') + '. ' + esc(t.title || 'Untitled') + '</div>' +
+              '<div class="lb-row-sub">' + fmtDur(t.duration_seconds) + '</div>' +
+            '</div>' +
+        '</div>';
+    }
+
+    function toggle(id) { AM.open[id] = !AM.open[id]; render(); }
+
+    /* Playback is AIADListen's, not ours: it mints the stream-token, decides preview
+       versus full from the pledge, records the play event and drives the bottom bar.
+       Entitlement is refreshed first because a fan can land here without ever having
+       opened the catalogue, and a stale `false` would hand a paying supporter a
+       60-second preview. */
+    async function play(trackId) {
+        if (!window.AIADListen || !AIADListen.playTrack) {
+            if (window.showToast) showToast('Player still loading — try again in a moment.');
+            return;
+        }
+        try {
+            if (AIADListen.refreshEntitlement) await AIADListen.refreshEntitlement();
+        } catch (e) {
+            console.warn('[AIAD artist music] entitlement check failed:', e);
+        }
+        await AIADListen.playTrack(trackId);
+    }
+
+    window.AIADArtistMusic = {
+        load: load, toggle: toggle, play: play, state: function () { return AM; }
+    };
 })();
 </script>
 
