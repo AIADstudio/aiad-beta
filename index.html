@@ -12415,6 +12415,46 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         const SPOTIFY_REDIRECT_URI = 'https://aiad.studio/callback';
         const SPOTIFY_SCOPES = 'user-read-private user-read-email user-top-read user-read-recently-played';
 
+        // Calls the specialized-agent edge function. The server owns the system
+        // prompt now: we send a persona id and it looks the prompt up. `system` and
+        // `messages` are still sent so this works against the pre-hardening function
+        // too, giving a zero-gap deploy; the server ignores both. They come out in
+        // the follow-up commit once the new function is live.
+        const SPECIALIZED_AGENT_URL = 'https://uapiytquwuhtewqieegx.supabase.co/functions/v1/specialized-agent';
+        async function callSpecializedAgent(persona, message, opts) {
+            opts = opts || {};
+            const sess = (typeof window.__aiadSession === 'function') ? window.__aiadSession() : null;
+            if (!sess || !sess.access_token) throw new Error('Sign in to use AIAD agents.');
+
+            const payload = { persona: persona, message: message, history: opts.history || [] };
+            if (opts.image) payload.image = opts.image;
+            if (opts.legacySystem) {              // transitional, ignored by the new function
+                payload.system = opts.legacySystem;
+                payload.messages = (opts.history || []).concat([{ role: 'user', content: message }]);
+            }
+
+            const res = await fetch(SPECIALIZED_AGENT_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sess.access_token },
+                body: JSON.stringify(payload)
+            });
+            let data = null;
+            try { data = await res.json(); } catch (e) { data = null; }
+
+            if (res.status === 402) {
+                if (typeof showAICreditUpsell === 'function') showAICreditUpsell();
+                const err = new Error('You are out of credits.');
+                err.insufficientCredits = true;
+                throw err;
+            }
+            if (!res.ok) throw new Error((data && data.error) || ('Agent failed: ' + res.status));
+            if (data && typeof data.remaining === 'number' && typeof updateCreditsDisplay === 'function') {
+                updateCreditsDisplay(data.remaining);
+            }
+            return data;
+        }
+        window.callSpecializedAgent = callSpecializedAgent;
+
         const AGENT_CONFIG = {
             strategy: {
                 title: 'Strategy Agent',
@@ -12505,16 +12545,11 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             agentModalHistory.push({ role: 'user', content: msg });
 
             try {
-                const res = await fetch('https://uapiytquwuhtewqieegx.supabase.co/functions/v1/specialized-agent', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-                    body: JSON.stringify({
-                        messages: agentModalHistory,
-                        system: config.prompt
-                    })
+                const data = await callSpecializedAgent(currentAgentType, msg, {
+                    history: agentModalHistory.slice(0, -1),
+                    legacySystem: config.prompt
                 });
-                const data = await res.json();
-                const reply = data.reply || data.content?.[0]?.text || data.answer || 'No response.';
+                const reply = data.reply || 'No response.';
                 agentModalHistory.push({ role: 'assistant', content: reply });
 
                 document.getElementById(typingId)?.remove();
@@ -13044,19 +13079,8 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             if (artistAgentHistory.length < 2) return;
 
             try {
-                const res = await fetch('https://uapiytquwuhtewqieegx.supabase.co/functions/v1/specialized-agent', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-                    body: JSON.stringify({
-                        system: `You analyze artist-AI conversations and extract key career decisions.
-If the conversation contains a clear decision or strategic choice the artist is making, respond with JSON:
-{"decision": true, "category": "strategy|monetization|creative|release|branding", "reasoning": "one sentence of what they decided", "tradeoff": "one sentence of what they're trading off"}
-If no clear decision was made, respond with: {"decision": false}
-Only capture real, meaningful decisions — not questions or general discussion. Be concise.`,
-                        messages: [{ role: 'user', content: `Artist said: "${userMessage}"\nAIAD responded: "${agentResponse.substring(0, 300)}"` }]
-                    })
-                });
-                const data = await res.json();
+                const data = await callSpecializedAgent('decision_capture',
+                    `Artist said: "${userMessage}"\nAIAD responded: "${agentResponse.substring(0, 300)}"`);
                 const text = data.reply?.trim();
                 if (!text) return;
 
@@ -16659,15 +16683,8 @@ Only capture real, meaningful decisions — not questions or general discussion.
             if (!container) return;
             container.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;padding:12px;">Generating suggestions...</div>';
             try {
-                const res = await fetch('https://uapiytquwuhtewqieegx.supabase.co/functions/v1/specialized-agent', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-                    body: JSON.stringify({
-                        messages: [{ role: 'user', content: 'Suggest 4 meaningful career milestones for an independent music artist. Be specific and motivating. Return ONLY a JSON array of objects with keys: title (short), description (one sentence). No other text.' }],
-                        system: 'You are AIAD milestone intelligence. Return only valid JSON arrays, no markdown, no preamble.'
-                    })
-                });
-                const data = await res.json();
+                const data = await callSpecializedAgent('milestone_suggest',
+                    'Suggest 4 meaningful career milestones for an independent music artist. Be specific and motivating. Return ONLY a JSON array of objects with keys: title (short), description (one sentence). No other text.');
                 let suggestions = [];
                 try { suggestions = JSON.parse(data.reply); } catch { suggestions = []; }
                 if (!suggestions.length) throw new Error('No suggestions');
@@ -16807,15 +16824,9 @@ Only capture real, meaningful decisions — not questions or general discussion.
             chatContainer.scrollTop = chatContainer.scrollHeight;
 
             try {
-                const res = await fetch('https://uapiytquwuhtewqieegx.supabase.co/functions/v1/specialized-agent', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-                    body: JSON.stringify({
-                        messages: fanAgentHistory,
-                        system: `You are AIAD's Fan Intelligence — a thoughtful assistant that helps music fans understand and connect with independent artists. You help fans make informed decisions about supporting artists, understand what an artist's work means, and navigate the creator economy without pressure or manipulation. You are neutral, honest, and fan-first. Never pressure fans to spend. Respect their autonomy.`
-                    })
+                const data = await callSpecializedAgent('fan_intelligence', message, {
+                    history: fanAgentHistory.slice(0, -1)
                 });
-                const data = await res.json();
                 const reply = data.reply || 'I\'m not sure how to answer that right now.';
                 fanAgentHistory.push({ role: 'assistant', content: reply });
 
@@ -19198,22 +19209,13 @@ Only capture real, meaningful decisions — not questions or general discussion.
                 try {
                     const base64 = mixmediaRefDataUrl.split(',')[1];
                     const mimeType = mixmediaRefDataUrl.split(';')[0].split(':')[1];
-                    const resp = await fetch('https://uapiytquwuhtewqieegx.supabase.co/functions/v1/specialized-agent', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-                        body: JSON.stringify({
-                            system: 'You are a visual art director. Analyze the uploaded reference image and describe its visual style in precise detail for an AI image generator. Cover: color palette (specific hex-like descriptions), mood/atmosphere, lighting style, composition, texture, art style/movement, any typography or graphic elements. Be specific and technical. Max 120 words.',
-                            messages: [{
-                                role: 'user',
-                                content: [
-                                    { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } },
-                                    { type: 'text', text: "Describe this image's visual style for use as a reference in AI image generation." }
-                                ]
-                            }]
-                        })
-                    });
-                    const data = await resp.json();
-                    mixmediaRefStyleDesc = data.reply || data.content?.[0]?.text || data.response || null;
+                    // The image travels as its own field: the server builds the
+                    // content blocks, and only the persona that declares vision
+                    // is allowed to receive one at all.
+                    const data = await callSpecializedAgent('style_reference',
+                        "Describe this image's visual style for use as a reference in AI image generation.",
+                        { image: { media_type: mimeType, data: base64 } });
+                    mixmediaRefStyleDesc = data.reply || null;
                     if (mixmediaRefStyleDesc) {
                         if (name) name.textContent = mixmediaRefFile.name + ' ✓';
                         if (btn) { btn.style.borderColor = 'var(--teal)'; btn.style.color = 'var(--teal-light)'; }
@@ -22668,19 +22670,14 @@ document.addEventListener('keydown', function(e) {
             try {
                 // Build messages array for specialized-agent (same format as main agent)
                 const agentMsgs = _agentHistories[panelId].slice(-8);
-                const resp = await fetch('https://uapiytquwuhtewqieegx.supabase.co/functions/v1/specialized-agent', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-                    },
-                    body: JSON.stringify({
-                        messages: agentMsgs,
-                        system: ctx.system
-                    })
+                // Same fallback the context lookup above uses, so an unrecognised
+                // panel still resolves to a persona the server knows.
+                const persona = (STUDIO_AGENT_CONTEXTS[panelId] || PAGE_AGENT_CONTEXTS[panelId]) ? panelId : 'musicProd';
+                const data = await callSpecializedAgent(persona, text, {
+                    history: agentMsgs.slice(0, -1),
+                    legacySystem: ctx.system
                 });
-                const data = await resp.json();
-                const reply = data.reply || data.content?.[0]?.text || data.answer || data.response || data.text || 'No response.';
+                const reply = data.reply || 'No response.';
 
                 _agentHistories[panelId].push({ role: 'assistant', content: reply });
 
@@ -22880,16 +22877,10 @@ document.addEventListener('keydown', function(e) {
             _collabAgentHistory.push({ role: 'user', content: text });
 
             try {
-                const resp = await fetch('https://uapiytquwuhtewqieegx.supabase.co/functions/v1/specialized-agent', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-                    body: JSON.stringify({
-                        messages: _collabAgentHistory.slice(-8),
-                        system: 'You are AIAD Collab Advisor, helping creative professionals (photographers, videographers, directors, designers, stylists) build sustainable collaboration careers with independent artists. Give specific, actionable advice on pricing, proposals, contracts, portfolio strategy, and finding opportunities. Be direct and practical. Max 150 words.'
-                    })
+                const data = await callSpecializedAgent('collab_advisor', text, {
+                    history: _collabAgentHistory.slice(-8, -1)
                 });
-                const data = await resp.json();
-                const reply = data.reply || data.content?.[0]?.text || data.response || 'No response.';
+                const reply = data.reply || 'No response.';
                 _collabAgentHistory.push({ role: 'assistant', content: reply });
                 thinking.style.cssText = 'background:rgba(255,179,71,0.06);border:1px solid rgba(255,179,71,0.12);border-radius:10px;padding:12px;font-size:0.82rem;color:var(--text-secondary);line-height:1.55;';
                 thinking.textContent = reply;
@@ -22964,16 +22955,10 @@ document.addEventListener('keydown', function(e) {
     _fanAgentHistory.push({ role: 'user', content: text });
 
     try {
-        const resp = await fetch('https://uapiytquwuhtewqieegx.supabase.co/functions/v1/specialized-agent', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-            body: JSON.stringify({
-                messages: _fanAgentHistory.slice(-8),
-                system: 'You are AIAD Fan Guide, helping music fans discover artists, understand how to support them meaningfully, and get more from their experience as a supporter. Help fans navigate the platform, discover creators, and understand what their support enables. Keep responses warm, specific, and under 120 words.'
-            })
+        const data = await callSpecializedAgent('fan_guide', text, {
+            history: _fanAgentHistory.slice(-8, -1)
         });
-        const data = await resp.json();
-        const reply = data.reply || data.content?.[0]?.text || data.response || 'No response.';
+        const reply = data.reply || 'No response.';
         _fanAgentHistory.push({ role: 'assistant', content: reply });
         thinking.style.cssText = 'background:rgba(0,212,255,0.06);border:1px solid rgba(0,212,255,0.12);border-radius:10px;padding:12px;font-size:0.82rem;color:var(--text-secondary);line-height:1.55;margin:4px 0;';
         thinking.textContent = reply;
