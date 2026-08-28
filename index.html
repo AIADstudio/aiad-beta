@@ -24239,7 +24239,9 @@ async function loadArtistPage(artistUserId) {
         followBtn.onclick=()=>fanToggleFollow(pid,name,followBtn);
         if(isSupporting){supportBtn.textContent='Supporting $'+rel.amount+'/mo ✓';supportBtn.style.background='#0a8a7a';}
         else{supportBtn.textContent='Support';supportBtn.style.background='';}
-        supportBtn.onclick=()=>{AppState._currentArtistId=pid;AppState._currentArtistName=name;fanOpenSupportModal(pid,name);};
+        // Support now opens the pledge tier picker, which goes through Stripe.
+        supportBtn.onclick=()=>{AppState._currentArtistId=pid;AppState._currentArtistName=name;
+            if(window.AIADPledge) AIADPledge.open(pid,name); else fanOpenSupportModal(pid,name);};
     }
     _loadArtistFanPosts(pid,name,av);
     // pid is the artist's user id, which is what products.artist_id holds.
@@ -38335,6 +38337,191 @@ window.AIAD_PROMPTS = [
 
     window.AIADArtistMusic = {
         load: load, toggle: toggle, play: play, state: function () { return AM; }
+    };
+})();
+</script>
+
+<style>
+/* ── Pledge picker ──────────────────────────────────────────────────────── */
+.pl-overlay{position:fixed;inset:0;z-index:4000;background:rgba(0,0,0,0.72);display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto;}
+.pl-card{position:relative;width:100%;max-width:440px;background:var(--bg-card,#161616);border:1px solid var(--border-default,rgba(255,255,255,0.08));border-radius:16px;padding:26px 24px;max-height:90vh;overflow-y:auto;}
+.pl-close{position:absolute;top:12px;right:14px;background:none;border:none;color:var(--text-muted,rgba(255,255,255,0.4));font-size:1.5rem;line-height:1;cursor:pointer;padding:4px 8px;}
+.pl-close:hover{color:var(--text-primary,#fff);}
+.pl-kicker{font-size:0.66rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted,rgba(255,255,255,0.4));}
+.pl-head h2{margin:4px 0 18px;font-size:1.2rem;color:var(--text-primary,#fff);}
+.pl-toggle{display:flex;gap:6px;background:rgba(255,255,255,0.04);border-radius:10px;padding:4px;margin-bottom:16px;}
+.pl-toggle button{flex:1;padding:8px 10px;border:none;background:none;border-radius:8px;color:var(--text-muted,rgba(255,255,255,0.4));font-size:0.8rem;cursor:pointer;}
+.pl-toggle button.active{background:rgba(0,180,216,0.16);color:var(--teal-light,#00D4FF);}
+.pl-save{display:block;font-size:0.62rem;opacity:0.8;}
+.pl-tiers{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;}
+.pl-tier{width:100%;text-align:left;background:rgba(255,255,255,0.03);border:1px solid var(--border-default,rgba(255,255,255,0.08));border-radius:12px;padding:14px 16px;cursor:pointer;color:inherit;}
+.pl-tier:hover:not(:disabled){border-color:var(--teal,#00B4D8);background:rgba(0,180,216,0.06);}
+.pl-tier:disabled{opacity:0.5;cursor:default;}
+.pl-tier-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px;}
+.pl-tier-name{font-size:0.92rem;font-weight:600;color:var(--text-primary,#fff);}
+.pl-tier-price{font-size:1rem;font-weight:700;color:var(--teal-light,#00D4FF);}
+.pl-per{font-size:0.7rem;font-weight:400;color:var(--text-muted,rgba(255,255,255,0.4));}
+.pl-tier-blurb{font-size:0.75rem;color:var(--text-muted,rgba(255,255,255,0.45));margin-top:4px;line-height:1.5;}
+.pl-dim{font-size:0.72rem;color:var(--text-hint,rgba(255,255,255,0.3));line-height:1.6;}
+.pl-err{font-size:0.8rem;color:#f87171;background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.25);border-radius:10px;padding:11px;margin-bottom:12px;}
+.pl-blocked{text-align:center;padding:6px 0 2px;}
+.pl-blocked-title{font-size:0.95rem;font-weight:600;color:var(--text-primary,#fff);margin-bottom:8px;}
+.pl-blocked p{font-size:0.84rem;color:var(--text-secondary,rgba(255,255,255,0.62));line-height:1.6;margin:0 0 10px;}
+.pl-btn{margin-top:8px;padding:9px 20px;border-radius:9px;border:1px solid var(--border-default,rgba(255,255,255,0.15));background:transparent;color:var(--text-primary,#fff);font-size:0.82rem;cursor:pointer;}
+</style>
+
+<script>
+/* ══════════════ PLEDGE — fan subscribing to an artist ══════════════
+   The picker shows prices, but it never sends one. pledge-checkout resolves the
+   amount from its own tier table and ignores anything the client claims, so these
+   figures are a display of the server's rule rather than an input to it. */
+(function () {
+    'use strict';
+
+    // Mirrors the TIERS table in the pledge-checkout function. Kept in step by hand;
+    // if the two ever disagree the server wins and the fan is charged the server's
+    // price, never this one.
+    var TIERS = [
+        { id: 'supporter',    name: 'Supporter',    monthly:  500, blurb: 'Full-quality streaming of everything they release.' },
+        { id: 'patron',       name: 'Patron',       monthly: 1000, blurb: 'Everything in Supporter, plus early access to new releases.' },
+        { id: 'collector',    name: 'Collector',    monthly: 3000, blurb: 'Everything in Patron, plus downloads of the masters.' },
+        { id: 'inner_circle', name: 'Inner Circle', monthly: 6000, blurb: 'Everything in Collector, plus direct access and credits on releases.' }
+    ];
+
+    var P = { artistId: null, artistName: '', interval: 'month', busy: false, err: '', notPayable: null };
+
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+    function money(cents) {
+        var v = (Number(cents) || 0) / 100;
+        return '$' + (v % 1 === 0 ? v.toFixed(0) : v.toFixed(2));
+    }
+    // A year is ten months — two months free, not a separate price list.
+    function priceFor(t) { return P.interval === 'year' ? t.monthly * 10 : t.monthly; }
+
+    function close() {
+        var el = document.getElementById('pledgeModal');
+        if (el) el.remove();
+        P.busy = false; P.err = ''; P.notPayable = null;
+    }
+
+    function open(artistId, artistName) {
+        P.artistId = artistId;
+        P.artistName = artistName || 'this artist';
+        P.interval = 'month';
+        P.busy = false; P.err = ''; P.notPayable = null;
+        close();
+        var host = document.createElement('div');
+        host.id = 'pledgeModal';
+        host.className = 'pl-overlay';
+        host.addEventListener('click', function (e) { if (e.target === host) close(); });
+        document.body.appendChild(host);
+        render();
+    }
+
+    function setInterval_(v) { P.interval = v; render(); }
+
+    function body() {
+        if (P.notPayable) {
+            return '<div class="pl-blocked">' +
+                '<div class="pl-blocked-title">Not accepting pledges yet</div>' +
+                '<p>' + esc(P.notPayable.message) + '</p>' +
+                '<p class="pl-dim">Nothing has been charged.</p>' +
+                '<button class="pl-btn" onclick="AIADPledge.close()">Close</button>' +
+            '</div>';
+        }
+        var toggle =
+            '<div class="pl-toggle">' +
+              '<button class="' + (P.interval === 'month' ? 'active' : '') + '" onclick="AIADPledge.setInterval(\'month\')">Monthly</button>' +
+              '<button class="' + (P.interval === 'year' ? 'active' : '') + '" onclick="AIADPledge.setInterval(\'year\')">Yearly <span class="pl-save">2 months free</span></button>' +
+            '</div>';
+
+        var tiers = TIERS.map(function (t) {
+            var p = priceFor(t);
+            return '<button class="pl-tier" ' + (P.busy ? 'disabled' : '') +
+                   ' onclick="AIADPledge.choose(\'' + t.id + '\')">' +
+                '<div class="pl-tier-top">' +
+                  '<span class="pl-tier-name">' + esc(t.name) + '</span>' +
+                  '<span class="pl-tier-price">' + money(p) +
+                    '<span class="pl-per">/' + (P.interval === 'year' ? 'yr' : 'mo') + '</span></span>' +
+                '</div>' +
+                '<div class="pl-tier-blurb">' + esc(t.blurb) + '</div>' +
+            '</button>';
+        }).join('');
+
+        return toggle +
+            (P.err ? '<div class="pl-err">' + esc(P.err) + '</div>' : '') +
+            '<div class="pl-tiers">' + tiers + '</div>' +
+            (P.busy ? '<div class="pl-dim">Opening secure checkout…</div>' : '') +
+            '<div class="pl-dim">Payments are handled by Stripe. You can cancel any time.</div>';
+    }
+
+    function render() {
+        var host = document.getElementById('pledgeModal');
+        if (!host) return;
+        host.innerHTML =
+            '<div class="pl-card" role="dialog" aria-modal="true">' +
+              '<button class="pl-close" onclick="AIADPledge.close()" aria-label="Close">×</button>' +
+              '<div class="pl-head">' +
+                '<div class="pl-kicker">Support</div>' +
+                '<h2>' + esc(P.artistName) + '</h2>' +
+              '</div>' +
+              body() +
+            '</div>';
+    }
+
+    async function choose(tierId) {
+        if (P.busy) return;
+        var sess = (typeof window.__aiadSession === 'function') ? window.__aiadSession() : null;
+        if (!sess || !sess.access_token) {
+            P.err = 'Sign in to support an artist.';
+            render();
+            return;
+        }
+        P.busy = true; P.err = ''; render();
+
+        var res, data = null;
+        try {
+            res = await fetch('https://uapiytquwuhtewqieegx.supabase.co/functions/v1/pledge-checkout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sess.access_token },
+                // Deliberately no amount: the server owns the price.
+                body: JSON.stringify({
+                    artist_id: P.artistId, tier: tierId, billing_interval: P.interval
+                })
+            });
+            try { data = await res.json(); } catch (e) { data = null; }
+        } catch (e) {
+            P.busy = false;
+            P.err = 'Could not reach checkout. Check your connection and try again.';
+            render();
+            return;
+        }
+
+        P.busy = false;
+
+        // The artist has no usable Connect account. This is a refusal, not a fault,
+        // and it gets its own screen rather than a generic error.
+        if (res.status === 409 && data && data.error === 'artist_not_payable') {
+            P.notPayable = data;
+            render();
+            return;
+        }
+        if (!res.ok || !data || !data.url) {
+            P.err = (data && data.message) || (data && data.error) || 'Could not start checkout.';
+            render();
+            return;
+        }
+        window.location.href = data.url;
+    }
+
+    window.AIADPledge = {
+        open: open, close: close, choose: choose,
+        setInterval: setInterval_,
+        tiers: function () { return TIERS.slice(); }
     };
 })();
 </script>
