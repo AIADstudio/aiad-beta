@@ -12416,10 +12416,10 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         const SPOTIFY_SCOPES = 'user-read-private user-read-email user-top-read user-read-recently-played';
 
         // Calls the specialized-agent edge function. The server owns the system
-        // prompt now: we send a persona id and it looks the prompt up. `system` and
-        // `messages` are still sent so this works against the pre-hardening function
-        // too, giving a zero-gap deploy; the server ignores both. They come out in
-        // the follow-up commit once the new function is live.
+        // prompt: we send a persona id and it looks the prompt up. The prompts are
+        // deliberately NOT duplicated here — a copy in the client is a copy that can
+        // drift from the one actually used, and it was a client-supplied prompt that
+        // made this endpoint an open Claude proxy in the first place.
         const SPECIALIZED_AGENT_URL = 'https://uapiytquwuhtewqieegx.supabase.co/functions/v1/specialized-agent';
         async function callSpecializedAgent(persona, message, opts) {
             opts = opts || {};
@@ -12428,10 +12428,6 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
 
             const payload = { persona: persona, message: message, history: opts.history || [] };
             if (opts.image) payload.image = opts.image;
-            if (opts.legacySystem) {              // transitional, ignored by the new function
-                payload.system = opts.legacySystem;
-                payload.messages = (opts.history || []).concat([{ role: 'user', content: message }]);
-            }
 
             const res = await fetch(SPECIALIZED_AGENT_URL, {
                 method: 'POST',
@@ -12455,34 +12451,32 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         }
         window.callSpecializedAgent = callSpecializedAgent;
 
+        // Display metadata only. The system prompts these agents run on live in the
+        // specialized-agent edge function, keyed by these same ids.
         const AGENT_CONFIG = {
             strategy: {
                 title: 'Strategy Agent',
                 subtitle: 'Long-term positioning, deal evaluation, career direction',
                 color: '#6366f1',
                 icon: '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>',
-                prompt: 'You are AIAD\'s Strategy Agent — a trusted advisor for independent artists making long-term career decisions. You specialize in positioning, deal evaluation, career direction, and strategic trade-offs. You give direct, honest guidance without hype. You understand the artist\'s context and goals from their profile. Ask clarifying questions when needed. Never give generic advice — always ground your responses in the artist\'s specific situation.'
             },
             release: {
                 title: 'Release Agent',
                 subtitle: 'Timing, sequencing, distribution strategy',
                 color: '#ec4899',
                 icon: '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>',
-                prompt: 'You are AIAD\'s Release Agent — an expert in music release strategy for independent artists. You specialize in release timing, rollout sequencing, platform distribution, pre-save campaigns, and post-release momentum. You give specific, actionable guidance based on the artist\'s current platform data and goals. You understand DSP algorithms, playlist pitching, and how to maximize reach without a label.'
             },
             monetization: {
                 title: 'Monetization Agent',
                 subtitle: 'Revenue streams, pricing, sustainability',
                 color: '#f59e0b',
                 icon: '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>',
-                prompt: 'You are AIAD\'s Monetization Agent — a specialist in sustainable revenue for independent artists. You help artists diversify income streams including fan support, sync licensing, merchandise, live, brand deals, and digital products. You understand the artist\'s current revenue situation and help them build toward financial sustainability without compromising their creative integrity. You are direct about trade-offs between money and artistic control.'
             },
             branding: {
                 title: 'Branding Agent',
                 subtitle: 'Identity, positioning, visual direction',
                 color: '#10b981',
                 icon: '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>',
-                prompt: 'You are AIAD\'s Branding Agent — a creative director and brand strategist for independent artists. You help artists define and refine their identity, aesthetic, visual language, and positioning in the market. You understand that great artist branding is authentic — it amplifies who they already are rather than manufacturing an image. You give specific, actionable advice on visual direction, content tone, and how to stand out.'
             }
         };
 
@@ -12546,8 +12540,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
 
             try {
                 const data = await callSpecializedAgent(currentAgentType, msg, {
-                    history: agentModalHistory.slice(0, -1),
-                    legacySystem: config.prompt
+                    history: agentModalHistory.slice(0, -1)
                 });
                 const reply = data.reply || 'No response.';
                 agentModalHistory.push({ role: 'assistant', content: reply });
@@ -22593,34 +22586,32 @@ document.addEventListener('keydown', function(e) {
 
 
         // ── Studio Agent Functions ────────────────────────────────────────
+        // These are now just the set of valid persona ids for panels — the prompts
+        // they run on live server-side in specialized-agent.
         const PAGE_AGENT_CONTEXTS = {
-            supporters: { system: 'You are AIAD Supporter Strategist. Help independent artists understand, engage and grow their supporter base. Give specific, actionable advice about community building, retention, tier strategy, and fan communication. Keep responses under 150 words.' },
-            projects:   { system: 'You are AIAD Project Advisor. Help independent artists plan, prioritize and execute creative projects from concept to release. Cover timelines, collaboration, budgeting and release strategy. Keep responses under 150 words.' },
-            revenue:    { system: 'You are AIAD Revenue Advisor. Help independent artists understand and grow their income streams — fan support, sync licensing, merchandise, live performance. Give specific tactical advice. Keep responses under 150 words.' },
-            schedule:   { system: 'You are AIAD Schedule Advisor. Help independent artists plan and manage their full schedule — releases, studio sessions, rehearsals, travel, content creation, collaborations, deadlines and personal time. Give practical, specific scheduling advice. Keep responses under 150 words.' },
-            collaborators: { system: 'You are AIAD Collaboration Advisor. Help independent artists find, evaluate and manage creative collaborations. Cover agreements, workflows, credit and relationship management. Keep responses under 150 words.' },
-            analytics:  { system: 'You are AIAD Analytics Interpreter. Help independent artists understand their streaming, social and fan data. Turn numbers into actionable insights. Keep responses under 150 words.' },
-            milestones: { system: 'You are AIAD Goal Coach. Help independent artists set meaningful milestones, track progress and stay motivated. Cover creative, audience and business goals. Keep responses under 150 words.' },
-            inbox:      { system: 'You are AIAD Communication Coach. Help independent artists write effective, authentic messages to their fans and collaborators. Cover tone, timing and content strategy. Keep responses under 150 words.' },
+            supporters: {},
+            projects:   {},
+            revenue:    {},
+            schedule:   {},
+            collaborators: {},
+            analytics:  {},
+            milestones: {},
+            inbox:      {},
         };
 
         // Merge page contexts into studio contexts so studioAgentSend works for all
         const STUDIO_AGENT_CONTEXTS = {
             musicProd: {
-                name: 'Beat Advisor',
-                system: 'You are AIAD Beat Advisor, an expert music producer helping independent artists with beat-making, production, BPM, keys, vibes, sound design, and music production direction. Be concise, specific, and creative. Use music industry terminology naturally. Keep responses under 150 words unless a detailed answer is genuinely needed.'
+                name: 'Beat Advisor'
             },
             songwriting: {
-                name: 'Songwriting Coach',
-                system: 'You are AIAD Songwriting Coach, helping independent artists develop song concepts, titles, lyrics, hooks, song structure, and storytelling. Be inspiring and specific. Offer concrete title suggestions when asked. Keep responses under 150 words.'
+                name: 'Songwriting Coach'
             },
             mixMedia: {
-                name: 'Visual Director',
-                system: 'You are AIAD Visual Director, an expert art director helping music artists create compelling visual identities — album covers, press photos, promo banners, color palettes, typography, and overall brand aesthetics. Be specific about color, composition, and visual style. Keep responses under 150 words.'
+                name: 'Visual Director'
             },
             merch: {
-                name: 'Merch Strategist',
-                system: 'You are AIAD Merch Strategist, helping independent artists build profitable merchandise businesses. Give specific, actionable advice on product selection, pricing, design strategy, drop mechanics, and which platforms to use. Keep responses under 150 words.'
+                name: 'Merch Strategist'
             }
         };
 
@@ -22674,8 +22665,7 @@ document.addEventListener('keydown', function(e) {
                 // panel still resolves to a persona the server knows.
                 const persona = (STUDIO_AGENT_CONTEXTS[panelId] || PAGE_AGENT_CONTEXTS[panelId]) ? panelId : 'musicProd';
                 const data = await callSpecializedAgent(persona, text, {
-                    history: agentMsgs.slice(0, -1),
-                    legacySystem: ctx.system
+                    history: agentMsgs.slice(0, -1)
                 });
                 const reply = data.reply || 'No response.';
 
@@ -23064,9 +23054,11 @@ document.addEventListener('keydown', function(e) {
         }
 
         // ── Page agent contexts for fan views ─────────────────────────────
+        // Registering the id is all this needs to do now: the prompts for fanHome and
+        // fanArtists live in the specialized-agent function under the same ids.
         if (typeof PAGE_AGENT_CONTEXTS !== 'undefined') {
-            PAGE_AGENT_CONTEXTS['fanHome']    = { system: 'You are AIAD Fan Guide. Help fans discover artists, understand how to support them meaningfully, and get the most from AIAD. Keep responses warm, specific, and under 120 words.' };
-            PAGE_AGENT_CONTEXTS['fanArtists'] = { system: 'You are AIAD Fan Support Advisor. Help fans understand what their financial support enables for independent artists, how to engage more meaningfully, and how to find new creators. Keep responses warm, specific, under 120 words.' };
+            PAGE_AGENT_CONTEXTS['fanHome']    = {};
+            PAGE_AGENT_CONTEXTS['fanArtists'] = {};
         }
 
         // ── Load fan creators (supporting + following) ─────────────────────

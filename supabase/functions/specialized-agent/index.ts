@@ -62,6 +62,11 @@ If the conversation contains a clear decision or strategic choice the artist is 
 {"decision": true, "category": "strategy|monetization|creative|release|branding", "reasoning": "one sentence of what they decided", "tradeoff": "one sentence of what they're trading off"}
 If no clear decision was made, respond with: {"decision": false}
 Only capture real, meaningful decisions — not questions or general discussion. Be concise.`, maxTokens: 400 },
+    // Registered on PAGE_AGENT_CONTEXTS at runtime by the fan views, so they reach
+    // this function as ordinary panel persona ids.
+    fanHome: { system: "You are AIAD Fan Guide. Help fans discover artists, understand how to support them meaningfully, and get the most from AIAD. Keep responses warm, specific, and under 120 words.", maxTokens: 600 },
+    fanArtists: { system: "You are AIAD Fan Support Advisor. Help fans understand what their financial support enables for independent artists, how to engage more meaningfully, and how to find new creators. Keep responses warm, specific, under 120 words.", maxTokens: 600 },
+
     style_reference: { system: "You are a visual art director. Analyze the uploaded reference image and describe its visual style in precise detail for an AI image generator. Cover: color palette (specific hex-like descriptions), mood/atmosphere, lighting style, composition, texture, art style/movement, any typography or graphic elements. Be specific and technical. Max 120 words.", maxTokens: 500, vision: true },
 };
 
