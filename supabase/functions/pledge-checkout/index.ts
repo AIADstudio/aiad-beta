@@ -43,7 +43,9 @@ const INTERVALS = new Set(["month", "year"]);
 const APPLICATION_FEE_PERCENT = "8";
 
 // Derived from the key in use, so a test-mode run can never pick up a live-mode
-// product id or the reverse.
+// product id or the reverse. stripe_accounts is keyed (user_id, livemode) for the
+// same reason: an artist has a different acct_ id in each mode and neither works
+// in the other.
 const LIVEMODE = STRIPE_SECRET.startsWith("sk_live_");
 
 const json = (b: unknown, s = 200) =>
@@ -123,7 +125,7 @@ Deno.serve(async (req) => {
         const { data: acct, error: acctErr } = await supa
             .from("stripe_accounts")
             .select("stripe_account_id, payouts_enabled, onboarding_complete")
-            .eq("user_id", artistId).maybeSingle();
+            .eq("user_id", artistId).eq("livemode", LIVEMODE).maybeSingle();
         if (acctErr) return json({ error: `account lookup: ${acctErr.message}` }, 500);
 
         // A structured refusal, not a raw Stripe error: no artist has completed
@@ -135,6 +137,28 @@ Deno.serve(async (req) => {
             return json({
                 error: "artist_not_payable",
                 reason: !acct || !acct.stripe_account_id ? "no_connect_account" : "payouts_disabled",
+                artist_name: ap?.artist_name ?? null,
+                message: (ap?.artist_name ?? "This artist") +
+                    " isn't set up to receive payments yet. We'll let them know you tried to pledge.",
+            }, 409);
+        }
+
+        /* The account rows are written by connect-onboard, which authenticates with
+           STRIPE_STORE_KEY, while this function charges with STRIPE_SECRET_KEY. If
+           those are different Stripe platforms (or somehow different modes), the
+           destination is invisible here and Stripe answers "No such account" at the
+           moment a fan is paying. Check it up front and refuse cleanly instead. */
+        const acctRes = await fetch(`https://api.stripe.com/v1/accounts/${acct.stripe_account_id}`, {
+            headers: { "Authorization": `Bearer ${STRIPE_SECRET}` },
+        });
+        if (!acctRes.ok) {
+            const { data: ap } = await supa.from("artist_profiles")
+                .select("artist_name").eq("user_id", artistId).maybeSingle();
+            console.error("[pledge-checkout] destination unreachable with the charging key",
+                acct.stripe_account_id, "livemode", LIVEMODE, "status", acctRes.status);
+            return json({
+                error: "artist_not_payable",
+                reason: "account_not_visible_to_charging_key",
                 artist_name: ap?.artist_name ?? null,
                 message: (ap?.artist_name ?? "This artist") +
                     " isn't set up to receive payments yet. We'll let them know you tried to pledge.",
