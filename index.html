@@ -10492,6 +10492,19 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         function handleIndustryContinue() {
             if (!AppState.userIndustry) return;
             localStorage.setItem('aiad_user_industry', AppState.userIndustry);
+            // Persist server-side too. Onboarding can be abandoned before
+            // saveProfileToSupabase ever runs, which left the choice on one device.
+            try {
+                const uid = window.aiadResolvedUserId && window.aiadResolvedUserId();
+                if (uid) {
+                    db.from('profiles')
+                      .update({ industry: AppState.userIndustry })
+                      .eq('id', uid)
+                      .then(function (r) {
+                          if (r && r.error) { window.reportDbError && window.reportDbError('profiles', 'update', r.error, { where: 'handleIndustryContinue' }); }
+                      }, function () {});
+                }
+            } catch (e) {}
             navigateTo('role-selection');
         }
 
