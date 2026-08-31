@@ -77,6 +77,17 @@ function ownerColumn(role){
   return String(role||'').toLowerCase() === 'fan' ? 'fan_id' : 'artist_id';
 }
 
+// fan_questions.topic is CHECK-constrained to these four; anything else fails the
+// insert outright. agent_results.topic is free text, so it keeps whatever the
+// caller actually sent.
+const FQ_TOPICS = ['Brand','Release','Content/Social','Other'];
+function fanQuestionTopic(t){
+  const raw = String(t == null ? '' : t).trim();
+  if(!raw) return 'Other';
+  const hit = FQ_TOPICS.find(x => x.toLowerCase() === raw.toLowerCase());
+  return hit || 'Other';
+}
+
 Deno.serve(async (req)=>{
   if(req.method==='OPTIONS') return new Response('ok',{headers:cors});
 
@@ -111,7 +122,7 @@ Deno.serve(async (req)=>{
     if(admin && userId && question){
       try{
         const q = await admin.from('fan_questions')
-          .insert({ [ownerKey]: userId, question, topic })
+          .insert({ [ownerKey]: userId, question, topic: fanQuestionTopic(topic) })
           .select('id').maybeSingle();
         if(q.data) questionId = q.data.id;
         else if(q.error) console.error('[ai-agent] fan_questions insert:', q.error.message);
