@@ -14200,6 +14200,10 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             if (view === 'feed') view = 'posts';
             try { history.replaceState(null, '', '#artist/' + view); } catch (e) {}
             try { window.aiadTrackTool && window.aiadTrackTool('artist:' + view); } catch (e) {}
+            // After the view is activated, so the thread node is on screen.
+            if (view === 'agent') setTimeout(function () {
+                try { window.aiadRenderAgentHistory && window.aiadRenderAgentHistory(); } catch (e) {}
+            }, 0);
 
             const allViews = ['artistLibraryView', 'artistReviewView', 'artistPlanView', 'artistHomeView', 'artistPostsView', 'artistSupportersView', 'artistProjectsView', 'artistRevenueView', 'artistScheduleView', 'artistCollaboratorsView', 'artistMusicView', 'artistSongwritingView', 'artistMixMediaView', 'artistMerchView', 'artistSyncLibraryView', 'artistMilestonesView', 'artistAnalyticsView', 'artistMyStatsView', 'artistAgentsView', 'artistInboxView', 'artistSettingsView', 'artistStoreView', 'artistPayoutsView', 'artistDistributeView'];
             allViews.forEach(v => {
@@ -15633,9 +15637,20 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     })
                 });
                 const data = await response.json();
-                aiResponse = data.answer || generateContextualResponse(message);
+                // A non-2xx or an {error} body is a real failure. This used to fall
+                // through to generateContextualResponse(), which serves canned copy
+                // about "248 active supporters" as if it were this artist's advice —
+                // the artist was charged, saw fiction, and nothing was recorded.
+                if (!response.ok || (data && data.error)) {
+                    throw new Error((data && data.error) || ('agent http ' + response.status));
+                }
+                if (!data || !data.answer) throw new Error('The agent returned no answer.');
+                aiResponse = data.answer;
+                try { window.aiadTrackAction && window.aiadTrackAction('agent_submit', { ok: true }); } catch (e) {}
             } catch (err) {
-                aiResponse = generateContextualResponse(message);
+                const detail = (err && err.message) || String(err);
+                try { window.aiadTrackError && window.aiadTrackError(detail, { action: 'agent_submit' }); } catch (e) {}
+                aiResponse = 'That did not go through — ' + detail + '\n\nYour credit has been returned. Try again in a moment.';
             }
 
             typingIndicator.remove();
@@ -15659,6 +15674,70 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 chatThread.appendChild(aiMsg);
                 chatThread.scrollTop = chatThread.scrollHeight;
         }
+
+        // The agent tool opened blank on every visit, so a returning artist had no
+        // sign their previous answers still existed — which is a large part of why
+        // they open it once and leave. agent_results is RLS-scoped to the caller.
+        window.aiadRenderAgentHistory = async function () {
+            const thread = document.querySelector('#artistAgentsView .agent-chat-thread');
+            if (!thread || thread.dataset.historyLoaded === '1') return;
+            const client = (typeof db !== 'undefined' && db) || window.db;
+            const uid = (typeof aiadResolvedUserId === 'function') ? aiadResolvedUserId() : null;
+            if (!client || !uid) return;
+            thread.dataset.historyLoaded = '1';
+            try {
+                const { data, error } = await client.from('agent_results')
+                    .select('question,answer,status,created_at,model')
+                    .or('artist_id.eq.' + uid + ',fan_id.eq.' + uid)
+                    .order('created_at', { ascending: false })
+                    .limit(20);
+                if (error) {
+                    thread.dataset.historyLoaded = '';
+                    try { window.aiadTrackError && window.aiadTrackError(error.message, { action: 'agent_history' }); } catch (e) {}
+                    return;
+                }
+                if (!data || !data.length) return;
+
+                const esc = (t) => String(t == null ? '' : t)
+                    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const fmt = (t) => esc(t)
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                    .replace(/\n/g, '<br>');
+                const when = (iso) => { try { return new Date(iso).toLocaleDateString(); } catch (e) { return ''; } };
+
+                const wrap = document.createElement('div');
+                wrap.id = 'aiadAgentHistory';
+                let html = '<div style="text-align:center;font-size:0.72rem;color:var(--text-muted,#94a3b8);margin:4px 0 14px;">'
+                         + 'Earlier conversations</div>';
+                // Oldest first, so the thread reads top-to-bottom like a conversation.
+                for (const row of data.slice().reverse()) {
+                    const failed = String(row.status || '').toLowerCase() === 'failed';
+                    html += `<div class="chat-message">
+                        <div class="chat-message-header">
+                            <div class="chat-avatar"></div>
+                            <span class="chat-name">You</span>
+                            <span class="chat-time">${esc(when(row.created_at))}</span>
+                        </div>
+                        <div class="chat-content">${fmt(row.question)}</div>
+                    </div>
+                    <div class="chat-message">
+                        <div class="chat-message-header">
+                            <div class="chat-avatar agent">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+                            </div>
+                            <span class="chat-name">AIAD</span>
+                        </div>
+                        <div class="chat-content"${failed ? ' style="color:#f87171;"' : ''}>${failed ? 'This one failed: ' : ''}${fmt(row.answer)}</div>
+                    </div>`;
+                }
+                html += '<div style="height:1px;background:rgba(255,255,255,0.08);margin:14px 0;"></div>';
+                wrap.innerHTML = html;
+                thread.insertBefore(wrap, thread.firstChild);
+            } catch (e) {
+                thread.dataset.historyLoaded = '';
+            }
+        };
 
         function generateContextualResponse(message) {
 
@@ -26121,8 +26200,10 @@ function toggleAgeRange(btn) {
                 if (o) o.style.display = 'none';
                 const b = document.getElementById('aiadStatsBanner');
                 if (b) b.style.display = 'none';
+                try { window.aiadTrackAction && window.aiadTrackAction('onboarding_save', { ok: true }); } catch (_) {}
                 (window.showToast || (() => {}))('Saved — AIAD will use this in every response');
             } catch (e) {
+                try { window.aiadTrackError && window.aiadTrackError(e && e.message, { action: 'onboarding_save' }); } catch (_) {}
                 (window.showToast || alert)('Failed: ' + e.message);
             } finally {
                 if (btn) { btn.disabled = false; btn.textContent = 'Save & continue'; }
@@ -26267,12 +26348,43 @@ function toggleAgeRange(btn) {
         }
 
         // Accept a pasted profile URL, a spotify: URI, or a bare ID.
+        // A Spotify artist id is 22 base62 characters. This used to `return t` for
+        // anything it could not parse, so an album link or a bare vanity handle was
+        // stored verbatim as the artist id — which is why fetch-artist-stats came
+        // back with followers:0 and top_tracks:[] for the artists who pasted one.
         function toSpotifyId(raw) {
             const t = String(raw == null ? '' : raw).trim();
             if (!t) return null;
-            const url = t.match(/artist\/([A-Za-z0-9]+)/); if (url) return url[1];
-            const uri = t.match(/spotify:artist:([A-Za-z0-9]+)/); if (uri) return uri[1];
-            return t;
+            const url = t.match(/artist\/([A-Za-z0-9]{16,})/); if (url) return url[1];
+            const uri = t.match(/spotify:artist:([A-Za-z0-9]{16,})/); if (uri) return uri[1];
+            if (/^[A-Za-z0-9]{16,}$/.test(t)) return t;
+            return null;
+        }
+
+        // Why a non-empty value was refused, phrased for the artist. null = usable.
+        function spotifyIdProblem(raw) {
+            const t = String(raw == null ? '' : raw).trim();
+            if (!t || toSpotifyId(t)) return null;
+            const wrong = t.match(/spotify\.com\/(album|track|playlist|show|episode)\//i);
+            if (wrong) return 'That is an ' + wrong[1].toLowerCase() + ' link. Open your artist page on Spotify, then Share \u2192 Copy link.';
+            return 'That does not look like a Spotify artist link. Use open.spotify.com/artist/\u2026 or paste the 22-character artist ID.';
+        }
+
+        // Inline message directly under the offending input.
+        function showSpotifyFieldError(inputId, text) {
+            const el = document.getElementById(inputId);
+            if (!el) return;
+            const slotId = inputId + 'Err';
+            let slot = document.getElementById(slotId);
+            if (!text) { if (slot) slot.remove(); el.style.borderColor = ''; return; }
+            if (!slot) {
+                slot = document.createElement('div');
+                slot.id = slotId;
+                slot.style.cssText = 'font-size:0.72rem;color:#f87171;margin-top:4px;line-height:1.35;';
+                el.insertAdjacentElement('afterend', slot);
+            }
+            slot.textContent = text;
+            el.style.borderColor = '#f87171';
         }
         // YouTube identifies channels either by @handle or by a bare UC… id; keep
         // whichever the artist gave us rather than forcing an @ onto a channel id.
@@ -26343,6 +26455,10 @@ function toggleAgeRange(btn) {
         // Saves whatever the artist filled in. Returns the merged self_reported
         // jsonb, or null when every field was left blank (nothing worth a round trip).
         async function saveStats(prefix) {
+            const spotifyEl = document.getElementById(prefix + 'SpotifyId');
+            const problem = spotifyIdProblem(spotifyEl && spotifyEl.value);
+            showSpotifyFieldError(prefix + 'SpotifyId', problem);
+            if (problem) throw new Error(problem);
             const args = readForm(prefix);
             if (Object.values(args).every((x) => x === null)) return null;
             if (!window.db) throw new Error('Not signed in yet');
@@ -29348,6 +29464,27 @@ Be direct and concrete with real industry insight — never generic filler. When
         track('tool_open', name, metadata || {});
       } catch (e) {}
     };
+
+    // Until now the table only ever held heartbeat/tool_open/session_start, so a
+    // failed generation or a save that never landed looked exactly like a user
+    // who wandered off. These two make the difference visible.
+    window.aiadTrackAction = function (action, metadata) {
+      try {
+        if (!action) return;
+        var meta = {}; for (var k in (metadata || {})) meta[k] = metadata[k];
+        meta.action = action;
+        touchSession();
+        track('action', currentTool(), meta);
+      } catch (e) {}
+    };
+    window.aiadTrackError = function (message, metadata) {
+      try {
+        var meta = {}; for (var k in (metadata || {})) meta[k] = metadata[k];
+        meta.message = String(message == null ? 'unknown' : message).slice(0, 500);
+        track('error', currentTool(), meta);
+      } catch (e) {}
+    };
+
     (function fireStart(n) {
       if (userId) { touchSession(); return track('session_start', null, { path: location.pathname }); }
       if (n > 0) setTimeout(function () { fireStart(n - 1); }, 1000);
