@@ -5,6 +5,9 @@ const cors = { 'Access-Control-Allow-Origin':'*', 'Access-Control-Allow-Headers'
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 const ANTHROPIC_KEY = Deno.env.get('ANTHROPIC_API_KEY') ?? '';
+// Used only to verify the caller's access token. Falls back to the service key,
+// which validates a JWT just the same, if the anon key is not injected.
+const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? SERVICE_KEY;
 
 // Opus, to match the answer quality of the seeded demo rows (which all record
 // claude-opus-4-6). max_tokens was 1000, which truncated real strategy answers
@@ -77,6 +80,21 @@ function ownerColumn(role){
   return String(role||'').toLowerCase() === 'fan' ? 'fan_id' : 'artist_id';
 }
 
+// The caller is whoever the access token says they are. The request body used to
+// carry user_id, which meant anyone holding the public anon key could name any
+// artist and read their stats back — the token is the only identity we accept.
+async function callerId(req){
+  const header = req.headers.get('Authorization') || '';
+  const token = header.replace(/^Bearer\s+/i, '').trim();
+  if(!token || !SUPABASE_URL || !ANON_KEY) return null;
+  try{
+    const auth = createClient(SUPABASE_URL, ANON_KEY);
+    const { data, error } = await auth.auth.getUser(token);
+    if(error || !data || !data.user) return null;
+    return data.user.id || null;
+  }catch(e){ return null; }
+}
+
 // fan_questions.topic is CHECK-constrained to these four; anything else fails the
 // insert outright. agent_results.topic is free text, so it keeps whatever the
 // caller actually sent.
@@ -97,19 +115,27 @@ Deno.serve(async (req)=>{
   let userId = null;
   let topic = null;
   let question = '';
+  let spendTxnId = null;
 
   try{
+    // Identity before anything else, and never from the body.
+    userId = await callerId(req);
+    if(!userId){
+      return new Response(JSON.stringify({error:'Sign in to use the agent.'}),
+        {status:401,headers:{...cors,'Content-Type':'application/json'}});
+    }
+
     const body = await req.json();
-    const { message, conversationHistory, artistName, genre, location, level, user_id, systemContext } = body;
-    userId = user_id || null;
+    const { message, conversationHistory, artistName, genre, location, level, systemContext } = body;
     topic = (body.topic != null && String(body.topic).trim()) ? String(body.topic).trim() : null;
+    spendTxnId = (typeof body.spend_txn_id === 'string' && body.spend_txn_id) ? body.spend_txn_id : null;
     question = String(message ?? '');
 
     if(SUPABASE_URL && SERVICE_KEY) admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
     // Resolve which side of agent_results/fan_questions this caller owns.
     let role = null;
-    if(admin && userId){
+    if(admin){
       try{
         const r = await admin.from('profiles').select('role').eq('id', userId).maybeSingle();
         role = r.data && r.data.role;
@@ -207,8 +233,11 @@ Deno.serve(async (req)=>{
           question, topic, answer: msg, model: MODEL, status: 'Failed',
         });
       }catch(_){}
+      // Reverses exactly the spend the client made. A missing or already-refunded
+      // id refunds nothing rather than inventing credits.
       try{
-        await admin.rpc('refund_ai_credit', { p_user: userId, p_action: CREDIT_ACTION });
+        await admin.rpc('refund_ai_credit', {
+          p_user: userId, p_action: CREDIT_ACTION, p_spend_txn_id: spendTxnId });
       }catch(_){}
     }
     return new Response(JSON.stringify({error: msg}),{status:500,headers:{...cors,'Content-Type':'application/json'}});

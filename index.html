@@ -13493,9 +13493,11 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             messages.scrollTop = messages.scrollHeight;
 
             try {
+                const token = await window.aiadAccessToken();
+                if (!token) throw new Error('Your session expired — sign in again.');
                 const response = await fetch('https://uapiytquwuhtewqieegx.supabase.co/functions/v1/ai-agent', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'apikey': SUPABASE_ANON_KEY },
                     body: JSON.stringify({
                         message,
                         systemContext: `You are the AIAD Sync Agent — an expert music supervisor assistant. You help music supervisors find the perfect tracks for their projects from the AIAD catalog. You understand music deeply — mood, tempo, instrumentation, genre, emotional arc. You ask smart clarifying questions about scenes, project type, and budget when needed. The supervisor's name is ${profile.name || 'the supervisor'}, they work at ${profile.company || 'their company'} and primarily place music for ${(profile.workTypes || []).join(', ') || 'various media'}. Always be specific, professional, and speak their language.`
@@ -15571,6 +15573,25 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
 
         let artistAgentHistory = [];
 
+        // ai-agent identifies the caller from this token and nothing else, so it has
+        // to be the signed-in user's — not the public anon key. Goes through the
+        // supabase client, which refreshes an expired token instead of pinning it.
+        window.aiadAccessToken = async function () {
+            try {
+                const c = (typeof db !== 'undefined' && db) || window.db;
+                if (c && c.auth && c.auth.getSession) {
+                    const { data } = await c.auth.getSession();
+                    const t = data && data.session && data.session.access_token;
+                    if (t) return t;
+                }
+            } catch (e) {}
+            try {
+                const s = (typeof getSession === 'function') ? getSession() : null;
+                if (s && s.access_token) return s.access_token;
+            } catch (e) {}
+            return null;
+        };
+
         async function sendArtistAgentMessage() {
             const uid = aiadResolvedUserId();
             if (!uid) return;
@@ -15620,16 +15641,19 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
 
             let aiResponse = '';
             try {
+                const token = await window.aiadAccessToken();
+                if (!token) throw new Error('Your session expired — sign in again.');
                 const response = await fetch('https://uapiytquwuhtewqieegx.supabase.co/functions/v1/ai-agent', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Authorization': `Bearer ${token}`,
+                        'apikey': SUPABASE_ANON_KEY,
                     },
                     body: JSON.stringify({
                         message,
                         conversationHistory: artistAgentHistory.slice(0, -1),
-                        user_id: (AppState.currentUser && uid) || null,
+                        spend_txn_id: window.__aiadLastSpendTxn || null,
                         artistName: AppState.artistProfile.artistName,
                         genre: AppState.artistProfile.primaryGenre,
                         location: AppState.artistProfile.location,
@@ -21422,10 +21446,12 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
 
             try {
                 const roles = AppState.collaborator?.roles?.join(', ') || AppState.collaboratorRole || 'Collaborator';
+                const token = await window.aiadAccessToken();
+                if (!token) throw new Error('Your session expired — sign in again.');
                 const response = await fetch('https://uapiytquwuhtewqieegx.supabase.co/functions/v1/ai-agent', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhcGl5dHF1d3VodGV3cWllZWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzNDk0MTIsImV4cCI6MjA1MzkyNTQxMn0.LlBLg3bJMn3WAaFGhkahONiL9EC0x9UGVFJvGFkE90I' },
-                    body: JSON.stringify({ message: msg, context: 'You are AIAD Agent helping an industry collaborator (' + roles + '). Give concise, practical advice for music industry professionals.', userId: AppState.currentUser?.id || 'anon' })
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token, 'apikey': SUPABASE_ANON_KEY },
+                    body: JSON.stringify({ message: msg, systemContext: 'You are AIAD Agent helping an industry collaborator (' + roles + '). Give concise, practical advice for music industry professionals.' })
                 });
                 const data = await response.json();
                 const reply = data.answer || data.response || data.message || data.reply || 'I can help with that. Could you provide more details?';
@@ -25620,15 +25646,26 @@ function toggleAgeRange(btn) {
         // Atomically consume credits for an action. Returns remaining (>=0), 999999 for
         // unlimited, -1 if out, or null on error. When `action` is given we call the
         // cost-aware spend_ai_credit(p_user, p_action) overload; otherwise the 1-credit one.
+        // The id of the ledger row the last spend created. A failed generation hands
+        // back exactly that row; the refund refuses anything else, so a stale or
+        // missing value costs the artist nothing and mints nothing.
+        window.__aiadLastSpendTxn = null;
+
         async function spendAiCredit(sess, action) {
             const c = _client();
             const params = action
                 ? { p_user: sess.user.id, p_action: action }
                 : { p_user: sess.user.id };
+            window.__aiadLastSpendTxn = null;
             try {
                 if (c) {
-                    const { data, error } = await c.rpc('spend_ai_credit', params);
-                    if (!error && typeof data === 'number') return data;
+                    // spend_ai_credit_tx returns { remaining, txn_id }; spend_ai_credit
+                    // is the same call with the id dropped.
+                    const { data, error } = await c.rpc('spend_ai_credit_tx', params);
+                    if (!error && data && typeof data.remaining === 'number') {
+                        window.__aiadLastSpendTxn = data.txn_id || null;
+                        return data.remaining;
+                    }
                     if (error) console.warn('[credits] rpc error:', error.message || error);
                 }
                 // REST fallback
@@ -27000,7 +27037,8 @@ Be direct and concrete with real industry insight — never generic filler. When
             _fashionChatHistory.push({ role: 'user', content: q });
             try {
                 const s = sess();
-                const r = await fetch(`${SUPA}/functions/v1/ai-agent`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + (s ? s.access_token : anon()), 'apikey': anon(), 'Content-Type': 'application/json' }, body: JSON.stringify({ message: q, conversationHistory: _fashionChatHistory.slice(0, -1), systemContext: FASHION_SYS }) });
+                if (!s || !s.access_token) throw new Error('Your session expired — sign in again.');
+                const r = await fetch(`${SUPA}/functions/v1/ai-agent`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + s.access_token, 'apikey': anon(), 'Content-Type': 'application/json' }, body: JSON.stringify({ message: q, conversationHistory: _fashionChatHistory.slice(0, -1), systemContext: FASHION_SYS }) });
                 const j = await r.json();
                 const ans = j.answer || j.error || 'Something went wrong.';
                 _fashionChatHistory.push({ role: 'assistant', content: ans });
