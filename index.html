@@ -29222,11 +29222,18 @@ Be direct and concrete with real industry insight — never generic filler. When
     })();
     </script>
 <!-- AIAD usage tracking (self-contained, fail-safe) -->
+<!-- v2: idle cutoff + per-tab session reuse. Heartbeats stop after 5 min of no
+     real interaction, so a parked tab no longer inflates usage numbers. -->
 <script>
 (function () {
   try {
     if (window.__aiadUsageTracking) return;
     window.__aiadUsageTracking = true;
+
+    var HEARTBEAT_MS   = 30000;   // how often we sample an active tab
+    var IDLE_MS        = 300000;  // 5 min with no interaction => stop sampling
+    var SESSION_GAP_MS = 1800000; // 30 min idle => next activity is a new session
+
     var client = null;
     try { if (typeof db !== 'undefined' && db && db.from) client = db; } catch (e) {}
     if (!client) {
@@ -29242,7 +29249,25 @@ Be direct and concrete with real industry insight — never generic filler. When
         { auth: { persistSession: true, autoRefreshToken: true, storage: dualStorage } }
       );
     }
-    var sessionId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random();
+
+    function newId() {
+      return (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+           : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+               var r = Math.random() * 16 | 0;
+               return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+             });
+    }
+
+    // Reuse one session per tab, but roll it over after a long idle gap so a tab
+    // left open overnight starts a fresh session instead of one 12-hour blob.
+    var sessionId = newId();
+    var lastActivity = Date.now();
+    function touchSession() {
+      var now = Date.now();
+      if (now - lastActivity > SESSION_GAP_MS) sessionId = newId();
+      lastActivity = now;
+    }
+
     var userId = null;
     function refreshUser() {
       client.auth.getSession()
@@ -29251,6 +29276,7 @@ Be direct and concrete with real industry insight — never generic filler. When
     }
     refreshUser();
     try { client.auth.onAuthStateChange(function (_e, s) { userId = (s && s.user) ? s.user.id : null; }); } catch (e) {}
+
     function currentTool() {
       try {
         if (window.AppState && AppState.currentPage) return AppState.currentPage;
@@ -29260,6 +29286,7 @@ Be direct and concrete with real industry insight — never generic filler. When
         return h || (location.pathname.replace(/^\//, '') || 'home');
       } catch (e) { return 'unknown'; }
     }
+
     function track(eventType, tool, metadata) {
       try {
         // Read the id from the live session at call time. The cached `userId` was
@@ -29280,6 +29307,13 @@ Be direct and concrete with real industry insight — never generic filler. When
       } catch (e) {}
     }
     window.__aiadTrack = track;
+
+    // Any of these count as the artist actually being present. Deliberately only
+    // real input — a programmatic re-render must not resurrect a parked tab.
+    var ACTIVITY = ['mousedown', 'keydown', 'scroll', 'touchstart', 'pointerdown'];
+    for (var i = 0; i < ACTIVITY.length; i++) {
+      window.addEventListener(ACTIVITY[i], touchSession, { passive: true, capture: true });
+    }
 
     // Dashboard views swap by CSS class, and the fan/collab/supervisor routers use
     // history.replaceState — neither fires hashchange, so the listener below never
@@ -29302,15 +29336,22 @@ Be direct and concrete with real industry insight — never generic filler. When
       } catch (e) {}
     };
     (function fireStart(n) {
-      if (userId) return track('session_start', null, { path: location.pathname });
+      if (userId) { touchSession(); return track('session_start', null, { path: location.pathname }); }
       if (n > 0) setTimeout(function () { fireStart(n - 1); }, 1000);
     })(12);
     setInterval(function () {
-      if (document.visibilityState === 'visible') track('heartbeat', currentTool());
-    }, 30000);
-    window.addEventListener('hashchange', function () { track('tool_open', currentTool()); });
+      if (document.visibilityState !== 'visible') return;
+      if (Date.now() - lastActivity > IDLE_MS) return;   // parked tab: don't count it
+      track('heartbeat', currentTool());
+    }, HEARTBEAT_MS);
+    window.addEventListener('hashchange', function () {
+      touchSession();
+      track('tool_open', currentTool());
+    });
     document.addEventListener('visibilitychange', function () {
-      if (document.visibilityState === 'visible') track('heartbeat', currentTool());
+      if (document.visibilityState !== 'visible') return;
+      touchSession();
+      track('heartbeat', currentTool());
     });
   } catch (e) {}
 })();
