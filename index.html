@@ -10409,13 +10409,26 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             if (targetPage) {
                 targetPage.classList.add('active');
                 AppState.currentPage = pageId;
-                try { window.__aiadTrack && window.__aiadTrack('tool_open', pageId); } catch (e) {}
                 // Landing here with an industry already stored is the loop two artists were
                 // caught in: the screen asks for something the profile has, and the path
                 // beyond it ends at a signup form they cannot use because they already
                 // have an account. Send them on instead of showing it.
                 if (pageId === 'industry-selection') {
-                    try { window.aiadResumeStoredIndustry && window.aiadResumeStoredIndustry(); } catch (e) {}
+                    // Log the open only if the resume did not bounce us onward,
+                    // otherwise the metric counts a screen nobody saw.
+                    var _r = null;
+                    try { _r = window.aiadResumeStoredIndustry && window.aiadResumeStoredIndustry(); } catch (e) {}
+                    if (_r && typeof _r.then === 'function') {
+                        _r.then(function (redirected) {
+                            if (!redirected) { try { window.__aiadTrack && window.__aiadTrack('tool_open', pageId); } catch (e) {} }
+                        }, function () {
+                            try { window.__aiadTrack && window.__aiadTrack('tool_open', pageId); } catch (e) {}
+                        });
+                    } else {
+                        try { window.__aiadTrack && window.__aiadTrack('tool_open', pageId); } catch (e) {}
+                    }
+                } else {
+                    try { window.__aiadTrack && window.__aiadTrack('tool_open', pageId); } catch (e) {}
                 }
                 const mainContainer = document.getElementById('mainContainer');
                 const formPages = ['artist-profile', 'artist-goals', 'reality-check', 'subjects', 'agent', 'subscription-tier', 'fan-profile', 'fan-identity', 'fan-discovery'];
