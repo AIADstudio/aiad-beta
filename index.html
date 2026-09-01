@@ -14599,22 +14599,456 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             document.querySelectorAll('.composer-media-btn').forEach(btn => btn.classList.remove('active'));
         }
 
+        /* ── AIAD Photo Editor ───────────────────────────────────────────
+           Self-contained crop / rotate / filter step for composer photos.
+           No dependencies — canvas + ctx.filter only, so every adjustment is
+           a GPU-side filter string rather than a per-pixel loop.
+
+               AiadPhotoEditor.open(file) -> Promise<Blob|null>   // null = cancelled
+
+           Throws if the image can't be decoded; callers fall back to the
+           original file rather than blocking the attach. */
+        window.AiadPhotoEditor = (function () {
+            const MAX_EDGE = 2048;      // longest edge of the exported JPEG
+            const MIN_ZOOM = 1, MAX_ZOOM = 8;
+
+            const ASPECTS = [
+                { key: 'original', label: 'Original', ratio: null },
+                { key: '1:1',      label: '1:1',      ratio: 1 },
+                { key: '4:5',      label: '4:5',      ratio: 4 / 5 },
+                { key: '16:9',     label: '16:9',     ratio: 16 / 9 }
+            ];
+
+            const SLIDERS = [
+                { key: 'brightness', label: 'Brightness', min: 50, max: 150 },
+                { key: 'contrast',   label: 'Contrast',   min: 50, max: 150 },
+                { key: 'saturation', label: 'Saturation', min: 0,  max: 200 },
+                { key: 'warmth',     label: 'Warmth',     min: 0,  max: 100 }
+            ];
+
+            /* A preset is nothing more than a stored slider combo plus an extra
+               filter string — no separate rendering path. */
+            const PRESETS = [
+                { key: 'none', label: 'None', s: { brightness: 100, contrast: 100, saturation: 100, warmth: 0 },  extra: '' },
+                { key: 'mono', label: 'Mono', s: { brightness: 105, contrast: 112, saturation: 0,   warmth: 0 },  extra: '' },
+                { key: 'fade', label: 'Fade', s: { brightness: 108, contrast: 82,  saturation: 88,  warmth: 8 },  extra: '' },
+                { key: 'warm', label: 'Warm', s: { brightness: 103, contrast: 106, saturation: 112, warmth: 30 }, extra: '' },
+                { key: 'cold', label: 'Cold', s: { brightness: 100, contrast: 108, saturation: 96,  warmth: 0 },  extra: 'hue-rotate(-12deg)' },
+                { key: 'film', label: 'Film', s: { brightness: 98,  contrast: 118, saturation: 86,  warmth: 14 }, extra: 'hue-rotate(4deg)' }
+            ];
+
+            let stylesInjected = false;
+            function injectStyles() {
+                if (stylesInjected) return;
+                stylesInjected = true;
+                const st = document.createElement('style');
+                st.id = 'aiadPhotoEditorStyles';
+                st.textContent = [
+                    '.ape-overlay .modal-content{max-width:660px;width:min(94vw,660px);max-height:90vh;overflow:hidden;display:flex;flex-direction:column;}',
+                    '.ape-title{font-size:0.72rem;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);padding:18px 24px 12px;}',
+                    '.ape-stage{background:#000;display:flex;align-items:center;justify-content:center;padding:12px;flex:0 0 auto;}',
+                    '.ape-canvas{display:block;max-width:100%;touch-action:none;cursor:grab;}',
+                    '.ape-canvas:active{cursor:grabbing;}',
+                    '.ape-controls{padding:16px 24px 4px;overflow-y:auto;flex:1 1 auto;}',
+                    '.ape-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}',
+                    '.ape-chip{padding:6px 14px;background:var(--bg-secondary);border:1px solid var(--border-default);border-radius:20px;color:var(--text-secondary);font-family:var(--font-body);font-size:0.78rem;font-weight:500;cursor:pointer;transition:all var(--transition-fast);}',
+                    '.ape-chip:hover{border-color:var(--border-hover);color:var(--text-primary);}',
+                    '.ape-chip.active{background:var(--teal);border-color:var(--teal);color:var(--bg-primary);}',
+                    '.ape-chip svg{width:14px;height:14px;vertical-align:-2px;margin-right:5px;}',
+                    '.ape-strip{display:flex;gap:10px;overflow-x:auto;padding-bottom:12px;margin-bottom:8px;-webkit-overflow-scrolling:touch;}',
+                    '.ape-preset{flex:0 0 auto;background:none;border:none;padding:0;cursor:pointer;text-align:center;font-family:var(--font-body);}',
+                    '.ape-preset canvas{display:block;width:60px;height:60px;border-radius:8px;border:2px solid transparent;object-fit:cover;}',
+                    '.ape-preset span{display:block;margin-top:5px;font-size:0.68rem;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-muted);}',
+                    '.ape-preset.active canvas{border-color:var(--magenta);}',
+                    '.ape-preset.active span{color:var(--text-primary);}',
+                    '.ape-slider{display:flex;align-items:center;gap:12px;margin-bottom:10px;}',
+                    '.ape-slider label{flex:0 0 84px;font-size:0.72rem;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-muted);}',
+                    '.ape-slider input{flex:1;accent-color:var(--teal);min-width:0;}',
+                    '.ape-slider output{flex:0 0 42px;text-align:right;font-size:0.72rem;color:var(--text-secondary);font-variant-numeric:tabular-nums;}',
+                    '.ape-footer{display:flex;gap:12px;padding:16px 24px 20px;border-top:1px solid var(--border-default);flex:0 0 auto;}',
+                    '.ape-btn{flex:1;padding:12px;border-radius:10px;font-family:var(--font-body);font-weight:600;font-size:0.85rem;cursor:pointer;}',
+                    '.ape-btn[disabled]{opacity:0.5;cursor:default;}',
+                    '.ape-ghost{background:transparent;border:1px solid var(--border-default);color:var(--text-secondary);}',
+                    '.ape-ghost:hover{border-color:var(--border-hover);color:var(--text-primary);}',
+                    '.ape-primary{background:var(--teal);border:none;color:var(--bg-primary);}',
+                    '@media (max-width:600px){.ape-controls,.ape-title,.ape-footer{padding-left:16px;padding-right:16px;}.ape-slider label{flex-basis:70px;}}'
+                ].join('');
+                document.head.appendChild(st);
+            }
+
+            /* EXIF orientation is honoured on load, then baked into the pixels —
+               the canvas round-trip drops the metadata on the way out. */
+            async function loadSource(file) {
+                try {
+                    return await createImageBitmap(file, { imageOrientation: 'from-image' });
+                } catch (e) { /* older browsers: fall back to an <img> decode */ }
+                return await new Promise(function (resolve, reject) {
+                    const url = URL.createObjectURL(file);
+                    const img = new Image();
+                    img.onload = function () { URL.revokeObjectURL(url); resolve(img); };
+                    img.onerror = function () {
+                        URL.revokeObjectURL(url);
+                        reject(new Error(/heic|heif/i.test(file.type || file.name || '')
+                            ? 'HEIC images aren’t supported — export as JPEG or PNG first'
+                            : 'Could not read that image file'));
+                    };
+                    img.src = url;
+                });
+            }
+
+            function filterFor(sliders, extra) {
+                return 'brightness(' + (sliders.brightness / 100) + ') contrast(' + (sliders.contrast / 100) +
+                       ') saturate(' + (sliders.saturation / 100) + ') sepia(' + (sliders.warmth / 100) + ')' +
+                       (extra ? ' ' + extra : '');
+            }
+
+            async function open(file) {
+                injectStyles();
+                const src = await loadSource(file);
+                const srcW = src.naturalWidth || src.width;
+                const srcH = src.naturalHeight || src.height;
+                if (!srcW || !srcH) throw new Error('Could not read that image file');
+
+                const state = {
+                    rotation: 0, flipH: false, zoom: 1, offsetX: 0, offsetY: 0,
+                    aspect: '1:1', presetKey: 'none', extra: '',
+                    sliders: { brightness: 100, contrast: 100, saturation: 100, warmth: 0 }
+                };
+                const view = { w: 320, h: 320 };
+
+                const overlay = document.createElement('div');
+                overlay.className = 'modal-overlay ape-overlay';
+                overlay.innerHTML =
+                    '<div class="modal-content">' +
+                        '<button class="modal-close" data-ape="cancel" aria-label="Cancel">&times;</button>' +
+                        '<div class="ape-title">Edit Photo</div>' +
+                        '<div class="ape-stage"><canvas class="ape-canvas"></canvas></div>' +
+                        '<div class="ape-controls">' +
+                            '<div class="ape-row" data-ape="aspects"></div>' +
+                            '<div class="ape-row">' +
+                                '<button class="ape-chip" data-ape="rotate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>Rotate</button>' +
+                                '<button class="ape-chip" data-ape="flip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="3" x2="12" y2="21"/><polyline points="8 8 4 12 8 16"/><polyline points="16 8 20 12 16 16"/></svg>Flip</button>' +
+                            '</div>' +
+                            '<div class="ape-strip" data-ape="presets"></div>' +
+                            '<div data-ape="sliders"></div>' +
+                        '</div>' +
+                        '<div class="ape-footer">' +
+                            '<button class="ape-btn ape-ghost" data-ape="cancel">Cancel</button>' +
+                            '<button class="ape-btn ape-primary" data-ape="apply">Apply</button>' +
+                        '</div>' +
+                    '</div>';
+
+                const canvas = overlay.querySelector('.ape-canvas');
+                const ctx = canvas.getContext('2d');
+                const aspectRow = overlay.querySelector('[data-ape="aspects"]');
+                const presetStrip = overlay.querySelector('[data-ape="presets"]');
+                const sliderBox = overlay.querySelector('[data-ape="sliders"]');
+                const applyBtn = overlay.querySelector('[data-ape="apply"]');
+                const titleEl = overlay.querySelector('.ape-title');
+                const controlsEl = overlay.querySelector('.ape-controls');
+                const footerEl = overlay.querySelector('.ape-footer');
+
+                // ── geometry ────────────────────────────────────────────
+                function rotatedDims() {
+                    return (state.rotation % 180) ? [srcH, srcW] : [srcW, srcH];
+                }
+                function aspectRatio() {
+                    const a = ASPECTS.find(function (x) { return x.key === state.aspect; });
+                    if (a && a.ratio) return a.ratio;
+                    const r = rotatedDims();
+                    return r[0] / r[1];
+                }
+                function baseScale() {
+                    const r = rotatedDims();
+                    return Math.max(view.w / r[0], view.h / r[1]);   // cover the crop rect
+                }
+                function clampOffsets() {
+                    const r = rotatedDims();
+                    const d = baseScale() * state.zoom;
+                    const maxX = Math.max(0, (r[0] * d - view.w) / 2);
+                    const maxY = Math.max(0, (r[1] * d - view.h) / 2);
+                    state.offsetX = Math.min(maxX, Math.max(-maxX, state.offsetX));
+                    state.offsetY = Math.min(maxY, Math.max(-maxY, state.offsetY));
+                }
+
+                /* One render path for both the preview and the export: the crop
+                   rect always maps onto the whole output canvas. */
+                function renderTo(target, outW, outH) {
+                    const s = outW / view.w;
+                    target.save();
+                    target.filter = 'none';
+                    target.fillStyle = '#000000';
+                    target.fillRect(0, 0, outW, outH);
+                    target.filter = filterFor(state.sliders, state.extra);
+                    target.translate(outW / 2 + state.offsetX * s, outH / 2 + state.offsetY * s);
+                    target.rotate(state.rotation * Math.PI / 180);
+                    target.scale(state.flipH ? -1 : 1, 1);
+                    const d = baseScale() * state.zoom * s;
+                    target.drawImage(src, -srcW * d / 2, -srcH * d / 2, srcW * d, srcH * d);
+                    target.restore();
+                }
+                function render() { renderTo(ctx, canvas.width, canvas.height); }
+
+                function layout() {
+                    const ratio = aspectRatio();
+                    const availW = Math.max(220, Math.min(600, (window.innerWidth || 660) - 90));
+                    // Measure the controls rather than guessing: the sliders and the
+                    // preset strip must stay on screen, the preview gives up the room.
+                    const chromeH = overlay.isConnected
+                        ? titleEl.offsetHeight + 24 + controlsEl.scrollHeight + footerEl.offsetHeight
+                        : 470;
+                    const availH = Math.max(160, Math.round((window.innerHeight || 800) * 0.9) - chromeH);
+                    let w = availW, h = w / ratio;
+                    if (h > availH) { h = availH; w = h * ratio; }
+                    view.w = Math.max(1, Math.round(w));
+                    view.h = Math.max(1, Math.round(h));
+                    const dpr = Math.min(2, window.devicePixelRatio || 1);
+                    canvas.style.width = view.w + 'px';
+                    canvas.style.height = view.h + 'px';
+                    canvas.width = Math.round(view.w * dpr);
+                    canvas.height = Math.round(view.h * dpr);
+                    clampOffsets();
+                    render();
+                }
+
+                // ── controls ────────────────────────────────────────────
+                ASPECTS.forEach(function (a) {
+                    const b = document.createElement('button');
+                    b.className = 'ape-chip' + (a.key === state.aspect ? ' active' : '');
+                    b.textContent = a.label;
+                    b.onclick = function () {
+                        state.aspect = a.key;
+                        aspectRow.querySelectorAll('.ape-chip').forEach(function (c) { c.classList.remove('active'); });
+                        b.classList.add('active');
+                        layout();
+                    };
+                    aspectRow.appendChild(b);
+                });
+
+                function markPreset(key) {
+                    state.presetKey = key;
+                    presetStrip.querySelectorAll('.ape-preset').forEach(function (p) {
+                        p.classList.toggle('active', p.dataset.preset === key);
+                    });
+                }
+
+                PRESETS.forEach(function (p) {
+                    const btn = document.createElement('button');
+                    btn.className = 'ape-preset' + (p.key === state.presetKey ? ' active' : '');
+                    btn.dataset.preset = p.key;
+                    const thumb = document.createElement('canvas');
+                    thumb.width = thumb.height = 120;
+                    const tctx = thumb.getContext('2d');
+                    const ts = Math.max(thumb.width / srcW, thumb.height / srcH);
+                    tctx.filter = filterFor(p.s, p.extra);
+                    tctx.drawImage(src, (thumb.width - srcW * ts) / 2, (thumb.height - srcH * ts) / 2, srcW * ts, srcH * ts);
+                    const label = document.createElement('span');
+                    label.textContent = p.label;
+                    btn.appendChild(thumb);
+                    btn.appendChild(label);
+                    btn.onclick = function () {
+                        Object.keys(p.s).forEach(function (k) { state.sliders[k] = p.s[k]; });
+                        state.extra = p.extra;
+                        markPreset(p.key);
+                        syncSliders();
+                        render();
+                    };
+                    presetStrip.appendChild(btn);
+                });
+
+                const sliderInputs = {};
+                SLIDERS.forEach(function (def) {
+                    const row = document.createElement('div');
+                    row.className = 'ape-slider';
+                    const lab = document.createElement('label');
+                    lab.textContent = def.label;
+                    const inp = document.createElement('input');
+                    inp.type = 'range'; inp.min = def.min; inp.max = def.max; inp.step = 1;
+                    inp.value = state.sliders[def.key];
+                    const out = document.createElement('output');
+                    out.textContent = state.sliders[def.key];
+                    lab.htmlFor = inp.id = 'apeSlider_' + def.key;
+                    inp.oninput = function () {
+                        state.sliders[def.key] = Number(inp.value);
+                        out.textContent = inp.value;
+                        // Hand-tuned values no longer match a preset, but the
+                        // preset's extra filter stays part of the look.
+                        markPreset(null);
+                        render();
+                    };
+                    row.appendChild(lab); row.appendChild(inp); row.appendChild(out);
+                    sliderBox.appendChild(row);
+                    sliderInputs[def.key] = { input: inp, output: out };
+                });
+                function syncSliders() {
+                    SLIDERS.forEach(function (def) {
+                        sliderInputs[def.key].input.value = state.sliders[def.key];
+                        sliderInputs[def.key].output.textContent = state.sliders[def.key];
+                    });
+                }
+
+                overlay.querySelector('[data-ape="rotate"]').onclick = function () {
+                    state.rotation = (state.rotation + 90) % 360;
+                    state.offsetX = 0; state.offsetY = 0;
+                    layout();
+                };
+                overlay.querySelector('[data-ape="flip"]').onclick = function () {
+                    state.flipH = !state.flipH;
+                    // Mirror the pan too, so the visible region stays put.
+                    if (state.rotation % 180) state.offsetY = -state.offsetY;
+                    else state.offsetX = -state.offsetX;
+                    render();
+                };
+
+                // ── pan / zoom ──────────────────────────────────────────
+                const pointers = new Map();
+                let pinch = null;
+                function clampZoom(z) { return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z)); }
+                function pointerSpread() {
+                    const pts = Array.from(pointers.values());
+                    return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+                }
+                canvas.addEventListener('pointerdown', function (e) {
+                    canvas.setPointerCapture(e.pointerId);
+                    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+                    if (pointers.size === 2) pinch = { spread: pointerSpread(), zoom: state.zoom };
+                });
+                canvas.addEventListener('pointermove', function (e) {
+                    const prev = pointers.get(e.pointerId);
+                    if (!prev) return;
+                    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+                    if (pointers.size >= 2) {
+                        if (pinch && pinch.spread > 0) {
+                            state.zoom = clampZoom(pinch.zoom * (pointerSpread() / pinch.spread));
+                            clampOffsets(); render();
+                        }
+                        return;
+                    }
+                    state.offsetX += e.clientX - prev.x;
+                    state.offsetY += e.clientY - prev.y;
+                    clampOffsets(); render();
+                });
+                ['pointerup', 'pointercancel'].forEach(function (t) {
+                    canvas.addEventListener(t, function (e) {
+                        pointers.delete(e.pointerId);
+                        if (pointers.size < 2) pinch = null;
+                    });
+                });
+                canvas.addEventListener('wheel', function (e) {
+                    e.preventDefault();
+                    state.zoom = clampZoom(state.zoom * (e.deltaY < 0 ? 1.08 : 1 / 1.08));
+                    clampOffsets(); render();
+                }, { passive: false });
+
+                // ── export ──────────────────────────────────────────────
+                function exportBlob() {
+                    const perView = 1 / (baseScale() * state.zoom);   // source px per view px
+                    let outW = view.w * perView, outH = view.h * perView;
+                    const longest = Math.max(outW, outH);
+                    if (longest > MAX_EDGE) { const k = MAX_EDGE / longest; outW *= k; outH *= k; }
+                    outW = Math.max(1, Math.round(outW));
+                    outH = Math.max(1, Math.round(outH));
+                    const off = document.createElement('canvas');
+                    off.width = outW; off.height = outH;
+                    renderTo(off.getContext('2d'), outW, outH);
+                    return new Promise(function (res) { off.toBlob(res, 'image/jpeg', 0.9); });
+                }
+
+                document.body.appendChild(overlay);
+                layout();
+                // setTimeout, not rAF: a backgrounded tab never fires rAF and the
+                // overlay would stay invisible.
+                setTimeout(function () { overlay.classList.add('active'); }, 20);
+
+                return await new Promise(function (resolve) {
+                    function finish(result) {
+                        window.removeEventListener('resize', layout);
+                        document.removeEventListener('keydown', onKey, true);
+                        overlay.remove();
+                        if (src.close) { try { src.close(); } catch (e) {} }
+                        resolve(result);
+                    }
+                    function onKey(e) { if (e.key === 'Escape') { e.stopPropagation(); finish(null); } }
+                    overlay.querySelectorAll('[data-ape="cancel"]').forEach(function (b) {
+                        b.onclick = function () { finish(null); };
+                    });
+                    applyBtn.onclick = async function () {
+                        applyBtn.disabled = true;
+                        applyBtn.textContent = 'Applying…';
+                        let blob = null;
+                        try { blob = await exportBlob(); } catch (e) { blob = null; }
+                        finish(blob || null);
+                    };
+                    overlay.onclick = function (e) { if (e.target === overlay) finish(null); };
+                    document.addEventListener('keydown', onKey, true);
+                    window.addEventListener('resize', layout);
+                });
+            }
+
+            return { open: open };
+        })();
+
         // ── Post media handlers ──────────────────────────────────────────
         let pendingPostMedia = null;
         let pendingPostMediaUrl = null;
         let pendingPostMediaName = null;
         let pendingPostFile = null;  // declared so text-only posts don't throw ReferenceError
+        let pendingPostOriginalFile = null;  // pre-edit source, so Edit can re-open it
 
-        function handlePostPhoto(input) {
-            if (!input.files[0]) return;
-            pendingPostFile = input.files[0];
-            const url = URL.createObjectURL(input.files[0]);
-            pendingPostMedia = 'photo'; pendingPostMediaUrl = url;
+        function renderPhotoAttachment() {
             const att = document.getElementById('composerAttachments');
             att.className = 'new-composer-preview';
-            att.innerHTML = `<div style="position:relative;"><img src="${url}" style="width:100%;max-height:480px;object-fit:cover;display:block;border-radius:0;"><button onclick="clearPostMedia()" style="position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.75);border:none;color:white;cursor:pointer;font-size:1.1rem;line-height:1;display:flex;align-items:center;justify-content:center;">×</button></div>`;
+            att.innerHTML = `<div style="position:relative;"><img src="${pendingPostMediaUrl}" style="width:100%;max-height:480px;object-fit:cover;display:block;border-radius:0;"><button onclick="reopenPhotoEditor()" title="Edit photo" style="position:absolute;top:8px;right:44px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.75);border:none;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4z"/></svg></button><button onclick="clearPostMedia()" style="position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.75);border:none;color:white;cursor:pointer;font-size:1.1rem;line-height:1;display:flex;align-items:center;justify-content:center;">×</button></div>`;
+        }
+        function _editedPhotoFile(blob, source) {
+            const base = (source && source.name ? source.name : 'photo').replace(/\.[^.]+$/, '');
+            return new File([blob], base + '.jpg', { type: 'image/jpeg', lastModified: Date.now() });
+        }
+        async function handlePostPhoto(input) {
+            const file = input.files[0];
+            if (!file) return;
+            let photo = file;
+            // Images get the editor step; anything else attaches untouched.
+            if (file.type && file.type.startsWith('image/')) {
+                let blob;
+                try {
+                    blob = await window.AiadPhotoEditor.open(file);
+                } catch (e) {
+                    // Undecodable image — attach the original rather than block.
+                    showToast(e.message || 'Could not open the photo editor');
+                    blob = file;
+                }
+                if (!blob) { input.value = ''; return; }   // cancelled — attach nothing
+                if (blob !== file) photo = _editedPhotoFile(blob, file);
+            }
+            pendingPostOriginalFile = file;
+            pendingPostFile = photo;
+            pendingPostMedia = 'photo';
+            pendingPostMediaUrl = URL.createObjectURL(photo);
+            renderPhotoAttachment();
             document.querySelectorAll('.nc-tool-btn, .composer-media-btn').forEach(b=>b.classList.remove('active','poll'));
             document.getElementById('postBtnPhoto').classList.add('active');
+        }
+        // Pencil button on the attached thumb — always re-edits the original file,
+        // so repeated passes don't stack filters on filters.
+        async function reopenPhotoEditor() {
+            // Photos only — a video or audio attachment leaves the previous
+            // pendingPostOriginalFile in place, and it must not be re-opened.
+            if (pendingPostMedia !== 'photo') return;
+            const source = pendingPostOriginalFile || pendingPostFile;
+            if (!source || !source.type || !source.type.startsWith('image/')) return;
+            let blob;
+            try {
+                blob = await window.AiadPhotoEditor.open(source);
+            } catch (e) {
+                showToast(e.message || 'Could not open the photo editor');
+                return;
+            }
+            if (!blob) return;   // cancelled — leave the attachment as it was
+            if (pendingPostMediaUrl) URL.revokeObjectURL(pendingPostMediaUrl);
+            pendingPostFile = _editedPhotoFile(blob, source);
+            pendingPostMediaUrl = URL.createObjectURL(pendingPostFile);
+            renderPhotoAttachment();
         }
         function handlePostVideo(input) {
             if (!input.files[0]) return;
@@ -14674,7 +15108,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             opts.appendChild(inp);
         }
         function clearPostMedia() {
-            pendingPostMedia = null; pendingPostMediaUrl = null; pendingPostMediaName = null; pendingPostFile = null;
+            pendingPostMedia = null; pendingPostMediaUrl = null; pendingPostMediaName = null; pendingPostFile = null; pendingPostOriginalFile = null;
             const att = document.getElementById('composerAttachments');
             att.innerHTML = ''; att.className = '';
             document.getElementById('postPollBuilder').style.display = 'none';
