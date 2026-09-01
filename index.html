@@ -15059,7 +15059,9 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 '.nc-thumb-edit{right:30px;}',
                 '.nc-thumb-remove{right:4px;font-size:1rem;}',
                 '.nc-thumb-add{flex:0 0 auto;width:92px;height:92px;border-radius:10px;border:1px dashed var(--border-default);background:transparent;color:var(--text-muted);font-size:1.4rem;cursor:pointer;font-family:var(--font-body);}',
-                '.nc-thumb-add:hover{border-color:var(--border-hover);color:var(--text-primary);}'
+                '.nc-thumb-add:hover{border-color:var(--border-hover);color:var(--text-primary);}',
+                '.nc-add-photo{display:block;width:100%;margin-top:10px;padding:9px;border:1px dashed var(--border-default);border-radius:10px;background:transparent;color:var(--text-muted);font-family:var(--font-body);font-size:0.8rem;cursor:pointer;}',
+                '.nc-add-photo:hover{border-color:var(--border-hover);color:var(--text-primary);}'
             ].join('');
             document.head.appendChild(st);
         }
@@ -15176,6 +15178,14 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         function renderPhotoAttachment() {
             _aiadCarouselCss();
             const att = document.getElementById('composerAttachments');
+            // A lone photo keeps the full-width preview it had before carousels;
+            // the thumb strip only earns its place once there is an order to show.
+            if (pendingPostItems.length === 1 && pendingPostItems[0].type === 'photo') {
+                att.className = 'new-composer-preview';
+                att.innerHTML = `<div style="position:relative;"><img src="${pendingPostMediaUrl}" style="width:100%;max-height:480px;object-fit:cover;display:block;border-radius:0;"><button onclick="reopenPhotoEditor()" title="Edit photo" style="position:absolute;top:8px;right:44px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.75);border:none;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4z"/></svg></button><button onclick="clearPostMedia()" style="position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.75);border:none;color:white;cursor:pointer;font-size:1.1rem;line-height:1;display:flex;align-items:center;justify-content:center;">×</button></div>`
+                + '<button type="button" class="nc-add-photo" onclick="document.getElementById(\'postPhotoInput\').click()">+ Add photo</button>';
+                return;
+            }
             att.className = 'new-composer-preview nc-thumb-strip';
             att.innerHTML = pendingPostItems.map(function (it, i) {
                 return '<div class="nc-thumb" draggable="true" data-i="' + i + '" title="Drag to reorder">'
