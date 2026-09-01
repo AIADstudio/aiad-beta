@@ -4083,7 +4083,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                                     <button onclick="addPostPollOption()" style="background:transparent;border:1px dashed var(--border-default);border-radius:8px;color:var(--text-muted);font-family:var(--font-body);font-size:0.78rem;padding:6px 14px;cursor:pointer;width:100%;">+ Add option</button>
                                 </div>
                                 <!-- Hidden inputs -->
-                                <input type="file" id="postPhotoInput" accept="image/*" style="display:none" onchange="handlePostPhoto(this)">
+                                <input type="file" id="postPhotoInput" accept="image/*" multiple style="display:none" onchange="handlePostPhoto(this)">
                                 <input type="file" id="postVideoInput" accept="video/*" style="display:none" onchange="handlePostVideo(this)">
                                 <input type="file" id="postAudioInput" accept="audio/*" style="display:none" onchange="handlePostAudio(this)">
                                 <!-- Toolbar -->
@@ -14988,54 +14988,350 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             return { open: open };
         })();
 
+        /* ── Post media carousel ─────────────────────────────────────────
+           artist_posts.media is the ordered [{url,type,name}] list; media_url
+           still mirrors media[0] for every reader that predates it.
+
+             aiadPostMedia(post)        -> normalised ordered array (falls back
+                                           to the legacy media_url columns)
+             aiadCarouselHtml(items)    -> markup for a 2+ item post
+             aiadInitCarousels(root)    -> wires the observers, call after the
+                                           markup lands in the DOM
+
+           Swiping is native scroll-snap, never a JS scroll handler. */
+        var AIAD_MAX_POST_MEDIA = 10;
+
+        window.aiadPostMedia = function (post) {
+            if (!post) return [];
+            var raw = post.media;
+            if (typeof raw === 'string') { try { raw = JSON.parse(raw); } catch (e) { raw = null; } }
+            if (Array.isArray(raw) && raw.length) {
+                var items = raw.map(function (m) {
+                    if (!m || !m.url) return null;
+                    return { url: m.url, type: m.type || 'photo', name: m.name || null };
+                }).filter(Boolean);
+                if (items.length) return items;
+            }
+            // Pre-migration row, or a reader whose query never asked for media.
+            if (post.media_url) {
+                return [{ url: post.media_url, type: post.media_type || 'photo', name: post.media_name || null }];
+            }
+            return [];
+        };
+
+        var _aiadCarouselStyles = false;
+        function _aiadCarouselCss() {
+            if (_aiadCarouselStyles) return;
+            _aiadCarouselStyles = true;
+            var st = document.createElement('style');
+            st.id = 'aiadCarouselStyles';
+            st.textContent = [
+                '.aiad-carousel{margin:12px 0;}',
+                '.aiad-carousel-viewport{position:relative;border-radius:12px;overflow:hidden;background:#000;}',
+                '.aiad-carousel-track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;-ms-overflow-style:none;}',
+                '.aiad-carousel-track::-webkit-scrollbar{display:none;}',
+                '.aiad-carousel-slide{flex:0 0 100%;scroll-snap-align:center;scroll-snap-stop:always;display:flex;align-items:center;justify-content:center;background:#000;}',
+                '.aiad-carousel-slide img,.aiad-carousel-slide video{width:100%;max-height:60vh;object-fit:contain;display:block;}',
+                '.aiad-carousel-slide.zoomable img{cursor:zoom-in;}',
+                '.aiad-carousel-count{position:absolute;top:10px;right:10px;padding:3px 10px;border-radius:12px;background:rgba(0,0,0,0.6);color:#fff;font-size:0.72rem;font-weight:600;font-variant-numeric:tabular-nums;pointer-events:none;}',
+                '.aiad-carousel-nav{position:absolute;top:50%;transform:translateY(-50%);width:30px;height:30px;padding:0;border:none;border-radius:50%;background:rgba(255,255,255,0.92);color:#111;cursor:pointer;display:none;align-items:center;justify-content:center;opacity:0;transition:opacity var(--transition-fast,150ms ease);}',
+                '.aiad-carousel-nav svg{width:16px;height:16px;}',
+                '.aiad-carousel-nav.prev{left:10px;}',
+                '.aiad-carousel-nav.next{right:10px;}',
+                '.aiad-carousel-nav[disabled]{visibility:hidden;}',
+                '@media (pointer:fine){.aiad-carousel-nav{display:flex;}.aiad-carousel-viewport:hover .aiad-carousel-nav{opacity:1;}}',
+                '.aiad-carousel-dots{display:flex;justify-content:center;align-items:center;gap:5px;padding:8px 0 2px;pointer-events:none;}',
+                '.aiad-carousel-dot{width:6px;height:6px;border-radius:50%;background:var(--text-hint,rgba(255,255,255,0.3));transition:background var(--transition-fast,150ms ease),transform var(--transition-fast,150ms ease);}',
+                '.aiad-carousel-dot.active{background:var(--teal,#00B4D8);transform:scale(1.25);}',
+                // IG-style stack marker on a grid tile whose post holds several items.
+                '.aiad-multi-badge{position:absolute;top:6px;right:6px;color:#fff;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.6));pointer-events:none;}',
+                '.aiad-multi-badge svg{width:16px;height:16px;display:block;}'
+            ].join('') + [
+                // Composer thumb strip.
+                '.nc-thumb-strip{display:flex;gap:8px;overflow-x:auto;padding:12px 2px 4px;-webkit-overflow-scrolling:touch;scrollbar-width:thin;}',
+                '.nc-thumb{position:relative;flex:0 0 auto;width:92px;height:92px;border-radius:10px;overflow:hidden;background:#000;border:1px solid var(--border-default);cursor:grab;}',
+                '.nc-thumb img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none;}',
+                '.nc-thumb.dragging{opacity:0.45;cursor:grabbing;}',
+                '.nc-thumb.drop-target{border-color:var(--teal);box-shadow:0 0 0 2px var(--teal);}',
+                '.nc-thumb-order{position:absolute;bottom:4px;left:4px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:rgba(0,0,0,0.65);color:#fff;font-size:0.62rem;font-weight:700;line-height:16px;text-align:center;pointer-events:none;}',
+                '.nc-thumb-btn{position:absolute;top:4px;width:22px;height:22px;border:none;border-radius:50%;background:rgba(0,0,0,0.72);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;}',
+                '.nc-thumb-btn:hover{background:rgba(0,0,0,0.9);}',
+                '.nc-thumb-edit{right:30px;}',
+                '.nc-thumb-remove{right:4px;font-size:1rem;}',
+                '.nc-thumb-add{flex:0 0 auto;width:92px;height:92px;border-radius:10px;border:1px dashed var(--border-default);background:transparent;color:var(--text-muted);font-size:1.4rem;cursor:pointer;font-family:var(--font-body);}',
+                '.nc-thumb-add:hover{border-color:var(--border-hover);color:var(--text-primary);}'
+            ].join('');
+            document.head.appendChild(st);
+        }
+
+        window.aiadCarouselHtml = function (items, opts) {
+            _aiadCarouselCss();
+            opts = opts || {};
+            var esc = function (s) {
+                return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+                    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+                });
+            };
+            var zoomable = opts.zoom && typeof window._zoomPostImage === 'function';
+            var slides = items.map(function (it, i) {
+                var lazy = i > 0;   // the first slide is what the reader sees; the rest wait
+                var inner;
+                if (it.type === 'video') {
+                    inner = '<video src="' + esc(it.url) + '" controls playsinline preload="' + (lazy ? 'none' : 'metadata') + '"></video>';
+                } else {
+                    inner = '<img src="' + esc(it.url) + '" alt=""' + (lazy ? ' loading="lazy"' : '')
+                        + (zoomable ? ' onclick="_zoomPostImage(this.src)"' : '') + '>';
+                }
+                return '<div class="aiad-carousel-slide' + (zoomable && it.type !== 'video' ? ' zoomable' : '') + '">' + inner + '</div>';
+            }).join('');
+            var dots = items.map(function (it, i) {
+                return '<span class="aiad-carousel-dot' + (i === 0 ? ' active' : '') + '"></span>';
+            }).join('');
+            return '<div class="aiad-carousel">'
+                + '<div class="aiad-carousel-viewport">'
+                    + '<div class="aiad-carousel-track">' + slides + '</div>'
+                    + '<div class="aiad-carousel-count">1/' + items.length + '</div>'
+                    + '<button type="button" class="aiad-carousel-nav prev" aria-label="Previous" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>'
+                    + '<button type="button" class="aiad-carousel-nav next" aria-label="Next"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></button>'
+                + '</div>'
+                + '<div class="aiad-carousel-dots">' + dots + '</div>'
+            + '</div>';
+        };
+
+        window.aiadInitCarousels = function (root) {
+            var scope = root || document;
+            var list = scope.querySelectorAll ? scope.querySelectorAll('.aiad-carousel:not([data-ready])') : [];
+            Array.prototype.forEach.call(list, function (el) {
+                el.setAttribute('data-ready', '1');
+                var track = el.querySelector('.aiad-carousel-track');
+                var slides = Array.prototype.slice.call(track.children);
+                var dots = Array.prototype.slice.call(el.querySelectorAll('.aiad-carousel-dot'));
+                var counter = el.querySelector('.aiad-carousel-count');
+                var prev = el.querySelector('.aiad-carousel-nav.prev');
+                var next = el.querySelector('.aiad-carousel-nav.next');
+                var active = 0;
+
+                function mark(i) {
+                    if (i < 0 || i >= slides.length || i === active) return;
+                    active = i;
+                    dots.forEach(function (d, n) { d.classList.toggle('active', n === i); });
+                    if (counter) counter.textContent = (i + 1) + '/' + slides.length;
+                    if (prev) prev.disabled = i === 0;
+                    if (next) next.disabled = i === slides.length - 1;
+                }
+
+                // The active slide comes from an observer on the slides themselves,
+                // so a native swipe and a chevron click land in the same place.
+                if (typeof IntersectionObserver === 'function') {
+                    var io = new IntersectionObserver(function (entries) {
+                        entries.forEach(function (en) {
+                            if (en.isIntersecting && en.intersectionRatio >= 0.6) mark(slides.indexOf(en.target));
+                        });
+                    }, { root: track, threshold: [0, 0.6, 1] });
+                    slides.forEach(function (s) { io.observe(s); });
+                }
+
+                function go(dir) {
+                    var target = slides[Math.min(slides.length - 1, Math.max(0, active + dir))];
+                    if (!target) return;
+                    track.scrollTo({ left: target.offsetLeft - track.offsetLeft, behavior: 'smooth' });
+                }
+                if (prev) prev.onclick = function (e) { e.stopPropagation(); go(-1); };
+                if (next) next.onclick = function (e) { e.stopPropagation(); go(1); };
+            });
+        };
+
+        // Small stack marker for grid tiles backed by a multi-item post.
+        window.aiadMultiBadge = function (post) {
+            if (window.aiadPostMedia(post).length < 2) return '';
+            _aiadCarouselCss();
+            return '<span class="aiad-multi-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="3" width="13" height="13" rx="2"/><path d="M16 19a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2"/></svg></span>';
+        };
+
         // ── Post media handlers ──────────────────────────────────────────
         let pendingPostMedia = null;
         let pendingPostMediaUrl = null;
         let pendingPostMediaName = null;
         let pendingPostFile = null;  // declared so text-only posts don't throw ReferenceError
         let pendingPostOriginalFile = null;  // pre-edit source, so Edit can re-open it
+        /* The ordered attachment list. Photos can hold up to AIAD_MAX_POST_MEDIA;
+           video and audio stay single and are mutually exclusive with photos.
+           The four scalars above mirror item 0 so every older reader still works. */
+        let pendingPostItems = [];   // [{ file, blobUrl, type, name, editedFrom }]
+
+        function _syncPendingPostLegacy() {
+            const first = pendingPostItems[0] || null;
+            pendingPostFile = first ? first.file : null;
+            pendingPostMediaUrl = first ? first.blobUrl : null;
+            pendingPostOriginalFile = first ? (first.editedFrom || first.file) : null;
+            if (first && first.type !== 'audio') pendingPostMediaName = first.name || null;
+        }
+        function _clearPendingPostItems() {
+            pendingPostItems.forEach(function (it) { if (it.blobUrl) URL.revokeObjectURL(it.blobUrl); });
+            pendingPostItems = [];
+        }
+
+        const _NC_PENCIL_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4z"/></svg>';
 
         function renderPhotoAttachment() {
+            _aiadCarouselCss();
             const att = document.getElementById('composerAttachments');
-            att.className = 'new-composer-preview';
-            att.innerHTML = `<div style="position:relative;"><img src="${pendingPostMediaUrl}" style="width:100%;max-height:480px;object-fit:cover;display:block;border-radius:0;"><button onclick="reopenPhotoEditor()" title="Edit photo" style="position:absolute;top:8px;right:44px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.75);border:none;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4z"/></svg></button><button onclick="clearPostMedia()" style="position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.75);border:none;color:white;cursor:pointer;font-size:1.1rem;line-height:1;display:flex;align-items:center;justify-content:center;">×</button></div>`;
+            att.className = 'new-composer-preview nc-thumb-strip';
+            att.innerHTML = pendingPostItems.map(function (it, i) {
+                return '<div class="nc-thumb" draggable="true" data-i="' + i + '" title="Drag to reorder">'
+                    + '<img src="' + it.blobUrl + '" alt="" draggable="false">'
+                    + '<span class="nc-thumb-order">' + (i + 1) + '</span>'
+                    + '<button type="button" class="nc-thumb-btn nc-thumb-edit" title="Edit photo" onclick="reopenPhotoEditor(' + i + ')">' + _NC_PENCIL_SVG + '</button>'
+                    + '<button type="button" class="nc-thumb-btn nc-thumb-remove" title="Remove" onclick="removePostItem(' + i + ')">×</button>'
+                    + '</div>';
+            }).join('')
+            + (pendingPostItems.length < AIAD_MAX_POST_MEDIA
+                ? '<button type="button" class="nc-thumb-add" title="Add more photos" onclick="document.getElementById(\'postPhotoInput\').click()">+</button>'
+                : '');
+            _bindThumbReorder(att);
         }
+
+        function removePostItem(i) {
+            const it = pendingPostItems[i];
+            if (!it) return;
+            if (it.blobUrl) URL.revokeObjectURL(it.blobUrl);
+            pendingPostItems.splice(i, 1);
+            if (!pendingPostItems.length) { clearPostMedia(); return; }
+            _syncPendingPostLegacy();
+            renderPhotoAttachment();
+        }
+
+        function _movePostItem(from, to) {
+            if (!(from >= 0 && from < pendingPostItems.length && to >= 0 && to < pendingPostItems.length) || from === to) {
+                renderPhotoAttachment();
+                return;
+            }
+            pendingPostItems.splice(to, 0, pendingPostItems.splice(from, 1)[0]);
+            _syncPendingPostLegacy();
+            renderPhotoAttachment();
+        }
+
+        /* Reorder by hand: HTML5 drag-and-drop with a mouse, long-press then drag
+           on touch. No library — the strip is a handful of nodes. */
+        function _bindThumbReorder(strip) {
+            let dragFrom = null;
+            const clearTargets = function () {
+                strip.querySelectorAll('.nc-thumb').forEach(function (t) { t.classList.remove('drop-target', 'dragging'); });
+            };
+            strip.querySelectorAll('.nc-thumb').forEach(function (el) {
+                el.addEventListener('dragstart', function (e) {
+                    dragFrom = Number(el.dataset.i);
+                    el.classList.add('dragging');
+                    try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(dragFrom)); } catch (err) {}
+                });
+                el.addEventListener('dragend', clearTargets);
+                el.addEventListener('dragover', function (e) {
+                    e.preventDefault();
+                    try { e.dataTransfer.dropEffect = 'move'; } catch (err) {}
+                    el.classList.add('drop-target');
+                });
+                el.addEventListener('dragleave', function () { el.classList.remove('drop-target'); });
+                el.addEventListener('drop', function (e) {
+                    e.preventDefault();
+                    let from = dragFrom;
+                    if (from === null) { try { from = Number(e.dataTransfer.getData('text/plain')); } catch (err) { from = NaN; } }
+                    dragFrom = null;
+                    clearTargets();
+                    _movePostItem(from, Number(el.dataset.i));
+                });
+            });
+
+            let pressTimer = null, touchFrom = null;
+            const thumbAt = function (x, y) {
+                const el = document.elementFromPoint(x, y);
+                return (el && el.closest) ? el.closest('.nc-thumb') : null;
+            };
+            strip.addEventListener('touchstart', function (e) {
+                const el = e.target.closest ? e.target.closest('.nc-thumb') : null;
+                if (!el) return;
+                pressTimer = setTimeout(function () {
+                    pressTimer = null;
+                    touchFrom = Number(el.dataset.i);
+                    el.classList.add('dragging');
+                    if (navigator.vibrate) { try { navigator.vibrate(15); } catch (err) {} }
+                }, 320);
+            }, { passive: true });
+            strip.addEventListener('touchmove', function (e) {
+                // Moving before the press lands is a scroll, not a drag.
+                if (touchFrom === null) { clearTimeout(pressTimer); pressTimer = null; return; }
+                e.preventDefault();
+                const t = e.touches[0];
+                const over = thumbAt(t.clientX, t.clientY);
+                strip.querySelectorAll('.nc-thumb').forEach(function (x) { x.classList.remove('drop-target'); });
+                if (over) over.classList.add('drop-target');
+            }, { passive: false });
+            strip.addEventListener('touchend', function (e) {
+                clearTimeout(pressTimer); pressTimer = null;
+                if (touchFrom === null) return;
+                const from = touchFrom;
+                touchFrom = null;
+                const t = e.changedTouches[0];
+                const over = thumbAt(t.clientX, t.clientY);
+                clearTargets();
+                _movePostItem(from, over ? Number(over.dataset.i) : from);
+            });
+            strip.addEventListener('touchcancel', function () {
+                clearTimeout(pressTimer); pressTimer = null; touchFrom = null; clearTargets();
+            });
+        }
+
         function _editedPhotoFile(blob, source) {
             const base = (source && source.name ? source.name : 'photo').replace(/\.[^.]+$/, '');
             return new File([blob], base + '.jpg', { type: 'image/jpeg', lastModified: Date.now() });
         }
         async function handlePostPhoto(input) {
-            const file = input.files[0];
-            if (!file) return;
-            let photo = file;
-            // Images get the editor step; anything else attaches untouched.
-            if (file.type && file.type.startsWith('image/')) {
-                let blob;
-                try {
-                    blob = await window.AiadPhotoEditor.open(file);
-                } catch (e) {
-                    // Undecodable image — attach the original rather than block.
-                    showToast(e.message || 'Could not open the photo editor');
-                    blob = file;
+            const picked = Array.prototype.slice.call(input.files || []);
+            input.value = '';   // so re-picking the same file still fires a change
+            if (!picked.length) return;
+            // Adding to an existing photo set; a video/audio attachment is replaced,
+            // but only once we know at least one photo survived the editor.
+            const existing = (pendingPostMedia === 'photo') ? pendingPostItems.slice() : [];
+            let room = AIAD_MAX_POST_MEDIA - existing.length;
+            if (room <= 0) { showToast('A post holds up to ' + AIAD_MAX_POST_MEDIA + ' photos'); return; }
+            const added = [];
+            let overflow = 0;
+            for (let i = 0; i < picked.length; i++) {
+                const file = picked[i];
+                if (room <= 0) { overflow++; continue; }
+                let photo = file;
+                if (file.type && file.type.startsWith('image/')) {
+                    let blob;
+                    try {
+                        blob = await window.AiadPhotoEditor.open(file);
+                    } catch (e) {
+                        // Undecodable image — attach the original rather than block.
+                        showToast(e.message || 'Could not open the photo editor');
+                        blob = file;
+                    }
+                    if (!blob) continue;   // cancelled this one; the rest of the batch carries on
+                    if (blob !== file) photo = _editedPhotoFile(blob, file);
                 }
-                if (!blob) { input.value = ''; return; }   // cancelled — attach nothing
-                if (blob !== file) photo = _editedPhotoFile(blob, file);
+                added.push({ file: photo, blobUrl: URL.createObjectURL(photo), type: 'photo', name: photo.name || null, editedFrom: file });
+                room--;
             }
-            pendingPostOriginalFile = file;
-            pendingPostFile = photo;
+            if (overflow) showToast('A post holds up to ' + AIAD_MAX_POST_MEDIA + ' photos — ' + overflow + ' left out');
+            if (!added.length) return;   // every pick cancelled — the composer is untouched
+            if (pendingPostMedia !== 'photo') clearPostMedia();
+            pendingPostItems = existing.concat(added);
             pendingPostMedia = 'photo';
-            pendingPostMediaUrl = URL.createObjectURL(photo);
+            _syncPendingPostLegacy();
             renderPhotoAttachment();
             document.querySelectorAll('.nc-tool-btn, .composer-media-btn').forEach(b=>b.classList.remove('active','poll'));
             document.getElementById('postBtnPhoto').classList.add('active');
         }
-        // Pencil button on the attached thumb — always re-edits the original file,
+        // Pencil button on a thumb — always re-edits that item's original file,
         // so repeated passes don't stack filters on filters.
-        async function reopenPhotoEditor() {
-            // Photos only — a video or audio attachment leaves the previous
-            // pendingPostOriginalFile in place, and it must not be re-opened.
+        async function reopenPhotoEditor(i) {
+            // Photos only: a video or audio attachment must never re-open the editor.
             if (pendingPostMedia !== 'photo') return;
-            const source = pendingPostOriginalFile || pendingPostFile;
+            const item = pendingPostItems[i || 0];
+            if (!item) return;
+            const source = item.editedFrom || item.file;
             if (!source || !source.type || !source.type.startsWith('image/')) return;
             let blob;
             try {
@@ -15045,16 +15341,20 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 return;
             }
             if (!blob) return;   // cancelled — leave the attachment as it was
-            if (pendingPostMediaUrl) URL.revokeObjectURL(pendingPostMediaUrl);
-            pendingPostFile = _editedPhotoFile(blob, source);
-            pendingPostMediaUrl = URL.createObjectURL(pendingPostFile);
+            if (item.blobUrl) URL.revokeObjectURL(item.blobUrl);
+            item.file = _editedPhotoFile(blob, source);
+            item.blobUrl = URL.createObjectURL(item.file);
+            item.name = item.file.name;
+            _syncPendingPostLegacy();
             renderPhotoAttachment();
         }
         function handlePostVideo(input) {
             if (!input.files[0]) return;
+            _clearPendingPostItems();   // video and photos are mutually exclusive
             pendingPostFile = input.files[0];
             const url = URL.createObjectURL(input.files[0]);
             pendingPostMedia = 'video'; pendingPostMediaUrl = url;
+            pendingPostItems = [{ file: pendingPostFile, blobUrl: url, type: 'video', name: pendingPostFile.name || null, editedFrom: null }];
             const att = document.getElementById('composerAttachments');
             att.className = 'new-composer-preview';
             att.innerHTML = `<div style="position:relative;"><video src="${url}" controls style="width:100%;max-height:400px;display:block;background:#000;"></video><button onclick="clearPostMedia()" style="position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.75);border:none;color:white;cursor:pointer;font-size:1.1rem;line-height:1;display:flex;align-items:center;justify-content:center;">×</button></div>`;
@@ -15063,11 +15363,13 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         }
         function handlePostAudio(input) {
             if (!input.files[0]) return;
+            _clearPendingPostItems();   // audio and photos are mutually exclusive
             const file = input.files[0];
             pendingPostFile = file;
             const url = URL.createObjectURL(file);
             pendingPostMedia = 'audio'; pendingPostMediaUrl = url;
             pendingPostMediaName = file.name.replace(/\.[^.]+$/, '');
+            pendingPostItems = [{ file: file, blobUrl: url, type: 'audio', name: pendingPostMediaName, editedFrom: null }];
             const bars = Array(14).fill(0).map(()=>`<span style="width:3px;background:var(--teal);border-radius:2px;height:${Math.floor(Math.random()*60+20)}%;opacity:0.7;display:inline-block;"></span>`).join('');
             const att = document.getElementById('composerAttachments');
             att.innerHTML = `<div style="display:flex;align-items:center;gap:14px;background:var(--bg-secondary);border-radius:10px;padding:14px;margin-top:12px;position:relative;">
@@ -15108,6 +15410,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             opts.appendChild(inp);
         }
         function clearPostMedia() {
+            _clearPendingPostItems();
             pendingPostMedia = null; pendingPostMediaUrl = null; pendingPostMediaName = null; pendingPostFile = null; pendingPostOriginalFile = null;
             const att = document.getElementById('composerAttachments');
             att.innerHTML = ''; att.className = '';
@@ -15147,7 +15450,12 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             const visibilityClass = visibility === 'inner' ? ' inner' : '';
 
             let mediaHtml = '';
-            if (_pm === 'photo' && _pmUrl) {
+            const _pmItems = pendingPostItems.slice();
+            if (_pm === 'photo' && _pmItems.length > 1) {
+                mediaHtml = window.aiadCarouselHtml(_pmItems.map(function (it) {
+                    return { url: it.blobUrl, type: it.type, name: it.name };
+                }));
+            } else if (_pm === 'photo' && _pmUrl) {
                 mediaHtml = `<div style="position:relative;cursor:zoom-in;" onclick="enlargePostImage('${_pmUrl}')">
                     <img src="${_pmUrl}" class="post-image" style="width:100%;display:block;">
                     <div style="position:absolute;top:10px;right:10px;width:32px;height:32px;background:rgba(0,0,0,0.55);border-radius:8px;display:flex;align-items:center;justify-content:center;pointer-events:none;">
@@ -15224,40 +15532,58 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
 
             document.getElementById('postComposerText').value = '';
 
-            // Capture file reference BEFORE clearPostMedia nulls it
-            const _fileToUpload = pendingPostFile;
-            const _mediaType    = _pm;
-            const _mediaName    = _pmName;
+            // Capture the attachments BEFORE clearPostMedia empties the list
+            const _itemsToUpload = _pmItems;
+            const _mediaType     = _pm;
+            const _mediaName     = _pmName;
+            pendingPostItems = [];   // handed to the upload; clearPostMedia must not revoke these
             clearPostMedia(); removeMedia();
+            aiadInitCarousels(newPost);
 
             if (AppState.currentUser) {
                 (async () => {
-                    let persistentUrl = null;
-                    if (_fileToUpload && _mediaType && _mediaType !== 'poll') {
-                        try {
-                            const ext = (_fileToUpload.name.split('.').pop() || 'bin').toLowerCase();
-                            const path = `posts/${uid}/${Date.now()}.${ext}`;
-                            const up = await window.aiadStorageUpload('artist-media', path, _fileToUpload, _fileToUpload.type);
-                            if (!up.ok) {
-                                console.warn('[AIAD] Storage upload error:', up.status);
-                                window.__aiadReportError && window.__aiadReportError('storage.upload', 'artist-media', new Error('post ' + up.status), { path });
-                            } else {
-                                persistentUrl = up.publicUrl || null;
-                                if (persistentUrl) {
+                    // Uploaded in order: media[0] is what the legacy columns mirror.
+                    const uploaded = [];
+                    if (_mediaType && _mediaType !== 'poll') {
+                        for (let _i = 0; _i < _itemsToUpload.length; _i++) {
+                            const _it = _itemsToUpload[_i];
+                            try {
+                                const ext = (_it.file.name.split('.').pop() || 'bin').toLowerCase();
+                                const path = `posts/${uid}/${Date.now()}-${_i}.${ext}`;
+                                const up = await window.aiadStorageUpload('artist-media', path, _it.file, _it.file.type);
+                                if (!up.ok) {
+                                    console.warn('[AIAD] Storage upload error:', up.status);
+                                    window.__aiadReportError && window.__aiadReportError('storage.upload', 'artist-media', new Error('post ' + up.status), { path });
+                                    continue;
+                                }
+                                if (!up.publicUrl) continue;
+                                uploaded.push({ url: up.publicUrl, type: _it.type || _mediaType, name: _it.name || null });
+                                // Swap this slide's blob preview for the stored URL.
+                                if (_it.blobUrl) {
                                     newPost.querySelectorAll('img, video, audio').forEach(el => {
-                                        if (el.src && el.src.startsWith('blob:')) el.src = persistentUrl;
+                                        if (el.src === _it.blobUrl) el.src = up.publicUrl;
                                     });
                                 }
-                            }
-                        } catch(e) { console.warn('[AIAD] Storage upload exception:', e); }
+                            } catch(e) { console.warn('[AIAD] Storage upload exception:', e); }
+                            finally { if (_it.blobUrl) URL.revokeObjectURL(_it.blobUrl); }
+                        }
+                    }
+                    const persistentUrl = uploaded.length ? uploaded[0].url : null;
+                    // Any blob left over (single-attachment paths whose element src was
+                    // rewritten by the browser) still points at the one uploaded file.
+                    if (uploaded.length === 1 && persistentUrl) {
+                        newPost.querySelectorAll('img, video, audio').forEach(el => {
+                            if (el.src && el.src.startsWith('blob:')) el.src = persistentUrl;
+                        });
                     }
                     const { data: insertedPost, error: _postErr } = await db.from('artist_posts').insert({
                         user_id: uid,
                         content: text,
                         visibility,
-                        media_type: _mediaType || null,
+                        media: uploaded.slice(0, AIAD_MAX_POST_MEDIA),
+                        media_type: (uploaded[0] && uploaded[0].type) || _mediaType || null,
                         media_url: persistentUrl,
-                        media_name: _mediaName || null,
+                        media_name: _mediaName || (uploaded[0] && uploaded[0].name) || null,
                         created_at: new Date().toISOString()
                     }).select('id').single();
                     if (_postErr) {
@@ -15451,7 +15777,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                         countsHtml += '</div>';
                     }
                     return '<div onclick="_openArtistPost(' + idx + ')" style="aspect-ratio:1;overflow:hidden;background:var(--bg-card);border:1px solid var(--border-default);border-radius:6px;cursor:pointer;position:relative;transition:opacity 0.15s;" onmouseenter="this.style.opacity=\'0.85\';var c=this.querySelector(\'.grid-hover-counts\');if(c)c.style.opacity=\'1\'" onmouseleave="this.style.opacity=\'1\';var c=this.querySelector(\'.grid-hover-counts\');if(c)c.style.opacity=\'0\'">' +
-                        thumb + countsHtml +
+                        thumb + window.aiadMultiBadge(post) + countsHtml +
                         '<div style="position:absolute;bottom:0;left:0;right:0;padding:6px 8px;background:linear-gradient(transparent,rgba(0,0,0,0.7));display:flex;align-items:center;justify-content:space-between;">' +
                             '<span style="font-size:0.6rem;color:rgba(255,255,255,0.6);">' + getTimeAgo(post.created_at) + '</span>' +
                         '</div>' +
@@ -15483,7 +15809,10 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 ? '<img src="' + avatar + '" style="width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0;">'
                 : '<div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--magenta-dark),var(--teal-dark));display:flex;align-items:center;justify-content:center;font-size:1rem;font-weight:700;color:white;flex-shrink:0;">' + (artistName[0] || 'A') + '</div>';
             var mediaHtml = '';
-            if (post.media_type === 'photo' && post.media_url) {
+            var _items = window.aiadPostMedia(post);
+            if (_items.length > 1) {
+                mediaHtml = window.aiadCarouselHtml(_items, { zoom: true });
+            } else if (post.media_type === 'photo' && post.media_url) {
                 mediaHtml = '<div style="margin:12px 0;border-radius:12px;overflow:hidden;text-align:center;background:#000;cursor:zoom-in;" onclick="_zoomPostImage(\'' + post.media_url + '\')"><img src="' + post.media_url + '" style="max-width:100%;max-height:60vh;object-fit:contain;display:block;margin:0 auto;"></div>';
             } else if (post.media_type === 'video' && post.media_url) {
                 mediaHtml = '<div style="margin:12px 0;border-radius:12px;overflow:hidden;"><video src="' + post.media_url + '" controls style="width:100%;max-height:60vh;background:#000;display:block;"></video></div>';
@@ -15529,6 +15858,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     '</div>' +
                 '</div>';
             overlay.style.display = 'flex';
+            aiadInitCarousels(overlay);
             document.body.style.overflow = 'hidden';
             // Load persisted like state and comments
             _loadPostLikeState(pid);
@@ -24639,7 +24969,10 @@ function _feedAvatar(url, name) {
 function _feedPostCard(p) {
     const name = p.display_name || p.username || 'Artist';
     let media = '';
-    if (p.media_url) {
+    const _items = window.aiadPostMedia(p);
+    if (_items.length > 1) {
+        media = window.aiadCarouselHtml(_items);
+    } else if (p.media_url) {
         if (p.media_type === 'video') {
             media = '<video src="' + escapeHtml(p.media_url) + '" controls playsinline style="width:100%;max-height:560px;background:#000;border-radius:12px;margin-top:10px;display:block"></video>';
         } else {
@@ -24676,6 +25009,7 @@ async function loadHomeFeed() {
         const avMap = await window.aiadAvatarsFor(rows.map(r => r.author_id)).catch(() => ({}));
         rows.forEach(r => { r.avatar_url = avMap[r.author_id] || r.avatar_url || ''; });
         box.innerHTML = rows.map(_feedPostCard).join('');
+        aiadInitCarousels(box);
     } catch (e) {
         box.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px">Could not load feed. Pull down to retry.</div>';
     }
@@ -25092,6 +25426,7 @@ function _buildFanPostCard(p) {
     if (!thumb) {
         thumb = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-hint);font-size:0.75rem;">Post</div>';
     }
+    thumb += window.aiadMultiBadge(p);
     var idx = _fanFeedData.indexOf(p);
     var lc = (p._likeCount || 0), cc = (p._commentCount || 0);
     var hoverOverlay = '';
@@ -25137,7 +25472,10 @@ function _openFanPost(idx) {
         ? '<img src="' + av + '" style="width:44px;height:44px;border-radius:50%;object-fit:cover;background:var(--bg-secondary);cursor:pointer;flex-shrink:0;" onclick="loadArtistPage(\'' + uid + '\');_closeFanPost();">'
         : '<div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#0d2f3f,#1a4a5e);display:flex;align-items:center;justify-content:center;font-size:1rem;font-weight:800;color:var(--teal-light);cursor:pointer;flex-shrink:0;" onclick="loadArtistPage(\'' + uid + '\');_closeFanPost();">' + (name[0] || 'A').toUpperCase() + '</div>';
     var mediaHtml = '';
-    if (p.media_url) {
+    var _items = window.aiadPostMedia(p);
+    if (_items.length > 1) {
+        mediaHtml = window.aiadCarouselHtml(_items, { zoom: true });
+    } else if (p.media_url) {
         var mUrl = p.media_url.toLowerCase();
         var isAudio = mUrl.includes('.mp3') || mUrl.includes('.wav') || mUrl.includes('.ogg') || mUrl.includes('.m4a') || mUrl.includes('.aac') || (p.post_type && p.post_type === 'music');
         var isVideo = mUrl.includes('.mp4') || mUrl.includes('.mov') || mUrl.includes('.webm') || mUrl.includes('.avi') || (p.post_type && p.post_type === 'video');
@@ -25216,6 +25554,7 @@ function _openFanPost(idx) {
             '</div>' +
         '</div>';
     overlay.style.display = 'flex';
+    aiadInitCarousels(overlay);
     document.body.style.overflow = 'hidden';
     // Load persisted like state and comments
     if (pid && pid !== 'tmp' && AppState.currentUser) {
@@ -30418,7 +30757,10 @@ Be direct and concrete with real industry insight — never generic filler. When
     var p = (window._collabFeedFiltered||[])[idx]; if(!p) return;
     var name=(p._artist&&p._artist.artist_name)||'Artist';
     var mUrl=p.media_url||'';
-    var media = isImg(mUrl) ? '<img src="'+mUrl+'" style="width:100%;max-height:70vh;object-fit:contain;background:#000">' : (isVid(mUrl) ? '<video src="'+mUrl+'" controls autoplay playsinline style="width:100%;max-height:70vh;background:#000"></video>' : '');
+    var _items = window.aiadPostMedia(p);
+    var media = _items.length > 1
+      ? window.aiadCarouselHtml(_items)
+      : (isImg(mUrl) ? '<img src="'+mUrl+'" style="width:100%;max-height:70vh;object-fit:contain;background:#000">' : (isVid(mUrl) ? '<video src="'+mUrl+'" controls autoplay playsinline style="width:100%;max-height:70vh;background:#000"></video>' : ''));
     var ov=document.createElement('div'); ov.id='aiadFeedLightbox';
     ov.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:20px';
     ov.innerHTML='<div style="max-width:640px;width:100%;max-height:90vh;overflow:auto;background:#141414;border-radius:16px">'
@@ -30426,6 +30768,7 @@ Be direct and concrete with real industry insight — never generic filler. When
       +media+(p.content?'<div style="padding:14px 16px;color:#ddd;font-size:.9rem;line-height:1.6">'+p.content+'</div>':'')+'</div>';
     ov.addEventListener('click',function(e){ if(e.target===ov) ov.remove(); });
     document.body.appendChild(ov);
+    window.aiadInitCarousels && window.aiadInitCarousels(ov);
   };
 
   /* ---------- #33 artist profile modal ---------- */
