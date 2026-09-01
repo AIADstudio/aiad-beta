@@ -121,7 +121,7 @@ Deno.serve(async (req) => {
         // Resolved here, never read from the request. body.amount is ignored.
         const amount = interval === "year" ? TIERS[tier].monthly * 10 : TIERS[tier].monthly;
 
-        // ── the artist must actually be able to receive money ──
+        // ── the artist must actually be able to receive money, IN THIS MODE ──
         const { data: acct, error: acctErr } = await supa
             .from("stripe_accounts")
             .select("stripe_account_id, payouts_enabled, onboarding_complete")
@@ -130,7 +130,8 @@ Deno.serve(async (req) => {
 
         // A structured refusal, not a raw Stripe error: no artist has completed
         // Connect onboarding yet, so this is the expected path today and the UI has
-        // to be able to say something useful about it.
+        // to be able to say something useful about it. Never falls back to the other
+        // mode's row — that acct_ id is invisible to this key.
         if (!acct || !acct.stripe_account_id || !acct.payouts_enabled) {
             const { data: ap } = await supa.from("artist_profiles")
                 .select("artist_name").eq("user_id", artistId).maybeSingle();
@@ -181,7 +182,6 @@ Deno.serve(async (req) => {
             customerId = cust.id;
         }
 
-        const label = `${TIERS[tier].name} pledge` + (interval === "year" ? " (annual)" : "");
         const params = new URLSearchParams({
             mode: "subscription",
             customer: customerId!,
