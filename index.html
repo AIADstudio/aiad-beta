@@ -79,12 +79,18 @@
     .agent-tabpanel{display:none;}
     .agent-tabpanel.active{display:block;}
 
-    .agent-workspace{display:flex;gap:18px;align-items:flex-start;}
+    /* The two columns are one row of equal height. The rail used to size itself
+       (sticky, max-height:100vh-190px) and ran on past the panel beside it; the
+       Stage Agents section sat inside the right column, so that overshoot pushed
+       the grid into a narrow lane. The section is now a sibling of this row and
+       the rail takes its height from the row. Height authority is
+       .agent-workspace-main, which is content-driven and grows with the thread —
+       nothing here may hardcode a pixel height. */
+    .agent-workspace{display:flex;gap:18px;}
     .agent-workspace-main{flex:1 1 auto;min-width:0;}
 
-    .agent-rail{flex:0 0 260px;width:260px;align-self:stretch;display:flex;flex-direction:column;gap:10px;
-        background:var(--bg-card);border:1px solid var(--border-default);border-radius:14px;padding:12px;
-        max-height:calc(100vh - 190px);position:sticky;top:12px;}
+    .agent-rail{flex:0 0 260px;width:260px;display:flex;flex-direction:column;gap:10px;
+        background:var(--bg-card);border:1px solid var(--border-default);border-radius:14px;padding:12px;}
     .agent-rail-head{display:flex;align-items:center;gap:8px;}
     .agent-newconvo{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:9px 12px;border-radius:9px;
         background:var(--teal);border:none;color:var(--bg-primary);font-family:var(--font-body);font-size:0.82rem;font-weight:700;cursor:pointer;}
@@ -94,7 +100,16 @@
     .agent-convo-search{width:100%;box-sizing:border-box;padding:8px 11px;border-radius:9px;background:var(--bg-secondary);
         border:1px solid var(--border-default);color:var(--text-primary);font-family:var(--font-body);font-size:0.8rem;outline:none;}
     .agent-convo-search:focus{border-color:var(--teal);}
-    .agent-convo-list{flex:1 1 auto;min-height:0;overflow-y:auto;margin:0 -4px;padding:0 4px;}
+    /* min-height:0 is load-bearing: a flex child defaults to min-height:auto and
+       refuses to shrink under its content, which would leave overflow-y:auto
+       never engaging and the rail growing instead of scrolling. */
+    .agent-convo-list{flex:1 1 auto;min-height:0;overflow-y:auto;margin:0 -4px;padding:0 4px;
+        scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.18) transparent;}
+    .agent-convo-list::-webkit-scrollbar{width:8px;}
+    .agent-convo-list::-webkit-scrollbar-track{background:transparent;}
+    .agent-convo-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.16);border-radius:8px;
+        border:2px solid transparent;background-clip:content-box;}
+    .agent-convo-list::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.30);background-clip:content-box;}
     .agent-convo-group{font-size:0.66rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-hint);padding:12px 6px 5px;}
     .agent-convo-row{position:relative;display:flex;align-items:center;border-radius:8px;}
     .agent-convo-row:hover{background:var(--bg-card-hover);}
@@ -118,6 +133,29 @@
     .agent-convo-toggle{display:none;background:none;border:1px solid var(--border-default);border-radius:9px;
         color:var(--text-secondary);cursor:pointer;padding:7px;margin-right:10px;flex:0 0 auto;}
     .agent-convo-toggle svg{width:17px;height:17px;display:block;}
+
+    /* .primary-agent-panel's 24px bottom margin used to separate it from the
+       Stage Agents section below it in the same column. The section is now a
+       sibling of the row and carries its own 32px top margin, so inside the
+       workspace that margin is just a tail hanging off the bottom of the column
+       — and the rail, which matches the column, would inherit it. */
+    .agent-workspace .primary-agent-panel{margin-bottom:0;}
+
+    /* Equal-height columns, desktop only.
+
+       align-items:stretch alone is not enough. A stretched flex item still
+       contributes its own content height to the line, so a rail holding 30
+       conversations would lengthen the row and drag the panel down with it —
+       the list would never scroll because the rail simply grew. Taking the rail
+       out of flow leaves .agent-workspace-main as the only in-flow column, so
+       the magenta panel alone decides the row's height; top:0/bottom:0 then
+       hands that exact height back to the rail. Nothing here is a fixed pixel
+       height: the panel is content-driven and grows with the conversation.
+       padding-left reserves the rail's lane (260px + the 18px gap). */
+    @media (min-width:769px){
+        .agent-workspace{align-items:stretch;position:relative;padding-left:278px;}
+        .agent-rail{position:absolute;left:0;top:0;bottom:0;width:260px;flex:none;min-height:0;}
+    }
 
     /* Under 768px the dashboard has no room for a rail, so it becomes a drawer. */
     @media (max-width:768px){
@@ -5386,28 +5424,6 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     <!-- A fourth connect panel lived here. Connecting now happens only in
                          My Stats, so the Agents view just uses the stats it finds. -->
 
-                    <!-- ──────────────────────────────────────────
-                         AIAD STAGE AGENTS — 8 stages (+ contract review as a cross-stage sub-agent)
-                         Backed by `stage-agent` edge function (server-side skill content).
-                         ────────────────────────────────────────── -->
-                    <div class="specialized-agents-section">
-                        <h3 class="specialized-agents-title">AIAD Stage Agents</h3>
-                        <p style="font-size:0.85rem;color:var(--text-muted);margin:0 0 18px 0;">Eight stages of the artist journey. Each agent runs a dedicated skill server-side.</p>
-                        <div class="specialized-agents-grid" id="aiadStageGrid"></div>
-
-                        <div style="margin-top:18px;display:flex;justify-content:center;">
-                            <button onclick="window.openStageAgent('contract_review')" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.10);border-radius:12px;padding:14px 22px;color:var(--text-primary);font-family:var(--font-body);font-size:0.88rem;cursor:pointer;display:flex;align-items:center;gap:14px;">
-                                <span style="width:22px;height:22px;display:inline-flex;color:#fff;">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="14 3 14 9 20 9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
-                                </span>
-                                <div style="text-align:left;">
-                                    <div style="font-weight:600;">Review a Contract</div>
-                                    <div style="font-size:0.74rem;color:var(--text-muted);">Cross-stage sub-agent — paste or describe any agreement</div>
-                                </div>
-                            </button>
-                        </div>
-                    </div>
-
                     <!-- Stage agent chat modal -->
                     <div id="stageAgentModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.78);backdrop-filter:blur(6px);z-index:9999;align-items:center;justify-content:center;padding:24px;">
                         <div style="background:var(--bg-card);border:1px solid var(--border-default);border-radius:16px;max-width:760px;width:100%;max-height:88dvh;display:flex;flex-direction:column;overflow:hidden;">
@@ -5433,6 +5449,28 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
 
                     </div><!-- /.agent-workspace-main -->
                     </div><!-- /.agent-workspace -->
+
+                    <!-- ──────────────────────────────────────────
+                         AIAD STAGE AGENTS — 8 stages (+ contract review as a cross-stage sub-agent)
+                         Backed by `stage-agent` edge function (server-side skill content).
+                         ────────────────────────────────────────── -->
+                    <div class="specialized-agents-section">
+                        <h3 class="specialized-agents-title">AIAD Stage Agents</h3>
+                        <p style="font-size:0.85rem;color:var(--text-muted);margin:0 0 18px 0;">Eight stages of the artist journey. Each agent runs a dedicated skill server-side.</p>
+                        <div class="specialized-agents-grid" id="aiadStageGrid"></div>
+
+                        <div style="margin-top:18px;display:flex;justify-content:center;">
+                            <button onclick="window.openStageAgent('contract_review')" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.10);border-radius:12px;padding:14px 22px;color:var(--text-primary);font-family:var(--font-body);font-size:0.88rem;cursor:pointer;display:flex;align-items:center;gap:14px;">
+                                <span style="width:22px;height:22px;display:inline-flex;color:#fff;">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="14 3 14 9 20 9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
+                                </span>
+                                <div style="text-align:left;">
+                                    <div style="font-weight:600;">Review a Contract</div>
+                                    <div style="font-size:0.74rem;color:var(--text-muted);">Cross-stage sub-agent — paste or describe any agreement</div>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
                     </div><!-- /conversations panel -->
 
                     <div class="agent-tabpanel" data-agent-panel="decisions">
