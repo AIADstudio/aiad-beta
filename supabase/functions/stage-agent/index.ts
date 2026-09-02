@@ -67,7 +67,44 @@ You are the AIAD platform agent operating in stage-specific mode. Strict rules:
    • Financial output is not tax or financial advice; route to a qualified professional.
    • Any contract term must be routed to the contract-review sub-agent before signature.
 5. If the user query falls outside the active stage, name the correct stage and stop.
+6. No sycophantic opener. Never begin with "Great question", "Great question!", "That's a great question", "Love this", "Absolutely", "I'd be happy to", or any other compliment on the question or restatement of it. The first sentence is already part of the answer. Do not close by praising them either.
+7. Write in plain prose. NEVER use markdown syntax: no # headings, no * or ** for bold or italics, no * or - bullet characters, no --- rules, no backticks. The section labels this contract calls for ("The Read", "Action Block") are a short plain line of text with no symbols around it. Tables stay plain pipe-delimited rows. Numbered lists are written as "1." at the start of a line. This is a hard formatting rule - a response containing # or * is wrong even if the answer is right.
+8. Never use emoji. No emoji in headings, in lists, as bullets, as decoration, or anywhere in the response. Plain text only. This is a hard formatting rule.
 `.trim();
+
+// Belt and braces for rules 10 and 11. The prompt tells the model not to emit
+// markdown syntax or emoji; this guarantees neither reaches the UI even when the
+// model drifts, which it does under long contexts. Deliberately not a markdown
+// *renderer* — the house style for agent answers is flat prose, so the symbols
+// are removed rather than converted. Ordering matters: strip leading heading
+// hashes per line first, then emphasis runs, then horizontal rules and bullet
+// markers; then the emoji passes; then close the gaps all of it leaves behind.
+function sanitizeAnswer(s){
+  if(typeof s !== 'string') return s;
+  return s
+    .replace(/^[ \t]{0,3}#{1,6}[ \t]+/gm, '')      // "# Heading" — space required, so #hashtags survive
+    .replace(/^[ \t]{0,3}[-*_][ \t]*[-*_][ \t]*[-*_][-*_ \t]*$/gm, '') // --- *** ___ rules
+    .replace(/^[ \t]*[*+][ \t]+/gm, '')            // * and + bullet markers
+    .replace(/\*{1,3}(?=\S)|(?<=\S)\*{1,3}/g, '')  // emphasis delimiters only — " 3 * $35 " is arithmetic, not markdown
+    .replace(/`{1,3}/g, '')                        // inline code / fences
+    // Emoji. \p{Extended_Pictographic} ONLY — \p{Emoji} also matches the ASCII
+    // digits 0-9 plus # and *, so a \p{Emoji} pass would silently delete every
+    // number, price and percentage in the answer. Never widen these to a bare
+    // digit range. Keycaps run first: they are digit + U+20E3, not pictographic,
+    // and this is the one rule allowed to name a digit at all.
+    .replace(/[0-9#*]\uFE0F?\u20E3/g, '')        // keycaps (1 + U+20E3)
+    .replace(/[\u{1F3FB}-\u{1F3FF}]/gu, '')        // skin-tone modifiers
+    .replace(/[\u{1F1E6}-\u{1F1FF}]{2}/gu, '')     // flag pairs
+    .replace(/\p{Extended_Pictographic}(\u200D\p{Extended_Pictographic})*/gu, '') // ZWJ sequences removed whole
+    .replace(/[\u200D\uFE0F\uFE0E\u20E3]/g, '') // leftover joiners, variation selectors, and the orphan
+                                                   // keycap left when the emphasis strip eats a *\uFE0F\u20E3
+    .replace(/[ \t]{2,}/g, ' ')                    // collapse the gaps the strips leave
+    .replace(/[ \t]+([.,;:!?])/g, '$1')            // and the space they orphan before punctuation
+    .replace(/[ \t]+$/gm, '')                      // trailing space where an emoji ended the line
+    .replace(/^[ \t]+$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
 
 async function callClaude(system: string, message: string, context: string) {
     const user = context ? `[Context]\n${context}\n\n[Question]\n${message}` : message;
@@ -135,7 +172,11 @@ serve(async (req) => {
         const mergedContext = [artistContext, context].filter(Boolean).join("\n\n");
         const system = `${ROUTING_RULES}\n\n--- ACTIVE SKILL: ${STAGE_NAMES[stage]} ---\n\n${skill}`;
 
-        const { text, usage } = await callClaude(system, message, mergedContext);
+        const { text: rawText, usage } = await callClaude(system, message, mergedContext);
+        // Belt and braces for rules 7 and 8, exactly as ai-agent does it. Applied
+        // here rather than at the return so anything added to this handler later
+        // sees the same sanitized text the client gets.
+        const text = sanitizeAnswer(rawText);
 
         // Best-effort: log usage to a metrics table if you create one later.
         if (user_id) {

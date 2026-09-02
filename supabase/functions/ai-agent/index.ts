@@ -30,15 +30,17 @@ NON-NEGOTIABLE RULES:
 7. Keep it tight, structured, and specific. Lead with the answer.
 8. No sycophantic opener. Never begin with "Great question", "Great question!", "That's a great question", "Love this", "Absolutely", "I'd be happy to", or any other compliment on the question or restatement of it. The first sentence is already part of the answer. Do not close by praising them either.
 9. career_stage describes where they are in their CAREER (Emerging / Developing / Established). It is never a billing plan. aiad_plan is their subscription tier and says nothing about their career - never treat it as career stage or reference it as such.
-10. Write in plain prose. NEVER use markdown syntax: no # headings, no * or ** for bold or italics, no * or - bullet characters, no --- rules, no backticks. If you need structure, use short paragraphs and plain sentences, or a numbered list written as "1." at the start of a line. Section labels, when you need one, are a short plain line of text with no symbols around it. This is a hard formatting rule - a response containing # or * is wrong even if the advice is right.`;
+10. Write in plain prose. NEVER use markdown syntax: no # headings, no * or ** for bold or italics, no * or - bullet characters, no --- rules, no backticks. If you need structure, use short paragraphs and plain sentences, or a numbered list written as "1." at the start of a line. Section labels, when you need one, are a short plain line of text with no symbols around it. This is a hard formatting rule - a response containing # or * is wrong even if the advice is right.
+11. Never use emoji. No emoji in headings, in lists, as bullets, as decoration, or anywhere in the response. Plain text only. This is a hard formatting rule.`;
 
-// Belt and braces for rule 10. The prompt tells the model not to emit markdown
-// syntax; this guarantees none reaches the UI even when the model drifts, which
-// it does under long contexts. Deliberately not a markdown *renderer* — the
-// house style for agent answers is flat prose, so the symbols are removed
-// rather than converted. Ordering matters: strip leading heading hashes per
-// line first, then emphasis runs, then horizontal rules and bullet markers.
-function stripMarkdownSyntax(s){
+// Belt and braces for rules 10 and 11. The prompt tells the model not to emit
+// markdown syntax or emoji; this guarantees neither reaches the UI even when the
+// model drifts, which it does under long contexts. Deliberately not a markdown
+// *renderer* — the house style for agent answers is flat prose, so the symbols
+// are removed rather than converted. Ordering matters: strip leading heading
+// hashes per line first, then emphasis runs, then horizontal rules and bullet
+// markers; then the emoji passes; then close the gaps all of it leaves behind.
+function sanitizeAnswer(s){
   if(typeof s !== 'string') return s;
   return s
     .replace(/^[ \t]{0,3}#{1,6}[ \t]+/gm, '')      // "# Heading" — space required, so #hashtags survive
@@ -46,7 +48,22 @@ function stripMarkdownSyntax(s){
     .replace(/^[ \t]*[*+][ \t]+/gm, '')            // * and + bullet markers
     .replace(/\*{1,3}(?=\S)|(?<=\S)\*{1,3}/g, '')  // emphasis delimiters only — " 3 * $35 " is arithmetic, not markdown
     .replace(/`{1,3}/g, '')                        // inline code / fences
-    .replace(/\n{3,}/g, '\n\n')                    // collapse gaps the strips leave
+    // Emoji. \p{Extended_Pictographic} ONLY — \p{Emoji} also matches the ASCII
+    // digits 0-9 plus # and *, so a \p{Emoji} pass would silently delete every
+    // number, price and percentage in the answer. Never widen these to a bare
+    // digit range. Keycaps run first: they are digit + U+20E3, not pictographic,
+    // and this is the one rule allowed to name a digit at all.
+    .replace(/[0-9#*]\uFE0F?\u20E3/g, '')        // keycaps (1 + U+20E3)
+    .replace(/[\u{1F3FB}-\u{1F3FF}]/gu, '')        // skin-tone modifiers
+    .replace(/[\u{1F1E6}-\u{1F1FF}]{2}/gu, '')     // flag pairs
+    .replace(/\p{Extended_Pictographic}(\u200D\p{Extended_Pictographic})*/gu, '') // ZWJ sequences removed whole
+    .replace(/[\u200D\uFE0F\uFE0E\u20E3]/g, '') // leftover joiners, variation selectors, and the orphan
+                                                   // keycap left when the emphasis strip eats a *\uFE0F\u20E3
+    .replace(/[ \t]{2,}/g, ' ')                    // collapse the gaps the strips leave
+    .replace(/[ \t]+([.,;:!?])/g, '$1')            // and the space they orphan before punctuation
+    .replace(/[ \t]+$/gm, '')                      // trailing space where an emoji ended the line
+    .replace(/^[ \t]+$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
 
@@ -262,7 +279,7 @@ Deno.serve(async (req)=>{
     }
     // Strip before it is saved as well as before it is returned, so history and
     // the live answer are the same text.
-    const answer = stripMarkdownSyntax(data.content[0].text);
+    const answer = sanitizeAnswer(data.content[0].text);
 
     if(admin && userId){
       try{

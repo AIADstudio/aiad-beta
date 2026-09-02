@@ -26,7 +26,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const MODEL = "claude-sonnet-4-5";
 
-type Persona = { system: string; maxTokens?: number; vision?: boolean };
+type Persona = { system: string; maxTokens?: number; vision?: boolean; json?: boolean };
 
 // The complete set. Anything not in here cannot be run.
 const PERSONAS: Record<string, Persona> = {
@@ -56,12 +56,12 @@ const PERSONAS: Record<string, Persona> = {
     fan_intelligence: { system: "You are AIAD's Fan Intelligence — a thoughtful assistant that helps music fans understand and connect with independent artists. You help fans make informed decisions about supporting artists, understand what an artist's work means, and navigate the creator economy without pressure or manipulation. You are neutral, honest, and fan-first. Never pressure fans to spend. Respect their autonomy." },
     fan_guide: { system: "You are AIAD Fan Guide, helping music fans discover artists, understand how to support them meaningfully, and get more from their experience as a supporter. Help fans navigate the platform, discover creators, and understand what their support enables. Keep responses warm, specific, and under 120 words.", maxTokens: 600 },
     collab_advisor: { system: "You are AIAD Collab Advisor, helping creative professionals (photographers, videographers, directors, designers, stylists) build sustainable collaboration careers with independent artists. Give specific, actionable advice on pricing, proposals, contracts, portfolio strategy, and finding opportunities. Be direct and practical. Max 150 words.", maxTokens: 700 },
-    milestone_suggest: { system: "You are AIAD milestone intelligence. Return only valid JSON arrays, no markdown, no preamble.", maxTokens: 800 },
+    milestone_suggest: { system: "You are AIAD milestone intelligence. Return only valid JSON arrays, no markdown, no preamble.", maxTokens: 800, json: true },
     decision_capture: { system: `You analyze artist-AI conversations and extract key career decisions.
 If the conversation contains a clear decision or strategic choice the artist is making, respond with JSON:
 {"decision": true, "category": "strategy|monetization|creative|release|branding", "reasoning": "one sentence of what they decided", "tradeoff": "one sentence of what they're trading off"}
 If no clear decision was made, respond with: {"decision": false}
-Only capture real, meaningful decisions — not questions or general discussion. Be concise.`, maxTokens: 400 },
+Only capture real, meaningful decisions — not questions or general discussion. Be concise.`, maxTokens: 400, json: true },
     // Registered on PAGE_AGENT_CONTEXTS at runtime by the fan views, so they reach
     // this function as ordinary panel persona ids.
     fanHome: { system: "You are AIAD Fan Guide. Help fans discover artists, understand how to support them meaningfully, and get the most from AIAD. Keep responses warm, specific, and under 120 words.", maxTokens: 600 },
@@ -69,6 +69,51 @@ Only capture real, meaningful decisions — not questions or general discussion.
 
     style_reference: { system: "You are a visual art director. Analyze the uploaded reference image and describe its visual style in precise detail for an AI image generator. Cover: color palette (specific hex-like descriptions), mood/atmosphere, lighting style, composition, texture, art style/movement, any typography or graphic elements. Be specific and technical. Max 120 words.", maxTokens: 500, vision: true },
 };
+
+// ai-agent's rules 8, 10 and 11, restated for these personas. Every prose persona
+// here renders into the same dashboard surface as the career advisor, so they have
+// to agree on format. Appended to the persona prompt rather than written into each
+// of the twenty-odd systems above, which would drift apart on the first edit.
+const OUTPUT_RULES = `
+
+OUTPUT RULES (these override any formatting habit, and apply to every answer):
+1. No sycophantic opener. Never begin with "Great question", "Great question!", "That's a great question", "Love this", "Absolutely", "I'd be happy to", or any other compliment on the question or restatement of it. The first sentence is already part of the answer. Do not close by praising them either.
+2. Write in plain prose. NEVER use markdown syntax: no # headings, no * or ** for bold or italics, no * or - bullet characters, no --- rules, no backticks. If you need structure, use short paragraphs and plain sentences, or a numbered list written as "1." at the start of a line. Section labels, when you need one, are a short plain line of text with no symbols around it. This is a hard formatting rule - a response containing # or * is wrong even if the advice is right.
+3. Never use emoji. No emoji in headings, in lists, as bullets, as decoration, or anywhere in the response. Plain text only. This is a hard formatting rule.`;
+
+// Belt and braces for rules 10 and 11. The prompt tells the model not to emit
+// markdown syntax or emoji; this guarantees neither reaches the UI even when the
+// model drifts, which it does under long contexts. Deliberately not a markdown
+// *renderer* — the house style for agent answers is flat prose, so the symbols
+// are removed rather than converted. Ordering matters: strip leading heading
+// hashes per line first, then emphasis runs, then horizontal rules and bullet
+// markers; then the emoji passes; then close the gaps all of it leaves behind.
+function sanitizeAnswer(s){
+  if(typeof s !== 'string') return s;
+  return s
+    .replace(/^[ \t]{0,3}#{1,6}[ \t]+/gm, '')      // "# Heading" — space required, so #hashtags survive
+    .replace(/^[ \t]{0,3}[-*_][ \t]*[-*_][ \t]*[-*_][-*_ \t]*$/gm, '') // --- *** ___ rules
+    .replace(/^[ \t]*[*+][ \t]+/gm, '')            // * and + bullet markers
+    .replace(/\*{1,3}(?=\S)|(?<=\S)\*{1,3}/g, '')  // emphasis delimiters only — " 3 * $35 " is arithmetic, not markdown
+    .replace(/`{1,3}/g, '')                        // inline code / fences
+    // Emoji. \p{Extended_Pictographic} ONLY — \p{Emoji} also matches the ASCII
+    // digits 0-9 plus # and *, so a \p{Emoji} pass would silently delete every
+    // number, price and percentage in the answer. Never widen these to a bare
+    // digit range. Keycaps run first: they are digit + U+20E3, not pictographic,
+    // and this is the one rule allowed to name a digit at all.
+    .replace(/[0-9#*]\uFE0F?\u20E3/g, '')        // keycaps (1 + U+20E3)
+    .replace(/[\u{1F3FB}-\u{1F3FF}]/gu, '')        // skin-tone modifiers
+    .replace(/[\u{1F1E6}-\u{1F1FF}]{2}/gu, '')     // flag pairs
+    .replace(/\p{Extended_Pictographic}(\u200D\p{Extended_Pictographic})*/gu, '') // ZWJ sequences removed whole
+    .replace(/[\u200D\uFE0F\uFE0E\u20E3]/g, '') // leftover joiners, variation selectors, and the orphan
+                                                   // keycap left when the emphasis strip eats a *\uFE0F\u20E3
+    .replace(/[ \t]{2,}/g, ' ')                    // collapse the gaps the strips leave
+    .replace(/[ \t]+([.,;:!?])/g, '$1')            // and the space they orphan before punctuation
+    .replace(/[ \t]+$/gm, '')                      // trailing space where an emoji ended the line
+    .replace(/^[ \t]+$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
 
 const MAX_MESSAGE_CHARS = 6000;
 const MAX_HISTORY_TURNS = 8;
@@ -175,7 +220,9 @@ Deno.serve(async (req) => {
             body: JSON.stringify({
                 model: MODEL,
                 max_tokens: persona.maxTokens ?? 1024,
-                system: persona.system,
+                // A JSON persona's contract is a parseable document; prose rules
+                // would fight it and the client JSON.parse()s the reply directly.
+                system: persona.json ? persona.system : persona.system + OUTPUT_RULES,
                 messages,
             }),
         });
@@ -185,7 +232,8 @@ Deno.serve(async (req) => {
             console.error("[specialized-agent] anthropic error", r.status, JSON.stringify(d).slice(0, 300));
             return json({ error: `agent unavailable (${r.status})`, refunded: true }, 502);
         }
-        const reply = (d?.content?.[0]?.text ?? "").trim();
+        const raw = (d?.content?.[0]?.text ?? "").trim();
+        const reply = persona.json ? raw : sanitizeAnswer(raw);
         if (!reply) {
             await refund("empty reply");
             return json({ error: "The agent returned nothing. Try again.", refunded: true }, 502);
