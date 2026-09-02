@@ -67,6 +67,71 @@
     .aiad-md code { background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 4px; font-size: 0.88em; }
     .aiad-md strong { color: var(--text-primary); }
     </style>
+    <style>
+    /* ── Agent conversations: tabs, thread rail, mobile drawer ────────────
+       The agent view used to render every past Q&A inline as one endless
+       transcript. Threads now live in a rail beside the chat. */
+    .agent-tabs{display:flex;gap:6px;margin:0 0 18px;border-bottom:1px solid var(--border-default);}
+    .agent-tab{background:none;border:none;border-bottom:2px solid transparent;padding:9px 14px;margin-bottom:-1px;
+        color:var(--text-muted);font-family:var(--font-body);font-size:0.88rem;font-weight:600;cursor:pointer;transition:color var(--transition-fast,150ms ease),border-color var(--transition-fast,150ms ease);}
+    .agent-tab:hover{color:var(--text-secondary);}
+    .agent-tab.active{color:var(--text-primary);border-bottom-color:var(--teal);}
+    .agent-tabpanel{display:none;}
+    .agent-tabpanel.active{display:block;}
+
+    .agent-workspace{display:flex;gap:18px;align-items:flex-start;}
+    .agent-workspace-main{flex:1 1 auto;min-width:0;}
+
+    .agent-rail{flex:0 0 260px;width:260px;align-self:stretch;display:flex;flex-direction:column;gap:10px;
+        background:var(--bg-card);border:1px solid var(--border-default);border-radius:14px;padding:12px;
+        max-height:calc(100vh - 190px);position:sticky;top:12px;}
+    .agent-rail-head{display:flex;align-items:center;gap:8px;}
+    .agent-newconvo{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:9px 12px;border-radius:9px;
+        background:var(--teal);border:none;color:var(--bg-primary);font-family:var(--font-body);font-size:0.82rem;font-weight:700;cursor:pointer;}
+    .agent-newconvo:hover{opacity:0.92;}
+    .agent-newconvo svg{width:15px;height:15px;}
+    .agent-rail-close{display:none;background:none;border:none;color:var(--text-muted);font-size:1.5rem;line-height:1;cursor:pointer;padding:0 4px;}
+    .agent-convo-search{width:100%;box-sizing:border-box;padding:8px 11px;border-radius:9px;background:var(--bg-secondary);
+        border:1px solid var(--border-default);color:var(--text-primary);font-family:var(--font-body);font-size:0.8rem;outline:none;}
+    .agent-convo-search:focus{border-color:var(--teal);}
+    .agent-convo-list{flex:1 1 auto;min-height:0;overflow-y:auto;margin:0 -4px;padding:0 4px;}
+    .agent-convo-group{font-size:0.66rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-hint);padding:12px 6px 5px;}
+    .agent-convo-row{position:relative;display:flex;align-items:center;border-radius:8px;}
+    .agent-convo-row:hover{background:var(--bg-card-hover);}
+    .agent-convo-row.active{background:rgba(0,212,255,0.10);}
+    .agent-convo-row.active .agent-convo-title{color:var(--text-primary);}
+    .agent-convo-open{flex:1;min-width:0;display:flex;align-items:baseline;gap:8px;background:none;border:none;
+        padding:8px 4px 8px 8px;cursor:pointer;text-align:left;font-family:var(--font-body);}
+    .agent-convo-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.82rem;color:var(--text-secondary);}
+    .agent-convo-when{flex:0 0 auto;font-size:0.68rem;color:var(--text-hint);font-variant-numeric:tabular-nums;}
+    .agent-convo-more{flex:0 0 auto;background:none;border:none;color:var(--text-hint);cursor:pointer;font-size:1rem;line-height:1;padding:6px 8px;border-radius:6px;}
+    .agent-convo-more:hover{color:var(--text-primary);}
+    .agent-convo-menu{display:none;position:absolute;right:6px;top:calc(100% - 4px);z-index:40;min-width:132px;
+        background:var(--bg-card);border:1px solid var(--border-hover);border-radius:9px;padding:4px;box-shadow:0 8px 26px rgba(0,0,0,0.5);}
+    .agent-convo-menu.open{display:block;}
+    .agent-convo-menu button{display:block;width:100%;text-align:left;background:none;border:none;padding:7px 10px;border-radius:6px;
+        color:var(--text-secondary);font-family:var(--font-body);font-size:0.8rem;cursor:pointer;}
+    .agent-convo-menu button:hover{background:var(--bg-card-hover);color:var(--text-primary);}
+    .agent-convo-menu button.danger:hover{color:#f87171;}
+    .agent-convo-empty{padding:16px 8px;font-size:0.78rem;line-height:1.5;color:var(--text-muted);}
+    .agent-convo-backdrop{display:none;}
+    .agent-convo-toggle{display:none;background:none;border:1px solid var(--border-default);border-radius:9px;
+        color:var(--text-secondary);cursor:pointer;padding:7px;margin-right:10px;flex:0 0 auto;}
+    .agent-convo-toggle svg{width:17px;height:17px;display:block;}
+
+    /* Under 768px the dashboard has no room for a rail, so it becomes a drawer. */
+    @media (max-width:768px){
+        .agent-workspace{display:block;}
+        .agent-convo-toggle{display:inline-flex;}
+        .agent-rail{position:fixed;top:0;left:0;bottom:0;width:min(86vw,300px);max-height:none;border-radius:0;
+            z-index:100002;transform:translateX(-102%);transition:transform 220ms ease;}
+        .agent-rail.open{transform:none;}
+        .agent-rail-close{display:block;}
+        .agent-convo-backdrop{display:block;position:fixed;inset:0;background:rgba(0,0,0,0.6);opacity:0;pointer-events:none;
+            z-index:100001;transition:opacity 220ms ease;}
+        .agent-convo-backdrop.open{opacity:1;pointer-events:auto;}
+    }
+    </style>
     <script>
     (function () {
         'use strict';
@@ -5235,8 +5300,32 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                         <p class="agents-page-subtitle">Your intelligence layer. Ask anything — AIAD understands your context.</p>
                     </div>
 
+                    <div class="agent-tabs" role="tablist">
+                        <button type="button" class="agent-tab active" data-agent-tab="conversations">Conversations</button>
+                        <button type="button" class="agent-tab" data-agent-tab="decisions">Decisions</button>
+                    </div>
+
+                    <div class="agent-tabpanel active" data-agent-panel="conversations">
+                    <div class="agent-workspace">
+                    <div class="agent-convo-backdrop" id="agentConvoBackdrop" onclick="aiadCloseConvoDrawer()"></div>
+                    <aside class="agent-rail" id="agentConvoRail">
+                        <div class="agent-rail-head">
+                            <button type="button" class="agent-newconvo" onclick="aiadNewConversation()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                New conversation
+                            </button>
+                            <button type="button" class="agent-rail-close" onclick="aiadCloseConvoDrawer()" aria-label="Close conversations">&times;</button>
+                        </div>
+                        <input type="search" id="agentConvoSearch" class="agent-convo-search" placeholder="Search conversations" autocomplete="off">
+                        <div class="agent-convo-list" id="agentConvoList"></div>
+                    </aside>
+                    <div class="agent-workspace-main">
+
                     <div class="primary-agent-panel">
                         <div class="agent-panel-header">
+                            <button type="button" class="agent-convo-toggle" onclick="aiadOpenConvoDrawer()" aria-label="Conversations">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                            </button>
                             <div class="agent-panel-icon">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
                             </div>
@@ -5342,6 +5431,11 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                          those concepts now live as full skills inside the Stage Agents grid above. -->
 
 
+                    </div><!-- /.agent-workspace-main -->
+                    </div><!-- /.agent-workspace -->
+                    </div><!-- /conversations panel -->
+
+                    <div class="agent-tabpanel" data-agent-panel="decisions">
                     <div class="decision-memory-section">
                         <div class="decision-memory-header">
                             <div>
@@ -5353,6 +5447,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
 
                         </div>
                     </div>
+                    </div><!-- /decisions panel -->
                 </div>
 
                 <div class="dash-view" id="artistInboxView">
@@ -14361,9 +14456,11 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             if (view === 'feed') view = 'posts';
             try { history.replaceState(null, '', '#artist/' + view); } catch (e) {}
             try { window.aiadTrackTool && window.aiadTrackTool('artist:' + view); } catch (e) {}
-            // After the view is activated, so the thread node is on screen.
+            // After the view is activated, so the rail node is on screen. Only the
+            // conversation list loads; the thread stays empty until the artist
+            // picks a conversation or asks something.
             if (view === 'agent') setTimeout(function () {
-                try { window.aiadRenderAgentHistory && window.aiadRenderAgentHistory(); } catch (e) {}
+                try { window.aiadLoadAgentConvos && window.aiadLoadAgentConvos(); } catch (e) {}
             }, 0);
 
             const allViews = ['artistLibraryView', 'artistReviewView', 'artistPlanView', 'artistHomeView', 'artistPostsView', 'artistSupportersView', 'artistProjectsView', 'artistRevenueView', 'artistScheduleView', 'artistCollaboratorsView', 'artistMusicView', 'artistSongwritingView', 'artistMixMediaView', 'artistMerchView', 'artistSyncLibraryView', 'artistMilestonesView', 'artistAnalyticsView', 'artistMyStatsView', 'artistAgentsView', 'artistInboxView', 'artistSettingsView', 'artistStoreView', 'artistPayoutsView', 'artistDistributeView'];
@@ -16559,6 +16656,8 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             }
 
             const chatThread = document.querySelector('#artistAgentsView .agent-chat-thread');
+            const _ph = chatThread && chatThread.querySelector('.agent-convo-empty');
+            if (_ph) _ph.remove();
 
             const userMsg = document.createElement('div');
             userMsg.className = 'chat-message user';
@@ -16606,7 +16705,11 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     },
                     body: JSON.stringify({
                         message,
+                        // Only the active thread. This array is rebuilt whenever a
+                        // conversation is opened or started, so a question can no
+                        // longer arrive carrying another thread's context.
                         conversationHistory: artistAgentHistory.slice(0, -1),
+                        conversation_id: _agentConvoId || null,
                         spend_txn_id: window.__aiadLastSpendTxn || null,
                         artistName: AppState.artistProfile.artistName,
                         genre: AppState.artistProfile.primaryGenre,
@@ -16624,6 +16727,9 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 }
                 if (!data || !data.answer) throw new Error('The agent returned no answer.');
                 aiResponse = data.answer;
+                // The function opens a thread when we send no id; from here on
+                // every question in this thread carries it.
+                if (data.conversation_id) aiadAdoptConversation(data.conversation_id, message, aiResponse);
                 try { window.aiadTrackAction && window.aiadTrackAction('agent_submit', { ok: true }); } catch (e) {}
             } catch (err) {
                 const detail = (err && err.message) || String(err);
@@ -16653,68 +16759,376 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 chatThread.scrollTop = chatThread.scrollHeight;
         }
 
-        // The agent tool opened blank on every visit, so a returning artist had no
-        // sign their previous answers still existed — which is a large part of why
-        // they open it once and leave. agent_results is RLS-scoped to the caller.
-        window.aiadRenderAgentHistory = async function () {
-            const thread = document.querySelector('#artistAgentsView .agent-chat-thread');
-            if (!thread || thread.dataset.historyLoaded === '1') return;
-            const client = (typeof db !== 'undefined' && db) || window.db;
-            const uid = (typeof aiadResolvedUserId === 'function') ? aiadResolvedUserId() : null;
+        // Past conversations are a rail now, not an inline transcript. This used to
+        // splice up to 20 old Q&A pairs into the live thread, so a fresh visit
+        // opened onto weeks-old questions. Kept as a no-op because older call
+        // sites still reach for it.
+        window.aiadRenderAgentHistory = function () {};
+
+        /* ── Agent conversations ──────────────────────────────────────────
+           A thread is every agent_results row sharing a conversation_id; the
+           title sits on the row that opened it. The active thread is the ONLY
+           history sent to the model — artistAgentHistory used to be a single
+           session-long array, so questions from one thread were being handed to
+           the model as context for another. It is now rebuilt per thread. */
+        var _agentConvos = [];        // [{id,title,lastAt,rows,hay}] newest first
+        var _agentConvoId = null;     // active thread; null = unsaved new one
+        var _agentConvoFilter = '';
+        var _agentConvosLoaded = false;
+
+        // Read by sendArtistAgentMessage; null means "open a new thread".
+        window.aiadActiveConversationId = function () { return _agentConvoId; };
+
+        function _agentEsc(t) {
+            return String(t == null ? '' : t)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function _agentTitleFor(rowsAsc) {
+            for (var i = 0; i < rowsAsc.length; i++) {
+                if (rowsAsc[i].title) return String(rowsAsc[i].title);
+            }
+            // Pre-threading rows, or a thread whose opening row was deleted.
+            var q = String((rowsAsc[0] && rowsAsc[0].question) || '').replace(/\s+/g, ' ').trim();
+            if (!q) return 'New conversation';
+            return q.length > 60 ? q.slice(0, 60).trim() + '…' : q;
+        }
+
+        function _agentRelTime(iso) {
+            var d = new Date(iso);
+            if (isNaN(d.getTime())) return '';
+            var mins = Math.floor((Date.now() - d.getTime()) / 60000);
+            if (mins < 1) return 'now';
+            if (mins < 60) return mins + 'm';
+            if (mins < 1440) return Math.floor(mins / 60) + 'h';
+            var days = Math.floor(mins / 1440);
+            if (days < 7) return days + 'd';
+            try { return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); }
+            catch (e) { return days + 'd'; }
+        }
+
+        // Claude's buckets, measured off local midnight rather than a rolling
+        // 24 hours, so "Yesterday" means yesterday and not "26 hours ago".
+        function _agentBucket(iso) {
+            var d = new Date(iso);
+            if (isNaN(d.getTime())) return 'Older';
+            var midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+            var days = Math.floor((midnight.getTime() - d.getTime()) / 86400000);
+            if (days < 0) return 'Today';
+            if (days < 1) return 'Yesterday';
+            if (days < 7) return 'Previous 7 Days';
+            if (days < 30) return 'Previous 30 Days';
+            return 'Older';
+        }
+        var _AGENT_BUCKETS = ['Today', 'Yesterday', 'Previous 7 Days', 'Previous 30 Days', 'Older'];
+
+        window.aiadLoadAgentConvos = aiadLoadAgentConvos;
+        async function aiadLoadAgentConvos(force) {
+            if (_agentConvosLoaded && !force) { renderAgentConvoList(); return; }
+            var client = (typeof db !== 'undefined' && db) || window.db;
+            var uid = (typeof aiadResolvedUserId === 'function') ? aiadResolvedUserId() : null;
             if (!client || !uid) return;
-            thread.dataset.historyLoaded = '1';
             try {
-                const { data, error } = await client.from('agent_results')
-                    .select('question,answer,status,created_at,model')
+                var res = await client.from('agent_results')
+                    .select('conversation_id,title,question,answer,status,created_at')
                     .or('artist_id.eq.' + uid + ',fan_id.eq.' + uid)
                     .order('created_at', { ascending: false })
-                    .limit(20);
-                if (error) {
-                    thread.dataset.historyLoaded = '';
-                    try { window.aiadTrackError && window.aiadTrackError(error.message, { action: 'agent_history' }); } catch (e) {}
+                    .limit(400);
+                if (res.error) {
+                    try { window.aiadTrackError && window.aiadTrackError(res.error.message, { action: 'agent_convos' }); } catch (e) {}
                     return;
                 }
-                if (!data || !data.length) return;
-
-                const esc = (t) => String(t == null ? '' : t)
-                    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                // Answers are markdown; the artist's own question is not.
-                const fmt = (t) => window.aiadRenderMarkdown(t);
-                const plain = (t) => esc(t).replace(/\n/g, '<br>');
-                const when = (iso) => { try { return new Date(iso).toLocaleDateString(); } catch (e) { return ''; } };
-
-                const wrap = document.createElement('div');
-                wrap.id = 'aiadAgentHistory';
-                let html = '<div style="text-align:center;font-size:0.72rem;color:var(--text-muted,#94a3b8);margin:4px 0 14px;">'
-                         + 'Earlier conversations</div>';
-                // Oldest first, so the thread reads top-to-bottom like a conversation.
-                for (const row of data.slice().reverse()) {
-                    const failed = String(row.status || '').toLowerCase() === 'failed';
-                    html += `<div class="chat-message">
-                        <div class="chat-message-header">
-                            <div class="chat-avatar"></div>
-                            <span class="chat-name">You</span>
-                            <span class="chat-time">${esc(when(row.created_at))}</span>
-                        </div>
-                        <div class="chat-content">${plain(row.question)}</div>
-                    </div>
-                    <div class="chat-message">
-                        <div class="chat-message-header">
-                            <div class="chat-avatar agent">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-                            </div>
-                            <span class="chat-name">AIAD</span>
-                        </div>
-                        <div class="chat-content"${failed ? ' style="color:#f87171;"' : ''}>${failed ? 'This one failed: ' : ''}${fmt(row.answer)}</div>
-                    </div>`;
-                }
-                html += '<div style="height:1px;background:rgba(255,255,255,0.08);margin:14px 0;"></div>';
-                wrap.innerHTML = html;
-                thread.insertBefore(wrap, thread.firstChild);
+                var byId = {};
+                (res.data || []).forEach(function (r) {
+                    // Rows written before threading have no id; each is its own thread.
+                    var id = r.conversation_id || ('legacy:' + r.created_at);
+                    (byId[id] = byId[id] || []).push(r);
+                });
+                _agentConvos = Object.keys(byId).map(function (id) {
+                    var rowsAsc = byId[id].slice().sort(function (a, b) {
+                        return new Date(a.created_at) - new Date(b.created_at);
+                    });
+                    var title = _agentTitleFor(rowsAsc);
+                    return {
+                        id: id,
+                        legacy: id.indexOf('legacy:') === 0,
+                        title: title,
+                        lastAt: rowsAsc[rowsAsc.length - 1].created_at,
+                        rows: rowsAsc,
+                        hay: (title + ' ' + rowsAsc.map(function (r) { return r.question || ''; }).join(' ')).toLowerCase()
+                    };
+                }).sort(function (a, b) { return new Date(b.lastAt) - new Date(a.lastAt); });
+                _agentConvosLoaded = true;
+                renderAgentConvoList();
+                _agentThreadEmptyState();
             } catch (e) {
-                thread.dataset.historyLoaded = '';
+                try { window.aiadTrackError && window.aiadTrackError(String(e), { action: 'agent_convos' }); } catch (_) {}
             }
-        };
+        }
+
+        function renderAgentConvoList() {
+            var list = document.getElementById('agentConvoList');
+            if (!list) return;
+            var q = _agentConvoFilter.trim().toLowerCase();
+            var shown = q ? _agentConvos.filter(function (c) { return c.hay.indexOf(q) >= 0; }) : _agentConvos;
+
+            if (!shown.length) {
+                list.innerHTML = '<div class="agent-convo-empty">'
+                    + (q ? 'No conversations match “' + _agentEsc(_agentConvoFilter) + '”.'
+                         : 'No conversations yet. Ask your first question to start one.')
+                    + '</div>';
+                return;
+            }
+            var groups = {};
+            shown.forEach(function (c) { (groups[_agentBucket(c.lastAt)] = groups[_agentBucket(c.lastAt)] || []).push(c); });
+            var html = '';
+            _AGENT_BUCKETS.forEach(function (b) {
+                if (!groups[b] || !groups[b].length) return;
+                html += '<div class="agent-convo-group">' + b + '</div>';
+                groups[b].forEach(function (c) {
+                    html += '<div class="agent-convo-row' + (c.id === _agentConvoId ? ' active' : '') + '" data-convo="' + _agentEsc(c.id) + '">'
+                        + '<button type="button" class="agent-convo-open" data-convo-open="' + _agentEsc(c.id) + '">'
+                            + '<span class="agent-convo-title">' + _agentEsc(c.title) + '</span>'
+                            + '<span class="agent-convo-when">' + _agentEsc(_agentRelTime(c.lastAt)) + '</span>'
+                        + '</button>'
+                        + '<button type="button" class="agent-convo-more" data-convo-more="' + _agentEsc(c.id) + '" aria-label="Conversation options">⋯</button>'
+                        + '<div class="agent-convo-menu" data-convo-menu="' + _agentEsc(c.id) + '">'
+                            + '<button type="button" data-convo-rename="' + _agentEsc(c.id) + '">Rename</button>'
+                            + '<button type="button" class="danger" data-convo-delete="' + _agentEsc(c.id) + '">Delete</button>'
+                        + '</div>'
+                    + '</div>';
+                });
+            });
+            list.innerHTML = html;
+        }
+
+        function _agentThreadEl() { return document.querySelector('#artistAgentsView .agent-chat-thread'); }
+
+        // A first-time artist opens onto an empty thread, which reads as broken
+        // without a line explaining it. The "Try asking" chips under the input
+        // are the rest of this empty state and are already rendered.
+        function _agentThreadEmptyState() {
+            var thread = _agentThreadEl();
+            if (!thread || _agentConvoId || thread.children.length) return;
+            var d = document.createElement('div');
+            d.className = 'agent-convo-empty';
+            d.style.cssText = 'text-align:center;padding:22px 8px;';
+            d.textContent = _agentConvos.length
+                ? 'New conversation — ask anything, or pick an earlier one from the list.'
+                : 'No conversations yet. Ask your first question below and AIAD will keep the thread here.';
+            thread.appendChild(d);
+        }
+
+        function _agentAppendPair(question, answer, whenIso, failed) {
+            var thread = _agentThreadEl();
+            if (!thread) return;
+            var ph = thread.querySelector('.agent-convo-empty');
+            if (ph) ph.remove();
+            var when = '';
+            try { when = whenIso ? new Date(whenIso).toLocaleString() : ''; } catch (e) {}
+            var you = document.createElement('div');
+            you.className = 'chat-message user';
+            you.innerHTML = '<div class="chat-message-header">'
+                + '<div class="chat-avatar user"><img src="' + _agentEsc(window.aiadCachedAvatar() || '') + '" data-avatar-for="' + _agentEsc((AppState.currentUser && AppState.currentUser.id) || '') + '" alt="You"></div>'
+                + '<span class="chat-name">You</span><span class="chat-time">' + _agentEsc(when) + '</span></div>'
+                + '<div class="chat-content">' + _agentEsc(question).replace(/\n/g, '<br>') + '</div>';
+            thread.appendChild(you);
+            var ai = document.createElement('div');
+            ai.className = 'chat-message';
+            ai.innerHTML = '<div class="chat-message-header">'
+                + '<div class="chat-avatar agent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></div>'
+                + '<span class="chat-name">AIAD</span></div>'
+                + '<div class="chat-content"' + (failed ? ' style="color:#f87171;"' : '') + '>'
+                + (failed ? 'This one failed: ' : '') + window.aiadRenderMarkdown(answer) + '</div>';
+            thread.appendChild(ai);
+        }
+
+        function aiadNewConversation() {
+            _agentConvoId = null;
+            artistAgentHistory = [];          // nothing from the old thread reaches the model
+            var thread = _agentThreadEl();
+            if (thread) thread.innerHTML = '';
+            renderAgentConvoList();
+            _agentThreadEmptyState();
+            aiadCloseConvoDrawer();
+            var input = document.getElementById('artistAgentInput');
+            if (input) input.focus();
+        }
+        window.aiadNewConversation = aiadNewConversation;
+
+        async function aiadOpenConversation(id) {
+            var c = _agentConvos.find(function (x) { return x.id === id; });
+            if (!c) return;
+            _agentConvoId = c.legacy ? null : id;   // a legacy row has no id to continue
+            var thread = _agentThreadEl();
+            if (thread) thread.innerHTML = '';
+            artistAgentHistory = [];
+
+            var rowsAsc = c.rows;
+            // Re-read a real thread: the list query is capped, so a long
+            // conversation may only be partly represented in it.
+            if (!c.legacy) {
+                var client = (typeof db !== 'undefined' && db) || window.db;
+                if (client) {
+                    try {
+                        var res = await client.from('agent_results')
+                            .select('question,answer,status,created_at')
+                            .eq('conversation_id', id)
+                            .order('created_at', { ascending: true });
+                        if (!res.error && res.data && res.data.length) rowsAsc = res.data;
+                    } catch (e) {}
+                }
+            }
+            rowsAsc.forEach(function (r) {
+                var failed = String(r.status || '').toLowerCase() === 'failed';
+                _agentAppendPair(r.question, r.answer, r.created_at, failed);
+                artistAgentHistory.push({ role: 'user', content: String(r.question || '') });
+                artistAgentHistory.push({ role: 'assistant', content: String(r.answer || '') });
+            });
+            if (thread) thread.scrollTop = thread.scrollHeight;
+            try { window.aiadResolveCommentAvatars && window.aiadResolveCommentAvatars(thread); } catch (e) {}
+            renderAgentConvoList();
+            aiadCloseConvoDrawer();
+        }
+
+        async function aiadRenameConversation(id) {
+            var c = _agentConvos.find(function (x) { return x.id === id; });
+            if (!c || c.legacy) return;
+            var next = window.prompt('Rename conversation', c.title);
+            if (next == null) return;
+            next = String(next).replace(/\s+/g, ' ').trim().slice(0, 200);
+            if (!next || next === c.title) return;
+            var client = (typeof db !== 'undefined' && db) || window.db;
+            if (!client) return;
+            // Every row of the thread, so whichever row the list reads the title
+            // from carries the new one. RLS scopes this to the caller's own rows.
+            var res = await client.from('agent_results').update({ title: next }).eq('conversation_id', id);
+            if (res.error) { (window.showToast || alert)('Could not rename: ' + res.error.message); return; }
+            c.title = next;
+            c.hay = (next + ' ' + c.rows.map(function (r) { return r.question || ''; }).join(' ')).toLowerCase();
+            renderAgentConvoList();
+        }
+
+        async function aiadDeleteConversation(id) {
+            var c = _agentConvos.find(function (x) { return x.id === id; });
+            if (!c || c.legacy) return;
+            if (!window.confirm('Delete “' + c.title + '”?\n\nThis removes the conversation and its answers. It cannot be undone.')) return;
+            var client = (typeof db !== 'undefined' && db) || window.db;
+            if (!client) return;
+            var res = await client.from('agent_results').delete().eq('conversation_id', id);
+            if (res.error) { (window.showToast || alert)('Could not delete: ' + res.error.message); return; }
+            _agentConvos = _agentConvos.filter(function (x) { return x.id !== id; });
+            if (_agentConvoId === id) aiadNewConversation(); else renderAgentConvoList();
+        }
+
+        // Called after a send lands, so a brand new thread appears in the rail
+        // without a full reload.
+        function aiadAdoptConversation(id, question, answer) {
+            if (!id) return;
+            var isNew = _agentConvoId !== id;
+            _agentConvoId = id;
+            var c = _agentConvos.find(function (x) { return x.id === id; });
+            var row = { conversation_id: id, question: question, answer: answer, status: 'Answered', created_at: new Date().toISOString(), title: null };
+            if (c) {
+                c.rows.push(row);
+                c.lastAt = row.created_at;
+                c.hay += ' ' + String(question || '').toLowerCase();
+            } else {
+                var title = String(question || '').replace(/\s+/g, ' ').trim();
+                title = title.length > 60 ? title.slice(0, 60).trim() + '…' : (title || 'New conversation');
+                _agentConvos.unshift({ id: id, legacy: false, title: title, lastAt: row.created_at, rows: [row], hay: (title + ' ' + String(question || '')).toLowerCase() });
+            }
+            _agentConvos.sort(function (a, b) { return new Date(b.lastAt) - new Date(a.lastAt); });
+            if (isNew) _agentConvosLoaded = true;
+            renderAgentConvoList();
+        }
+
+        // .dash-view carries a transform, which makes it the containing block for
+        // position:fixed — the drawer anchored to the view (top 174px, 2600px
+        // tall) instead of the viewport. Portal it to <body> while it is open so
+        // it is fixed to the screen, and put it back for the desktop flex rail.
+        function aiadOpenConvoDrawer() {
+            var rail = document.getElementById('agentConvoRail');
+            var bd = document.getElementById('agentConvoBackdrop');
+            if (!rail || !bd) return;
+            if (rail.parentElement !== document.body) {
+                document.body.appendChild(bd);
+                document.body.appendChild(rail);
+            }
+            rail.classList.add('open');
+            bd.classList.add('open');
+        }
+        function aiadCloseConvoDrawer() {
+            var rail = document.getElementById('agentConvoRail');
+            var bd = document.getElementById('agentConvoBackdrop');
+            if (!rail || !bd) return;
+            rail.classList.remove('open');
+            bd.classList.remove('open');
+            var home = document.querySelector('#artistAgentsView .agent-workspace');
+            if (home && rail.parentElement === document.body) {
+                // After the slide-out, so the rail doesn't jump as it returns.
+                setTimeout(function () {
+                    if (rail.classList.contains('open')) return;
+                    home.insertBefore(rail, home.firstChild);
+                    home.insertBefore(bd, rail);
+                }, 240);
+            }
+        }
+        // Resizing to desktop with the drawer open would strand it on <body>.
+        window.addEventListener('resize', function () {
+            if (window.innerWidth > 768) aiadCloseConvoDrawer();
+        });
+        window.aiadOpenConvoDrawer = aiadOpenConvoDrawer;
+        window.aiadCloseConvoDrawer = aiadCloseConvoDrawer;
+
+        function aiadAgentTab(name) {
+            document.querySelectorAll('#artistAgentsView .agent-tab').forEach(function (b) {
+                b.classList.toggle('active', b.dataset.agentTab === name);
+            });
+            document.querySelectorAll('#artistAgentsView .agent-tabpanel').forEach(function (p) {
+                p.classList.toggle('active', p.dataset.agentPanel === name);
+            });
+            // Decision Memory is relocated, not rebuilt — its existing loaders
+            // still own its content, so there is nothing to kick here.
+        }
+        window.aiadAgentTab = aiadAgentTab;
+
+        // One delegated listener for the whole rail — rows are re-rendered often.
+        document.addEventListener('click', function (e) {
+            var t = e.target;
+            if (!t || !t.closest) return;
+            var tab = t.closest('#artistAgentsView .agent-tab');
+            if (tab) { aiadAgentTab(tab.dataset.agentTab); return; }
+            var openBtn = t.closest('[data-convo-open]');
+            if (openBtn) { aiadOpenConversation(openBtn.getAttribute('data-convo-open')); return; }
+            var moreBtn = t.closest('[data-convo-more]');
+            if (moreBtn) {
+                e.stopPropagation();
+                var id = moreBtn.getAttribute('data-convo-more');
+                document.querySelectorAll('.agent-convo-menu.open').forEach(function (m) {
+                    if (m.getAttribute('data-convo-menu') !== id) m.classList.remove('open');
+                });
+                var menu = document.querySelector('[data-convo-menu="' + id + '"]');
+                if (menu) menu.classList.toggle('open');
+                return;
+            }
+            var ren = t.closest('[data-convo-rename]');
+            if (ren) { document.querySelectorAll('.agent-convo-menu.open').forEach(function (m) { m.classList.remove('open'); }); aiadRenameConversation(ren.getAttribute('data-convo-rename')); return; }
+            var del = t.closest('[data-convo-delete]');
+            if (del) { document.querySelectorAll('.agent-convo-menu.open').forEach(function (m) { m.classList.remove('open'); }); aiadDeleteConversation(del.getAttribute('data-convo-delete')); return; }
+            document.querySelectorAll('.agent-convo-menu.open').forEach(function (m) { m.classList.remove('open'); });
+        });
+
+        document.addEventListener('DOMContentLoaded', function () {
+            var search = document.getElementById('agentConvoSearch');
+            if (search) {
+                search.addEventListener('input', function () {
+                    _agentConvoFilter = search.value || '';
+                    renderAgentConvoList();
+                });
+            }
+        });
 
         function generateContextualResponse(message) {
 

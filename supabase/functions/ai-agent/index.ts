@@ -29,7 +29,26 @@ NON-NEGOTIABLE RULES:
 6. AIAD has tools (Creative Studio for songwriting/music/artwork/merch, a collaborator network, fan features). Only mention a tool when it's the genuine next action.
 7. Keep it tight, structured, and specific. Lead with the answer.
 8. No sycophantic opener. Never begin with "Great question", "Great question!", "That's a great question", "Love this", "Absolutely", "I'd be happy to", or any other compliment on the question or restatement of it. The first sentence is already part of the answer. Do not close by praising them either.
-9. career_stage describes where they are in their CAREER (Emerging / Developing / Established). It is never a billing plan. aiad_plan is their subscription tier and says nothing about their career - never treat it as career stage or reference it as such.`;
+9. career_stage describes where they are in their CAREER (Emerging / Developing / Established). It is never a billing plan. aiad_plan is their subscription tier and says nothing about their career - never treat it as career stage or reference it as such.
+10. Write in plain prose. NEVER use markdown syntax: no # headings, no * or ** for bold or italics, no * or - bullet characters, no --- rules, no backticks. If you need structure, use short paragraphs and plain sentences, or a numbered list written as "1." at the start of a line. Section labels, when you need one, are a short plain line of text with no symbols around it. This is a hard formatting rule - a response containing # or * is wrong even if the advice is right.`;
+
+// Belt and braces for rule 10. The prompt tells the model not to emit markdown
+// syntax; this guarantees none reaches the UI even when the model drifts, which
+// it does under long contexts. Deliberately not a markdown *renderer* — the
+// house style for agent answers is flat prose, so the symbols are removed
+// rather than converted. Ordering matters: strip leading heading hashes per
+// line first, then emphasis runs, then horizontal rules and bullet markers.
+function stripMarkdownSyntax(s){
+  if(typeof s !== 'string') return s;
+  return s
+    .replace(/^[ \t]{0,3}#{1,6}[ \t]+/gm, '')      // "# Heading" — space required, so #hashtags survive
+    .replace(/^[ \t]{0,3}[-*_][ \t]*[-*_][ \t]*[-*_][-*_ \t]*$/gm, '') // --- *** ___ rules
+    .replace(/^[ \t]*[*+][ \t]+/gm, '')            // * and + bullet markers
+    .replace(/\*{1,3}(?=\S)|(?<=\S)\*{1,3}/g, '')  // emphasis delimiters only — " 3 * $35 " is arithmetic, not markdown
+    .replace(/`{1,3}/g, '')                        // inline code / fences
+    .replace(/\n{3,}/g, '\n\n')                    // collapse gaps the strips leave
+    .trim();
+}
 
 // Billing/plan words that must never be mistaken for a career stage.
 const PLAN_WORDS = new Set(['free','starter','pro','premier','artist_starter','artist_pro','artist_premier','trial','trialing','active','inactive','none','collaborator','supervisor','supervisor_standard','supervisor_pro','paid','premium','basic','plus']);
@@ -96,6 +115,19 @@ async function callerId(req){
   }catch(e){ return null; }
 }
 
+// A conversation is just a uuid stamped on every agent_results row of the thread.
+// An absent or malformed id opens a new thread rather than erroring, so a client
+// that has lost track of its id can always keep asking.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// The thread's title is its opening question, trimmed. Only the row that opens a
+// conversation carries one, so a later question can never overwrite a rename.
+function deriveTitle(q){
+  const s = String(q == null ? '' : q).replace(/\s+/g, ' ').trim();
+  if(!s) return 'New conversation';
+  return s.length > 60 ? s.slice(0, 60).trimEnd() + '\u2026' : s;
+}
+
 // fan_questions.topic is CHECK-constrained to these four; anything else fails the
 // insert outright. agent_results.topic is free text, so it keeps whatever the
 // caller actually sent.
@@ -117,6 +149,9 @@ Deno.serve(async (req)=>{
   let topic = null;
   let question = '';
   let spendTxnId = null;
+  let conversationId = null;
+  let convoTitle = null;
+  let firstInThread = true;
 
   try{
     // Identity before anything else, and never from the body.
@@ -132,6 +167,13 @@ Deno.serve(async (req)=>{
     spendTxnId = (typeof body.spend_txn_id === 'string' && body.spend_txn_id) ? body.spend_txn_id : null;
     question = String(message ?? '');
 
+    // No id, or one we don't recognise as a uuid, starts a new thread.
+    const rawConvo = (typeof body.conversation_id === 'string') ? body.conversation_id.trim() : '';
+    const continuing = UUID_RE.test(rawConvo);
+    conversationId = continuing ? rawConvo.toLowerCase() : crypto.randomUUID();
+    const rawTitle = (typeof body.title === 'string') ? body.title.trim() : '';
+    convoTitle = rawTitle ? rawTitle.slice(0, 200) : deriveTitle(question);
+
     if(SUPABASE_URL && SERVICE_KEY) admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
     // Resolve which side of agent_results/fan_questions this caller owns.
@@ -142,6 +184,17 @@ Deno.serve(async (req)=>{
         role = r.data && r.data.role;
       }catch(e){}
       ownerKey = ownerColumn(role);
+    }
+
+    // A freshly generated id cannot have rows yet, so only a continuing thread is
+    // worth a round trip. head:true returns no rows — the count is on `count`.
+    if(admin && continuing){
+      try{
+        const ex = await admin.from('agent_results')
+          .select('id', { count: 'exact', head: true })
+          .eq('conversation_id', conversationId);
+        if(ex.count && ex.count > 0) firstInThread = false;
+      }catch(e){ console.error('[ai-agent] thread lookup:', String(e)); }
     }
 
     // Record the question up front, so a question survives even if the model call
@@ -207,19 +260,23 @@ Deno.serve(async (req)=>{
                    : ('anthropic http ' + r.status);
       throw new Error(detail);
     }
-    const answer = data.content[0].text;
+    // Strip before it is saved as well as before it is returned, so history and
+    // the live answer are the same text.
+    const answer = stripMarkdownSyntax(data.content[0].text);
 
     if(admin && userId){
       try{
         const ins = await admin.from('agent_results').insert({
           question_id: questionId, [ownerKey]: userId,
           question, topic, answer, model: MODEL, status: 'Answered',
+          conversation_id: conversationId,
+          ...(firstInThread && convoTitle ? { title: convoTitle } : {}),
         });
         if(ins.error) console.error('[ai-agent] agent_results insert:', ins.error.message);
       }catch(e){ console.error('[ai-agent] agent_results threw:', String(e)); }
     }
 
-    return new Response(JSON.stringify({answer, question_id: questionId, model: MODEL}),{headers:{...cors,'Content-Type':'application/json'}});
+    return new Response(JSON.stringify({answer, question_id: questionId, conversation_id: conversationId, model: MODEL}),{headers:{...cors,'Content-Type':'application/json'}});
 
   }catch(e){
     const msg = String((e&&e.message)||e);
@@ -228,10 +285,15 @@ Deno.serve(async (req)=>{
     // state here is what made these disappear: the artist was charged, saw
     // filler text, and nothing was ever recorded.
     if(admin && userId){
+      // Thrown before the body was read: the question still gets a thread of its own.
+      if(!conversationId) conversationId = crypto.randomUUID();
+      if(!convoTitle) convoTitle = deriveTitle(question);
       try{
         await admin.from('agent_results').insert({
           question_id: questionId, [ownerKey]: userId,
           question, topic, answer: msg, model: MODEL, status: 'Failed',
+          conversation_id: conversationId,
+          ...(firstInThread && convoTitle ? { title: convoTitle } : {}),
         });
       }catch(_){}
       // Reverses exactly the spend the client made. A missing or already-refunded
