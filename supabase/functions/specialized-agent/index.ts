@@ -56,12 +56,13 @@ const PERSONAS: Record<string, Persona> = {
     fan_intelligence: { system: "You are AIAD's Fan Intelligence — a thoughtful assistant that helps music fans understand and connect with independent artists. You help fans make informed decisions about supporting artists, understand what an artist's work means, and navigate the creator economy without pressure or manipulation. You are neutral, honest, and fan-first. Never pressure fans to spend. Respect their autonomy." },
     fan_guide: { system: "You are AIAD Fan Guide, helping music fans discover artists, understand how to support them meaningfully, and get more from their experience as a supporter. Help fans navigate the platform, discover creators, and understand what their support enables. Keep responses warm, specific, and under 120 words.", maxTokens: 600 },
     collab_advisor: { system: "You are AIAD Collab Advisor, helping creative professionals (photographers, videographers, directors, designers, stylists) build sustainable collaboration careers with independent artists. Give specific, actionable advice on pricing, proposals, contracts, portfolio strategy, and finding opportunities. Be direct and practical. Max 150 words.", maxTokens: 700 },
-    milestone_suggest: { system: "You are AIAD milestone intelligence. Return only valid JSON arrays, no markdown, no preamble.", maxTokens: 800, json: true },
+    milestone_suggest: { system: "You are AIAD milestone intelligence. Return only valid JSON arrays, no markdown, no preamble. Inside string values, use plain text only — no emoji and no markdown syntax.", maxTokens: 800, json: true },
     decision_capture: { system: `You analyze artist-AI conversations and extract key career decisions.
 If the conversation contains a clear decision or strategic choice the artist is making, respond with JSON:
 {"decision": true, "category": "strategy|monetization|creative|release|branding", "reasoning": "one sentence of what they decided", "tradeoff": "one sentence of what they're trading off"}
 If no clear decision was made, respond with: {"decision": false}
-Only capture real, meaningful decisions — not questions or general discussion. Be concise.`, maxTokens: 400, json: true },
+Only capture real, meaningful decisions — not questions or general discussion. Be concise.
+Inside string values, use plain text only — no emoji and no markdown syntax.`, maxTokens: 400, json: true },
     // Registered on PAGE_AGENT_CONTEXTS at runtime by the fan views, so they reach
     // this function as ordinary panel persona ids.
     fanHome: { system: "You are AIAD Fan Guide. Help fans discover artists, understand how to support them meaningfully, and get the most from AIAD. Keep responses warm, specific, and under 120 words.", maxTokens: 600 },
@@ -113,6 +114,36 @@ function sanitizeAnswer(s){
     .replace(/^[ \t]+$/gm, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
+
+// A json persona's reply is a document the client JSON.parse()s, so the whole
+// string cannot go through sanitizeAnswer. The string values inside it still
+// reach a user though — decision_capture's reasoning and tradeoff render in the
+// Decisions tab, milestone_suggest's titles and descriptions in the Milestones
+// view — so those get the same treatment and nothing else does. Keys, booleans,
+// numbers, null and the shape come back exactly as the model produced them.
+function sanitizeJsonStrings(value: unknown): unknown {
+    if (typeof value === "string") return sanitizeAnswer(value);
+    if (Array.isArray(value)) return value.map((v) => sanitizeJsonStrings(v));
+    if (value && typeof value === "object") {
+        const out: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(value)) out[k] = sanitizeJsonStrings(v);
+        return out;
+    }
+    return value;
+}
+
+// Never throws. A reply that does not parse — a fenced block, a truncated
+// document, prose where JSON was asked for — comes back exactly as it arrived.
+// decision_capture has no client-side fallback: it returns early on anything it
+// cannot read, so a throw here would stop decisions being recorded and say
+// nothing about it.
+function sanitizeJsonReply(raw: string): string {
+    try {
+        return JSON.stringify(sanitizeJsonStrings(JSON.parse(raw)));
+    } catch {
+        return raw;
+    }
 }
 
 const MAX_MESSAGE_CHARS = 6000;
@@ -233,7 +264,7 @@ Deno.serve(async (req) => {
             return json({ error: `agent unavailable (${r.status})`, refunded: true }, 502);
         }
         const raw = (d?.content?.[0]?.text ?? "").trim();
-        const reply = persona.json ? raw : sanitizeAnswer(raw);
+        const reply = persona.json ? sanitizeJsonReply(raw) : sanitizeAnswer(raw);
         if (!reply) {
             await refund("empty reply");
             return json({ error: "The agent returned nothing. Try again.", refunded: true }, 502);
