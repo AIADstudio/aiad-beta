@@ -110,8 +110,8 @@ function sanitizeAnswer(s){
                                                    // keycap left when the emphasis strip eats a *\uFE0F\u20E3
     .replace(/[ \t]{2,}/g, ' ')                    // collapse the gaps the strips leave
     .replace(/[ \t]+([.,;:!?])/g, '$1')            // and the space they orphan before punctuation
-    .replace(/[ \t]+$/gm, '')                      // trailing space where an emoji ended the line
-    .replace(/^[ \t]+$/gm, '')
+    .replace(/[ \t]+$/gm, '')                      // trailing space where an emoji ended the line,
+                                                   // and whitespace-only lines with it
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
@@ -133,14 +133,23 @@ function sanitizeJsonStrings(value: unknown): unknown {
     return value;
 }
 
-// Never throws. A reply that does not parse — a fenced block, a truncated
-// document, prose where JSON was asked for — comes back exactly as it arrived.
-// decision_capture has no client-side fallback: it returns early on anything it
-// cannot read, so a throw here would stop decisions being recorded and say
-// nothing about it.
+// ```json ... ``` around the document, which the model produces often enough
+// that the client strips it too. Unwrapped here so the strings inside get
+// sanitized rather than sailing through as an unparseable blob.
+const JSON_FENCE_RE = /^```(?:json)?[ \t]*\r?\n([\s\S]*?)\r?\n?```$/;
+
+// Never throws. A reply that does not parse — a truncated document, prose where
+// JSON was asked for — comes back exactly as it arrived, fence included: the
+// client does its own fence handling and has to see what it expects. Note the
+// fallback returns `raw`, not the unwrapped candidate, for that reason.
+// decision_capture has no client-side fallback beyond that: it returns early on
+// anything it cannot read, so a throw here would stop decisions being recorded
+// and say nothing about it.
 function sanitizeJsonReply(raw: string): string {
     try {
-        return JSON.stringify(sanitizeJsonStrings(JSON.parse(raw)));
+        const fenced = JSON_FENCE_RE.exec(raw.trim());
+        const candidate = (fenced ? fenced[1] : raw).trim();
+        return JSON.stringify(sanitizeJsonStrings(JSON.parse(candidate)));
     } catch {
         return raw;
     }
