@@ -25536,7 +25536,7 @@ async function loadFanDiscover() { setTimeout(()=>_execDiscoverSearch(),100); }
             const e = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
             if (!rows.length) { box.innerHTML = '<div style="padding:16px;color:var(--text-muted);font-size:0.85rem;">No artists found</div>'; box.style.display = 'block'; return; }
             box.innerHTML = rows.map((r) => {
-                const p = idMap[r.username] || {}; const id = p.user_id || ''; const name = r.name || r.username || 'Artist';
+                const p = idMap[r.username] || {}; const id = r.user_id || p.id || ''; const name = r.name || r.username || 'Artist';
                 const av = r.avatar || p.avatar_url || ''; const isMe = id && id === me; const isF = following.has(id);
                 const jsName = e(JSON.stringify(name).slice(1, -1));
                 const avatar = (av && (av.indexOf('http') === 0 || av.indexOf('data:') === 0))
