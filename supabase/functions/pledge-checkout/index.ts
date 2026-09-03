@@ -40,7 +40,7 @@ const TIERS: Record<string, { name: string; monthly: number }> = {
     inner_circle: { name: "Inner Circle", monthly: 6000 },
 };
 const INTERVALS = new Set(["month", "year"]);
-const APPLICATION_FEE_PERCENT = "8";
+const APPLICATION_FEE_PERCENT = "10";
 
 // Derived from the key in use, so a test-mode run can never pick up a live-mode
 // product id or the reverse. stripe_accounts is keyed (user_id, livemode) for the
@@ -196,7 +196,8 @@ Deno.serve(async (req) => {
             "line_items[0][price_data][recurring][interval]": interval,
         });
 
-        // Connect: the artist is paid directly, AIAD keeps 8%.
+        // Connect: the artist is paid directly, AIAD keeps 10% — the same platform fee
+        // as the store, so every revenue stream carries one rate.
         params.set("subscription_data[application_fee_percent]", APPLICATION_FEE_PERCENT);
         params.set("subscription_data[transfer_data][destination]", acct.stripe_account_id);
 
