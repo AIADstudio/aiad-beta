@@ -1,5 +1,5 @@
 # AIAD Streaming License Agreement
-AIAD Studio Inc. — Artist Content License for the AIAD Streaming Layer. Version 1.1.
+AIAD Studio Inc. — Artist Content License for the AIAD Streaming Layer. Version 1.2.
 
 ## Read this first
 This is not a record deal and not a distribution deal.
@@ -25,11 +25,11 @@ What you are NOT granting: No downloads — fans stream only, unless you separat
 You retain 100% ownership of your masters and 100% of your publishing. This Agreement transfers no copyright, assigns no rights, and creates no option, right of first refusal, or matching right on any future work.
 
 ## 4. How you get paid
-4.1 Fans pay you through Supporter Pledges. AIAD retains an 8% platform fee; payment processing fees are deducted by the processor. The balance is paid to you through your connected payout account.
+4.1 Fans pay you through Supporter Pledges. AIAD retains a 10% platform fee; payment processing fees are deducted by the processor. The balance is paid to you through your connected payout account.
 4.2 AIAD does not pay a per-stream rate. Streams on AIAD are not a revenue event on their own — they are a benefit fans receive for supporting you.
 4.3 Plays, unique listeners, save/skip behavior, and geographic data are visible in your dashboard in near real time, and you can export all of it at any time, free.
 4.4 You are an independent contractor and responsible for your own taxes. AIAD will collect a W-9 or W-8BEN through its payment processor and issue tax forms where required by law.
-4.5 Purchases. Fans may buy your Recordings as permanent downloads at prices you set, at or above the platform minimum. AIAD retains 8% of the sale price. Payment processing fees and the statutory mechanical under 5.5 are deducted from the sale. The remainder is yours.
+4.5 Purchases. Fans may buy your Recordings as permanent downloads at prices you set, at or above the platform minimum. AIAD retains 10% of the sale price. Payment processing fees and the statutory mechanical under 5.5 are deducted from the sale. The remainder is yours.
 
 ## 5. Publishing, mechanicals, and performance royalties
 5.1 You must identify, for every Recording, all songwriters, their splits totaling 100%, their publishers, and their PRO and IPI/CAE numbers. This is a condition of delivery.

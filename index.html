@@ -36740,7 +36740,7 @@ window.AIAD_PROMPTS = [
     }
     var STRIPE_PCT = 0.029;
     var STRIPE_FIXED_CENTS = 30;
-    var AIAD_PCT = 0.08;
+    var AIAD_PCT = 0.10;
 
     var MECH_TOOLTIP = 'Set by U.S. copyright law, not by AIAD. If you own the publishing, this is paid to you.';
 
@@ -36773,7 +36773,7 @@ window.AIAD_PROMPTS = [
         return mechCache[key];
     }
 
-    /* gross -> Stripe -> AIAD 8% -> statutory mechanical -> artist net */
+    /* gross -> Stripe -> AIAD 10% -> statutory mechanical -> artist net */
     function payoutRows(grossCents, mechCents) {
         var gross = Math.max(0, Math.round(Number(grossCents) || 0));
         var stripe = Math.round(gross * STRIPE_PCT) + STRIPE_FIXED_CENTS;
@@ -36788,7 +36788,7 @@ window.AIAD_PROMPTS = [
         return '<div class="rw-payout">' +
             '<div class="rw-payout-row"><span>Sale price</span><strong>' + money(p.gross) + '</strong></div>' +
             '<div class="rw-payout-row"><span>Stripe (2.9% + $0.30)</span><strong>-' + money(p.stripe) + '</strong></div>' +
-            '<div class="rw-payout-row"><span>AIAD (8%)</span><strong>-' + money(p.aiad) + '</strong></div>' +
+            '<div class="rw-payout-row"><span>AIAD (10%)</span><strong>-' + money(p.aiad) + '</strong></div>' +
             '<div class="rw-payout-row"><span>Statutory songwriter royalty' +
               '<button type="button" class="rw-info" title="' + esc(MECH_TOOLTIP) + '" ' +
               'onclick="AIADRelease.explainMechanical()">?</button></span><strong>' +
@@ -38160,7 +38160,7 @@ window.AIAD_PROMPTS = [
     ];
 
     var CATALOG_NOTE = 'A pledge to any artist unlocks the entire AIAD catalogue for streaming. ' +
-                       'AIAD takes 8% — the rest goes to the artist.';
+                       'AIAD takes 10% — the rest goes to the artist.';
 
     function esc(s) {
         return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
