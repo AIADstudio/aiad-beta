@@ -8679,7 +8679,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     <div class="studio-layout">
                     <div><!-- main -->
 
-                    <button onclick="showFanView('discover')" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--text-muted);cursor:pointer;padding:0;margin-bottom:20px;font-family:var(--font-body);font-size:0.85rem;">
+                    <button onclick="aiadArtistPageBack()" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--text-muted);cursor:pointer;padding:0;margin-bottom:20px;font-family:var(--font-body);font-size:0.85rem;">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> Back
                     </button>
 
@@ -24946,6 +24946,21 @@ function showFanView(view) {
     const viewId = viewMap[view] || null;
     const viewEl = viewId ? document.getElementById(viewId) : null;
     if (!viewEl) { showDemoPreview(view.charAt(0).toUpperCase() + view.slice(1)); return; }
+    // Opening a fan view from another dashboard — the artist dashboard's artist
+    // search does exactly that — only toggled .active on a view inside a
+    // container that was still display:none, so the click looked dead. Surface
+    // #fanDashboard first, remembering which dashboard we left so Back returns
+    // there instead of stranding an artist in the fan nav.
+    const _fanDash = document.getElementById('fanDashboard');
+    if (_fanDash && !_fanDash.classList.contains('active')) {
+        const prev = document.querySelector('.dashboard-container.active, .collab-dashboard.active');
+        AppState._returnDashboard = (prev && prev.id) ? prev.id : null;
+        document.querySelectorAll('.dashboard-container, .collab-dashboard').forEach(d => d.classList.remove('active'));
+        ['.header', '.main', '.footer'].forEach(sel => {
+            const el = document.querySelector(sel); if (el) el.style.display = 'none';
+        });
+        _fanDash.classList.add('active');
+    }
     if (viewId === 'fanDiscoverView') {
         setTimeout(function () {
             try { if (window.AIADListen) AIADListen.open(); }
@@ -24967,6 +24982,20 @@ function showFanView(view) {
     if (view==='settings') setTimeout(() => applyFanSettingsProfile(), 100);
     if (view==='orders')  setTimeout(() => { if (window.loadMyOrders) loadMyOrders('fanOrdersList'); }, 100);
 }
+
+// Back off an artist page. showFanView records the dashboard we came from, so
+// an artist who opened a page from their own search lands back on their own
+// dashboard rather than in the fan nav they never chose.
+function aiadArtistPageBack() {
+    const back = AppState._returnDashboard;
+    AppState._returnDashboard = null;
+    const dash = back ? document.getElementById(back) : null;
+    if (!dash || dash.id === 'fanDashboard') { showFanView('discover'); return; }
+    document.getElementById('fanDashboard')?.classList.remove('active');
+    dash.classList.add('active');
+    try { history.replaceState(null, '', '#'); } catch (e) {}
+}
+window.aiadArtistPageBack = aiadArtistPageBack;
 
 // ── Fan home feed ─────────────────────────────────────────────────────────
 async function loadFanHomeFeed() {
@@ -25192,6 +25221,7 @@ async function fanToggleFollow(artistId, artistName, btn) {
             showToast('Now following '+artistName+'!');
         }
         AppState._fanCreatorsStale=true;
+        try { window.aiadLoadFollowingStrip && window.aiadLoadFollowingStrip(true); } catch(e) {}
         const av=document.getElementById('fanArtistsView');
         if(av&&av.classList.contains('active')) setTimeout(()=>loadFanCreators(),300);
     } catch(e) { showToast('Error: '+e.message); }
@@ -25564,8 +25594,59 @@ async function loadFanDiscover() { setTimeout(()=>_execDiscoverSearch(),100); }
                     btn.textContent = 'Following'; btn.style.background = 'rgba(0,212,255,0.1)'; btn.style.color = 'var(--teal-light)'; btn.style.borderColor = 'var(--teal)';
                     (window.showToast || function () {})('Following ' + name);
                 }
+                try { window.aiadLoadFollowingStrip && window.aiadLoadFollowingStrip(true); } catch (e) {}
             } catch (e) { (window.showToast || alert)('Could not update follow'); }
             btn.disabled = false;
+        };
+
+        // ── Following strip (dashboard top bar) ───────────────────────────────
+        // Following was only ever visible from the fan dashboard, so an artist
+        // had no way to see who they had followed. This keeps the list on the
+        // screen they actually use, and every chip opens that artist's page.
+        window.aiadLoadFollowingStrip = async function (force) {
+            const strip = document.getElementById('aiadFollowingStrip');
+            if (!strip) return;
+            const uid = aiadResolvedUserId();
+            if (!uid) { strip.style.display = 'none'; return; }
+            if (strip.dataset.loading === '1') return;
+            if (!force && strip.dataset.loadedFor === uid) return;
+            strip.dataset.loading = '1';
+            try {
+                const { data: fs } = await db.from('fan_support').select('artist_id,amount').eq('fan_id', uid);
+                const rows = Array.isArray(fs) ? fs : [];
+                const ids = [...new Set(rows.map((r) => r.artist_id).filter(Boolean))];
+                strip.dataset.loadedFor = uid;
+                if (!ids.length) {
+                    strip.innerHTML = '<div style="font-size:0.78rem;color:var(--text-muted);">You are not following anyone yet — search above to find artists.</div>';
+                    strip.style.display = 'block';
+                    return;
+                }
+                let names = {};
+                try {
+                    const { data: aps } = await db.from('artist_profiles').select('user_id,artist_name,username').in('user_id', ids);
+                    (aps || []).forEach((a) => { names[a.user_id] = a.artist_name || a.username || ''; });
+                } catch (e) {}
+                const avs = await window.aiadAvatarsFor(ids).catch(() => ({}));
+                const amt = {}; rows.forEach((r) => { amt[r.artist_id] = Math.max(amt[r.artist_id] || 0, r.amount || 0); });
+                const e = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+                const chips = ids.map((id) => {
+                    const nm = names[id] || 'Artist';
+                    const av = avs[id] || '';
+                    const pic = (av && (av.indexOf('http') === 0 || av.indexOf('data:') === 0))
+                        ? '<img src="' + e(av) + '" style="width:44px;height:44px;border-radius:50%;object-fit:cover;">'
+                        : '<div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#0d2f3f,#1a4a5e);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--teal-light);">' + e(nm.slice(0, 1).toUpperCase()) + '</div>';
+                    const tag = amt[id] > 0 ? '<div style="font-size:0.64rem;color:var(--teal-light);">$' + amt[id] + '/mo</div>' : '';
+                    return '<div onclick="loadArtistPage(\'' + e(id) + '\')" title="' + e(nm) + '" style="flex:0 0 auto;width:64px;text-align:center;cursor:pointer;">'
+                        + pic
+                        + '<div style="font-size:0.68rem;margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + e(nm) + '</div>'
+                        + tag + '</div>';
+                }).join('');
+                strip.innerHTML = '<div style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Following · ' + ids.length + '</div>'
+                    + '<div style="display:flex;gap:14px;overflow-x:auto;padding-bottom:4px;">' + chips + '</div>';
+                strip.style.display = 'block';
+            } catch (err) {
+                console.warn('[AIAD] following strip:', err && err.message);
+            } finally { strip.dataset.loading = '0'; }
         };
         (function initArtistSearchBar() {
             function ensure() {
@@ -25580,11 +25661,19 @@ async function loadFanDiscover() { setTimeout(()=>_execDiscoverSearch(),100); }
                 const stats = main.querySelector('#liveStatsBar');
                 if (stats && stats.parentNode === main) main.insertBefore(bar, stats.nextSibling);
                 else main.insertBefore(bar, main.firstChild);
+                const strip = document.createElement('div');
+                strip.id = 'aiadFollowingStrip';
+                strip.style.cssText = 'display:none;margin:0 0 20px;padding:14px 16px;background:var(--bg-card);border:1px solid var(--border-default);border-radius:12px;';
+                bar.parentNode.insertBefore(strip, bar.nextSibling);
                 const acctW = document.getElementById('acctMenuWrap');
                 if (acctW) { acctW.style.display='block'; acctW.style.position='relative'; acctW.style.top='auto'; acctW.style.right='auto'; acctW.style.height='auto'; acctW.style.marginLeft='auto'; acctW.style.flexShrink='0'; bar.appendChild(acctW); }
             }
             if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ensure); else ensure();
             setInterval(ensure, 2500);
+            // Auth restores after this bar is injected, so a single load on inject
+            // would run with no session and leave the strip empty for good. The
+            // loadedFor guard makes every repeat after the first one free.
+            setInterval(function () { try { window.aiadLoadFollowingStrip(); } catch (e) {} }, 3000);
             document.addEventListener('click', function (ev) {
                 const w = document.getElementById('aiadArtistSearchWrap');
                 const box = document.getElementById('aiadArtistSearchResults');
