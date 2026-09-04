@@ -5076,15 +5076,18 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                              </div>
                              <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:rgba(255,255,255,0.04);border-radius:8px;border:1px solid rgba(255,255,255,0.08);">
                                  <span style="font-size:0.875rem;color:var(--text-secondary);">Limited Edition Run</span>
-                                 <div class="commerce-toggle" onclick="this.classList.toggle('active')"></div>
+                                 <div style="display:flex;align-items:center;gap:10px;">
+                                     <input type="number" id="merchRunSize" value="100" min="1" step="1" title="Run size" style="display:none;width:74px;background:transparent;border:1px solid var(--border-default);border-radius:6px;color:var(--text-primary);text-align:right;font-size:0.875rem;font-family:inherit;outline:none;padding:5px 8px;">
+                                     <div class="commerce-toggle" id="merchLimitedToggle" onclick="toggleMerchLimited(this)"></div>
+                                 </div>
                              </div>
                              <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:rgba(255,255,255,0.04);border-radius:8px;border:1px solid rgba(255,255,255,0.08);">
                                  <span style="font-size:0.875rem;color:var(--text-secondary);">Supporter Exclusive</span>
-                                 <div class="commerce-toggle" onclick="this.classList.toggle('active')"></div>
+                                 <div class="commerce-toggle" id="merchSupporterToggle" onclick="this.classList.toggle('active')"></div>
                              </div>
                          </div>
                          <div class="creation-actions" style="margin-top:20px;">
-                             <button class="creation-btn primary" onclick="handleMerchPublish()" style="width:100%;">Publish to Store</button>
+                             <button class="creation-btn primary" id="merchPublishBtn" onclick="handleMerchPublish()" style="width:100%;">Publish to Store</button>
                          </div>
                      </div>
                     <!-- Merch History -->
@@ -19128,22 +19131,110 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             reader.readAsDataURL(file);
         }
 
+        // The mockup names the artist picks are not the store's category names, so
+        // map onto STORE_CATEGORIES exactly — the product editor requires a category
+        // and would reject a row that carried a mockup label or a null.
+        function merchCategoryFor(product) {
+            var p = String(product || '');
+            // Sweat first: "sweatshirt" contains "tshirt", so the tee test would
+            // otherwise claim it.
+            if (/hoodie|sweat/i.test(p))   return 'Hoodies & Sweats';
+            if (/tee|t-?shirt/i.test(p))   return 'T-Shirts';
+            if (/cap|hat|beanie/i.test(p)) return 'Hats & Beanies';
+            return 'Other';
+        }
+
+        // The run size only means anything for a limited run, so it stays hidden
+        // until the toggle is on rather than sitting there inviting a number that
+        // would be ignored.
+        window.toggleMerchLimited = function (el) {
+            el.classList.toggle('active');
+            var run = document.getElementById('merchRunSize');
+            if (run) run.style.display = el.classList.contains('active') ? 'block' : 'none';
+        };
+
+        // Publishes straight into public.products, the store that already works.
+        // This used to open a Printify/Shopify picker whose buttons only said
+        // "coming soon", so the whole step was a dead end in front of a live store.
         async function handleMerchPublish() {
-            // Show connect store modal
-            document.getElementById('modalBody').innerHTML = `
-                <div style="text-align:center;padding:16px 0;">
-                    <div style="width:56px;height:56px;border-radius:14px;background:rgba(255,179,71,0.15);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="#FFB347" stroke-width="2" style="width:28px;height:28px;"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
-                    </div>
-                    <h3 style="font-size:1.1rem;font-weight:600;margin-bottom:8px;">Connect a Store</h3>
-                    <p style="font-size:0.875rem;color:var(--text-secondary);line-height:1.6;margin-bottom:24px;">Connect Printify or Shopify to publish your merch directly. Coming in the next update.</p>
-                    <div style="display:flex;flex-direction:column;gap:10px;">
-                        <button onclick="showToast('Printify integration coming soon');closeModal();" style="padding:12px;background:rgba(255,255,255,0.06);border:1px solid var(--border-default);border-radius:10px;color:var(--text-primary);font-family:var(--font-body);font-size:0.875rem;cursor:pointer;">Printify (Print-on-demand)</button>
-                        <button onclick="showToast('Shopify integration coming soon');closeModal();" style="padding:12px;background:rgba(255,255,255,0.06);border:1px solid var(--border-default);border-radius:10px;color:var(--text-primary);font-family:var(--font-body);font-size:0.875rem;cursor:pointer;">Shopify</button>
-                        <button onclick="closeModal()" style="padding:10px;background:transparent;border:none;color:var(--text-muted);font-family:var(--font-body);font-size:0.85rem;cursor:pointer;">Cancel</button>
-                    </div>
-                </div>`;
-            document.getElementById('globalModal').classList.add('active');
+            const btn = document.getElementById('merchPublishBtn');
+
+            const name = (document.getElementById('merchProductName')?.value || '').trim();
+            if (!name) { showToast('Give the product a name first'); return; }
+
+            const price = Number(String(document.getElementById('merchPrice')?.value || '').replace(/[^0-9.]/g, ''));
+            if (!Number.isFinite(price) || price <= 0) { showToast('Set a price above zero'); return; }
+
+            const src = document.getElementById('merchDesignImg')?.src || '';
+            if (!/^(https?:|data:)/.test(src)) { showToast('Generate or upload a design first'); return; }
+
+            const me = (typeof aiadResolvedUserId === 'function') ? aiadResolvedUserId() : null;
+            if (!me) { showToast('Sign in to publish'); return; }
+
+            const limited   = !!document.getElementById('merchLimitedToggle')?.classList.contains('active');
+            const exclusive = !!document.getElementById('merchSupporterToggle')?.classList.contains('active');
+            // No toggle means an open run: null inventory is the store's "unlimited".
+            let inventory = null;
+            if (limited) {
+                const n = parseInt(document.getElementById('merchRunSize')?.value, 10);
+                inventory = Number.isFinite(n) && n > 0 ? n : 100;
+            }
+
+            const label = btn ? btn.textContent : '';
+            if (btn) { btn.disabled = true; btn.textContent = 'Publishing…'; }
+            try {
+                // The generator hands back a short-lived URL, so the design is copied
+                // into artist-media first — same bucket and path shape the product
+                // editor's photo upload uses — and the row keeps the stored URL. Writing
+                // the raw response URL would leave a product with a broken image later.
+                let blob;
+                try {
+                    const r = await fetch(src);
+                    if (!r.ok) throw new Error('status ' + r.status);
+                    blob = await r.blob();
+                } catch (e) {
+                    throw new Error('Could not read the design image: ' + ((e && e.message) || e));
+                }
+                const ext = (String(blob.type || '').split('/')[1] || 'png').replace(/[^\w]/g, '') || 'png';
+                const path = me + '/products/' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '_merch.' + ext;
+                const up = await window.aiadStorageUpload('artist-media', path, blob, blob.type || 'image/png');
+                if (!up.ok) {
+                    window.__aiadReportError && window.__aiadReportError('storage.upload', 'artist-media', new Error('merch ' + up.status), { path });
+                    throw new Error('Could not upload the design (' + up.status + ')');
+                }
+                const url = up.publicUrl;
+                if (!url) throw new Error('Upload returned no URL');
+
+                // Supporter-only is a property of this product, not a column the
+                // store has — details is the jsonb the editor already round-trips.
+                const details = { source: 'merch_studio', mockup: selectedMerchProduct };
+                if (exclusive) details.supporter_exclusive = true;
+                if (limited)   details.limited_edition = true;
+
+                // artist_id is left off deliberately: the column defaults to auth.uid().
+                const { error } = await window.db.from('products').insert({
+                    name: name,
+                    price: price,
+                    currency: 'usd',
+                    image_url: url,
+                    images: [url],
+                    product_kind: 'physical',
+                    category: merchCategoryFor(selectedMerchProduct),
+                    inventory: inventory,
+                    details: details,
+                    is_active: true,
+                });
+                if (error) throw new Error(error.message);
+
+                showToast('Published to your store');
+                // Lands on the store with the list reloaded — showArtistView('store')
+                // already calls loadStoreManager(), so the new item is on screen.
+                showArtistView('store');
+            } catch (e) {
+                showToast((e && e.message) || 'Could not publish');
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = label || 'Publish to Store'; }
+            }
         }
 
         async function handleMerchAI() {
