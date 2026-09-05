@@ -22959,7 +22959,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             if (!uid) { showToast('Sign in to follow artists'); return; }
             const isFollowing = btn.textContent.trim() === 'Following';
             try {
-                // Goes through set_follow like every other follow button. This used to
+                // Goes through set_follow like every other follow path. This used to
                 // write fan_support directly, which skipped the self-follow guard and
                 // could create a row the RPC then refused to delete.
                 const { error } = await db.rpc('set_follow', { p_artist: artistId, p_state: !isFollowing });
@@ -25743,11 +25743,21 @@ async function loadFanDiscover() { setTimeout(()=>_execDiscoverSearch(),100); }
             const isF = btn.textContent.trim() === 'Following';
             btn.disabled = true;
             try {
+                // Was two direct fan_support writes. The insert hit UNIQUE(fan_id,
+                // artist_id) whenever any row existed and the error was swallowed, and
+                // the delete filtered type='follow' so it could not remove a row written
+                // by any other path — including a paid pledge, where it deleted nothing
+                // and flipped the button anyway. set_follow handles both, and preserves
+                // paid support on unfollow.
+                const { error } = await db.rpc('set_follow', { p_artist: artistId, p_state: !isF });
+                if (error) {
+                    (window.showToast || alert)('Could not update follow: ' + error.message);
+                    btn.disabled = false;
+                    return;
+                }
                 if (isF) {
-                    await db.from('fan_support').delete().eq('fan_id', me).eq('artist_id', artistId).eq('type', 'follow');
                     btn.textContent = 'Follow'; btn.style.background = 'transparent'; btn.style.color = 'var(--text-primary)'; btn.style.borderColor = 'var(--border-default)';
                 } else {
-                    await db.from('fan_support').insert({ fan_id: me, artist_id: artistId, amount: 0, type: 'follow' });
                     btn.textContent = 'Following'; btn.style.background = 'rgba(0,212,255,0.1)'; btn.style.color = 'var(--teal-light)'; btn.style.borderColor = 'var(--teal)';
                     (window.showToast || function () {})('Following ' + name);
                 }
