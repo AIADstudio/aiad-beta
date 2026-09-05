@@ -20588,6 +20588,10 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 });
                 if (forLS.length > 0) {
                     localStorage.setItem('aiad_sh_' + key, JSON.stringify(forLS));
+                } else {
+                    // Nothing http-backed left. Skipping the write here used to leave the
+                    // PREVIOUS cache in place, so deleting the last image brought it back.
+                    localStorage.removeItem('aiad_sh_' + key);
                 }
             } catch(e) {}
         }
@@ -20611,22 +20615,33 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
 
         function _shFromRow(key, row) {
             const meta = row.meta || {};
+            // row.id is what makes a delete durable - without it the client can only
+            // remove its own cache and the row comes back on the next load.
+            const id = row.id || null;
             const date = meta.date || (row.created_at
                 ? new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                 : '');
             if (key === 'songwriting') {
-                return { date, genre: meta.genre || '', mood: meta.mood || '',
+                return { id, date, genre: meta.genre || '', mood: meta.mood || '',
                          preview: (row.content || '').slice(0, 200), lyrics: row.content || '' };
             }
-            return { date, label: row.title || '', url: row.url || '' };
+            return { id, date, label: row.title || '', url: row.url || '' };
         }
 
         // Best-effort insert. Never blocks or fails the generation itself.
         async function _shPersist(key, item) {
             try {
                 if (!AppState.currentUser) return;
-                const { error } = await db.from('creations').insert(_shToRow(key, item));
-                if (error) console.warn('[AIAD] creations insert failed:', error.message);
+                const { data, error } = await db.from('creations')
+                    .insert(_shToRow(key, item)).select('id').single();
+                if (error) { console.warn('[AIAD] creations insert failed:', error.message); return; }
+                if (data && data.id) {
+                    // item is the same object held in _studioHistoryMem, so stamping the
+                    // id here makes a delete in this session durable too. Re-save so the
+                    // localStorage copy carries the id across a refresh.
+                    item.id = data.id;
+                    _shSet(key, _shGet(key));
+                }
             } catch (e) { console.warn('[AIAD] creations insert threw:', e); }
         }
 
@@ -20646,7 +20661,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 if (!AppState.currentUser) return;
                 const { data, error } = await db
                     .from('creations')
-                    .select('kind,title,content,url,meta,created_at')
+                    .select('id,kind,title,content,url,meta,created_at')
                     .eq('kind', key)
                     .order('created_at', { ascending: false })
                     .limit(30);
@@ -20658,13 +20673,24 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             } catch (e) { console.warn('[AIAD] creations load threw:', e); }
         }
 
-        function clearStudioHistory(key) {
+        async function clearStudioHistory(key) {
+            if (!confirm('Clear this history permanently? This cannot be undone.')) return;
             localStorage.removeItem('aiad_sh_'+key);
             _studioHistoryMem[key] = [];
             renderStudioHistory(key);
-            // Local-only clear: the durable rows in creations are intentionally left
-            // alone so history is not destroyed across devices by a cache clear.
-            showToast('History cleared on this device');
+            // The durable rows go too. A local-only clear looked like it worked and then
+            // reappeared on the next load, because _shLoadFromDb lets the rows win.
+            try {
+                if (AppState.currentUser) {
+                    const { error } = await db.from('creations').delete().eq('kind', key);
+                    if (error) {
+                        console.warn('[AIAD] creations clear failed:', error.message);
+                        showToast('Cleared here, but the server copy could not be removed');
+                        return;
+                    }
+                }
+            } catch (e) { console.warn('[AIAD] creations clear threw:', e); }
+            showToast('History cleared');
         }
 
         function renderStudioHistory(key) {
@@ -20737,12 +20763,35 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             showToast('Loaded from history');
         }
 
-        function deleteStudioHistoryItem(key, index) {
+        async function deleteStudioHistoryItem(key, index) {
             var items = _shGet(key);
             if (index < 0 || index >= items.length) return;
+            var item = items[index];
             items.splice(index, 1);
             _shSet(key, items);
             renderStudioHistory(key);
+
+            // Remove the durable row as well. Cache-only deletion was the bug: on the
+            // next load _shLoadFromDb overwrites memory from creations, so the deleted
+            // image came straight back after a hard refresh.
+            try {
+                if (!AppState.currentUser) { showToast('Deleted from history'); return; }
+                var q = null;
+                if (item && item.id) {
+                    q = db.from('creations').delete().eq('id', item.id);
+                } else if (item && item.url) {
+                    // No id: the row was written before the insert started returning one.
+                    q = db.from('creations').delete().eq('kind', key).eq('url', item.url);
+                }
+                if (q) {
+                    const { error } = await q;
+                    if (error) {
+                        console.warn('[AIAD] creations delete failed:', error.message);
+                        showToast('Removed here, but the server copy remains');
+                        return;
+                    }
+                }
+            } catch (e) { console.warn('[AIAD] creations delete threw:', e); }
             showToast('Deleted from history');
         }
 
