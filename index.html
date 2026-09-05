@@ -22959,12 +22959,15 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             if (!uid) { showToast('Sign in to follow artists'); return; }
             const isFollowing = btn.textContent.trim() === 'Following';
             try {
+                // Goes through set_follow like every other follow button. This used to
+                // write fan_support directly, which skipped the self-follow guard and
+                // could create a row the RPC then refused to delete.
+                const { error } = await db.rpc('set_follow', { p_artist: artistId, p_state: !isFollowing });
+                if (error) { showToast('Could not update follow: ' + error.message); return; }
                 if (isFollowing) {
-                    await db.from('fan_support').delete().eq('fan_id', uid).eq('artist_id', artistId);
                     btn.textContent = 'Follow'; btn.style.background = 'transparent'; btn.style.color = 'var(--text-primary)'; btn.style.borderColor = 'var(--border-default)';
                     showToast('Unfollowed ' + artistName);
                 } else {
-                    await db.from('fan_support').upsert({ fan_id: uid, artist_id: artistId, status: 'following', amount: 0 }, { onConflict: 'fan_id,artist_id' });
                     btn.textContent = 'Following'; btn.style.background = 'rgba(0,212,255,0.1)'; btn.style.color = 'var(--teal-light)'; btn.style.borderColor = 'var(--teal)';
                     showToast('Now following ' + artistName + '!');
                 }
@@ -25358,11 +25361,13 @@ async function fanToggleFollow(artistId, artistName, btn) {
     const resolvedId = (artistId&&!artistId.includes('-')) ? 'ed9c7f5c-9c3c-4999-8bba-468d5ba9d935' : artistId;
     try {
         if (isFollowing) {
-            await db.rpc('set_follow',{p_artist:resolvedId,p_state:false});
+            const { error } = await db.rpc('set_follow',{p_artist:resolvedId,p_state:false});
+            if (error) { showToast('Could not unfollow: '+error.message); return; }
             btn.textContent='Follow'; btn.style.cssText='padding:9px 20px;border-radius:10px;border:1px solid var(--border-default);background:transparent;color:var(--text-primary);font-size:0.85rem;cursor:pointer;font-family:var(--font-body);min-width:100px;';
             showToast('Unfollowed '+artistName);
         } else {
-            await db.rpc('set_follow',{p_artist:resolvedId,p_state:true});
+            const { error } = await db.rpc('set_follow',{p_artist:resolvedId,p_state:true});
+            if (error) { showToast('Could not follow: '+error.message); return; }
             btn.textContent='Following ✓'; btn.style.cssText='padding:9px 20px;border-radius:10px;border:1px solid var(--teal);background:rgba(0,212,255,0.1);color:var(--teal-light);font-size:0.85rem;cursor:pointer;font-family:var(--font-body);min-width:100px;';
             showToast('Now following '+artistName+'!');
         }
@@ -25377,14 +25382,20 @@ function fanFollowFromDiscover(artistId, artistName, btn) {
     const following = btn.textContent.trim()==='Following';
     if (!AppState.currentUser) { showToast('Sign in to follow'); return; }
     const resolvedId = (artistId&&!artistId.includes('-')) ? 'ed9c7f5c-9c3c-4999-8bba-468d5ba9d935' : artistId;
+    // The button used to flip before the RPC resolved, so a refused write still
+    // looked like it worked until the next reload.
     if (following) {
-        btn.textContent='Follow'; btn.style.background='transparent'; btn.style.color='var(--text-primary)'; btn.style.borderColor='var(--border-default)';
-        showToast('Unfollowed '+artistName);
-        db.rpc('set_follow',{p_artist:resolvedId,p_state:false}).then(()=>{AppState._fanCreatorsStale=true;});
+        db.rpc('set_follow',{p_artist:resolvedId,p_state:false}).then(({error})=>{
+            if (error) { showToast('Could not unfollow: '+error.message); return; }
+            btn.textContent='Follow'; btn.style.background='transparent'; btn.style.color='var(--text-primary)'; btn.style.borderColor='var(--border-default)';
+            showToast('Unfollowed '+artistName);
+            AppState._fanCreatorsStale=true;
+        });
     } else {
-        btn.textContent='Following'; btn.style.background='rgba(0,212,255,0.1)'; btn.style.color='var(--teal-light)'; btn.style.borderColor='var(--teal)';
-        showToast('Now following '+artistName+'!');
-        db.rpc('set_follow',{p_artist:resolvedId,p_state:true}).then(()=>{
+        db.rpc('set_follow',{p_artist:resolvedId,p_state:true}).then(({error})=>{
+            if (error) { showToast('Could not follow: '+error.message); return; }
+            btn.textContent='Following'; btn.style.background='rgba(0,212,255,0.1)'; btn.style.color='var(--teal-light)'; btn.style.borderColor='var(--teal)';
+            showToast('Now following '+artistName+'!');
             AppState._fanCreatorsStale=true;
             const mv=document.getElementById('fanArtistsView');
             if(mv&&mv.classList.contains('active')) loadFanCreators();
