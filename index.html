@@ -5074,6 +5074,18 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                                  <span style="font-size:0.875rem;color:var(--text-secondary);">Price</span>
                                  <input type="text" id="merchPrice" value="$65.00" style="background:transparent;border:none;color:var(--text-primary);text-align:right;font-size:0.875rem;outline:none;width:80px;">
                              </div>
+                             <div style="padding:14px 16px;background:rgba(255,255,255,0.04);border-radius:8px;border:1px solid rgba(255,255,255,0.08);">
+                                 <div style="font-size:0.875rem;color:var(--text-secondary);margin-bottom:8px;">Description</div>
+                                 <textarea id="merchDescription" rows="3" placeholder="What it is, what it's made of, and who it's for. Fans read this before they buy." style="width:100%;box-sizing:border-box;background:transparent;border:1px solid var(--border-default);border-radius:6px;color:var(--text-primary);font-size:0.85rem;font-family:inherit;line-height:1.45;outline:none;padding:8px 10px;resize:vertical;"></textarea>
+                             </div>
+                             <div style="padding:14px 16px;background:rgba(255,255,255,0.04);border-radius:8px;border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;">
+                                 <span style="font-size:0.875rem;color:var(--text-secondary);">Sizes <span style="color:var(--text-muted);font-size:0.78rem;">comma-separated</span></span>
+                                 <input type="text" id="merchSizes" placeholder="S, M, L, XL" style="background:transparent;border:none;color:var(--text-primary);text-align:right;font-size:0.875rem;outline:none;width:200px;">
+                             </div>
+                             <div style="padding:14px 16px;background:rgba(255,255,255,0.04);border-radius:8px;border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;">
+                                 <span style="font-size:0.875rem;color:var(--text-secondary);">Colors <span style="color:var(--text-muted);font-size:0.78rem;">comma-separated</span></span>
+                                 <input type="text" id="merchColors" placeholder="Black, Bone" style="background:transparent;border:none;color:var(--text-primary);text-align:right;font-size:0.875rem;outline:none;width:200px;">
+                             </div>
                              <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:rgba(255,255,255,0.04);border-radius:8px;border:1px solid rgba(255,255,255,0.08);">
                                  <span style="font-size:0.875rem;color:var(--text-secondary);">Limited Edition Run</span>
                                  <div style="display:flex;align-items:center;gap:10px;">
@@ -19211,6 +19223,13 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
 
                 // Supporter-only is a property of this product, not a column the
                 // store has — details is the jsonb the editor already round-trips.
+                // Same shape openProductEditor writes, so a merch product opens in the
+                // editor as a complete row rather than one with three empty fields.
+                const asList = (v) => String(v || '').split(',').map((x) => x.trim()).filter(Boolean);
+                const description = (document.getElementById('merchDescription')?.value || '').trim();
+                const sizes  = asList(document.getElementById('merchSizes')?.value);
+                const colors = asList(document.getElementById('merchColors')?.value);
+
                 const details = { source: 'merch_studio', mockup: selectedMerchProduct };
                 if (exclusive) details.supporter_exclusive = true;
                 if (limited)   details.limited_edition = true;
@@ -19218,8 +19237,11 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 // artist_id is left off deliberately: the column defaults to auth.uid().
                 const { error } = await window.db.from('products').insert({
                     name: name,
+                    description: description || null,
                     price: price,
                     currency: 'usd',
+                    sizes: sizes,
+                    colors: colors,
                     image_url: url,
                     images: [url],
                     product_kind: 'physical',
