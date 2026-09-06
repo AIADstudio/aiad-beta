@@ -24666,15 +24666,37 @@ document.addEventListener('keydown', function(e) {
     _fanAgentHistory.push({ role: 'user', content: text });
 
     try {
-        const data = await callSpecializedAgent('fan_guide', text, {
-            history: _fanAgentHistory.slice(-8, -1)
-        });
-        const reply = data.reply || 'No response.';
+        let reply;
+        let products = null;
+        // The artist page's agent is the shopping agent over the live product table.
+        // Every other fan surface keeps the general guide.
+        if (input.id === 'fanArtistViewAgentInput' && window.aiadStoreInvoke) {
+            const d = await window.aiadStoreInvoke('store-agent', {
+                message: text,
+                artist_id: (window.AppState && AppState._currentArtistId) || null,
+                history: _fanAgentHistory.slice(-6, -1),
+            });
+            reply = d.response || 'No response.';
+            products = Array.isArray(d.products) ? d.products : null;
+        } else {
+            const data = await callSpecializedAgent('fan_guide', text, {
+                history: _fanAgentHistory.slice(-8, -1)
+            });
+            reply = data.reply || 'No response.';
+        }
         _fanAgentHistory.push({ role: 'assistant', content: reply });
         thinking.style.cssText = 'background:rgba(0,212,255,0.06);border:1px solid rgba(0,212,255,0.12);border-radius:10px;padding:12px;font-size:0.82rem;color:var(--text-secondary);line-height:1.55;margin:4px 0;';
         thinking.textContent = reply;
+        // Cards are built server-side from rows a search actually returned, so what
+        // renders here can only be a real product — the provenance gate, client side.
+        if (products && products.length && window.renderStorefrontCard) {
+            const wrap = document.createElement('div');
+            wrap.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:8px 0 4px;';
+            wrap.innerHTML = products.map(window.renderStorefrontCard).join('');
+            msgs.appendChild(wrap);
+        }
     } catch(e) {
-        thinking.textContent = 'Connection error — try again.';
+        thinking.textContent = (e && e.message) ? e.message : 'Connection error — try again.';
     }
     msgs.scrollTop = msgs.scrollHeight;
 }
@@ -26045,6 +26067,8 @@ async function loadArtistPage(artistUserId) {
         supportBtn.onclick=()=>{AppState._currentArtistId=pid;AppState._currentArtistName=name;
             if(window.AIADPledge) AIADPledge.open(pid,name); else fanOpenSupportModal(pid,name);};
     }
+    AppState._currentArtistId = pid;
+    AppState._currentArtistName = name;
     _loadArtistFanPosts(pid,name,av);
     // pid is the artist's user id, which is what products.artist_id holds.
     try { if (window.AIADArtistMusic) AIADArtistMusic.load(pid); } catch(e) {}
@@ -32612,6 +32636,11 @@ Be direct and concrete with real industry insight — never generic filler. When
     }
 
     window.loadStoreManager = loadStoreManager;
+    // The fan shopping agent lives in the fan module and renders the same cards the
+    // public storefront does, so both cross the module boundary here rather than
+    // being reimplemented on the other side.
+    window.aiadStoreInvoke = invokeMsg;
+    window.renderStorefrontCard = renderStorefrontCard;
     window.loadPayouts      = loadPayouts;
     window.loadStorefront   = loadStorefront;
     window.loadMyOrders     = loadMyOrders;
