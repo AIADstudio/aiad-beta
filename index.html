@@ -5303,6 +5303,10 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     <!-- Shown only when payouts aren't set up: without Connect, checkout fails. -->
                     <div id="storeOnboardBanner" style="display:none;margin-bottom:16px;"></div>
 
+                    <!-- Proposed by a store skill, applied only by the artist. Hidden
+                         until something is pending. -->
+                    <div id="storeStagedPanel" style="display:none;margin-bottom:18px;"></div>
+
                     <div id="storeCatTabs" style="display:none;gap:6px;overflow-x:auto;padding-bottom:2px;margin-bottom:14px;-webkit-overflow-scrolling:touch;"></div>
                     <div id="storeProductsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;"></div>
 
@@ -32053,6 +32057,7 @@ Be direct and concrete with real industry insight — never generic filler. When
 
         renderOnboardBanner();
         loadRecentSales(me);
+        loadStagedChanges();
     }
 
     const STORE_CATEGORIES = ['T-Shirts','Hoodies & Sweats','Hats & Beanies','Jackets & Outerwear','Bottoms','Footwear','Accessories','Luxury','Basics','Vinyl & Music','Digital','Other'];
@@ -32335,6 +32340,95 @@ Be direct and concrete with real industry insight — never generic filler. When
             msg.textContent = e.message;
             btn.disabled = false; btn.textContent = 'Save product';
         }
+    };
+
+    // ── Staged changes ────────────────────────────────────────────────────
+    // A store skill proposes; the artist decides. Approving is two writes from the
+    // client under the artist's own RLS — the product update, then the decision —
+    // so no new server-side function can write to a listing.
+    async function loadStagedChanges() {
+        const host = document.getElementById('storeStagedPanel');
+        if (!host) return;
+        const me = await uid();
+        if (!me) { host.style.display = 'none'; return; }
+        const { data, error } = await window.db.from('staged_changes')
+            .select('id,product_id,skill,summary,changes,created_at')
+            .eq('artist_id', me).eq('status', 'pending')
+            .order('created_at', { ascending: false });
+        if (error || !data || !data.length) { host.style.display = 'none'; host.innerHTML = ''; return; }
+        const byId = {};
+        (window._storeProducts || []).forEach((p) => { byId[p.id] = p; });
+        host.innerHTML = '<div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:10px;">'
+            + 'Proposed changes · ' + data.length + '</div>'
+            + data.map(function (c) {
+                const prod = byId[c.product_id];
+                const fields = Object.keys(c.changes || {});
+                const rows = fields.map(function (f) {
+                    const d = c.changes[f] || {};
+                    const now = prod ? prod[f] : undefined;
+                    // The listing can move after a change is proposed. Say so rather
+                    // than letting an approval silently overwrite newer work.
+                    const stale = prod && JSON.stringify(now == null ? null : now) !== JSON.stringify(d.from == null ? null : d.from);
+                    return '<div style="display:grid;grid-template-columns:110px 1fr;gap:8px;padding:7px 0;border-top:1px solid var(--border-default);font-size:0.8rem;">'
+                        + '<div style="color:var(--text-muted);">' + esc(f) + (stale ? ' <span style="color:#f59e0b;" title="This field changed after the proposal was made">changed since</span>' : '') + '</div>'
+                        + '<div><div style="color:var(--text-muted);text-decoration:line-through;white-space:pre-wrap;">' + esc(_stagedVal(d.from)) + '</div>'
+                        + '<div style="color:var(--text-primary);white-space:pre-wrap;">' + esc(_stagedVal(d.to)) + '</div></div></div>';
+                }).join('');
+                return '<div style="background:var(--bg-card);border:1px solid var(--border-default);border-radius:13px;padding:14px;margin-bottom:10px;">'
+                    + '<div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;">'
+                    + '<div style="flex:1;min-width:180px;"><div style="font-weight:600;font-size:0.9rem;">' + esc((prod && prod.name) || 'Product') + '</div>'
+                    + '<div style="font-size:0.78rem;color:var(--text-secondary);">' + esc(c.summary || '') + '</div>'
+                    + (c.skill ? '<div style="font-size:0.68rem;color:var(--text-muted);margin-top:2px;">proposed by ' + esc(c.skill) + '</div>' : '')
+                    + '</div>'
+                    + '<div style="display:flex;gap:7px;flex-shrink:0;">'
+                    + '<button class="artist-action-btn primary" onclick="approveStagedChange(\'' + esc(c.id) + '\',this)">Approve</button>'
+                    + '<button class="artist-action-btn" onclick="rejectStagedChange(\'' + esc(c.id) + '\',this)">Reject</button>'
+                    + '</div></div>' + rows + '</div>';
+            }).join('');
+        host.style.display = 'block';
+    }
+    function _stagedVal(v) {
+        if (v == null || v === '') return '(empty)';
+        if (Array.isArray(v)) return v.join(', ') || '(empty)';
+        if (typeof v === 'object') return JSON.stringify(v);
+        return String(v);
+    }
+    window.loadStagedChanges = loadStagedChanges;
+
+    window.approveStagedChange = async function (id, btn) {
+        if (btn) { btn.disabled = true; btn.textContent = 'Applying…'; }
+        try {
+            const { data: c, error: e1 } = await window.db.from('staged_changes')
+                .select('product_id,changes,status').eq('id', id).maybeSingle();
+            if (e1) throw new Error(e1.message);
+            if (!c) throw new Error('That change is gone');
+            if (c.status !== 'pending') throw new Error('Already ' + c.status);
+            const patch = {};
+            Object.keys(c.changes || {}).forEach(function (f) { patch[f] = c.changes[f].to; });
+            if (!Object.keys(patch).length) throw new Error('Nothing to apply');
+            patch.updated_at = new Date().toISOString();
+            // The product write goes through the artist's own row policy, which is
+            // what keeps a skill from ever reaching a live listing on its own.
+            const { error: e2 } = await window.db.from('products').update(patch).eq('id', c.product_id);
+            if (e2) throw new Error(e2.message);
+            const { error: e3 } = await window.db.from('staged_changes')
+                .update({ status: 'approved', decided_at: new Date().toISOString() }).eq('id', id);
+            if (e3) throw new Error(e3.message);
+            toast('Change applied');
+            loadStoreManager();
+        } catch (err) {
+            toast('Could not apply: ' + err.message);
+            if (btn) { btn.disabled = false; btn.textContent = 'Approve'; }
+        }
+    };
+
+    window.rejectStagedChange = async function (id, btn) {
+        if (btn) { btn.disabled = true; btn.textContent = 'Rejecting…'; }
+        const { error } = await window.db.from('staged_changes')
+            .update({ status: 'rejected', decided_at: new Date().toISOString() }).eq('id', id);
+        if (error) { toast('Could not reject: ' + error.message); if (btn) { btn.disabled = false; btn.textContent = 'Reject'; } return; }
+        toast('Change rejected');
+        loadStagedChanges();
     };
 
     window.deleteProduct = async function (id) {
