@@ -14073,7 +14073,9 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             if (!email) { showSettingsToast('No account email on file'); return; }
             const label = btn && btn.textContent;
             if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
-            const { error } = await db.auth.resetPasswordForEmail(email);
+            const { error } = await db.auth.resetPasswordForEmail(email, {
+                redirectTo: window.aiadRecoveryRedirect()
+            });
             if (btn) { btn.disabled = false; btn.textContent = label; }
             showSettingsToast(error ? ('Could not send the reset link — ' + error.message)
                                     : ('Reset link sent to ' + email));
@@ -21405,6 +21407,18 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         window.aiadRerunActiveViewForSession = aiadRerunActiveViewForSession;
 
         db.auth.onAuthStateChange(async (event, session) => {
+            // A recovery link signs the user in with a session whose only job is to
+            // authorize updateUser({password}). It must NOT fall through to the
+            // SIGNED_IN path below, or the user lands in the dashboard with the old
+            // password still active and reasonably concludes the reset failed.
+            if (event === 'PASSWORD_RECOVERY' && session) {
+                window.__aiadRecovery = true;
+                window.__aiadBootUid = session.user.id;
+                AppState.currentUser = session.user;
+                if (window.aiadOpenPasswordReset) window.aiadOpenPasswordReset();
+                return;
+            }
+            if (window.__aiadRecovery && event === 'SIGNED_IN') return;
             if (event === 'SIGNED_IN' && session) {
                 const newUid = session.user.id;
                 const boot = window.__aiadBootUid;
@@ -21487,18 +21501,34 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             if (error) showToast('Error: ' + error.message);
         }
 
+        // The recovery link has to come back to THIS origin carrying ?recovery=1, so
+        // the app can tell a recovery session apart from an ordinary sign-in. Every
+        // origin this runs on must be listed in Supabase Auth > URL Configuration.
+        window.aiadRecoveryRedirect = function () {
+            return window.location.origin + window.location.pathname + '?recovery=1';
+        };
+
         async function handleForgotPassword() {
             const email = document.getElementById('signInEmail').value.trim();
             if (!email) {
                 showToast('Enter your email first');
                 return;
             }
-            const { error } = await db.auth.resetPasswordForEmail(email);
-            if (error) {
-                showToast('Error: ' + error.message);
-            } else {
-                showToast('Password reset link sent to ' + email);
+            if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+                showToast('That does not look like an email address');
+                return;
             }
+            const link = document.querySelector('.forgot-password a');
+            const label = link && link.textContent;
+            if (link) { link.style.pointerEvents = 'none'; link.textContent = 'Sending...'; }
+            const { error } = await db.auth.resetPasswordForEmail(email, {
+                redirectTo: window.aiadRecoveryRedirect()
+            });
+            if (link) { link.style.pointerEvents = ''; link.textContent = label; }
+            // Deliberately does not confirm whether the address has an account.
+            showToast(error
+                ? ('Could not send the link - ' + error.message)
+                : ('If an account exists for ' + email + ', a reset link is on its way'));
         }
 
         async function handleSignOut() {
@@ -40602,6 +40632,143 @@ window.AIAD_PROMPTS = [
 })();
 </script>
 
+
+<!-- ===== Password reset (recovery link lands here) ===== -->
+<div id="aiadPwResetModal" style="display:none;position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.85);align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#161616;border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:32px;max-width:420px;width:100%;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;">
+    <h2 style="margin:0 0 8px;font-size:1.35rem;font-weight:600;color:#fff;">Set a new password</h2>
+    <p style="margin:0 0 24px;font-size:0.875rem;color:rgba(255,255,255,0.6);line-height:1.5;" id="aiadPwResetSub">Choose a new password for your account. You will be signed out and asked to sign in with it.</p>
+    <input type="password" id="aiadPwNew" placeholder="New password" autocomplete="new-password"
+           style="width:100%;padding:14px 16px;margin-bottom:12px;background:#0A0A0A;border:1px solid rgba(255,255,255,0.08);border-radius:10px;color:#fff;font-size:1rem;font-family:inherit;outline:none;">
+    <input type="password" id="aiadPwConfirm" placeholder="Confirm new password" autocomplete="new-password"
+           style="width:100%;padding:14px 16px;margin-bottom:8px;background:#0A0A0A;border:1px solid rgba(255,255,255,0.08);border-radius:10px;color:#fff;font-size:1rem;font-family:inherit;outline:none;">
+    <div id="aiadPwResetMsg" style="min-height:20px;margin-bottom:12px;font-size:0.8125rem;color:#FF6B6B;"></div>
+    <button id="aiadPwResetBtn" onclick="aiadCompletePasswordReset()"
+            style="width:100%;padding:14px;background:linear-gradient(90deg,#00D4FF,#00B4D8);border:none;border-radius:12px;color:#0A0A0A;font-size:1rem;font-weight:600;font-family:inherit;cursor:pointer;">Update password</button>
+    <button onclick="aiadCancelPasswordReset()"
+            style="width:100%;padding:12px;margin-top:8px;background:transparent;border:none;color:rgba(255,255,255,0.4);font-size:0.875rem;font-family:inherit;cursor:pointer;">Cancel</button>
+  </div>
+</div>
+<script>
+(function () {
+    'use strict';
+    function db() { return window.db; }
+    function msg(text, ok) {
+        var el = document.getElementById('aiadPwResetMsg');
+        if (el) { el.textContent = text || ''; el.style.color = ok ? '#4ADE80' : '#FF6B6B'; }
+    }
+
+    window.aiadOpenPasswordReset = function () {
+        var m = document.getElementById('aiadPwResetModal');
+        if (!m) return;
+        window.__aiadRecovery = true;
+        m.style.display = 'flex';
+        msg('');
+        var f = document.getElementById('aiadPwNew');
+        if (f) { f.value = ''; setTimeout(function () { f.focus(); }, 50); }
+        var c = document.getElementById('aiadPwConfirm');
+        if (c) c.value = '';
+    };
+
+    // Leaving the flow must not strand a live recovery session in the app.
+    window.aiadCancelPasswordReset = function () {
+        window.__aiadRecovery = false;
+        var m = document.getElementById('aiadPwResetModal');
+        if (m) m.style.display = 'none';
+        try { db().auth.signOut(); } catch (e) {}
+        window.location.replace(window.location.origin + window.location.pathname);
+    };
+
+    window.aiadCompletePasswordReset = async function () {
+        var p1 = (document.getElementById('aiadPwNew') || {}).value || '';
+        var p2 = (document.getElementById('aiadPwConfirm') || {}).value || '';
+        var btn = document.getElementById('aiadPwResetBtn');
+        if (p1.length < 8) { msg('Use at least 8 characters'); return; }
+        if (p1 !== p2) { msg('Those two do not match'); return; }
+        if (btn) { btn.disabled = true; btn.textContent = 'Updating...'; }
+        msg('');
+        var res;
+        try {
+            res = await db().auth.updateUser({ password: p1 });
+        } catch (e) {
+            res = { error: { message: String((e && e.message) || e) } };
+        }
+        if (btn) { btn.disabled = false; btn.textContent = 'Update password'; }
+        if (res && res.error) {
+            // "same as the old password" and "session expired" both land here.
+            msg(res.error.message || 'Could not update the password');
+            return;
+        }
+        msg('Password updated. Signing you out...', true);
+        window.__aiadRecovery = false;
+        try { await db().auth.signOut(); } catch (e) {}
+        setTimeout(function () {
+            window.location.replace(window.location.origin + window.location.pathname + '?reset=1');
+        }, 900);
+    };
+
+    // PASSWORD_RECOVERY is the happy path, but it can be missed: the listener is
+    // registered after the client, and a PKCE link arrives as ?code= and is
+    // exchanged into an ordinary session. ?recovery=1 (set in redirectTo) is the
+    // signal that survives both, so poll for the session once we see it.
+    function boot() {
+        var hash = window.location.hash || '';
+        var qs = new URLSearchParams(window.location.search);
+
+        if (qs.get('reset') === '1') {
+            if (window.showToast) window.showToast('Password updated. Sign in with your new password.');
+            history.replaceState(null, '', window.location.origin + window.location.pathname);
+            return;
+        }
+
+        // Supabase reports a dead link as #error=...&error_code=otp_expired
+        if (/error_code=|error=access_denied/.test(hash)) {
+            if (window.showToast) window.showToast('That reset link has expired. Request a new one.');
+            history.replaceState(null, '', window.location.origin + window.location.pathname);
+            return;
+        }
+
+        if (qs.get('recovery') !== '1' && !/type=recovery/.test(hash)) return;
+        window.__aiadRecovery = true;
+
+        var tries = 0;
+        (function poll() {
+            tries++;
+            if (!db() || !db().auth) {
+                if (tries < 60) setTimeout(poll, 150);
+                return;
+            }
+            db().auth.getSession().then(function (r) {
+                if (r && r.data && r.data.session) {
+                    window.aiadOpenPasswordReset();
+                } else if (tries < 60) {
+                    setTimeout(poll, 150);
+                } else {
+                    window.__aiadRecovery = false;
+                    if (window.showToast) window.showToast('That reset link has expired. Request a new one.');
+                }
+            }).catch(function () { if (tries < 60) setTimeout(poll, 150); });
+        })();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot);
+    } else {
+        boot();
+    }
+
+    // Enter submits from either field.
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter') return;
+        var m = document.getElementById('aiadPwResetModal');
+        if (!m || m.style.display !== 'flex') return;
+        if (e.target && (e.target.id === 'aiadPwNew' || e.target.id === 'aiadPwConfirm')) {
+            e.preventDefault();
+            window.aiadCompletePasswordReset();
+        }
+    });
+})();
+</script>
 </body>
 
 
