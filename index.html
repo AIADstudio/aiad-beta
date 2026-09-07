@@ -40653,6 +40653,17 @@ window.AIAD_PROMPTS = [
 (function () {
     'use strict';
     function db() { return window.db; }
+
+    // Defined in the main app block (~21507) but consumed by aiadSendPasswordReset
+    // (~14077), which sits ~7,400 lines EARLIER in that same block. Both are window
+    // assignments, so anything that throws between those two lines leaves the button
+    // wired and the helper undefined. This block is a separate <script>, so it runs
+    // regardless -- backfill the helper if the main block never got there.
+    if (typeof window.aiadRecoveryRedirect !== 'function') {
+        window.aiadRecoveryRedirect = function () {
+            return window.location.origin + window.location.pathname + '?recovery=1';
+        };
+    }
     function msg(text, ok) {
         var el = document.getElementById('aiadPwResetMsg');
         if (el) { el.textContent = text || ''; el.style.color = ok ? '#4ADE80' : '#FF6B6B'; }
