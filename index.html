@@ -39337,6 +39337,7 @@ window.AIAD_PROMPTS = [
         fan.playEventId = d.play_event_id || null;
         fan.expiresAt = Date.now() + (Number(d.expires_in) || 300) * 1000;
         fan.trackId = trackId;
+        fan.releaseId = (d.release && d.release.id) || null;
         fan.source = d.preview ? 'preview' : 'stream';
         fan.startedAt = Date.now();
         fan.previewUntil = d.preview && d.client_must_clip
@@ -39349,7 +39350,7 @@ window.AIAD_PROMPTS = [
         window.loadGlobalTrack({
             trackId: trackId,
             title: (d.track && d.track.title) || (t && t.title) || 'Track',
-            imageUrl: (d.release && d.release.artwork_url) || (S.release && S.release.artwork_url) || '',
+            imageUrl: (d.release && d.release.artwork_url) || '',
             audioUrl: d.url,
             source: 'uploaded',
             __fan: true
@@ -39414,10 +39415,22 @@ window.AIAD_PROMPTS = [
     }
 
     // ── queue ───────────────────────────────────────────────────────────────
-    function setQueue(trackIds, startIndex) {
+    /* A queue is owned by the surface that built it. Without that, a release queued in
+       Discover stayed live across the whole app: finishing a single track played from an
+       artist page auto-advanced into the leftover queue and started something the
+       listener never chose. */
+    function setQueue(trackIds, startIndex, owner) {
         S.queue = (trackIds || []).slice();
         S.queueIndex = typeof startIndex === 'number' ? startIndex : 0;
+        S.queueOwner = owner || null;
         renderQueueControls();
+    }
+    function clearQueue() { setQueue([], 0, null); }
+    window.aiadClearListenQueue = clearQueue;
+    // True only while the track on air is the one this queue points at. A play started
+    // anywhere else moves the audio element without touching the queue, and this notices.
+    function queueOwnsCurrent() {
+        return !!(S.queue.length && fan.trackId && S.queue[S.queueIndex] === fan.trackId);
     }
     function playQueueAt(i) {
         if (i < 0 || i >= S.queue.length) return false;
@@ -39433,14 +39446,18 @@ window.AIAD_PROMPTS = [
     }
     function renderQueueControls() {
         var p = el('lxPrev'), n = el('lxNext');
-        if (p) p.disabled = S.queueIndex <= 0 && !(el('globalAudioPlayer') || {}).currentTime;
-        if (n) n.disabled = S.queueIndex >= S.queue.length - 1;
+        // Hidden rather than disabled when there is nothing to skip through: these were
+        // permanently visible and bound to AIADListen even during a playTrackById play
+        // this module never queued, so pressing them jumped to an unrelated track.
+        var show = queueOwnsCurrent() && S.queue.length > 1;
+        if (p) { p.style.display = show ? '' : 'none'; p.disabled = !show || (S.queueIndex <= 0 && !(el('globalAudioPlayer') || {}).currentTime); }
+        if (n) { n.style.display = show ? '' : 'none'; n.disabled = !show || S.queueIndex >= S.queue.length - 1; }
     }
 
     function playRelease() {
         var ready = S.tracks.filter(function (t) { return t.derivatives_status === 'ready'; });
         if (!ready.length) { toast('Nothing on this release is ready to play yet.'); return; }
-        setQueue(ready.map(function (t) { return t.id; }), 0);
+        setQueue(ready.map(function (t) { return t.id; }), 0, 'release');
         playQueueAt(0);
     }
 
@@ -39463,7 +39480,8 @@ window.AIAD_PROMPTS = [
         if (!trackId) { host.innerHTML = ''; return; }
         await loadComments(trackId);
 
-        var isArtist = !!(S.release && S.uid && S.release.user_id === S.uid);
+        var isArtist = !!(S.release && S.uid && S.release.user_id === S.uid
+                         && (!fan.releaseId || S.release.id === fan.releaseId));
         var dur = (el('globalAudioPlayer') || {}).duration || 0;
 
         var markers = S.comments.map(function (c) {
@@ -39596,7 +39614,7 @@ window.AIAD_PROMPTS = [
         var ready = (r.data || []).filter(function (x) { return x.tracks && x.tracks.derivatives_status === 'ready'; });
         if (!ready.length) { toast('Nothing in that playlist is ready to play yet.'); return; }
         S.tracks = ready.map(function (x) { return x.tracks; });
-        setQueue(ready.map(function (x) { return x.track_id; }), 0);
+        setQueue(ready.map(function (x) { return x.track_id; }), 0, 'playlist');
         playQueueAt(0);
     }
 
@@ -39709,10 +39727,13 @@ window.AIAD_PROMPTS = [
         if (typeof origLoad === 'function') {
             window.loadGlobalTrack = function (track) {
                 if (!track || !track.__fan) {
-                    // Artist-library play: drop any fan state so a stale play_event is
-                    // not later closed against the wrong track.
+                    // Artist-library or artist-page play: drop any fan state so a stale
+                    // play_event is not later closed against the wrong track, and drop
+                    // the queue with it. A queue this module built belongs to the surface
+                    // that built it, and playback has just left that surface.
                     flushFanEvent(false);
-                    fan.trackId = null; wavePeaks = null; applyWaveMode();
+                    fan.trackId = null; fan.releaseId = null; wavePeaks = null; applyWaveMode();
+                    clearQueue();
                 }
                 return origLoad.apply(this, arguments);
             };
@@ -39739,7 +39760,10 @@ window.AIAD_PROMPTS = [
         window.onGlobalEnded = function () {
             if (typeof origEnded === 'function') { try { origEnded.apply(this, arguments); } catch (e) { console.warn('[AIAD listen] base ended:', e && e.message); } }
             flushFanEvent(true);
-            if (S.queue.length && S.queueIndex < S.queue.length - 1) next();
+            // Only advance a queue that owns the track that just finished. A track played
+            // from an artist page or the library ends where it ends.
+            if (queueOwnsCurrent() && S.queueIndex < S.queue.length - 1) next();
+            else renderQueueControls();
         };
 
         var a = el('globalAudioPlayer');
