@@ -18867,6 +18867,12 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     role = pending.role || 'artist';
                     industry = pending.industry || null;
                     // Write every field we have; extra keys (location, avatar_url, industry) are ignored if columns absent.
+                    // Verifying on a device whose pending blob has no role would otherwise
+                    // write the 'artist' default over a fan who already signed up.
+                    // Signup is the one place a role is genuinely being established, so an
+                    // unreadable current role falls back to what the pending blob says
+                    // rather than abandoning the profile write entirely.
+                    role = (await aiadPreserveFanRole(user.id, role)) || role;
                     const row = { id: user.id, email: pending.email || user.email, role };
                     if (pending.full_name)  row.full_name = pending.full_name;
                     if (pending.username)   row.username  = pending.username;
@@ -21378,7 +21384,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     AppState.pendingAvatar = (profile && profile.avatar_url) || '';
                     // Pre-populate avatar cache for this artist
                     if (profile && profile.avatar_url) { if (!AppState._cachedArtistAvatars) AppState._cachedArtistAvatars = {}; AppState._cachedArtistAvatars[AppState.currentUser?.id] = profile.avatar_url; }
-                    AppState.pendingAvatarRole = _role || 'artist';
+                    AppState.pendingAvatarRole = _role || (profile && profile.role) || 'artist';
                     localStorage.setItem('aiad_user_industry', AppState.userIndustry);
                     localStorage.setItem('aiad_user_role', AppState.userRole);
                     const lastDashboard = localStorage.getItem('aiad_last_dashboard');
@@ -23324,9 +23330,31 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
         }
 
+        // A fan's role is only ever set deliberately, by the fan signup flow. Every
+        // other caller here is inferring a role from which dashboard is on screen, and a
+        // fan can reach an artist dashboard (preview, a stale aiad_last_dashboard) without
+        // ever having stopped being a fan. Downgrading 'fan' to 'artist' from a render is
+        // never right, so an existing 'fan' wins unless the caller explicitly says 'fan'.
+        async function aiadPreserveFanRole(uid, role) {
+            if (role === 'fan') return role;
+            try {
+                const { data, error } = await db.from('profiles').select('role').eq('id', uid).maybeSingle();
+                // null means "could not tell". A failed read must not be treated as
+                // "not a fan": the caller skips the write instead, and the next navigation
+                // saves once the read works. Losing one background industry write beats
+                // demoting a fan to artist on a transient error.
+                if (error) { console.warn('[AIAD] role preserve read failed:', error.message); return null; }
+                if (data && data.role === 'fan') return 'fan';
+            } catch (e) { console.warn('[AIAD] role preserve threw:', e); return null; }
+            return role;
+        }
+        window.aiadPreserveFanRole = aiadPreserveFanRole;
+
         async function saveProfileToSupabase(industry, role) {
             const uid = aiadResolvedUserId();
             if (!uid) return;
+            role = await aiadPreserveFanRole(uid, role);
+            if (role === null) return;          // could not read the current role; write nothing
             const { error } = await db.from('profiles').upsert({
                 id: uid,
                 email: AppState.currentUser.email,
@@ -23363,6 +23391,8 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             document.querySelector('.footer').style.display = 'none';
             document.getElementById('demoPanel').style.display = 'none';
 
+            // Inferred from the dashboard on screen, so saveProfileToSupabase keeps an
+            // existing 'fan' rather than letting a render decide someone is an artist.
             saveProfileToSupabase(AppState.userIndustry, dashboard === 'fan' ? 'fan' : dashboard === 'collab' ? 'collaborator' : 'artist');
 
             document.querySelectorAll('.dashboard-container, .collab-dashboard').forEach(d => {
@@ -25115,20 +25145,11 @@ document.addEventListener('keydown', function(e) {
                                         .map(c => c.dataset.value);
             const intent = document.querySelector('#page-fan-preferences .option-btn.selected')?.dataset.value || '';
 
-            // Save fan profile to artist_profiles (for feed/discover queries)
-            if (AppState.currentUser) {
-                const acc = AppState.fanAccount || {};
-                // artist_profiles.username is UNIQUE too (partial index, where not null),
-                // so this needs the same collision handling as the profiles write.
-                const fanApUsername = await aiadUniqueUsername(acc.name || 'fan');
-                await db.from('artist_profiles').upsert({
-                    id: AppState.currentUser.id,
-                    username: fanApUsername,
-                    artist_name: acc.name || 'Fan',
-                    location: acc.location || '',
-                    primary_genre: genres[0] || '',
-                }, { onConflict: 'id' });
-            }
+            // A fan used to get an artist_profiles row here, "for feed/discover queries".
+            // Nothing reads it: the feed resolves poster names by user_id and this row set
+            // only `id`, list_artists gates on profiles.role, and the fan's own name and
+            // avatar come from profiles. All it did was give every fan a half-formed
+            // artist record. The genre the fan picked is kept below, where it belongs.
 
             // Drive artist suggestions off the fan's first pick. profiles.preferred_genre
             // holds a single genre, so the full multi-select stays in localStorage below;
@@ -25321,7 +25342,9 @@ async function loadFanHomeFeed() {
         const postArtistIds2 = [...new Set(posts.map(p => p.user_id).filter(Boolean))];
         const artMap = {};
         try {
-            const { data: apRows } = await db.from('artist_profiles').select('id,user_id,artist_name').in('id', postArtistIds2);
+            // These are artist_posts.user_id values; artist_profiles.id is a different
+            // key, so matching on it found nothing and every card said "Artist".
+            const { data: apRows } = await db.from('artist_profiles').select('id,user_id,artist_name').in('user_id', postArtistIds2);
             await window.aiadFillAvatars(apRows);
             (apRows||[]).forEach(ap => { artMap[ap.id] = ap; if(ap.user_id) artMap[ap.user_id] = ap; });
         } catch(e) {}
@@ -25406,6 +25429,22 @@ async function loadFanSupportGrid() {
     } catch(e) { grid.innerHTML = ''; }
 }
 
+// artist_profiles rows are reached by user_id — `id` is a separate key that none of
+// the ids flowing through the fan surfaces (fan_support.artist_id, artist_posts.user_id)
+// ever match.
+async function _fanArtistNames(ids) {
+    const out = {};
+    const want = [...new Set((ids || []).filter(Boolean))];
+    if (!want.length) return out;
+    try {
+        const { data, error } = await db.from('artist_profiles')
+            .select('user_id,artist_name').in('user_id', want);
+        if (error) { console.warn('[AIAD] artist name lookup:', error.message); return out; }
+        (data || []).forEach(r => { if (r.user_id && r.artist_name) out[r.user_id] = r.artist_name; });
+    } catch (e) { console.warn('[AIAD] artist name lookup threw:', e); }
+    return out;
+}
+
 async function loadFanSidebarPledges() {
     const el = document.getElementById('fanSidebarPledges');
     if (!el) return;
@@ -25414,7 +25453,10 @@ async function loadFanSidebarPledges() {
     try {
         const { data } = await db.from('fan_support').select('amount,status,artist_id').eq('fan_id',uid);
         if (!data||!data.length) { el.innerHTML=`<div style="font-size:0.82rem;color:var(--text-muted);padding:8px 0;">No pledges yet.</div>`; return; }
-        el.innerHTML = data.map(d=>{const name=d.artist_profiles?.artist_name||'Artist';const amt=d.amount>0?'$'+d.amount+'/mo':'Following';const init=name[0]?.toUpperCase()||'?';return `<div class="dash-pledge-item"><div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#0d2f3f,#1a4a5e);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.8rem;color:var(--teal-light);flex-shrink:0;">${init}</div><div style="flex:1;min-width:0;"><div class="dash-pledge-name">${name}</div></div><span class="dash-pledge-amount">${amt}</span></div>`;}). join('');
+        // This select carries no join, so d.artist_profiles was always undefined and
+        // every pledge read "Artist". Resolve the names on artist_profiles.user_id.
+        const _pnames = await _fanArtistNames(data.map(d=>d.artist_id));
+        el.innerHTML = data.map(d=>{const name=_pnames[d.artist_id]||'Artist';const amt=d.amount>0?'$'+d.amount+'/mo':'Following';const init=name[0]?.toUpperCase()||'?';return `<div class="dash-pledge-item"><div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#0d2f3f,#1a4a5e);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.8rem;color:var(--teal-light);flex-shrink:0;">${init}</div><div style="flex:1;min-width:0;"><div class="dash-pledge-name">${name}</div></div><span class="dash-pledge-amount">${amt}</span></div>`;}). join('');
     } catch(e) { el.innerHTML=''; }
 }
 
@@ -25426,8 +25468,10 @@ async function loadFanSidebarPerks() {
     try {
         const { data } = await db.from('fan_support').select('amount,status,artist_id').eq('fan_id',uid).gt('amount',0).eq('status','active');
         if (!data||!data.length) { el.innerHTML=`<div style="font-size:0.82rem;color:var(--text-muted);">Support a creator to unlock perks.</div>`; return; }
+        // Same missing join as the pledges sidebar directly above.
+        const _knames = await _fanArtistNames(data.map(d=>d.artist_id));
         const perks=[];
-        data.forEach(d=>{const name=d.artist_profiles?.artist_name||'Artist';const amt=d.amount||0;if(amt>=5){perks.push({perk:'Early access to releases',artist:name});perks.push({perk:'Behind-the-scenes content',artist:name});};if(amt>=25){perks.push({perk:'Exclusive drops',artist:name});perks.push({perk:'Direct message access',artist:name});}});
+        data.forEach(d=>{const name=_knames[d.artist_id]||'Artist';const amt=d.amount||0;if(amt>=5){perks.push({perk:'Early access to releases',artist:name});perks.push({perk:'Behind-the-scenes content',artist:name});};if(amt>=25){perks.push({perk:'Exclusive drops',artist:name});perks.push({perk:'Direct message access',artist:name});}});
         el.innerHTML=perks.slice(0,4).map(p=>`<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid var(--border-subtle);"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2.5" style="flex-shrink:0;margin-top:2px;"><polyline points="20 6 9 17 4 12"/></svg><div><div style="font-size:0.78rem;font-weight:500;">${p.perk}</div><div style="font-size:0.7rem;color:var(--text-muted);">${p.artist}</div></div></div>`).join('');
     } catch(e) { el.innerHTML=''; }
 }
@@ -25474,10 +25518,11 @@ async function loadFanFeed() {
             // Fill any missing ones by user_id
             const missing = artistIds.filter(id => !artistMap[id]);
             if (missing.length) {
+                // No .neq('role','fan') here: artist_profiles has no role column, so the
+                // filter 400'd the query and dropped every name into the catch below.
                 const { data: byUserId } = await db.from('artist_profiles')
                     .select('id,user_id,artist_name')
-                    .in('user_id', missing)
-                    .neq('role', 'fan');
+                    .in('user_id', missing);
                 (byUserId||[]).forEach(p => { artistMap[p.id] = p; if(p.user_id) artistMap[p.user_id] = p; });
             }
             await window.aiadFillAvatars([...new Set(Object.values(artistMap))]);
@@ -25737,8 +25782,11 @@ async function fanPreferredGenre() {
 window.aiadResetPreferredGenre = () => { _fanPreferredGenre = null; };
 
 async function _execDiscoverSearch() {
+    // No session is fine here. list_artists is SECURITY DEFINER and granted to anon,
+    // and profiles is publicly readable, so a signed-out visitor gets the same cards.
+    // uid is only used by the follow-state pass below, which is behind its own session
+    // check; returning early here meant a visitor saw a permanently empty Discover.
     const uid = aiadResolvedUserId();
-    if (!uid) return;
     const results=document.getElementById('discoverResults');
     if(!results) return;
     const q=(document.getElementById('discoverSearch')?.value||'').trim();
@@ -39255,7 +39303,11 @@ window.AIAD_PROMPTS = [
 
     // ── fan playback ────────────────────────────────────────────────────────
     var fan = { playEventId: null, expiresAt: 0, trackId: null, source: 'stream',
-                previewUntil: 0, startedAt: 0, refreshing: false };
+                previewUntil: 0, startedAt: 0, refreshing: false,
+                // The release the playing track actually belongs to, from stream-token's
+                // own response. S.release is whatever Discover last opened, which is a
+                // different thing and was being borrowed for artwork and comments.
+                releaseId: null };
 
     async function playTrack(trackId, opts) {
         opts = opts || {};
