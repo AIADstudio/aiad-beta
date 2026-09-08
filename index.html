@@ -17006,6 +17006,17 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             'What\'s realistic for my first 1000 listeners?'
         ];
 
+        // The rotating "Try asking" chips under the input are a separate surface every
+        // artist sees. While the starters are up, two sets of suggestions on one empty
+        // screen is noise, so the rotating set stands down. Gated only — renderPromptChips
+        // still runs and still fills the list, which is why this toggles the wrapper
+        // rather than its contents.
+        function _agentRotatingChips(show) {
+            var list = document.getElementById('artistAgentPromptList');
+            var wrap = list && list.closest('.agent-example-prompts');
+            if (wrap) wrap.style.display = show ? '' : 'none';
+        }
+
         function _agentRenderStarters() {
             var box = document.getElementById('artistAgentStarters');
             if (!box) return;
@@ -17015,6 +17026,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             if (!_agentConvosLoaded || _agentConvos.length) {
                 box.style.display = 'none';
                 box.innerHTML = '';
+                _agentRotatingChips(true);
                 return;
             }
             box.innerHTML = '<div class="agent-example-prompts" style="padding:0 0 12px;">'
@@ -17033,11 +17045,15 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     input.value = q;
                     // Hide immediately: the artist has committed to a question, and leaving
                     // the row up while the answer streams reads as though nothing happened.
+                    // The rotating chips come back here rather than waiting on the answer,
+                    // so a send that fails before rendering cannot strand them hidden.
                     box.style.display = 'none';
+                    _agentRotatingChips(true);
                     if (window.sendArtistAgentMessage) sendArtistAgentMessage();
                 });
             });
             box.style.display = 'block';
+            _agentRotatingChips(false);
         }
         window.aiadRenderAgentStarters = _agentRenderStarters;
 
@@ -17045,7 +17061,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             var thread = _agentThreadEl();
             if (!thread) return;
             var _st = document.getElementById('artistAgentStarters');
-            if (_st) { _st.style.display = 'none'; }
+            if (_st) { _st.style.display = 'none'; _agentRotatingChips(true); }
             var ph = thread.querySelector('.agent-convo-empty');
             if (ph) ph.remove();
             var when = '';
