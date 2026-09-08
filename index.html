@@ -4114,7 +4114,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             </div>
                     </div> <!-- /studio-layout --></div>
 
-                <div class="dash-view" id="artistHomeView"><div style="max-width:600px;margin:0 auto;padding:8px 0 60px"><!-- Install prompt, mobile only, filled by the A2HS module. --><div id="aiadInstallBanner"></div><h2 style="font-size:1.4rem;font-weight:700;margin:4px 4px 4px">Home</h2><p style="color:var(--text-secondary);font-size:0.9rem;margin:0 4px 20px">Latest from artists you follow</p><div id="homeFeedInner"><div style="text-align:center;color:var(--text-muted);padding:40px">Loading feed…</div></div></div></div><div class="dash-view active" id="artistPostsView">
+                <div class="dash-view" id="artistHomeView"><div style="max-width:600px;margin:0 auto;padding:8px 0 60px"><!-- Install prompt, mobile only, filled by the A2HS module. --><div id="aiadInstallBanner"></div><div id="connectPromptHome"></div><h2 style="font-size:1.4rem;font-weight:700;margin:4px 4px 4px">Home</h2><p style="color:var(--text-secondary);font-size:0.9rem;margin:0 4px 20px">Latest from artists you follow</p><div id="homeFeedInner"><div style="text-align:center;color:var(--text-muted);padding:40px">Loading feed…</div></div></div></div><div class="dash-view active" id="artistPostsView">
                     <style>
                         /* ── Posts page ── */
                         .posts-page { display: block; }
@@ -5235,6 +5235,9 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
 
                 <!-- ── MY STATS — first-class destination for platform handles + self-reported numbers ── -->
                 <div class="dash-view" id="artistMyStatsView">
+                    <!-- Connect prompt; filled by the connect-prompt module when the artist
+                         has no platform links. -->
+                    <div id="connectPromptMyStats"></div>
                     <div class="agents-page-header">
                         <h1 class="agents-page-title">My Stats</h1>
                         <p class="agents-page-subtitle">AIAD grounds every recommendation in your real numbers. Connect platforms or self-report — both work.</p>
@@ -5427,6 +5430,12 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                             </div>
                         </div>                       <div class="agent-chat-thread" id="artistAgentChatThread">
                         </div>
+
+                        <!-- Starter questions for an artist with no agent_results yet.
+                             Rendered by _agentRenderStarters(); hidden the moment they have
+                             one. Separate from the rotating "Try asking" chips below the
+                             input, which every artist sees. -->
+                        <div id="artistAgentStarters" style="display:none;"></div>
 
                         <div class="agent-input-area">
                             <textarea class="agent-input" id="artistAgentInput" placeholder="Ask about your career, strategy, or any decision you're thinking through..." rows="1"></textarea>
@@ -16890,7 +16899,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
 
         window.aiadLoadAgentConvos = aiadLoadAgentConvos;
         async function aiadLoadAgentConvos(force) {
-            if (_agentConvosLoaded && !force) { renderAgentConvoList(); return; }
+            if (_agentConvosLoaded && !force) { renderAgentConvoList(); _agentRenderStarters(); return; }
             var client = (typeof db !== 'undefined' && db) || window.db;
             var uid = (typeof aiadResolvedUserId === 'function') ? aiadResolvedUserId() : null;
             if (!client || !uid) return;
@@ -16927,6 +16936,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 _agentConvosLoaded = true;
                 renderAgentConvoList();
                 _agentThreadEmptyState();
+                _agentRenderStarters();
             } catch (e) {
                 try { window.aiadTrackError && window.aiadTrackError(String(e), { action: 'agent_convos' }); } catch (_) {}
             }
@@ -16985,9 +16995,57 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             thread.appendChild(d);
         }
 
+        // 55 opens against 9 answers: artists were landing on an empty box and leaving.
+        // These give a first-time artist something to press. They are deliberately fixed
+        // rather than drawn from nextPrompts() — the point is a known-good first question,
+        // not variety, and the rotating chips under the input already cover variety.
+        var _AGENT_STARTERS = [
+            'What should I be working on this month?',
+            'How do I get my music into sync licensing?',
+            'Review my release plan and tell me what\'s missing',
+            'What\'s realistic for my first 1000 listeners?'
+        ];
+
+        function _agentRenderStarters() {
+            var box = document.getElementById('artistAgentStarters');
+            if (!box) return;
+            // Only when the load actually succeeded. aiadLoadAgentConvos sets
+            // _agentConvosLoaded on success only, so a failed read leaves this false and
+            // the starters stay hidden — an error must not be dressed up as "no history".
+            if (!_agentConvosLoaded || _agentConvos.length) {
+                box.style.display = 'none';
+                box.innerHTML = '';
+                return;
+            }
+            box.innerHTML = '<div class="agent-example-prompts" style="padding:0 0 12px;">'
+                + '<div class="example-prompts-label">Not sure where to start? Pick one:</div>'
+                + '<div class="example-prompts-list">'
+                + _AGENT_STARTERS.map(function (q) {
+                    return '<button type="button" class="example-prompt" data-starter="' + _agentEsc(q) + '">' + _agentEsc(q) + '</button>';
+                  }).join('')
+                + '</div></div>';
+            box.querySelectorAll('button[data-starter]').forEach(function (b) {
+                b.addEventListener('click', function () {
+                    var q = b.dataset.starter;
+                    try { window.__aiadTrack && window.__aiadTrack('starter_click', 'artist:agent', { question: q }); } catch (e) {}
+                    var input = document.getElementById('artistAgentInput');
+                    if (!input) return;
+                    input.value = q;
+                    // Hide immediately: the artist has committed to a question, and leaving
+                    // the row up while the answer streams reads as though nothing happened.
+                    box.style.display = 'none';
+                    if (window.sendArtistAgentMessage) sendArtistAgentMessage();
+                });
+            });
+            box.style.display = 'block';
+        }
+        window.aiadRenderAgentStarters = _agentRenderStarters;
+
         function _agentAppendPair(question, answer, whenIso, failed) {
             var thread = _agentThreadEl();
             if (!thread) return;
+            var _st = document.getElementById('artistAgentStarters');
+            if (_st) { _st.style.display = 'none'; }
             var ph = thread.querySelector('.agent-convo-empty');
             if (ph) ph.remove();
             var when = '';
@@ -28395,6 +28453,28 @@ function toggleAgeRange(btn) {
             set('TiktokHandle',       row && row.tiktok_handle);
         }
 
+        // The connect form writes artist_stats; artist_platform_links is a separate
+        // table that nothing in this file wrote, which is why it holds 2 rows for 31
+        // artists. Instagram and TikTok are the only two of its five columns this form
+        // collects, so those are what get recorded. Best-effort: a failure here must not
+        // fail a save that already succeeded.
+        async function recordPlatformLinks(prefix) {
+            try {
+                const uid = (typeof aiadResolvedUserId === 'function') ? aiadResolvedUserId() : null;
+                if (!uid || !window.db) return;
+                const val = (suffix) => {
+                    const el = document.getElementById(prefix + suffix);
+                    const v = el && el.value ? el.value.trim() : '';
+                    return v || null;
+                };
+                const row = { user_id: uid, instagram: val('InstagramHandle'), tiktok: val('TiktokHandle') };
+                if (!row.instagram && !row.tiktok) return;
+                const { error } = await window.db.from('artist_platform_links')
+                    .upsert(row, { onConflict: 'user_id' });
+                if (error) console.warn('[AIAD] artist_platform_links upsert:', error.code || '', error.message);
+            } catch (e) { console.warn('[AIAD] artist_platform_links upsert threw:', e); }
+        }
+
         async function onDashSave() {
             const btn = document.getElementById('dashSrSave');
             const msg = document.getElementById('dashSrMsg');
@@ -28407,7 +28487,9 @@ function toggleAgeRange(btn) {
                 } else {
                     if (msg) { msg.style.color = '#22c55e'; msg.textContent = '✓ Saved'; }
                     try { localStorage.setItem('aiad_stats_collected', '1'); } catch (e) {}
+                    await recordPlatformLinks('dashSr');
                     await refresh();
+                    renderConnectPrompt();
                 }
             } catch (e) {
                 if (msg) { msg.style.color = '#f59e0b'; msg.textContent = e.message; }
@@ -28425,6 +28507,92 @@ function toggleAgeRange(btn) {
         }
         window.aiadRefreshSelfReportedStats = refresh;
 
+        // ── Connect-platforms prompt ──────────────────────────────────────────
+        // artist_platform_links holds 2 rows across 31 artists, and My Stats and Home
+        // both open on numbers that are mostly blank without them. This is the nudge,
+        // on both surfaces, dismissible, and back in a week if still nothing is linked.
+        const CONNECT_LINK_COLS = ['instagram', 'tiktok', 'apple_music', 'soundcloud', 'beatport'];
+        const CONNECT_SNOOZE_MS = 7 * 24 * 60 * 60 * 1000;
+
+        function _connectDismissKey(uid) { return 'aiad_connect_prompt_dismissed_' + uid; }
+
+        function _connectDismissedRecently(uid) {
+            try {
+                const raw = localStorage.getItem(_connectDismissKey(uid));
+                if (!raw) return false;
+                const at = Date.parse(raw);
+                if (!isFinite(at)) return false;
+                // Still unlinked a week on, so ask again. The caller only reaches this
+                // when there are zero links, which is what makes re-showing fair.
+                return (Date.now() - at) < CONNECT_SNOOZE_MS;
+            } catch (e) { return false; }
+        }
+
+        // null means "say nothing" — no session, a read that failed, or already linked.
+        // A failed read must never render the prompt: telling an artist to connect
+        // platforms they already connected is worse than showing nothing.
+        async function _connectNeedsPrompt(uid) {
+            if (!uid || !window.db) return null;
+            const { data, error } = await window.db.from('artist_platform_links')
+                .select(CONNECT_LINK_COLS.join(','))
+                .eq('user_id', uid).maybeSingle();
+            if (error) {
+                console.warn('[AIAD] artist_platform_links read failed:', error.code || '', error.message);
+                return null;
+            }
+            // No row at all, or a row whose every column is null, both count as unlinked.
+            const linked = !!data && CONNECT_LINK_COLS.some((c) => data[c]);
+            return linked ? null : true;
+        }
+
+        function _connectCardHtml() {
+            return '<div id="connectPromptCard" style="position:relative;background:rgba(255,255,255,0.02);'
+                + 'border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:18px 20px;margin-bottom:16px;">'
+                + '<button type="button" onclick="aiadDismissConnectPrompt()" aria-label="Dismiss"'
+                + ' style="position:absolute;top:10px;right:12px;background:none;border:none;color:var(--text-muted);'
+                + 'font-size:1.1rem;line-height:1;cursor:pointer;padding:2px 4px;">&times;</button>'
+                + '<h3 style="margin:0 0 4px 0;font-size:1rem;font-weight:600;padding-right:24px;">Connect your platforms to see real numbers</h3>'
+                + '<p style="font-size:0.82rem;color:var(--text-muted);margin:0 0 14px 0;max-width:52ch;">'
+                + 'Until something is linked, these figures are estimates. Link a profile and AIAD reads what the platform makes public.</p>'
+                + '<button type="button" class="artist-action-btn primary" onclick="aiadOpenConnectForm()">Connect platforms</button>'
+                + '</div>';
+        }
+
+        async function renderConnectPrompt() {
+            const hosts = ['connectPromptHome', 'connectPromptMyStats']
+                .map((id) => document.getElementById(id)).filter(Boolean);
+            if (!hosts.length) return;
+            const uid = (typeof aiadResolvedUserId === 'function') ? aiadResolvedUserId() : null;
+            const clear = () => hosts.forEach((h) => { h.innerHTML = ''; });
+            if (!uid) { clear(); return; }
+            let needs;
+            try { needs = await _connectNeedsPrompt(uid); }
+            catch (e) { console.warn('[AIAD] connect prompt check threw:', e); clear(); return; }
+            if (!needs || _connectDismissedRecently(uid)) { clear(); return; }
+            hosts.forEach((h) => { h.innerHTML = _connectCardHtml(); });
+        }
+        window.aiadRenderConnectPrompt = renderConnectPrompt;
+
+        window.aiadDismissConnectPrompt = function () {
+            const uid = (typeof aiadResolvedUserId === 'function') ? aiadResolvedUserId() : null;
+            if (uid) { try { localStorage.setItem(_connectDismissKey(uid), new Date().toISOString()); } catch (e) {} }
+            ['connectPromptHome', 'connectPromptMyStats'].forEach((id) => {
+                const h = document.getElementById(id); if (h) h.innerHTML = '';
+            });
+        };
+
+        window.aiadOpenConnectForm = function () {
+            try { window.__aiadTrack && window.__aiadTrack('connect_prompt_click', 'artist:mystats', {}); } catch (e) {}
+            // The one place a platform is linked, per the note above that section.
+            if (window.showArtistView) showArtistView('mystats');
+            setTimeout(() => {
+                const el = document.getElementById('myStatsSpotifyId');
+                if (!el) return;
+                try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+                el.focus();
+            }, 160);
+        };
+
         // Render whenever the My Stats view is opened.
         function hookView() {
             const orig = window.showArtistView;
@@ -28432,6 +28600,7 @@ function toggleAgeRange(btn) {
             window.showArtistView = function (view) {
                 orig.apply(this, arguments);
                 if (view === 'mystats') setTimeout(refresh, 60);
+                if (view === 'mystats' || view === 'home') setTimeout(renderConnectPrompt, 80);
             };
             window.showArtistView.__srHooked = true;
         }
