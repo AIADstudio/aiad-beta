@@ -92,6 +92,23 @@
         background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff}
       .post .cap{position:absolute;left:0;right:0;bottom:0;padding:8px;font-size:11px;color:#fff;
         background:linear-gradient(transparent,rgba(0,0,0,0.7));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .rel{border:1px solid var(--border-default);border-radius:14px;background:rgba(255,255,255,0.02);
+        padding:14px;margin-bottom:12px}
+      .rel-head{display:flex;align-items:center;gap:12px}
+      .rel-art{width:56px;height:56px;border-radius:8px;object-fit:cover;flex:0 0 auto;background:#12232b}
+      .rel-title{font-weight:600;font-size:15px}
+      .rel-meta{color:var(--text-muted);font-size:12px;margin-top:2px}
+      .trk{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border-default);font-size:14px}
+      .trk:first-of-type{margin-top:10px}
+      .trk-no{color:var(--text-muted);font-size:12px;width:18px;flex:0 0 auto;text-align:right}
+      .trk-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .trk-dur{color:var(--text-muted);font-size:12px;flex:0 0 auto}
+      .trk-play{flex:0 0 auto;width:30px;height:30px;border-radius:50%;border:1px solid var(--border-default);
+        background:rgba(255,255,255,0.04);color:var(--text-primary);cursor:pointer;font-size:11px;line-height:1}
+      .trk-play:hover{border-color:var(--teal-light);color:var(--teal-light)}
+      .trk-play[disabled]{opacity:.5;cursor:default}
+      .trk.playing .trk-title{color:var(--teal-light)}
+      .rel-note{color:var(--text-muted);font-size:12px;margin-top:10px}
       .empty{border:1px solid var(--border-default);border-radius:14px;background:rgba(255,255,255,0.02);
         padding:40px;text-align:center;color:var(--text-muted);font-size:14px}
       .brand{margin-top:48px;text-align:center;color:var(--text-muted);font-size:13px}
@@ -291,6 +308,7 @@
               </div>
             </div>
           </div>
+          <div id="music"></div>
           <div id="storefront"></div>
           <div class="section-title">Posts</div>
           ${postsHtml}
@@ -305,6 +323,141 @@
         root.querySelectorAll('.post').forEach((el) => el.addEventListener('click', openSignup));
 
         loadStorefront(p.id, p.username, name);
+        loadMusic(p.id);
+      }
+
+      // ── Live releases ────────────────────────────────────────────────────────
+      // The same shape the in-app profile renders through AIADArtistMusic: releases
+      // that are live AND whose aiad_streaming destination is live, then the tracks
+      // that finished transcoding. All three tables allow anon SELECT for exactly
+      // this content, so the list renders for a signed-out visitor.
+      let MUSIC = { audio: null, current: null };
+
+      async function loadMusic(artistId) {
+        const host = document.getElementById('music');
+        if (!host || !artistId) return;
+        const rel = await db.from('releases')
+          .select('id,title,release_type,artwork_url,go_live_at,release_destinations!inner(destination,status)')
+          .eq('user_id', artistId)
+          .eq('status', 'live')
+          .eq('release_destinations.destination', 'aiad_streaming')
+          .eq('release_destinations.status', 'live')
+          .order('go_live_at', { ascending: false });
+        // A failed read is not "no music" — say nothing rather than claiming silence.
+        if (rel.error) { console.warn('[artist] releases:', rel.error.message); return; }
+        const releases = rel.data || [];
+        if (!releases.length) return;
+
+        const tr = await db.from('tracks')
+          .select('id,title,track_number,duration_seconds,release_id')
+          .in('release_id', releases.map((r) => r.id))
+          .eq('derivatives_status', 'ready')
+          .order('track_number', { ascending: true });
+        if (tr.error) { console.warn('[artist] tracks:', tr.error.message); return; }
+
+        const byRelease = {};
+        (tr.data || []).forEach((t) => { (byRelease[t.release_id] = byRelease[t.release_id] || []).push(t); });
+        // A live release whose tracks are all still transcoding has nothing to play.
+        const withTracks = releases.filter((r) => (byRelease[r.id] || []).length);
+        if (!withTracks.length) return;
+
+        host.innerHTML = '<div class="section-title">Music</div>' + withTracks.map((r) => {
+          const ts = byRelease[r.id];
+          const year = r.go_live_at ? new Date(r.go_live_at).getFullYear() : '';
+          const art = r.artwork_url
+            ? `<img class="rel-art" src="${esc(r.artwork_url)}" alt="" />`
+            : '<div class="rel-art"></div>';
+          return `<div class="rel">
+              <div class="rel-head">${art}
+                <div style="min-width:0">
+                  <div class="rel-title">${esc(r.title || 'Untitled')}</div>
+                  <div class="rel-meta">${esc([r.release_type, year, ts.length + (ts.length === 1 ? ' track' : ' tracks')].filter(Boolean).join(' · '))}</div>
+                </div>
+              </div>
+              ${ts.map((t) => `<div class="trk" id="trk_${esc(t.id)}">
+                  <button class="trk-play" data-track="${esc(t.id)}" aria-label="Play ${esc(t.title || '')}">&#9654;</button>
+                  <span class="trk-no">${esc(t.track_number == null ? '' : t.track_number)}</span>
+                  <span class="trk-title">${esc(t.title || 'Untitled')}</span>
+                  <span class="trk-dur">${esc(fmtDur(t.duration_seconds))}</span>
+                </div>`).join('')}
+            </div>`;
+        }).join('') + '<div class="rel-note">Previews are 60 seconds. Full plays are for supporters.</div>';
+
+        host.querySelectorAll('button[data-track]').forEach((b) => {
+          b.addEventListener('click', () => playTrack(b.dataset.track, b));
+        });
+      }
+
+      function fmtDur(s) {
+        const n = Number(s);
+        if (!Number.isFinite(n) || n <= 0) return '';
+        return Math.floor(n / 60) + ':' + String(Math.floor(n % 60)).padStart(2, '0');
+      }
+
+      // stream-token is verify_jwt and returns 401 without a user, so a signed-out
+      // visitor cannot be handed audio at all — not even a preview. They get the same
+      // signup gate the posts use, rather than a play button that fails silently.
+      async function playTrack(trackId, btn) {
+        const token = storedSession();
+        if (!token) return openSignup();
+
+        if (MUSIC.current === trackId && MUSIC.audio && !MUSIC.audio.paused) {
+          MUSIC.audio.pause();
+          setTrackState(trackId, false);
+          return;
+        }
+        stopMusic();
+        btn.disabled = true; btn.innerHTML = '&hellip;';
+        try {
+          const res = await fetch(`${SUPABASE_URL}/functions/v1/stream-token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` },
+            // Always preview here: this is a public profile, and a preview needs no
+            // pledge, so an unpledged supporter still hears something.
+            body: JSON.stringify({ track_id: trackId, source: 'preview' }),
+          });
+          const body = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            alert(body.error || 'Could not play that right now.');
+            return;
+          }
+          const audio = new Audio(body.url);
+          MUSIC.audio = audio; MUSIC.current = trackId;
+          // The worker's pre-clipped file starts at 0; an unclipped one needs the
+          // client to seek and stop, which is what client_must_clip reports.
+          const start = Number(body.preview_start_seconds) || 0;
+          const dur = Number(body.preview_duration_seconds) || 60;
+          if (body.client_must_clip && start) audio.currentTime = start;
+          audio.addEventListener('timeupdate', () => {
+            if (body.client_must_clip && audio.currentTime >= start + dur) stopMusic();
+          });
+          audio.addEventListener('ended', () => stopMusic());
+          await audio.play();
+          setTrackState(trackId, true);
+        } catch (e) {
+          console.warn('[artist] play failed:', e);
+          alert('Could not play that right now.');
+        } finally {
+          if (MUSIC.current !== trackId) { btn.disabled = false; btn.innerHTML = '&#9654;'; }
+        }
+      }
+
+      function setTrackState(trackId, playing) {
+        document.querySelectorAll('.trk').forEach((r) => r.classList.remove('playing'));
+        document.querySelectorAll('button[data-track]').forEach((b) => { b.disabled = false; b.innerHTML = '&#9654;'; });
+        if (!playing) return;
+        const row = document.getElementById('trk_' + trackId);
+        if (row) row.classList.add('playing');
+        const b = document.querySelector(`button[data-track="${trackId}"]`);
+        if (b) { b.disabled = false; b.innerHTML = '&#10073;&#10073;'; }
+      }
+
+      function stopMusic() {
+        if (MUSIC.audio) { try { MUSIC.audio.pause(); } catch (e) {} }
+        MUSIC.audio = null;
+        const was = MUSIC.current;
+        MUSIC.current = null;
+        if (was) setTrackState(was, false);
       }
 
       // Products are anon-readable when is_active (RLS "Public can read active
