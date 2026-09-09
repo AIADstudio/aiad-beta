@@ -24015,7 +24015,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         function openTrackDetail(track) {
             globalTrack = track;
             populateTrackDetail(track);
-            try { window.aiadRenderReleaseButton && window.aiadRenderReleaseButton(); } catch (e) {}
+            try { window.aiadRenderReleaseButton && window.aiadRenderReleaseButton(track && track.release_id); } catch (e) {}
             document.getElementById('trackDetailPage').style.display = 'block';
             document.body.style.overflow = 'hidden';
         }
@@ -34334,36 +34334,153 @@ window.AIAD_PROMPTS = [
     // upload_url lands on "new release" rather than a dashboard they'd have to
     // navigate. 'other' ships an empty upload_url, so that case gets a note
     // instead of a button that goes nowhere.
-    window.aiadRenderReleaseButton = async function () {
+    const BTN_BASE = 'display:flex;align-items:center;gap:8px;padding:10px 20px;border-radius:10px;font-size:0.875rem;font-weight:500;text-decoration:none;';
+    const LINK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">'
+        + '<path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
+    const DL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">'
+        + '<path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+
+    /* Which release the buttons in aiadReleaseBtnHost are for. Remembered because
+       saving a distributor in settings re-renders that host with no release in hand,
+       and the pack button must survive it. */
+    let _btnReleaseId = null;
+
+    window.aiadRenderReleaseButton = async function (releaseId) {
+        if (releaseId) _btnReleaseId = releaseId;
         const host = document.getElementById('aiadReleaseBtnHost');
         if (!host) return;
         await window.aiadDistributors();
         const mine = (await window.aiadMyDistributor()) || {};
         const slug = mine.distributor_slug || '';
-        const base = 'display:flex;align-items:center;gap:8px;padding:10px 20px;border-radius:10px;font-size:0.875rem;font-weight:500;text-decoration:none;';
-        const icon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">'
-            + '<path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
+        // display:contents so the pack button and its warnings join the host's flex
+        // row and wrap onto their own line, rather than being boxed inside a span.
+        const slot = '<span id="aiadPackBtnSlot" style="display:contents;"></span>';
+        const name = myDistName();
+        const d = slug ? distBySlug(slug) : null;
+        const url = d && d.upload_url ? d.upload_url : '';
 
         if (!slug) {
-            host.innerHTML = '<button onclick="aiadGoToDistributorSettings()" style="' + base
+            host.innerHTML = '<button onclick="aiadGoToDistributorSettings()" style="' + BTN_BASE
                 + 'background:transparent;border:1px solid var(--border-default);color:var(--text-secondary);cursor:pointer;">'
-                + icon + 'Set your distributor</button>';
-            return;
-        }
-        const d = distBySlug(slug);
-        const url = d && d.upload_url ? d.upload_url : '';
-        const name = myDistName();
-        if (!url) {
-            host.innerHTML = '<button disabled title="Add a distributor with a release page to enable this" style="' + base
+                + LINK_ICON + 'Set your distributor</button>' + slot;
+        } else if (!url) {
+            host.innerHTML = '<button disabled title="Add a distributor with a release page to enable this" style="' + BTN_BASE
                 + 'background:transparent;border:1px solid var(--border-default);color:var(--text-muted);cursor:not-allowed;opacity:0.65;">'
-                + icon + 'Release on ' + esc(name) + '</button>'
+                + LINK_ICON + 'Release on ' + esc(name) + '</button>' + slot
                 + '<p style="width:100%;font-size:0.72rem;color:var(--text-muted);margin:6px 0 0;">'
                 + 'We don&#39;t have a release link for ' + esc(name) + '. Open it yourself and upload there — your statements still import here.</p>';
-            return;
+        } else {
+            host.innerHTML = '<a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer" style="' + BTN_BASE
+                + 'background:transparent;border:1px solid var(--teal);color:var(--teal);">'
+                + LINK_ICON + 'Release on ' + esc(name) + '</a>' + slot;
         }
-        host.innerHTML = '<a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer" style="' + base
-            + 'background:transparent;border:1px solid var(--teal);color:var(--teal);">'
-            + icon + 'Release on ' + esc(name) + '</a>';
+        await window.aiadRenderPackButton('aiadPackBtnSlot', _btnReleaseId);
+    };
+
+    // ── 2b. The distributor pack ───────────────────────────────────────────
+    /* AIAD assembles the package; the artist uploads it. Nothing on this path
+       delivers to a DSP, and the button says so by sitting next to "Release on X"
+       rather than in place of it. */
+    window.aiadRenderPackButton = async function (slotId, releaseId) {
+        const slot = document.getElementById(slotId);
+        if (!slot) return;
+        slot.innerHTML = '';
+        if (!releaseId) return;
+        const c = client(), uid = myId();
+        if (!c || !uid) return;
+
+        // A pack carries private masters, so it is offered to the owner and nobody
+        // else — this same host is on the track page a fan can open.
+        const { data: rel, error: relErr } = await c.from('releases')
+            .select('user_id').eq('id', releaseId).maybeSingle();
+        if (relErr || !rel || rel.user_id !== uid) return;
+
+        const { data: trs } = await c.from('tracks').select('storage_path').eq('release_id', releaseId);
+        const ready = (trs || []).filter(function (t) { return t.storage_path; }).length;
+
+        slot.innerHTML = ready
+            ? '<button id="' + esc(slotId) + '-btn" onclick="aiadDownloadPack(' + JSON.stringify(releaseId).replace(/"/g, '&quot;')
+                + ',' + JSON.stringify(slotId).replace(/"/g, '&quot;') + ')" style="' + BTN_BASE
+                + 'background:transparent;border:1px solid var(--border-default);color:var(--text-secondary);cursor:pointer;">'
+                + DL_ICON + 'Download distributor pack</button>'
+            : '<button id="' + esc(slotId) + '-btn" disabled title="Add tracks first" style="' + BTN_BASE
+                + 'background:transparent;border:1px solid var(--border-default);color:var(--text-muted);cursor:not-allowed;opacity:0.65;">'
+                + DL_ICON + 'Download distributor pack</button>';
+        slot.innerHTML += '<p id="' + esc(slotId) + '-warn" style="display:none;width:100%;font-size:0.72rem;'
+            + 'color:var(--text-muted);margin:6px 0 0;line-height:1.6;"></p>';
+    };
+
+    /* The same pair of buttons for any host that is not the track page: the pack to
+       download, and the link to the place it gets uploaded. */
+    window.aiadRenderPackBlock = async function (hostId, releaseId) {
+        const host = document.getElementById(hostId);
+        if (!host) return;
+        await window.aiadDistributors();
+        const mine = (await window.aiadMyDistributor()) || {};
+        const slug = mine.distributor_slug || '';
+        const d = slug ? distBySlug(slug) : null;
+        const url = d && d.upload_url ? d.upload_url : '';
+        const name = myDistName();
+        host.innerHTML = '<span id="' + esc(hostId) + '-pack" style="display:contents;"></span>'
+            + (url
+                ? '<a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer" style="' + BTN_BASE
+                    + 'background:transparent;border:1px solid var(--teal);color:var(--teal);">'
+                    + LINK_ICON + 'Release on ' + esc(name) + '</a>'
+                : (slug
+                    ? '<p style="width:100%;font-size:0.72rem;color:var(--text-muted);margin:6px 0 0;">'
+                        + 'Upload the pack on ' + esc(name) + ' yourself — we don&#39;t have a release link for it.</p>'
+                    : '<button onclick="aiadGoToDistributorSettings()" style="' + BTN_BASE
+                        + 'background:transparent;border:1px solid var(--border-default);color:var(--text-secondary);cursor:pointer;">'
+                        + LINK_ICON + 'Set your distributor</button>'));
+        await window.aiadRenderPackButton(hostId + '-pack', releaseId);
+    };
+
+    window.aiadDownloadPack = async function (releaseId, slotId) {
+        const btn = document.getElementById(slotId + '-btn');
+        const warn = document.getElementById(slotId + '-warn');
+        const c = client();
+        if (!c || !btn) return;
+        const label = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = DL_ICON + 'Building pack…';
+        if (warn) { warn.style.display = 'none'; warn.innerHTML = ''; }
+        try {
+            const res = await c.functions.invoke('distributor-pack', { body: { release_id: releaseId } });
+            if (res.error) {
+                // invoke() reports the status but drops the body, which is where the
+                // reason is. Read it back off the Response before giving up.
+                let msg = res.error.message || 'Could not build the pack';
+                try { const b = await res.error.context.json(); if (b && b.error) msg = b.error; } catch (e) {}
+                throw new Error(msg);
+            }
+            const data = res.data || {};
+            const where = myDistName() || 'your distributor';
+            const opened = window.open(data.url, '_blank', 'noopener,noreferrer');
+            toast('Pack ready — ' + data.track_count + ' track' + (data.track_count === 1 ? '' : 's')
+                + '. Now upload it on ' + where + '.');
+            if (warn) {
+                const notes = (data.warnings || []).slice();
+                // A blocked popup would otherwise leave the artist with a toast and no
+                // file, so the link is offered rather than assumed.
+                if (!opened) {
+                    notes.unshift('Your browser blocked the download window — '
+                        + '<a href="' + esc(data.url) + '" target="_blank" rel="noopener noreferrer" '
+                        + 'style="color:var(--teal);">open the pack</a>. The link is good for an hour.');
+                }
+                if (notes.length) {
+                    warn.innerHTML = notes.map(function (w, i) {
+                        return '• ' + (i === 0 && !opened ? w : esc(w));
+                    }).join('<br>');
+                    warn.style.display = 'block';
+                }
+            }
+        } catch (err) {
+            console.warn('[AIAD] distributor pack:', err);
+            toast('Could not build the pack: ' + err.message);
+            if (warn) { warn.textContent = err.message; warn.style.display = 'block'; }
+        }
+        btn.disabled = false;
+        btn.innerHTML = label;
     };
 
     window.aiadGoToDistributorSettings = function () {
@@ -35117,11 +35234,8 @@ window.AIAD_PROMPTS = [
 #artistDistributeView .rw-dest-head strong{display:block;font-size:0.92rem;color:var(--text-primary,#fff);}
 #artistDistributeView .rw-dest-head em{display:block;font-style:normal;font-size:0.78rem;color:var(--text-muted,rgba(255,255,255,0.45));margin-top:3px;line-height:1.5;}
 #artistDistributeView .rw-dest-pitch{margin:9px 0 0 27px;padding:10px 13px;border-radius:9px;background:rgba(0,212,255,0.07);border:1px solid rgba(0,212,255,0.2);font-size:0.79rem;line-height:1.55;color:var(--text-secondary,rgba(255,255,255,0.72));}
-#artistDistributeView .rw-dest-gate{margin:11px 0 0 27px;max-width:360px;}
-#artistDistributeView .rw-dest-gate .rw-label{display:block;margin-bottom:5px;text-transform:none;letter-spacing:0;font-size:0.78rem;color:var(--text-secondary,rgba(255,255,255,0.6));}
 #artistDistributeView .rw-dest-meta{font-size:0.76rem;color:#6ee7b7;margin:9px 0 0 27px;}
 #artistDistributeView .rw-dest-inner{margin:12px 0 0 27px;}
-#artistDistributeView .rw-dest-block{margin:11px 0 0 27px;padding:11px 13px;border-radius:9px;background:rgba(245,158,11,0.09);border:1px solid rgba(245,158,11,0.32);font-size:0.79rem;line-height:1.55;color:#fcd34d;}
 #artistDistributeView .rw-art{margin:10px 0;}
 #artistDistributeView .rw-art img{width:150px;height:150px;object-fit:cover;border-radius:10px;border:1px solid var(--border-default,rgba(255,255,255,0.08));display:block;}
 #artistDistributeView .rw-art-meta{font-size:0.73rem;color:var(--text-muted,rgba(255,255,255,0.4));margin-top:6px;}
@@ -35739,7 +35853,12 @@ window.AIAD_PROMPTS = [
         else if (RS.step === 3) body.innerHTML = viewRights();
         else if (RS.step === 4) body.innerHTML = viewDestinations();
         else if (RS.step === 5) { body.innerHTML = viewPricing(); renderPricingPreview(); }
-        else body.innerHTML = viewReview();
+        else {
+            body.innerHTML = viewReview();
+            // Rendered after the innerHTML swap because it reads the release back from
+            // the database; the host has to exist before it is filled.
+            try { window.aiadRenderPackBlock && window.aiadRenderPackBlock('rwPackHost', RS.releaseId); } catch (e) {}
+        }
         if (RS.step === 2) RS.tracks.forEach(function (t) { updateShareTotal(t.localId); });
         try { el('artistDistributeView').scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) { /* non-critical */ }
     }
@@ -37047,12 +37166,11 @@ window.AIAD_PROMPTS = [
 
 
     // ── Step 4 — destinations ───────────────────────────────────────────────
-    /* NOTE ON CONSENT. The exclusivity checkbox in this step belongs to AIAD
-       Distribution and nothing else. It writes release_destinations.exclusivity_confirmed
-       for the aiad_distribution row. It is deliberately NOT wired to the Streaming
-       License consent captured in Step 0 (#rwLicRead / #rwLicRights →
-       streaming_license_acceptances): that licence is explicitly non-exclusive, this
-       one asserts the opposite, and one checkbox must never stand for both. */
+    /* NOTE. There is no exclusivity consent in this step any more. AIAD does not
+       deliver to DSPs, so it has nothing to be exclusive about: the second card now
+       prepares a pack the artist uploads to their own distributor. The
+       exclusivity_confirmed column is left alone for the rows that already carry it,
+       but nothing here writes it. */
     var DISTRIBUTORS = ['DistroKid', 'TuneCore', 'CD Baby', 'UnitedMasters', 'Symphonic', 'Believe', 'Other'];
 
     var STREAMING_PITCH = [
@@ -37069,8 +37187,6 @@ window.AIAD_PROMPTS = [
             aiad_streaming: true,          // free, included in the subscription
             aiad_distribution: false,
             external_distributor: false,
-            already_distributed: null,     // gate: null unanswered, true, false
-            exclusivity_confirmed: false,
             external_name: '',
             external_other: '',
             external_url: ''
@@ -37079,20 +37195,11 @@ window.AIAD_PROMPTS = [
 
     function setDest(key, value) {
         var D = RS.dest;
-        if (key === 'already_distributed') {
-            D.already_distributed = value === '' ? null : (value === 'yes');
-            // Answering yes retires the AIAD Distribution option entirely.
-            if (D.already_distributed === true) {
-                D.aiad_distribution = false;
-                D.exclusivity_confirmed = false;
-            }
-        } else if (key === 'aiad_distribution') {
-            D.aiad_distribution = !!value;
-            if (D.aiad_distribution) D.external_distributor = false;   // mutually exclusive
-        } else if (key === 'external_distributor') {
-            D.external_distributor = !!value;
-            if (D.external_distributor) D.aiad_distribution = false;   // mutually exclusive
-        } else if (key === 'aiad_streaming' || key === 'exclusivity_confirmed') {
+        if (key === 'aiad_distribution' || key === 'external_distributor') {
+            // Independent: a pack is something the artist uploads, not a delivery, so
+            // it does not contend with a release that is already out somewhere.
+            D[key] = !!value;
+        } else if (key === 'aiad_streaming') {
             D[key] = !!value;
         } else {
             D[key] = value;
@@ -37112,28 +37219,19 @@ window.AIAD_PROMPTS = [
 
     function viewDestinations() {
         var D = RS.dest;
-        var gate = D.already_distributed;
 
-        // (b) AIAD Distribution, behind the duplicate-delivery gate
-        // The gate only governs this one option, so it lives inside this one card
-        // rather than floating between two checkboxes belonging to neither.
-        var distInner = '<div class="rw-dest-gate">' +
-            '<label class="rw-label">Is any recording on this release currently distributed through another distributor?</label>' +
-            '<select class="rw-input" onchange="AIADRelease.setDest(\'already_distributed\', this.value)">' +
-              '<option value=""' + (gate === null ? ' selected' : '') + '>Choose…</option>' +
-              '<option value="no"' + (gate === false ? ' selected' : '') + '>No</option>' +
-              '<option value="yes"' + (gate === true ? ' selected' : '') + '>Yes</option>' +
-            '</select></div>';
-        if (gate === true) {
-            distInner += '<div class="rw-dest-block">Each recording can only be delivered through one distributor. ' +
-                'Duplicate delivery causes DSP takedowns and withheld royalties. Take it down there first, ' +
-                'or choose “Already distributed elsewhere”.</div>';
-        } else if (D.aiad_distribution) {
-            distInner += '<label class="rw-check rw-dest-inner"><input type="checkbox"' +
-                (D.exclusivity_confirmed ? ' checked' : '') +
-                ' onchange="AIADRelease.setDest(\'exclusivity_confirmed\', this.checked)"> ' +
-                '<span>I confirm no recording on this release is currently delivered by another distributor, ' +
-                'and I am not delivering it elsewhere while AIAD Distribution carries it.</span></label>';
+        // (b) The distributor pack. No gate and no exclusivity consent: preparing a
+        // package is not a delivery, so it conflicts with nothing the artist has
+        // already put out anywhere else.
+        var distInner = '';
+        if (D.aiad_distribution) {
+            var dName = (window.aiadMyDistName && window.aiadMyDistName()) || '';
+            distInner = '<div class="rw-dest-inner" style="font-size:0.78rem;line-height:1.55;' +
+                'color:var(--text-secondary,rgba(255,255,255,0.6));">' + (dName
+                ? 'Built in <strong>' + esc(dName) + '</strong>\u2019s field order. You download it and upload it there.'
+                : 'Tell us who distributes your music and we\u2019ll build the pack in their field order. ' +
+                  '<button type="button" class="rw-linkbtn" onclick="aiadGoToDistributorSettings()">Set your distributor</button>') +
+                '</div>';
         }
 
         // (c) already elsewhere
@@ -37166,9 +37264,10 @@ window.AIAD_PROMPTS = [
                      'No threshold, no pro-rata pool, no cut of your masters or publishing.' +
                    '</div>' +
                    '<div class="rw-dest-meta">Free — included in your subscription.</div>') +
-          destCard('aiad_distribution', 'Worldwide DSPs via AIAD Distribution',
-                   'Spotify, Apple Music, YouTube Music, Amazon, TikTok, 150+ more. 2–5 business days per DSP.',
-                   D.aiad_distribution, gate !== false, distInner) +
+          destCard('aiad_distribution', 'Prepare for your distributor',
+                   'Get a ready-to-upload pack — WAV masters, 3000×3000 artwork, and a metadata sheet in your ' +
+                   'distributor’s field order. You upload it there; AIAD never delivers to DSPs on your behalf.',
+                   D.aiad_distribution, false, distInner) +
           destCard('external_distributor', 'Already distributed elsewhere',
                    'Keep your current distributor. AIAD links to the release rather than delivering it.',
                    D.external_distributor, false, extInner) +
@@ -37185,21 +37284,11 @@ window.AIAD_PROMPTS = [
         var chosen = ['aiad_streaming', 'aiad_distribution', 'external_distributor']
             .filter(function (k) { return D[k]; });
         if (!chosen.length) e.push('Choose at least one destination.');
-        if (D.already_distributed === null || D.already_distributed === undefined) {
-            e.push('Answer whether any recording is already distributed elsewhere.');
-        }
-        if (D.aiad_distribution) {
-            if (D.already_distributed !== false) e.push('AIAD Distribution needs the duplicate-delivery question answered No.');
-            if (!D.exclusivity_confirmed) e.push('Tick the exclusivity confirmation for AIAD Distribution.');
-        }
         if (D.external_distributor) {
             var name = D.external_name === 'Other' ? trim(D.external_other) : trim(D.external_name);
             if (!name) e.push('Name the distributor that currently carries this release.');
             if (!trim(D.external_url)) e.push('Add the public release URL.');
             else if (!/^https?:\/\/\S+\.\S+/.test(trim(D.external_url))) e.push('The release URL needs to be a full http(s) link.');
-        }
-        if (D.aiad_distribution && D.external_distributor) {
-            e.push('AIAD Distribution and "already distributed elsewhere" cannot both apply.');
         }
         return e;
     }
@@ -37219,7 +37308,10 @@ window.AIAD_PROMPTS = [
 
         var wanted = {};
         if (D.aiad_streaming) wanted.aiad_streaming = { status: 'pending', exclusivity_confirmed: false };
-        if (D.aiad_distribution) wanted.aiad_distribution = { status: 'pending', exclusivity_confirmed: true };
+        // 'prepared', not 'pending': nothing is queued and nothing is owed. The row
+        // records that the artist wants a pack, and distributor-pack stamps it with
+        // provider_ref and delivered_at once one is actually built.
+        if (D.aiad_distribution) wanted.aiad_distribution = { status: 'prepared' };
         if (D.external_distributor) {
             wanted.external_distributor = {
                 status: 'delivered',
@@ -37263,7 +37355,7 @@ window.AIAD_PROMPTS = [
 
     async function loadDestinations(releaseId) {
         var r = await window.db.from('release_destinations')
-            .select('destination, status, exclusivity_confirmed, external_distributor, external_release_url')
+            .select('destination, status, external_distributor, external_release_url')
             .eq('release_id', releaseId);
         if (dbFail('release_destinations', 'select', r.error)) return false;
         var rows = r.data || [];
@@ -37272,16 +37364,11 @@ window.AIAD_PROMPTS = [
         RS.dest.aiad_streaming = false;
         rows.forEach(function (row) {
             RS.dest[row.destination] = true;
-            if (row.destination === 'aiad_distribution') {
-                RS.dest.exclusivity_confirmed = !!row.exclusivity_confirmed;
-                RS.dest.already_distributed = false;   // it could not have been saved otherwise
-            }
             if (row.destination === 'external_distributor') {
                 var n = row.external_distributor || '';
                 RS.dest.external_name = DISTRIBUTORS.indexOf(n) !== -1 ? n : (n ? 'Other' : '');
                 RS.dest.external_other = DISTRIBUTORS.indexOf(n) !== -1 ? '' : n;
                 RS.dest.external_url = row.external_release_url || '';
-                RS.dest.already_distributed = true;
             }
         });
         return true;
@@ -37565,6 +37652,10 @@ window.AIAD_PROMPTS = [
             row('Split sheet', R.split_sheet_url ? docLabel(R.split_sheet_url) : (multiWriterTracks().length ? 'REQUIRED' : 'Not required')) +
           '</div>' +
           '<h4 class="rw-h4">Tracks</h4><div class="rw-review">' + tracks + '</div>' +
+          '<h4 class="rw-h4">Your distributor</h4>' +
+          '<p class="rw-sub">AIAD does not deliver to DSPs. Download the pack and upload it yourself — ' +
+            'you can do this now or any time after QC.</p>' +
+          '<div id="rwPackHost" style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:22px;"></div>' +
           '<div class="rw-declaration">' +
             '<h4 class="rw-h4">Declaration</h4>' +
             '<p>I confirm that the information in this submission is accurate and complete, that I own or control all rights necessary to grant AIAD the license in the AIAD Streaming License Agreement, that all samples and interpolations are cleared, and that my origin declaration is truthful. I understand AIAD relies on these statements and that false statements may result in removal of my catalog and termination of my account.</p>' +
@@ -37589,6 +37680,10 @@ window.AIAD_PROMPTS = [
           '<p class="rw-sub">“' + esc(RS.release.title || '') + '” is with QC.</p>' +
           '<div class="rw-ref">' + esc(RS.submissionRef) + '</div>' +
           '<p class="rw-sub">QC review takes 1–3 business days. AIAD checks audio, artwork, metadata, splits, and clearances. If something fails you get the specific reason and the specific fix, not a generic rejection. Then it goes live on your go-live date.</p>' +
+          '<h4 class="rw-h4">Your distributor</h4>' +
+          '<p class="rw-sub">QC is AIAD\u2019s own check. Delivery to DSPs is still yours — download the pack ' +
+            'and upload it to your distributor whenever you\u2019re ready.</p>' +
+          '<div id="rwPackHost" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px;margin-bottom:22px;"></div>' +
           '<div class="rw-actions">' +
             '<button class="rw-btn rw-btn-primary" onclick="AIADRelease.downloadSheet()">Download submission sheet</button>' +
             '<button class="rw-btn" onclick="AIADRelease.startAnother()">Start another release</button>' +
@@ -37828,8 +37923,7 @@ window.AIAD_PROMPTS = [
         L.push('DESTINATIONS');
         var _D = RS.dest || destDefaults();
         L.push('AIAD Streaming: ' + (_D.aiad_streaming ? 'yes' : 'no'));
-        L.push('AIAD Distribution: ' + (_D.aiad_distribution
-            ? 'yes (exclusivity confirmed: ' + (_D.exclusivity_confirmed ? 'yes' : 'NO') + ')' : 'no'));
+        L.push('Distributor pack: ' + (_D.aiad_distribution ? 'ready' : 'not requested'));
         L.push('Already distributed elsewhere: ' + (_D.external_distributor
             ? (_D.external_name === 'Other' ? _D.external_other : _D.external_name) + ' — ' + (_D.external_url || 'no URL')
             : 'no'));
@@ -40102,7 +40196,7 @@ window.AIAD_PROMPTS = [
         if (!d.length) return '';
         return d.map(function (x) {
             var name = x.destination === 'aiad_streaming' ? 'AIAD Streaming'
-                     : x.destination === 'aiad_distribution' ? 'DSPs'
+                     : x.destination === 'aiad_distribution' ? 'Distributor pack'
                      : 'External';
             return '<span class="lb-chip lb-chip-' + esc(x.status) + '">' + esc(name) + ' · ' + esc(x.status) + '</span>';
         }).join('');
