@@ -790,14 +790,29 @@ html, body {
         box-sizing: border-box !important;
     }
 
-    /* 9. Stats ticker: swipeable */
+    /* 9. Stats ticker.
+       The marquee is deliberately OFF on mobile. iOS Safari would not run this
+       animation reliably and a stalled marquee reads as a broken one, so the row is
+       static and swipeable instead — motion that does not work is worse than none.
+       The bar keeps the label pinned and scrolls only the stats, so the label can
+       never end up over the numbers. */
     .live-stats-bar {
-        overflow-x: auto !important;
-        overflow-y: hidden !important;
+        overflow: hidden !important;
         -webkit-overflow-scrolling: touch;
     }
     .live-stats-bar::-webkit-scrollbar { display: none; }
-    .live-stats-ticker { animation: none !important; transform: none !important; }
+    .live-stats-ticker {
+        animation: none !important;
+        transform: none !important;
+        overflow-x: auto;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+        min-width: 0;
+    }
+    .live-stats-ticker::-webkit-scrollbar { display: none; }
+    /* The duplicate half exists only to make the marquee loop seamlessly. With no
+       marquee it is just the same six stats a second time. */
+    .live-stats-ticker .live-stat-item.is-loop-copy { display: none; }
 
     /* 10. Grids */
     .quick-metrics-bar { overflow-x: auto !important; flex-wrap: nowrap !important; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
@@ -947,11 +962,17 @@ html, body {
     gap: 6px;
     padding: 0 14px;
     height: 100%;
+    /* Unshrinkable: it sits over the ticker, so it must never be squeezed. */
+    flex: 0 0 auto;
     /* The ticker translates left past its own box and painted straight over
        this label, leaving "Live" unreadable behind sliding numbers. Lift it. */
     position: relative;
     z-index: 1;
-    background: linear-gradient(135deg, rgba(255,0,255,0.15), rgba(0,212,255,0.1));
+    /* Split from the shorthand on purpose: the gradient is translucent, so without a
+       solid base underneath it the ticker shows through the word "Live". A later
+       `background:` shorthand would reset any background-color set above it. */
+    background-color: var(--bg-secondary);
+    background-image: linear-gradient(135deg, rgba(255,0,255,0.15), rgba(0,212,255,0.1));
     border-right: 1px solid var(--border-default);
     font-size: 0.6rem;
     font-weight: 700;
@@ -976,8 +997,15 @@ html, body {
     animation: tickerScroll 40s linear infinite;
     white-space: nowrap;
     gap: 0;
+    /* The bar is a flex row of [label][ticker]. The ticker had no min-width, so a
+       nowrap row of stats wider than the bar refused to shrink and pushed itself
+       under the label — which is what was painting over "Monthly Revenue". A flex
+       item's default min-width is auto, not 0; this is the fix. */
+    min-width: 0;
+    flex: 1 1 auto;
 }
 .live-stats-ticker:hover { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) { .live-stats-ticker { animation: none; } }
 @keyframes tickerScroll {
     0%   { transform: translateX(0); }
     100% { transform: translateX(-50%); }
@@ -15649,8 +15677,9 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 { tool: 'mixmedia',    label: 'Product shot',kind: 'image', hint: 'Photoreal product mockup' }
             ];
 
-            function open(item) {
+            function open(item, opts) {
                 injectStyles();
+                opts = opts || {};
                 return new Promise(function (resolve) {
                     var src = item && item.blobUrl;
                     if (!src) { resolve(null); return; }
@@ -15695,6 +15724,21 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                       +     '<button type="button" class="ave-save">Done</button></div>'
                       + '</div>';
                     document.body.appendChild(ov);
+
+                    // Choosing a cover for a post that is already out is not editing it:
+                    // the trim, the grade and the AI tools would all imply a re-cut nobody
+                    // asked for. Only the frame picker is offered.
+                    if (opts.coverOnly) {
+                        ov.querySelector('.ave-title').textContent = 'Choose cover';
+                        Array.prototype.forEach.call(ov.querySelectorAll('.ave-tab'), function (t) {
+                            if (t.dataset.p !== 'cover') t.remove();
+                        });
+                        Array.prototype.forEach.call(ov.querySelectorAll('.ave-panel'), function (pnl) {
+                            pnl.classList.toggle('active', pnl.dataset.p === 'cover');
+                        });
+                        var only = ov.querySelector('.ave-tab');
+                        if (only) only.classList.add('active');
+                    }
 
                     var vid = ov.querySelector('video');
                     var rail = ov.querySelector('.ave-rail');
@@ -16079,6 +16123,24 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         };
 
         // Small stack marker for grid tiles backed by a multi-item post.
+        // A video tile used to be a play glyph on a coloured square, which told you
+        // nothing about the post. api/watermark.js writes a real frame from the same
+        // ffmpeg pass into media[i].poster_url; show it when it is there and keep the old
+        // placeholder for anything not processed yet.
+        window.aiadVideoThumbHtml = function (post, fallbackHtml) {
+            var items = (window.aiadPostMedia ? window.aiadPostMedia(post) : []) || [];
+            var poster = null;
+            for (var i = 0; i < items.length; i++) {
+                if (items[i] && items[i].type === 'video' && items[i].poster_url) { poster = items[i].poster_url; break; }
+            }
+            if (!poster) return fallbackHtml;
+            var esc = function (v) { return String(v == null ? '' : v).replace(/"/g, '&quot;'); };
+            return '<div style="position:relative;width:100%;height:100%;background:#000;">'
+                + '<img src="' + esc(poster) + '" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;">'
+                + '<svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true" style="position:absolute;right:6px;bottom:6px;width:16px;height:16px;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.7));"><path d="M8 5v14l11-7z"/></svg>'
+                + '</div>';
+        };
+
         window.aiadMultiBadge = function (post) {
             if (window.aiadPostMedia(post).length < 2) return '';
             _aiadCarouselCss();
@@ -16335,6 +16397,60 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             });
         }
 
+        // Re-choose the frame people see before a published video plays. Ownership is
+        // checked twice on purpose: the row read below is under the same RLS that
+        // delete_artist_post relies on, and /api/watermark re-derives the user from the
+        // token and refuses a post it does not own. media[i].url is never touched — only
+        // the cover time, and the poster the server writes from it.
+        window.aiadChooseCover = async function (postId) {
+            try {
+                if (!postId || !window.AiadVideoEditor) return;
+                const uid = window.aiadResolvedUserId && window.aiadResolvedUserId();
+                if (!uid) return;
+                const r = await db.from('artist_posts').select('media,user_id').eq('id', postId).maybeSingle();
+                if (r.error || !r.data) return;
+                if (r.data.user_id !== uid) return;          // owner only
+                let media = r.data.media;
+                if (typeof media === 'string') { try { media = JSON.parse(media); } catch (e) { return; } }
+                if (!Array.isArray(media)) return;
+                const i = media.findIndex(function (m) { return m && m.type === 'video' && m.url; });
+                if (i < 0) { showToast('This post has no video.'); return; }
+
+                // Opened on the ORIGINAL upload: the server subtracts trimStart from the
+                // cover time, so the timestamp has to be in the original timeline.
+                const picked = await window.AiadVideoEditor.open(
+                    { blobUrl: media[i].url, type: 'video', edit: media[i].edit || null },
+                    { coverOnly: true });
+                if (!picked || picked.coverTime == null) return;
+
+                const next = media.slice();
+                next[i] = Object.assign({}, media[i], {
+                    edit: Object.assign({}, media[i].edit || {}, { coverTime: picked.coverTime })
+                });
+                const w = await db.from('artist_posts').update({ media: next }).eq('id', postId);
+                if (w.error) { showToast('Could not save the cover.'); return; }
+
+                showToast('Cover updating\u2026');
+                const sess = await db.auth.getSession();
+                const token = sess && sess.data && sess.data.session && sess.data.session.access_token;
+                if (!token) return;
+                const resp = await fetch('/api/watermark', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                    body: JSON.stringify({ postId: postId, itemIndex: i, videoUrl: media[i].url })
+                });
+                const out = await resp.json().catch(function () { return null; });
+                if (out && out.poster) {
+                    showToast('Cover updated.');
+                    if (typeof loadArtistPosts === 'function') setTimeout(loadArtistPosts, 300);
+                } else {
+                    showToast('Cover saved \u2014 the new frame appears once processing finishes.');
+                }
+            } catch (e) {
+                console.warn('[AIAD] choose cover:', e && e.message);
+            }
+        };
+
         function _videoEditSummary(ed) {
             const bits = [];
             const len = Math.max(0, (ed.trimEnd || 0) - (ed.trimStart || 0));
@@ -16506,10 +16622,15 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 var branding = window.AIAD_WATERMARK !== false;
                 for (var i = 0; i < media.length; i++) {
                     var m = media[i];
-                    if (!m || m.type !== 'video' || !m.url || m.watermarked_url) continue;
+                    if (!m || m.type !== 'video' || !m.url) continue;
+                    // Processed already AND has a cover: nothing left to do. A clip that
+                    // was processed before posters existed still needs one, and that is the
+                    // backfill — it happens the next time a feed draws the post, with no
+                    // migration and no service key.
+                    if (m.watermarked_url && m.poster_url) continue;
                     // With branding off there is nothing to recover for a plain clip, but an
                     // edited one still has a trim and a filter that exist nowhere but here.
-                    if (!branding && !m.edit) continue;
+                    if (!branding && !m.edit && m.watermarked_url) continue;
                     var key = post.id + ':' + i;
                     if (_wmRetried.has(key)) continue;
                     pending.push({ index: i, url: m.url, key: key });
@@ -16882,7 +17003,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     } else if (post.media_type === 'audio' && post.media_url) {
                         thumb = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:6px;"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--magenta-light)" stroke-width="1.5"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><span style="font-size:0.7rem;color:var(--text-muted);">Music</span></div>';
                     } else if (post.media_type === 'video' && post.media_url) {
-                        thumb = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:6px;"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--teal-light)" stroke-width="1.5"><polygon points="5 3 19 12 5 21 5 3"/></svg><span style="font-size:0.7rem;color:var(--text-muted);">Video</span></div>';
+                        thumb = window.aiadVideoThumbHtml(post, '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:6px;"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--teal-light)" stroke-width="1.5"><polygon points="5 3 19 12 5 21 5 3"/></svg><span style="font-size:0.7rem;color:var(--text-muted);">Video</span></div>');
                     }
                     if (!thumb && post.content) {
                         var snippet = post.content.length > 80 ? post.content.slice(0, 80) + '\u2026' : post.content;
@@ -18375,6 +18496,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             menu.appendChild(item('Copy for Instagram', 'var(--text-primary)', () => navigator.clipboard.writeText(decodeURIComponent(safeText)).then(()=>showToast('Copied for Instagram'))));
             menu.appendChild(item('Copy for TikTok',    'var(--text-primary)', () => navigator.clipboard.writeText(decodeURIComponent(safeText)).then(()=>showToast('Copied for TikTok'))));
             menu.appendChild(divider());
+            menu.appendChild(item('Choose cover',       'var(--text-secondary)', () => aiadChooseCover(postId)));
             menu.appendChild(item('Archive Post',       'var(--text-secondary)', () => archivePost(postCard, postId)));
             menu.appendChild(item('Delete Post',        '#ef4444',              () => deletePost(postCard, postId)));
 
@@ -25397,7 +25519,13 @@ document.addEventListener('keydown', function(e) {
                         || window.innerWidth || 1;
                     const oneSet = ticker.scrollWidth || 1;
                     const reps = Math.max(1, Math.min(20, Math.ceil(avail / oneSet)));
-                    ticker.innerHTML = new Array(reps * 2).fill(makeItems()).join('');
+                    // Everything past the first set exists only so the -50% translate
+                    // loops seamlessly. Tagged, so the mobile rule — where there is no
+                    // marquee — can drop it instead of repeating the same six stats.
+                    const loopCopy = makeItems().replace(/class="live-stat-item"/g,
+                        'class="live-stat-item is-loop-copy"');
+                    ticker.innerHTML = makeItems()
+                        + new Array(reps * 2 - 1).fill(loopCopy).join('');
                     // Hold the scroll speed steady as the strip grows: one set
                     // per 20s, which is what the original 40s/2-sets gave.
                     ticker.style.animationDuration = (reps * 20) + 's';
@@ -26769,6 +26897,58 @@ async function loadFanDiscover() { setTimeout(()=>_execDiscoverSearch(),100); }
         // Following was only ever visible from the fan dashboard, so an artist
         // had no way to see who they had followed. This keeps the list on the
         // screen they actually use, and every chip opens that artist's page.
+        // One place decides whether the strip is a row or a chip, so a resize does not
+        // leave a phone showing the desktop row.
+        window.aiadPaintFollowing = function () {
+            const strip = document.getElementById('aiadFollowingStrip');
+            if (!strip || !strip.dataset.full) return;
+            const list = window.__aiadFollowingList || [];
+            const mobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+            if (mobile && list.length) {
+                strip.classList.add('aiad-following-chip');
+                strip.innerHTML = 'Following <b>' + list.length + '</b>';
+                strip.onclick = window.aiadOpenFollowingSheet;
+                strip.style.display = 'inline-flex';
+            } else {
+                strip.classList.remove('aiad-following-chip');
+                strip.innerHTML = strip.dataset.full;
+                strip.onclick = null;
+                strip.style.display = 'block';
+            }
+        };
+
+        window.aiadOpenFollowingSheet = function () {
+            const list = window.__aiadFollowingList || [];
+            if (!list.length) return;
+            const e = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+            const ov = document.createElement('div');
+            ov.className = 'aiad-follow-sheet';
+            ov.innerHTML = '<div class="aiad-follow-sheet-inner" role="dialog" aria-label="Following">'
+                + '<div class="aiad-follow-sheet-head"><span>Following \u00b7 ' + list.length + '</span>'
+                + '<button type="button" class="aiad-follow-sheet-x" aria-label="Close">&times;</button></div>'
+                + list.map(function (a) {
+                    const pic = (a.avatar && (a.avatar.indexOf('http') === 0 || a.avatar.indexOf('data:') === 0))
+                        ? '<img src="' + e(a.avatar) + '" alt="">'
+                        : '<div class="ph"></div>';
+                    return '<div class="aiad-follow-sheet-row" data-id="' + e(a.id) + '">' + pic
+                        + '<div style="min-width:0;"><div style="font-size:0.9rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + e(a.name) + '</div>'
+                        + (a.amount > 0 ? '<div style="font-size:0.68rem;color:var(--teal-light);">$' + a.amount + '/mo</div>' : '')
+                        + '</div></div>';
+                }).join('')
+                + '</div>';
+            const close = function () { ov.remove(); };
+            ov.addEventListener('click', function (ev) {
+                if (ev.target === ov || ev.target.closest('.aiad-follow-sheet-x')) { close(); return; }
+                const row = ev.target.closest('.aiad-follow-sheet-row');
+                if (row && window.loadArtistPage) { close(); window.loadArtistPage(row.dataset.id); }
+            });
+            document.body.appendChild(ov);
+        };
+
+        window.addEventListener('resize', function () {
+            try { window.aiadPaintFollowing(); } catch (e) {}
+        });
+
         window.aiadLoadFollowingStrip = async function (force) {
             const strip = document.getElementById('aiadFollowingStrip');
             if (!strip) return;
@@ -26807,9 +26987,16 @@ async function loadFanDiscover() { setTimeout(()=>_execDiscoverSearch(),100); }
                         + '<div style="font-size:0.68rem;margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + e(nm) + '</div>'
                         + tag + '</div>';
                 }).join('');
-                strip.innerHTML = '<div style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Following · ' + ids.length + '</div>'
+                const _full = '<div style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Following \u00b7 ' + ids.length + '</div>'
                     + '<div style="display:flex;gap:14px;overflow-x:auto;padding-bottom:4px;">' + chips + '</div>';
-                strip.style.display = 'block';
+                // The avatar row is a phone-screen's worth of chrome above the thing the
+                // artist actually came to use. On mobile it becomes a count you can tap;
+                // the row itself moves into a sheet, unchanged.
+                strip.dataset.full = _full;
+                window.__aiadFollowingList = ids.map(function (id) {
+                    return { id: id, name: names[id] || 'Artist', avatar: avs[id] || '', amount: amt[id] || 0 };
+                });
+                window.aiadPaintFollowing();
             } catch (err) {
                 console.warn('[AIAD] following strip:', err && err.message);
             } finally { strip.dataset.loading = '0'; }
@@ -27314,7 +27501,7 @@ function _buildFanPostCard(p) {
         if (isImage) {
             thumb = '<img src="' + p.media_url + '" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display=\'none\'">';
         } else if (isVideo) {
-            thumb = '<div style="position:relative;width:100%;height:100%;background:#000;"><video src="' + p.media_url + '" muted preload="metadata" style="width:100%;height:100%;object-fit:cover;" onloadeddata="this.currentTime=0.5"></video><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;"><div style="width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg></div></div></div>';
+            thumb = window.aiadVideoThumbHtml(p, '<div style="position:relative;width:100%;height:100%;background:#000;"><video src="' + p.media_url + '" muted preload="metadata" style="width:100%;height:100%;object-fit:cover;" onloadeddata="this.currentTime=0.5"></video><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;"><div style="width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg></div></div></div>');
         } else if (isAudio) {
             thumb = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:6px;"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--magenta-light)" stroke-width="1.5"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><span style="font-size:0.7rem;color:var(--text-muted);">Music</span></div>';
         }
@@ -39583,7 +39770,87 @@ window.AIAD_PROMPTS = [
 .aiad-founding-strip.is-urgent { border-color: rgba(245,158,11,0.45); }
 .aiad-founding-strip.is-urgent .fs-count { color: #fcd34d; }
 @media (max-width: 768px) {
-  .aiad-founding-strip .fs-count { margin-left: 0; }
+  /* ── Mobile density ───────────────────────────────────────────────────────
+     Phone first. On a 380px screen the founding strip, the ticker, the search
+     bar and the following strip are all chrome, and they sat between the header
+     and whichever view is active — so the agent input started ~995px down a
+     844px viewport. Everything below is scoped to this breakpoint; desktop is
+     untouched.                                                              */
+
+  /* The active view comes first, so the agent card is the first thing under the
+     header. .dash-main becomes a column so order applies; the chrome keeps its
+     source order below it. */
+  .dash-main { display: flex; flex-direction: column; }
+  .dash-main > .dash-view.active { order: -1; }
+  .dash-main > .aiad-site-footer { order: 99; }
+
+  /* Founding strip collapses to one line: the name and the countdown, with the
+     pricing detail behind a tap rather than a third of the viewport. */
+  .aiad-founding-strip {
+    flex-wrap: nowrap; gap: 8px; cursor: pointer; position: relative;
+    padding: 9px 30px 9px 14px; margin-bottom: 12px;
+    flex: 0 0 auto;
+  }
+  .aiad-founding-strip > span:not(.fs-count) { display: none; }
+  .aiad-founding-strip .fs-count { margin-left: auto; }
+  .aiad-founding-strip .fs-count::before {
+    content: '\00b7'; margin-right: 8px; color: var(--text-muted); font-weight: 400;
+  }
+  .aiad-founding-strip.is-open .fs-count::before { content: none; }
+  .aiad-founding-strip strong { white-space: nowrap; }
+  .aiad-founding-strip::after {
+    content: ''; position: absolute; right: 12px; top: 50%;
+    width: 7px; height: 7px; margin-top: -4px;
+    border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+    transform: rotate(45deg); opacity: 0.5; transition: transform 150ms ease;
+  }
+  .aiad-founding-strip.is-open { flex-wrap: wrap; }
+  .aiad-founding-strip.is-open > span:not(.fs-count) { display: block; flex: 1 0 100%; }
+  .aiad-founding-strip.is-open::after { transform: rotate(-135deg); }
+
+  /* Following becomes a chip; the avatars move into a sheet. */
+  #aiadFollowingStrip.aiad-following-chip {
+    display: inline-flex !important; align-items: center; gap: 8px;
+    /* .dash-main is a flex column here, so a stretched item would fill the width and
+       stop being a chip. */
+    align-self: flex-start; width: auto; flex: 0 0 auto;
+    padding: 7px 14px !important; margin: 0 0 12px !important;
+    border-radius: 999px !important; cursor: pointer;
+    font-size: 0.76rem; color: var(--text-secondary);
+  }
+  #aiadFollowingStrip.aiad-following-chip b {
+    color: var(--text-primary); font-weight: 700; font-variant-numeric: tabular-nums;
+  }
+
+  /* The search bar is not the reason anyone opens the dashboard. */
+  #aiadArtistSearchWrap { margin: 4px 0 12px !important; }
+}
+
+/* Following sheet — mobile only, but the rules are harmless anywhere. */
+.aiad-follow-sheet {
+  position: fixed; inset: 0; z-index: 100050; background: rgba(0,0,0,0.6);
+  display: flex; align-items: flex-end;
+}
+.aiad-follow-sheet-inner {
+  width: 100%; max-height: 72vh; overflow-y: auto;
+  background: var(--bg-card); border-top-left-radius: 18px; border-top-right-radius: 18px;
+  padding: 16px 16px 28px; border-top: 1px solid var(--border-default);
+}
+.aiad-follow-sheet-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 14px; font-size: 0.72rem; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--text-muted);
+}
+.aiad-follow-sheet-x {
+  background: none; border: none; color: var(--text-secondary);
+  font-size: 1.4rem; line-height: 1; cursor: pointer; padding: 0 4px;
+}
+.aiad-follow-sheet-row {
+  display: flex; align-items: center; gap: 12px; padding: 10px 4px; cursor: pointer;
+}
+.aiad-follow-sheet-row img, .aiad-follow-sheet-row .ph {
+  width: 40px; height: 40px; border-radius: 50%; object-fit: cover;
+  flex-shrink: 0; background: var(--bg-secondary);
 }
 
 </style>
@@ -39794,8 +40061,17 @@ window.AIAD_PROMPTS = [
             existing.id = 'aiadFoundingStrip';
             main.insertBefore(existing, main.firstChild);
         }
-        existing.className = 'aiad-founding-strip ' + cls;
+        existing.className = 'aiad-founding-strip ' + cls + (existing.classList.contains('is-open') ? ' is-open' : '');
         existing.innerHTML = html;
+        // One line on a phone; the pricing detail is a tap away rather than a third of
+        // the viewport. Bound once — this function re-runs on a timer.
+        if (!existing.dataset.tapBound) {
+            existing.dataset.tapBound = '1';
+            existing.addEventListener('click', function () {
+                if (!(window.matchMedia && window.matchMedia('(max-width: 768px)').matches)) return;
+                existing.classList.toggle('is-open');
+            });
+        }
     }
 
     async function init() {
