@@ -15464,6 +15464,379 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             return { open: open };
         })();
 
+        /* ── AIAD Video Editor ───────────────────────────────────────────
+           The composer's video equivalent of AiadPhotoEditor. It deliberately
+           encodes NOTHING: a phone cannot re-encode a 4K clip without melting,
+           and every attempt to do it client-side ends in a 40-second freeze.
+
+           So this collects INTENT and returns it:
+
+               AiadVideoEditor.open(item) -> Promise<edit|null>   // null = cancelled
+               edit = { trimStart, trimEnd, filter, coverTime }
+
+           Preview is CSS and currentTime seeking. Truth is api/watermark.js,
+           which applies the trim, the filter chain, the AIAD mark and the poster
+           in the single ffmpeg pass it already runs. */
+        window.AiadVideoEditor = (function () {
+            // The photo editor's presets, reused verbatim so a filter means the same
+            // thing on a photo and on a video. PRESETS lives in that module's closure,
+            // so the CSS strings are rebuilt here from the same numbers.
+            var VPRESETS = [
+                { key: 'none', label: 'None', b: 100, c: 100, s: 100, w: 0,  extra: '' },
+                { key: 'mono', label: 'Mono', b: 105, c: 112, s: 0,   w: 0,  extra: '' },
+                { key: 'fade', label: 'Fade', b: 108, c: 82,  s: 88,  w: 8,  extra: '' },
+                { key: 'warm', label: 'Warm', b: 103, c: 106, s: 112, w: 30, extra: '' },
+                { key: 'cold', label: 'Cold', b: 100, c: 108, s: 96,  w: 0,  extra: 'hue-rotate(-12deg)' },
+                { key: 'film', label: 'Film', b: 98,  c: 118, s: 86,  w: 14, extra: 'hue-rotate(4deg)' }
+            ];
+            // Warmth is a sepia wash in the photo editor; same mapping here so the
+            // preview and the server agree.
+            function cssFor(p) {
+                if (!p || p.key === 'none') return 'none';
+                return 'brightness(' + (p.b / 100) + ') contrast(' + (p.c / 100) + ') saturate(' + (p.s / 100) + ')'
+                     + (p.w ? ' sepia(' + (p.w / 100) + ')' : '') + (p.extra ? ' ' + p.extra : '');
+            }
+            window.aiadVideoFilterCss = function (key) {
+                for (var i = 0; i < VPRESETS.length; i++) if (VPRESETS[i].key === key) return cssFor(VPRESETS[i]);
+                return 'none';
+            };
+
+            var stylesInjected = false;
+            function injectStyles() {
+                if (stylesInjected) return;
+                stylesInjected = true;
+                var st = document.createElement('style');
+                st.id = 'aiadVideoEditorStyles';
+                st.textContent = [
+                    // Phone first: a full-height sheet, because a centred dialog on a
+                    // 380px screen leaves no room for a scrubber and a video at once.
+                    '.ave-overlay .modal-content{width:100%;max-width:660px;height:100dvh;max-height:100dvh;border-radius:0;',
+                        'display:flex;flex-direction:column;overflow:hidden;padding:0;}',
+                    '@media (min-width:700px){.ave-overlay .modal-content{height:auto;max-height:92vh;border-radius:16px;}}',
+                    '.ave-head{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--border-default);flex:0 0 auto;}',
+                    '.ave-title{font-size:0.72rem;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);flex:1;}',
+                    '.ave-x{background:none;border:none;color:var(--text-secondary);font-size:1.5rem;line-height:1;cursor:pointer;padding:0 4px;}',
+                    '.ave-stage{background:#000;display:flex;align-items:center;justify-content:center;flex:1 1 auto;min-height:0;position:relative;}',
+                    '.ave-stage video{max-width:100%;max-height:100%;display:block;}',
+                    '.ave-body{flex:0 0 auto;overflow-y:auto;max-height:46vh;padding:12px 16px 16px;}',
+                    '.ave-tabs{display:flex;gap:6px;padding:10px 16px 0;flex:0 0 auto;}',
+                    '.ave-tab{flex:1;padding:9px 4px;border-radius:9px;border:1px solid var(--border-default);background:transparent;',
+                        'color:var(--text-secondary);font-family:var(--font-body);font-size:0.78rem;cursor:pointer;}',
+                    '.ave-tab.active{border-color:var(--teal);color:var(--text-primary);background:rgba(0,180,216,0.10);}',
+                    '.ave-panel{display:none;}.ave-panel.active{display:block;}',
+                    // Trim. The rail is tall and the handles are 44px so a thumb can
+                    // actually grab one; the visual grip inside is narrower.
+                    '.ave-rail{position:relative;height:44px;margin:14px 0 6px;border-radius:10px;background:var(--bg-secondary);',
+                        'border:1px solid var(--border-default);touch-action:none;}',
+                    '.ave-sel{position:absolute;top:0;bottom:0;background:rgba(0,180,216,0.18);border-top:1px solid var(--teal);border-bottom:1px solid var(--teal);}',
+                    '.ave-h{position:absolute;top:50%;transform:translate(-50%,-50%);width:44px;height:44px;display:flex;align-items:center;',
+                        'justify-content:center;cursor:ew-resize;touch-action:none;}',
+                    '.ave-h::after{content:"";width:8px;height:30px;border-radius:4px;background:var(--teal);box-shadow:0 1px 4px rgba(0,0,0,0.5);}',
+                    '.ave-play{position:absolute;top:0;bottom:0;width:2px;background:#fff;opacity:0.85;pointer-events:none;}',
+                    '.ave-times{display:flex;justify-content:space-between;font-size:0.72rem;color:var(--text-muted);font-variant-numeric:tabular-nums;}',
+                    '.ave-chips{display:flex;gap:8px;overflow-x:auto;padding:12px 0 4px;scrollbar-width:none;}',
+                    '.ave-chips::-webkit-scrollbar{display:none;}',
+                    '.ave-chip{flex:0 0 auto;padding:8px 14px;border-radius:999px;border:1px solid var(--border-default);background:transparent;',
+                        'color:var(--text-secondary);font-family:var(--font-body);font-size:0.78rem;cursor:pointer;}',
+                    '.ave-chip.active{border-color:var(--teal);color:var(--text-primary);background:rgba(0,180,216,0.12);}',
+                    '.ave-hint{font-size:0.75rem;color:var(--text-muted);line-height:1.5;margin:8px 0 0;}',
+                    '.ave-foot{display:flex;gap:10px;padding:12px 16px;border-top:1px solid var(--border-default);flex:0 0 auto;}',
+                    '.ave-foot button{flex:1;padding:12px;border-radius:10px;font-family:var(--font-body);font-size:0.88rem;cursor:pointer;border:1px solid var(--border-default);}',
+                    '.ave-cancel{background:transparent;color:var(--text-secondary);}',
+                    '.ave-save{background:linear-gradient(135deg,var(--teal),var(--teal-dark));border-color:transparent;color:#fff;font-weight:600;}',
+                    // AI tab.
+                    '.ave-ai-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:10px;}',
+                    '.ave-ai-tool{padding:10px;border-radius:10px;border:1px solid var(--border-default);background:transparent;color:var(--text-secondary);',
+                        'font-family:var(--font-body);font-size:0.78rem;cursor:pointer;text-align:left;}',
+                    '.ave-ai-tool.active{border-color:var(--magenta);color:var(--text-primary);}',
+                    '.ave-ai-prompt{width:100%;margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--bg-secondary);',
+                        'border:1px solid var(--border-default);color:var(--text-primary);font-family:var(--font-body);font-size:0.85rem;resize:vertical;}',
+                    '.ave-ai-run{margin-top:10px;width:100%;padding:12px;border-radius:10px;border:none;color:#fff;font-weight:600;cursor:pointer;',
+                        'background:linear-gradient(135deg,var(--magenta),var(--magenta-dark));font-family:var(--font-body);}',
+                    '.ave-ai-run[disabled]{opacity:0.55;cursor:default;}',
+                    '.ave-credits{display:flex;align-items:center;gap:6px;font-size:0.72rem;color:var(--text-muted);margin-top:10px;}',
+                    '.ave-credits b{color:var(--text-secondary);font-weight:600;font-variant-numeric:tabular-nums;}',
+                    '.ave-ai-out{margin-top:12px;font-size:0.82rem;line-height:1.55;color:var(--text-secondary);white-space:pre-wrap;',
+                        'max-height:180px;overflow:auto;}',
+                    '.ave-ai-out img{width:100%;border-radius:10px;display:block;}'
+                ].join('');
+                document.head.appendChild(st);
+            }
+
+            function fmt(t) {
+                t = Math.max(0, t || 0);
+                var m = Math.floor(t / 60), s = t - m * 60;
+                return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1);
+            }
+
+            function esc(v) {
+                return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
+                    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+                });
+            }
+
+            // Only the tools creative-studio already serves. Nothing new is invented
+            // here and no prompt logic is duplicated: the function owns all of it.
+            var AI_TOOLS = [
+                { tool: 'songwriting', label: 'Songwriting', kind: 'text', hint: 'Lyric and concept ideas' },
+                { tool: 'merch',       label: 'Merch ideas', kind: 'text', hint: 'Product and drop concepts' },
+                { tool: 'coverart',    label: 'Cover art',   kind: 'image', hint: 'Square cover image' },
+                { tool: 'mixmedia',    label: 'Product shot',kind: 'image', hint: 'Photoreal product mockup' }
+            ];
+
+            function open(item) {
+                injectStyles();
+                return new Promise(function (resolve) {
+                    var src = item && item.blobUrl;
+                    if (!src) { resolve(null); return; }
+                    var prev = (item && item.edit) || {};
+                    var state = {
+                        trimStart: prev.trimStart || 0,
+                        trimEnd: prev.trimEnd || 0,      // 0 until metadata gives a duration
+                        filter: prev.filter || 'none',
+                        coverTime: prev.coverTime == null ? null : prev.coverTime
+                    };
+
+                    var ov = document.createElement('div');
+                    ov.className = 'modal-overlay ave-overlay active';
+                    ov.innerHTML =
+                        '<div class="modal-content" role="dialog" aria-label="Edit video">'
+                      +   '<div class="ave-head"><span class="ave-title">Edit video</span>'
+                      +     '<button type="button" class="ave-x" aria-label="Close">&times;</button></div>'
+                      +   '<div class="ave-stage"><video playsinline preload="metadata"></video></div>'
+                      +   '<div class="ave-tabs">'
+                      +     '<button type="button" class="ave-tab active" data-p="trim">Trim</button>'
+                      +     '<button type="button" class="ave-tab" data-p="filter">Filters</button>'
+                      +     '<button type="button" class="ave-tab" data-p="cover">Cover</button>'
+                      +     '<button type="button" class="ave-tab" data-p="ai">AI</button>'
+                      +   '</div>'
+                      +   '<div class="ave-body">'
+                      +     '<div class="ave-panel active" data-p="trim">'
+                      +       '<div class="ave-rail"><div class="ave-sel"></div><div class="ave-play"></div>'
+                      +         '<div class="ave-h" data-h="a" role="slider" aria-label="Trim start" tabindex="0"></div>'
+                      +         '<div class="ave-h" data-h="b" role="slider" aria-label="Trim end" tabindex="0"></div></div>'
+                      +       '<div class="ave-times"><span class="ave-t-a">0:00.0</span><span class="ave-t-len"></span><span class="ave-t-b">0:00.0</span></div>'
+                      +       '<p class="ave-hint">Drag the handles to set the start and end. Nothing is re-encoded on your phone &mdash; the trim is applied when the post is processed.</p>'
+                      +     '</div>'
+                      +     '<div class="ave-panel" data-p="filter"><div class="ave-chips"></div>'
+                      +       '<p class="ave-hint">Previewed here, burned in on the server so it travels with the file.</p></div>'
+                      +     '<div class="ave-panel" data-p="cover">'
+                      +       '<p class="ave-hint">Scrub the video, then pick the frame people see before it plays.</p>'
+                      +       '<button type="button" class="ave-chip ave-usecover" style="margin-top:10px;">Use current frame</button>'
+                      +       '<span class="ave-cover-at ave-hint" style="margin-left:10px;"></span></div>'
+                      +     '<div class="ave-panel" data-p="ai"></div>'
+                      +   '</div>'
+                      +   '<div class="ave-foot"><button type="button" class="ave-cancel">Cancel</button>'
+                      +     '<button type="button" class="ave-save">Done</button></div>'
+                      + '</div>';
+                    document.body.appendChild(ov);
+
+                    var vid = ov.querySelector('video');
+                    var rail = ov.querySelector('.ave-rail');
+                    var sel = ov.querySelector('.ave-sel');
+                    var playhead = ov.querySelector('.ave-play');
+                    var hA = ov.querySelector('.ave-h[data-h="a"]');
+                    var hB = ov.querySelector('.ave-h[data-h="b"]');
+                    var tA = ov.querySelector('.ave-t-a'), tB = ov.querySelector('.ave-t-b'), tLen = ov.querySelector('.ave-t-len');
+                    var duration = 0;
+
+                    vid.src = src;
+                    vid.style.filter = window.aiadVideoFilterCss(state.filter);
+
+                    function pct(t) { return duration ? Math.max(0, Math.min(100, (t / duration) * 100)) : 0; }
+                    function paint() {
+                        hA.style.left = pct(state.trimStart) + '%';
+                        hB.style.left = pct(state.trimEnd) + '%';
+                        sel.style.left = pct(state.trimStart) + '%';
+                        sel.style.width = Math.max(0, pct(state.trimEnd) - pct(state.trimStart)) + '%';
+                        tA.textContent = fmt(state.trimStart);
+                        tB.textContent = fmt(state.trimEnd);
+                        tLen.textContent = fmt(Math.max(0, state.trimEnd - state.trimStart)) + ' selected';
+                        playhead.style.left = pct(vid.currentTime || 0) + '%';
+                        var c = ov.querySelector('.ave-cover-at');
+                        if (c) c.textContent = state.coverTime == null ? 'Using the first frame of the trim.' : ('Cover at ' + fmt(state.coverTime));
+                    }
+
+                    vid.addEventListener('loadedmetadata', function () {
+                        duration = vid.duration || 0;
+                        if (!state.trimEnd || state.trimEnd > duration) state.trimEnd = duration;
+                        if (state.trimStart >= state.trimEnd) state.trimStart = 0;
+                        try { vid.currentTime = state.trimStart; } catch (e) {}
+                        paint();
+                    });
+                    vid.addEventListener('timeupdate', function () {
+                        // Keep playback inside the selection so the preview shows the trim.
+                        if (duration && vid.currentTime >= state.trimEnd - 0.05) {
+                            vid.pause();
+                            try { vid.currentTime = state.trimStart; } catch (e) {}
+                        }
+                        paint();
+                    });
+
+                    function timeFromEvent(e) {
+                        var r = rail.getBoundingClientRect();
+                        var x = (e.touches && e.touches[0] ? e.touches[0].clientX : e.clientX) - r.left;
+                        return Math.max(0, Math.min(duration, (x / Math.max(1, r.width)) * duration));
+                    }
+                    function drag(handle, which) {
+                        function move(e) {
+                            if (!duration) return;
+                            e.preventDefault();
+                            var t = timeFromEvent(e);
+                            // Always leave something to encode: a zero-length trim would
+                            // produce an empty file rather than an error anyone could see.
+                            if (which === 'a') state.trimStart = Math.min(t, state.trimEnd - 0.2);
+                            else state.trimEnd = Math.max(t, state.trimStart + 0.2);
+                            state.trimStart = Math.max(0, state.trimStart);
+                            state.trimEnd = Math.min(duration, state.trimEnd);
+                            try { vid.currentTime = which === 'a' ? state.trimStart : state.trimEnd; } catch (e2) {}
+                            paint();
+                        }
+                        function up() {
+                            document.removeEventListener('mousemove', move);
+                            document.removeEventListener('touchmove', move);
+                            document.removeEventListener('mouseup', up);
+                            document.removeEventListener('touchend', up);
+                        }
+                        handle.addEventListener('mousedown', function (e) {
+                            e.preventDefault();
+                            document.addEventListener('mousemove', move);
+                            document.addEventListener('mouseup', up);
+                        });
+                        handle.addEventListener('touchstart', function (e) {
+                            document.addEventListener('touchmove', move, { passive: false });
+                            document.addEventListener('touchend', up);
+                        }, { passive: true });
+                        // Keyboard: the handles are sliders, so arrows have to move them.
+                        handle.addEventListener('keydown', function (e) {
+                            var step = e.shiftKey ? 1 : 0.1, d = 0;
+                            if (e.key === 'ArrowLeft') d = -step;
+                            else if (e.key === 'ArrowRight') d = step;
+                            else return;
+                            e.preventDefault();
+                            if (which === 'a') state.trimStart = Math.max(0, Math.min(state.trimStart + d, state.trimEnd - 0.2));
+                            else state.trimEnd = Math.min(duration, Math.max(state.trimEnd + d, state.trimStart + 0.2));
+                            try { vid.currentTime = which === 'a' ? state.trimStart : state.trimEnd; } catch (e2) {}
+                            paint();
+                        });
+                    }
+                    drag(hA, 'a'); drag(hB, 'b');
+                    rail.addEventListener('click', function (e) {
+                        if (e.target.closest('.ave-h') || !duration) return;
+                        try { vid.currentTime = timeFromEvent(e); } catch (e2) {}
+                    });
+
+                    // Filters
+                    var chips = ov.querySelector('.ave-chips');
+                    chips.innerHTML = VPRESETS.map(function (p) {
+                        return '<button type="button" class="ave-chip' + (p.key === state.filter ? ' active' : '')
+                             + '" data-f="' + p.key + '">' + esc(p.label) + '</button>';
+                    }).join('');
+                    chips.addEventListener('click', function (e) {
+                        var b = e.target.closest('.ave-chip'); if (!b) return;
+                        state.filter = b.dataset.f;
+                        Array.prototype.forEach.call(chips.children, function (c) { c.classList.toggle('active', c === b); });
+                        vid.style.filter = window.aiadVideoFilterCss(state.filter);
+                    });
+
+                    // Cover
+                    ov.querySelector('.ave-usecover').addEventListener('click', function () {
+                        state.coverTime = vid.currentTime || state.trimStart;
+                        paint();
+                    });
+
+                    // Tabs
+                    ov.querySelector('.ave-tabs').addEventListener('click', function (e) {
+                        var b = e.target.closest('.ave-tab'); if (!b) return;
+                        Array.prototype.forEach.call(ov.querySelectorAll('.ave-tab'), function (t) { t.classList.toggle('active', t === b); });
+                        Array.prototype.forEach.call(ov.querySelectorAll('.ave-panel'), function (p) {
+                            p.classList.toggle('active', p.dataset.p === b.dataset.p);
+                        });
+                        if (b.dataset.p === 'ai') buildAi(ov);
+                    });
+
+                    function close(result) {
+                        try { vid.pause(); } catch (e) {}
+                        ov.remove();
+                        resolve(result);
+                    }
+                    ov.querySelector('.ave-x').addEventListener('click', function () { close(null); });
+                    ov.querySelector('.ave-cancel').addEventListener('click', function () { close(null); });
+                    ov.querySelector('.ave-save').addEventListener('click', function () {
+                        close({
+                            trimStart: +state.trimStart.toFixed(2),
+                            trimEnd: +state.trimEnd.toFixed(2),
+                            filter: state.filter,
+                            coverTime: state.coverTime == null ? null : +state.coverTime.toFixed(2)
+                        });
+                    });
+                    ov.addEventListener('click', function (e) { if (e.target === ov) close(null); });
+                });
+            }
+
+            // The AI tab is a thin caller. creative-studio owns the prompts, the model
+            // choice and the credit: it spends before calling the provider and refunds
+            // when the provider fails, so a failed generation here costs nothing.
+            var aiBuilt = false;
+            function buildAi(ov) {
+                var panel = ov.querySelector('.ave-panel[data-p="ai"]');
+                if (!panel || panel.dataset.ready) return;
+                panel.dataset.ready = '1';
+                panel.innerHTML =
+                    '<p class="ave-hint">The same Creative Studio tools, without leaving the composer.</p>'
+                  + '<div class="ave-ai-grid">' + AI_TOOLS.map(function (t, i) {
+                        return '<button type="button" class="ave-ai-tool' + (i === 0 ? ' active' : '') + '" data-t="' + t.tool + '">'
+                             + '<div style="font-weight:600;color:var(--text-primary);">' + esc(t.label) + '</div>'
+                             + '<div style="margin-top:2px;">' + esc(t.hint) + '</div></button>';
+                    }).join('') + '</div>'
+                  + '<textarea class="ave-ai-prompt" rows="2" placeholder="What do you want?"></textarea>'
+                  + '<button type="button" class="ave-ai-run">Generate</button>'
+                  + '<div class="ave-credits">Credits <b class="ave-credit-n">' + esc(_creditText()) + '</b></div>'
+                  + '<div class="ave-ai-out"></div>';
+
+                var tool = AI_TOOLS[0].tool;
+                panel.querySelector('.ave-ai-grid').addEventListener('click', function (e) {
+                    var b = e.target.closest('.ave-ai-tool'); if (!b) return;
+                    tool = b.dataset.t;
+                    Array.prototype.forEach.call(panel.querySelectorAll('.ave-ai-tool'), function (x) { x.classList.toggle('active', x === b); });
+                });
+
+                var run = panel.querySelector('.ave-ai-run');
+                var out = panel.querySelector('.ave-ai-out');
+                run.addEventListener('click', async function () {
+                    var prompt = (panel.querySelector('.ave-ai-prompt').value || '').trim();
+                    if (!prompt) { out.textContent = 'Say what you want first.'; return; }
+                    if (typeof callCreativeStudio !== 'function') { out.textContent = 'Creative Studio is unavailable here.'; return; }
+                    run.disabled = true; run.textContent = 'Generating…'; out.textContent = '';
+                    try {
+                        var data = await callCreativeStudio(tool, prompt);
+                        var res = data && data.result;
+                        if (!res) { out.textContent = (data && data.error) || 'Nothing came back. Your credit was refunded.'; return; }
+                        if (/^https?:\/\//.test(String(res))) {
+                            out.innerHTML = '<img src="' + esc(res) + '" alt="">';
+                        } else {
+                            out.textContent = String(res);
+                        }
+                    } catch (e) {
+                        // 402 already showed the top-up; anything else says what happened.
+                        out.textContent = (e && e.message) || 'Generation failed.';
+                    } finally {
+                        run.disabled = false; run.textContent = 'Generate';
+                        panel.querySelector('.ave-credit-n').textContent = _creditText();
+                    }
+                });
+            }
+
+            function _creditText() {
+                var r = (window.AppState && AppState.aiCreditsRemaining);
+                var m = window.__aiCreditMax || (window.AppState && AppState.aiCreditsMax);
+                if (r == null) return '—';
+                return m ? (r + ' / ' + m) : String(r);
+            }
+
+            return { open: open };
+        })();
+
         /* ── Post media carousel ─────────────────────────────────────────
            artist_posts.media is the ordered [{url,type,name}] list; media_url
            still mirrors media[0] for every reader that predates it.
@@ -15492,15 +15865,24 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     if (!m || !m.url) return null;
                     // watermarked_url is written by /api/watermark after the post lands, so it
                     // is absent on a fresh row and on anything that failed to transcode.
+                    // An edited clip must PLAY the processed file — the trim and the filter
+                    // exist nowhere else — while an unedited one keeps playing the original,
+                    // so the mark stays a thing that travels off-platform rather than
+                    // something the artist's own audience is shown.
+                    var _wm = m.watermarked_url || null;
                     return { url: m.url, type: m.type || 'photo', name: m.name || null,
-                             watermarked_url: m.watermarked_url || null };
+                             watermarked_url: _wm,
+                             poster_url: m.poster_url || null,
+                             edit: m.edit || null,
+                             play_url: (m.edit && _wm) ? _wm : m.url };
                 }).filter(Boolean);
                 if (items.length) return items;
             }
             // Pre-migration row, or a reader whose query never asked for media.
             if (post.media_url) {
                 return [{ url: post.media_url, type: post.media_type || 'photo', name: post.media_name || null,
-                          watermarked_url: null }];
+                          watermarked_url: null, poster_url: null, edit: null,
+                          play_url: post.media_url }];
             }
             return [];
         };
@@ -15565,7 +15947,9 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 var lazy = i > 0;   // the first slide is what the reader sees; the rest wait
                 var inner;
                 if (it.type === 'video') {
-                    inner = '<video src="' + esc(it.url) + '" controls playsinline preload="' + (lazy ? 'none' : 'metadata') + '"></video>';
+                    inner = '<video src="' + esc(it.play_url || it.url) + '" controls playsinline'
+                        + (it.poster_url ? ' poster="' + esc(it.poster_url) + '"' : '')
+                        + ' preload="' + (lazy ? 'none' : 'metadata') + '"></video>';
                 } else {
                     inner = '<img src="' + esc(it.url) + '" alt=""' + (lazy ? ' loading="lazy"' : '')
                         + (zoomable ? ' onclick="_zoomPostImage(this.src)"' : '') + '>';
@@ -15844,6 +16228,72 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             _syncPendingPostLegacy();
             renderPhotoAttachment();
         }
+        // The pending video preview, with the edit affordance beside the remove button.
+        // The trim and the filter are shown here the way they will look once the server
+        // has applied them — CSS and a seek, never a client-side encode.
+        function renderVideoAttachment() {
+            const it = pendingPostItems[0];
+            const att = document.getElementById('composerAttachments');
+            if (!it || !att) return;
+            const ed = it.edit || null;
+            const css = ed ? window.aiadVideoFilterCss(ed.filter) : 'none';
+            att.className = 'new-composer-preview';
+            att.innerHTML = '<div style="position:relative;">'
+                + '<video src="' + it.blobUrl + '" controls playsinline style="width:100%;max-height:400px;display:block;background:#000;filter:' + css + ';"></video>'
+                + '<button type="button" onclick="openVideoEditor()" title="Edit video" style="position:absolute;top:8px;right:44px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.75);border:none;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;">' + _NC_PENCIL_SVG + '</button>'
+                + '<button onclick="clearPostMedia()" style="position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.75);border:none;color:white;cursor:pointer;font-size:1.1rem;line-height:1;display:flex;align-items:center;justify-content:center;">\u00d7</button>'
+                + (ed ? '<div style="position:absolute;left:8px;bottom:8px;padding:4px 9px;border-radius:999px;background:rgba(0,0,0,0.72);color:#fff;font-size:0.68rem;">'
+                        + _videoEditSummary(ed) + '</div>' : '')
+                + '</div>';
+            const v = att.querySelector('video');
+            if (v && ed) {
+                // Preview the trim by keeping playback inside it. The file is untouched.
+                v.addEventListener('loadedmetadata', function () { try { v.currentTime = ed.trimStart || 0; } catch (e) {} });
+                v.addEventListener('timeupdate', function () {
+                    if (ed.trimEnd && v.currentTime >= ed.trimEnd - 0.05) { v.pause(); try { v.currentTime = ed.trimStart || 0; } catch (e) {} }
+                });
+            }
+        }
+
+        // Keeps an optimistic card's playback inside the trim the artist set, so the card
+        // that appears the instant they hit post already looks like the finished clip.
+        function _bindOptimisticTrim(root) {
+            if (!root) return;
+            Array.prototype.forEach.call(root.querySelectorAll('video[data-aiad-edit]'), function (v) {
+                var ed = null;
+                try { ed = JSON.parse(v.getAttribute('data-aiad-edit') || 'null'); } catch (e) { ed = null; }
+                if (!ed || !ed.trimEnd) return;
+                v.addEventListener('loadedmetadata', function () { try { v.currentTime = ed.trimStart || 0; } catch (e) {} });
+                v.addEventListener('timeupdate', function () {
+                    if (v.currentTime >= ed.trimEnd - 0.05) { v.pause(); try { v.currentTime = ed.trimStart || 0; } catch (e) {} }
+                });
+            });
+        }
+
+        function _videoEditSummary(ed) {
+            const bits = [];
+            const len = Math.max(0, (ed.trimEnd || 0) - (ed.trimStart || 0));
+            if (ed.trimStart || ed.trimEnd) bits.push(len.toFixed(1) + 's');
+            if (ed.filter && ed.filter !== 'none') bits.push(ed.filter);
+            if (ed.coverTime != null) bits.push('cover set');
+            return bits.length ? bits.join(' \u00b7 ') : 'edited';
+        }
+
+        async function openVideoEditor() {
+            const it = pendingPostItems[0];
+            if (!it || it.type !== 'video' || !window.AiadVideoEditor) return;
+            let edit = null;
+            try { edit = await window.AiadVideoEditor.open(it); }
+            catch (e) { console.warn('[AIAD] video editor:', e); return; }
+            if (!edit) return;                       // cancelled: leave the item alone
+            // A full-length clip with no filter and no cover is not an edit worth carrying.
+            const untouched = (!edit.trimStart)
+                && (!it.__duration || Math.abs(edit.trimEnd - it.__duration) < 0.05)
+                && edit.filter === 'none' && edit.coverTime == null;
+            it.edit = untouched ? null : edit;
+            renderVideoAttachment();
+        }
+
         function handlePostVideo(input) {
             if (!input.files[0]) return;
             _clearPendingPostItems();   // video and photos are mutually exclusive
@@ -15853,7 +16303,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             pendingPostItems = [{ file: pendingPostFile, blobUrl: url, type: 'video', name: pendingPostFile.name || null, editedFrom: null }];
             const att = document.getElementById('composerAttachments');
             att.className = 'new-composer-preview';
-            att.innerHTML = `<div style="position:relative;"><video src="${url}" controls style="width:100%;max-height:400px;display:block;background:#000;"></video><button onclick="clearPostMedia()" style="position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.75);border:none;color:white;cursor:pointer;font-size:1.1rem;line-height:1;display:flex;align-items:center;justify-content:center;">×</button></div>`;
+            renderVideoAttachment();
             document.querySelectorAll('.nc-tool-btn, .composer-media-btn').forEach(b=>b.classList.remove('active','poll'));
             document.getElementById('postBtnVideo').classList.add('active');
         }
@@ -15940,8 +16390,11 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         // or surface a failure to the artist.
         function _aiadRequestVideoWatermark(postId, mediaRows) {
             try {
-                if (window.AIAD_WATERMARK === false) return;
                 if (!postId || !Array.isArray(mediaRows)) return;
+                // Branding off still leaves the trim and filter to apply, so only a post
+                // with nothing to do at all short-circuits here.
+                if (window.AIAD_WATERMARK === false
+                    && !mediaRows.some(function (m) { return m && m.type === 'video' && m.edit; })) return;
                 var indices = [];
                 for (var i = 0; i < mediaRows.length; i++) {
                     var _m = mediaRows[i];
@@ -15972,7 +16425,6 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
 
         function _aiadMaybeRetryWatermark(post) {
             try {
-                if (window.AIAD_WATERMARK === false) return;
                 if (!post || !post.id || !post.created_at) return;
                 // Younger than this and the publish-time request is probably still encoding,
                 // so a retry would only duplicate work that is already under way.
@@ -15986,9 +16438,13 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 if (!Array.isArray(media)) return;
 
                 var pending = [];
+                var branding = window.AIAD_WATERMARK !== false;
                 for (var i = 0; i < media.length; i++) {
                     var m = media[i];
                     if (!m || m.type !== 'video' || !m.url || m.watermarked_url) continue;
+                    // With branding off there is nothing to recover for a plain clip, but an
+                    // edited one still has a trim and a filter that exist nowhere but here.
+                    if (!branding && !m.edit) continue;
                     var key = post.id + ':' + i;
                     if (_wmRetried.has(key)) continue;
                     pending.push({ index: i, url: m.url, key: key });
@@ -16049,7 +16505,13 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     </div>
                 </div>`;
             } else if (_pm === 'video' && _pmUrl) {
-                mediaHtml = `<video src="${_pmUrl}" controls style="width:100%;border-radius:12px;display:block;background:#000;max-height:400px;"></video>`;
+                // The card goes up before the upload finishes, so the trim and the filter
+                // are shown here the same way the composer previewed them: CSS and a seek
+                // over the local blob. The processed file swaps in later, when
+                // watermarked_url lands and loadArtistPosts re-renders from the row.
+                const _ved = (_pmItems[0] && _pmItems[0].edit) || null;
+                const _vcss = _ved ? window.aiadVideoFilterCss(_ved.filter) : 'none';
+                mediaHtml = `<video src="${_pmUrl}" controls playsinline data-aiad-edit='${_ved ? JSON.stringify(_ved).replace(/'/g, "&#39;") : ""}' style="width:100%;border-radius:12px;display:block;background:#000;max-height:400px;filter:${_vcss};"></video>`;
             } else if (_pm === 'audio' && _pmUrl) {
                 const trackName = _pmName || 'New Track';
                 const bars = Array(12).fill(0).map(()=>`<span class="wave-bar" style="height:${Math.floor(Math.random()*60+20)}%"></span>`).join('');
@@ -16113,6 +16575,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             const emptyEl = document.getElementById('postsFeedEmpty');
             if (emptyEl) emptyEl.style.display = 'none';
             feed.insertBefore(newPost, feed.firstChild);
+            _bindOptimisticTrim(newPost);
 
             setTimeout(() => newPost.classList.remove('new-post'), 100);
 
@@ -16143,7 +16606,12 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                                     continue;
                                 }
                                 if (!up.publicUrl) continue;
-                                uploaded.push({ url: up.publicUrl, type: _it.type || _mediaType, name: _it.name || null });
+                                var _row = { url: up.publicUrl, type: _it.type || _mediaType, name: _it.name || null };
+                                // The edit is intent, not a rendered file: api/watermark.js
+                                // applies it. Stored on the item so the server can read it
+                                // back without the client having to re-send it.
+                                if (_it.edit) _row.edit = _it.edit;
+                                uploaded.push(_row);
                                 // Swap this slide's blob preview for the stored URL.
                                 if (_it.blobUrl) {
                                     newPost.querySelectorAll('img, video, audio').forEach(el => {

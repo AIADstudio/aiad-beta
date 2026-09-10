@@ -65,6 +65,117 @@ export function parseProbe(stderr) {
     return out;
 }
 
+// The composer's six presets, as ffmpeg.
+//
+// CSS filters are matrix and affine operations in sRGB. ffmpeg's eq works in YUV, so
+// eq=saturation=0 is NOT the same grey as CSS saturate(0) — measured against a solid
+// patch it came out 86,89,85 where the browser produced 72,72,72. So saturate, sepia and
+// hue-rotate are done here as a single colorchannelmixer using exactly the coefficients
+// the CSS Filter Effects spec defines, which is the same arithmetic the browser runs.
+// Only brightness and contrast are left to eq; both are small adjustments in these
+// presets, and the residual difference is under a couple of levels.
+//
+// The preview is still a preview: this is close, not bit-identical.
+const REC709 = [0.2126, 0.7152, 0.0722];
+
+function mul(A, B) {                       // 3x3 * 3x3
+    const o = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++)
+        o[r][c] = A[r][0] * B[0][c] + A[r][1] * B[1][c] + A[r][2] * B[2][c];
+    return o;
+}
+const IDENTITY = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+
+// CSS saturate(s): luminance-preserving, Rec.709.
+function satMatrix(s) {
+    const [lr, lg, lb] = REC709;
+    return [
+        [lr + (1 - lr) * s, lg - lg * s,       lb - lb * s],
+        [lr - lr * s,       lg + (1 - lg) * s, lb - lb * s],
+        [lr - lr * s,       lg - lg * s,       lb + (1 - lb) * s]
+    ];
+}
+// CSS sepia(a): identity mixed `a` of the way toward the spec's sepia matrix.
+function sepiaMatrix(a) {
+    const m = [[0.393, 0.769, 0.189], [0.349, 0.686, 0.168], [0.272, 0.534, 0.131]];
+    const o = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++)
+        o[r][c] = IDENTITY[r][c] + (m[r][c] - IDENTITY[r][c]) * a;
+    return o;
+}
+// CSS hue-rotate(deg), straight from the spec's matrix.
+function hueMatrix(deg) {
+    const r = (deg * Math.PI) / 180, c = Math.cos(r), s = Math.sin(r);
+    return [
+        [0.213 + c * 0.787 - s * 0.213, 0.715 - c * 0.715 - s * 0.715, 0.072 - c * 0.072 + s * 0.928],
+        [0.213 - c * 0.213 + s * 0.143, 0.715 + c * 0.285 + s * 0.140, 0.072 - c * 0.072 - s * 0.283],
+        [0.213 - c * 0.213 - s * 0.787, 0.715 - c * 0.715 + s * 0.715, 0.072 + c * 0.928 + s * 0.072]
+    ];
+}
+function mixer(M) {
+    const f = (n) => n.toFixed(4);
+    return 'colorchannelmixer=rr=' + f(M[0][0]) + ':rg=' + f(M[0][1]) + ':rb=' + f(M[0][2])
+         + ':gr=' + f(M[1][0]) + ':gg=' + f(M[1][1]) + ':gb=' + f(M[1][2])
+         + ':br=' + f(M[2][0]) + ':bg=' + f(M[2][1]) + ':bb=' + f(M[2][2]);
+}
+
+// Same numbers the composer's VPRESETS carry, in the order CSS applies them:
+// brightness, contrast, saturate, sepia, hue-rotate.
+function chainFor(b, c, sat, sepia, hue) {
+    const parts = [];
+    // Contrast is the only part left to eq. Brightness is a pure per-channel multiply, so
+    // it folds into the matrix below and costs nothing in accuracy.
+    if (c !== 100) parts.push('eq=contrast=' + (c / 100).toFixed(4));
+    let M = satMatrix(sat / 100);
+    if (sepia) M = mul(sepiaMatrix(sepia / 100), M);
+    if (hue) M = mul(hueMatrix(hue), M);
+    if (b !== 100) {
+        const k = b / 100;
+        M = M.map(function (row) { return row.map(function (v) { return v * k; }); });
+    }
+    // Only emit the matrix when it is not the identity.
+    const isId = M.every((row, r) => row.every((v, cc) => Math.abs(v - IDENTITY[r][cc]) < 0.0005));
+    if (!isId) parts.push(mixer(M));
+    return parts.length ? parts.join(',') : null;
+}
+
+const FILTER_PRESETS = {
+    none: null,
+    mono: chainFor(105, 112, 0,   0,  0),
+    fade: chainFor(108, 82,  88,  8,  0),
+    warm: chainFor(103, 106, 112, 30, 0),
+    cold: chainFor(100, 108, 96,  0,  -12),
+    film: chainFor(98,  118, 86,  14, 4)
+};
+
+// Everything here arrives from a jsonb column the user controls, so nothing is passed
+// through: the filter is chosen from a fixed table by key, and the times are clamped
+// numbers. A value that is not a finite number, or a filter key that is not one of the
+// six, is dropped rather than sanitised into something adjacent.
+function normaliseEdit(raw, durationSeconds) {
+    const out = { trimStart: 0, trimEnd: null, filterChain: null, coverTime: null };
+    if (!raw || typeof raw !== 'object') return out;
+
+    const dur = Number.isFinite(durationSeconds) && durationSeconds > 0 ? durationSeconds : null;
+    const num = function (v) { return typeof v === 'number' && Number.isFinite(v) ? v : null; };
+
+    let a = num(raw.trimStart), b = num(raw.trimEnd);
+    if (a != null && a > 0) out.trimStart = dur ? Math.min(a, dur) : a;
+    if (b != null && b > 0) out.trimEnd = dur ? Math.min(b, dur) : b;
+    // A trim that ends before it starts, or selects nothing, is not a trim.
+    if (out.trimEnd != null && out.trimEnd - out.trimStart < 0.1) { out.trimStart = 0; out.trimEnd = null; }
+    // A trim covering the whole clip is not worth the argument.
+    if (out.trimEnd != null && dur && out.trimStart === 0 && out.trimEnd >= dur - 0.05) out.trimEnd = null;
+
+    if (typeof raw.filter === 'string' && Object.prototype.hasOwnProperty.call(FILTER_PRESETS, raw.filter)) {
+        out.filterChain = FILTER_PRESETS[raw.filter];
+    }
+
+    const c = num(raw.coverTime);
+    if (c != null && c >= 0) out.coverTime = dur ? Math.min(c, dur) : c;
+    return out;
+}
+
 export default async function handler(req, res) {
     if (req.method !== 'POST') return send(res, 405, { error: 'method_not_allowed' });
 
@@ -133,6 +244,7 @@ export default async function handler(req, res) {
         dir = await mkdtemp(join(tmpdir(), 'aiad-wm-'));
         const inPath = join(dir, 'in.mp4');
         const outPath = join(dir, 'out.mp4');
+        const posterPath = join(dir, 'poster.jpg');
 
         const dl = await fetch(videoUrl);
         if (!dl.ok) return send(res, 200, { watermarked: false, url: videoUrl, reason: 'source_unreachable' });
@@ -153,16 +265,48 @@ export default async function handler(req, res) {
             return send(res, 200, { watermarked: false, url: videoUrl, reason: 'too_long' });
         }
 
-        // ---- overlay ----
+        // ---- the artist's edit, collected in the composer and applied here ----
+        // The browser never re-encodes: a phone cannot trim and filter a clip without
+        // freezing, so the composer previews with CSS and a seek and stores intent only.
+        // This is where that intent becomes the file.
+        const edit = normaliseEdit(media[itemIndex] && media[itemIndex].edit, info.seconds);
+
+        // ---- one pass: trim, colour, overlay, poster ----
         const markW = Math.max(1, Math.round(info.width * MARK_WIDTH_FRACTION));
         const pad = Math.round(Math.min(info.width, info.height) * PAD_FRACTION);
-        const filter = '[1:v]scale=' + markW + ':-1[wm];'
-            + '[0:v][wm]overlay=' + pad + ':main_h-overlay_h-' + pad + ':format=auto[v]';
+
+        // The colour grade runs before the mark is composited, so the mark itself is never
+        // tinted by the artist's filter.
+        const grade = edit.filterChain ? ('[0:v]' + edit.filterChain + '[g];') : '';
+        const base = edit.filterChain ? '[g]' : '[0:v]';
+        const wantMark = process.env.WATERMARK_ENABLED !== 'false';
+        // A filter_complex label feeds exactly one output, so the graph has to split:
+        // [v] encodes the clip and [vp] supplies the single poster frame. Mapping [v]
+        // twice is rejected outright ("already used elsewhere"), not silently ignored.
+        const composed = wantMark
+            ? (grade + '[1:v]scale=' + markW + ':-1[wm];'
+               + base + '[wm]overlay=' + pad + ':main_h-overlay_h-' + pad + ':format=auto[vo]')
+            : (edit.filterChain ? ('[0:v]' + edit.filterChain + '[vo]') : '[0:v]null[vo]');
+        const filter = composed + ';[vo]split=2[v][vp]';
+
+        // -ss and -to before -i so the seek is done by demuxing rather than by decoding
+        // and discarding every frame up to the in-point.
+        const trimArgs = [];
+        if (edit.trimStart > 0) trimArgs.push('-ss', String(edit.trimStart));
+        if (edit.trimEnd != null) trimArgs.push('-to', String(edit.trimEnd));
+
+        // The poster is a second OUTPUT of the same invocation, not a second run of
+        // ffmpeg: one decode, both files. Its time is relative to the trimmed clip.
+        const posterAt = Math.max(0, Math.min(
+            edit.coverTime == null ? 0 : (edit.coverTime - edit.trimStart),
+            Math.max(0, (edit.trimEnd == null ? (info.seconds || 0) : edit.trimEnd) - edit.trimStart - 0.05)
+        ));
 
         const enc = await runFfmpeg([
             '-hide_banner', '-nostdin', '-y',
+            ...trimArgs,
             '-i', inPath,
-            '-i', MARK_PATH,
+            ...(wantMark ? ['-i', MARK_PATH] : []),
             '-filter_complex', filter,
             '-map', '[v]',
             '-map', '0:a?',              // silent clips must not fail the encode
@@ -171,7 +315,11 @@ export default async function handler(req, res) {
             '-profile:v', 'high', '-level', '4.0',
             '-c:a', 'copy',
             '-movflags', '+faststart',
-            outPath
+            outPath,
+            // second output of the SAME invocation: one decode, two files
+            '-map', '[vp]', '-ss', String(posterAt), '-frames:v', '1', '-q:v', '3',
+            '-update', '1',
+            posterPath
         ], 240000);
 
         if (enc.code !== 0) {
@@ -200,17 +348,36 @@ export default async function handler(req, res) {
         }
         const publicUrl = SUPABASE_URL + '/storage/v1/object/public/' + BUCKET + '/' + path;
 
+        // ---- the cover frame, written beside the clip ----
+        // Best effort: a post whose video processed fine must not be held back because
+        // its poster did not, so a failure here just leaves poster_url unset.
+        let posterUrl = null;
+        try {
+            const posterStat = await stat(posterPath);
+            if (posterStat && posterStat.size) {
+                const pPath = user.id + '/watermarked/' + postId + '-' + itemIndex + '.jpg';
+                const pUp = await supa.storage.from(BUCKET).upload(pPath, await readFile(posterPath), {
+                    contentType: 'image/jpeg',
+                    upsert: true
+                });
+                if (!pUp.error) posterUrl = SUPABASE_URL + '/storage/v1/object/public/' + BUCKET + '/' + pPath;
+            }
+        } catch (e) {}
+
         // ---- read/modify/write the jsonb array, keeping every other item intact ----
         const next = media.slice();
-        // Add a field; never rewrite url. The original stays addressable forever.
-        next[itemIndex] = Object.assign({}, next[itemIndex], { watermarked_url: publicUrl });
+        // Add fields; never rewrite url. The original stays addressable forever, which is
+        // what lets the trim, the filter and the mark all be reconsidered later.
+        const patch = { watermarked_url: publicUrl };
+        if (posterUrl) patch.poster_url = posterUrl;
+        next[itemIndex] = Object.assign({}, next[itemIndex], patch);
         const wrote = await supa.from('artist_posts').update({ media: next }).eq('id', postId);
         if (wrote.error) {
             console.warn('[watermark] media update failed', wrote.error.message);
             return send(res, 200, { watermarked: false, url: videoUrl, reason: 'row_update_failed' });
         }
 
-        return send(res, 200, { watermarked: true, url: publicUrl });
+        return send(res, 200, { watermarked: true, url: publicUrl, poster: posterUrl });
     } catch (e) {
         console.warn('[watermark] ' + (e && e.message));
         return send(res, 200, { watermarked: false, url: videoUrl, reason: 'error' });
