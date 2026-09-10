@@ -41,5 +41,10 @@
       "source": "/contact",
       "destination": "/contact.html"
     }
-  ]
+  ],
+  "functions": {
+    "api/watermark.js": {
+      "includeFiles": "{assets,node_modules/ffmpeg-static}/**"
+    }
+  }
 }

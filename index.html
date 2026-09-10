@@ -15325,13 +15325,17 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             if (Array.isArray(raw) && raw.length) {
                 var items = raw.map(function (m) {
                     if (!m || !m.url) return null;
-                    return { url: m.url, type: m.type || 'photo', name: m.name || null };
+                    // watermarked_url is written by /api/watermark after the post lands, so it
+                    // is absent on a fresh row and on anything that failed to transcode.
+                    return { url: m.url, type: m.type || 'photo', name: m.name || null,
+                             watermarked_url: m.watermarked_url || null };
                 }).filter(Boolean);
                 if (items.length) return items;
             }
             // Pre-migration row, or a reader whose query never asked for media.
             if (post.media_url) {
-                return [{ url: post.media_url, type: post.media_type || 'photo', name: post.media_name || null }];
+                return [{ url: post.media_url, type: post.media_type || 'photo', name: post.media_name || null,
+                          watermarked_url: null }];
             }
             return [];
         };
@@ -15754,6 +15758,33 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         }
         function removeMedia() { clearPostMedia(); }
 
+        // Ask the server to burn the AIAD mark into each posted video. Canvas cannot touch
+        // video and iOS Safari has no captureStream, so the encode happens on Vercel and the
+        // result is written back to artist_posts.media[i].watermarked_url. Strictly
+        // fire-and-forget: the post is already published, so nothing here may block, toast,
+        // or surface a failure to the artist.
+        function _aiadRequestVideoWatermark(postId, mediaRows) {
+            try {
+                if (!postId || !Array.isArray(mediaRows)) return;
+                var indices = [];
+                for (var i = 0; i < mediaRows.length; i++) {
+                    if (mediaRows[i] && mediaRows[i].type === 'video' && mediaRows[i].url) indices.push(i);
+                }
+                if (!indices.length) return;
+                db.auth.getSession().then(function (r) {
+                    var token = r && r.data && r.data.session && r.data.session.access_token;
+                    if (!token) return;
+                    indices.forEach(function (i) {
+                        fetch('/api/watermark', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                            body: JSON.stringify({ postId: postId, itemIndex: i, videoUrl: mediaRows[i].url })
+                        }).catch(function () {});
+                    });
+                }).catch(function () {});
+            } catch (e) {}
+        }
+
         async function createNewPost() {
             const uid = aiadResolvedUserId();
             if (!uid) return;
@@ -15903,11 +15934,14 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                             if (el.src && el.src.startsWith('blob:')) el.src = persistentUrl;
                         });
                     }
+                    // The row's media array is what /api/watermark indexes into, so the
+                    // watermark request must be handed this exact slice, not `uploaded`.
+                    const _mediaRows = uploaded.slice(0, AIAD_MAX_POST_MEDIA);
                     const { data: insertedPost, error: _postErr } = await db.from('artist_posts').insert({
                         user_id: uid,
                         content: text,
                         visibility,
-                        media: uploaded.slice(0, AIAD_MAX_POST_MEDIA),
+                        media: _mediaRows,
                         media_type: (uploaded[0] && uploaded[0].type) || _mediaType || null,
                         media_url: persistentUrl,
                         media_name: _mediaName || (uploaded[0] && uploaded[0].name) || null,
@@ -15926,6 +15960,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     }
                     // Tag the card with the DB id so delete/archive works immediately
                     if (insertedPost?.id) newPost.dataset.postId = insertedPost.id;
+                    if (insertedPost?.id) _aiadRequestVideoWatermark(insertedPost.id, _mediaRows);
                     showToast('Post published successfully!');
                     // Refresh grid to show new post as thumbnail
                     setTimeout(function() { loadArtistPosts(); }, 500);
@@ -26851,15 +26886,18 @@ function _sharePrefetch(postId, anchorEl) {
             }
         }
         var file = null;
-        if (item && item.url) {
+        // Videos are marked server-side at upload time, so prefer that copy. Absent means
+        // still transcoding or the encode failed — share the original exactly as before.
+        var src = (item && (item.watermarked_url || item.url)) || '';
+        if (src) {
             try {
-                var blob = await (await fetch(item.url)).blob();
-                file = _shareFileFromBlob(blob, item);
-                // Burn the AIAD mark + @handle into stills so the branding travels when reposted.
+                var blob = await (await fetch(src)).blob();
+                file = _shareFileFromBlob(blob, { url: src, type: item.type });
+                // Stills are still marked here: the canvas pass also burns in the @handle.
                 if (/^image\//.test(file.type)) file = await _watermarkImageFile(file, username);
             } catch (e) {}
         }
-        return { caption: caption, username: username, file: file, url: (item && item.url) || '' };
+        return { caption: caption, username: username, file: file, url: src };
     })().then(function (v) {
         entry.value = v;
         return v;
