@@ -39781,6 +39781,11 @@ window.AIAD_PROMPTS = [
      header. .dash-main becomes a column so order applies; the chrome keeps its
      source order below it. */
   .dash-main { display: flex; flex-direction: column; }
+  /* .dash-main has a definite height and scrolls, so as a flex column its children
+     would share that height — the active view became a 304px internally-scrolling
+     box that clipped the agent card and its input. Children keep their natural
+     height; .dash-main does the scrolling, exactly as it did before. */
+  .dash-main > * { flex: 0 0 auto; }
   .dash-main > .dash-view.active { order: -1; }
   .dash-main > .aiad-site-footer { order: 99; }
 
@@ -39824,6 +39829,16 @@ window.AIAD_PROMPTS = [
 
   /* The search bar is not the reason anyone opens the dashboard. */
   #aiadArtistSearchWrap { margin: 4px 0 12px !important; }
+
+  /* The agent view's own header is chrome too. The subtitle explains a screen the
+     artist is already looking at, and the space it takes is the difference between
+     the input sitting above the fixed bottom nav and behind it. */
+  .agents-page-subtitle { display: none !important; }
+  .agents-page-header { margin-bottom: 10px !important; }
+  .agent-tabs { margin-bottom: 10px !important; }
+
+  /* Nothing should end up under the fixed bottom nav. */
+  .dash-main { padding-bottom: 96px !important; }
 }
 
 /* Following sheet — mobile only, but the rules are harmless anywhere. */
