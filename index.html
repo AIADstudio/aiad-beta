@@ -174,6 +174,17 @@
     (function () {
         'use strict';
 
+        // Launch-era branding, meant to come off once the platform is populated. Turning it
+        // off is two switches, and neither one needs an excavation:
+        //   1. this constant — stops the client marking photos, stops asking the server to
+        //      mark videos, and stops sharing the marked copy of anything already posted;
+        //   2. WATERMARK_ENABLED=false in the Vercel project env — stops the server marking
+        //      new uploads without shipping a client deploy at all.
+        // Either switch alone is safe. Originals are never overwritten: an unmarked upload
+        // keeps its own URL forever, which is what makes this reversible rather than a
+        // migration.
+        window.AIAD_WATERMARK = true;  // temporary launch-era branding — set false to remove from photos and videos everywhere
+
         // ?demo=1 hides founder-only chrome (the Admin pill, the Preview role
         // panel, the Review queue nav item) so the app can be filmed on the
         // founder account without internal tooling on screen. Presentation only:
@@ -15765,6 +15776,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         // or surface a failure to the artist.
         function _aiadRequestVideoWatermark(postId, mediaRows) {
             try {
+                if (window.AIAD_WATERMARK === false) return;
                 if (!postId || !Array.isArray(mediaRows)) return;
                 var indices = [];
                 for (var i = 0; i < mediaRows.length; i++) {
@@ -26888,7 +26900,10 @@ function _sharePrefetch(postId, anchorEl) {
         var file = null;
         // Videos are marked server-side at upload time, so prefer that copy. Absent means
         // still transcoding or the encode failed — share the original exactly as before.
-        var src = (item && (item.watermarked_url || item.url)) || '';
+        // With the switch off, every post reverts to its original: the marked copy is left
+        // in storage untouched, it just stops being the one anybody shares.
+        var _marked = window.AIAD_WATERMARK === false ? null : (item && item.watermarked_url);
+        var src = _marked || (item && item.url) || '';
         if (src) {
             try {
                 var blob = await (await fetch(src)).blob();
@@ -27013,6 +27028,7 @@ function _shareCopy(txt) {
 
 async function _watermarkImageFile(file, handle) {
     try {
+        if (window.AIAD_WATERMARK === false) return file;
         if (!file || !/^image\//.test(file.type)) return file;
         var img = await new Promise(function (res, rej) {
             var im = new Image();

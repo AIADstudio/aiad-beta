@@ -86,6 +86,15 @@ export default async function handler(req, res) {
     } catch (e) { user = null; }
     if (!user || !user.id) return send(res, 401, { error: 'unauthorized' });
 
+    // Second half of the launch-era branding switch (the first is window.AIAD_WATERMARK in
+    // index.html). Setting WATERMARK_ENABLED=false in the Vercel project env stops marking
+    // new uploads with no client deploy at all. Unset means enabled, so a missing var can
+    // never silently turn branding off. Nothing already stored is touched either way —
+    // originals keep their own URLs, so this is reversible by flipping the var back.
+    // Deliberately after the auth check: killing the feature must not turn this into an
+    // endpoint that answers 200 to anonymous callers.
+    if (process.env.WATERMARK_ENABLED === 'false') return send(res, 200, { skipped: true });
+
     // ---- input ----
     let body = req.body;
     if (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { body = null; } }
@@ -175,6 +184,11 @@ export default async function handler(req, res) {
         }
 
         // ---- store it under the user's own prefix so the update policy matches on re-runs ----
+        // The marked copy goes to its OWN path and the original is never touched: uploads
+        // land under posts/<uid>/, this lands under <uid>/watermarked/, and media[i].url
+        // keeps pointing at the original. That separation is the whole reason the branding
+        // can be switched off later without re-encoding or restoring anything, so the
+        // upsert below must never be pointed at an upload path.
         const path = user.id + '/watermarked/' + postId + '-' + itemIndex + '.mp4';
         const up = await supa.storage.from(BUCKET).upload(path, await readFile(outPath), {
             contentType: 'video/mp4',
@@ -188,6 +202,7 @@ export default async function handler(req, res) {
 
         // ---- read/modify/write the jsonb array, keeping every other item intact ----
         const next = media.slice();
+        // Add a field; never rewrite url. The original stays addressable forever.
         next[itemIndex] = Object.assign({}, next[itemIndex], { watermarked_url: publicUrl });
         const wrote = await supa.from('artist_posts').update({ media: next }).eq('id', postId);
         if (wrote.error) {
