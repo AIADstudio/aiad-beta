@@ -16167,12 +16167,12 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                             '<button class="post-stat post-like-btn" id="artistLikeBtn_' + pid + '" onclick="_toggleLike(\'' + pid + '\',this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg> <span class="like-count">' + counts.likes + '</span></button>' +
                             '<button class="post-stat post-comment-btn" onclick="document.getElementById(\'artistPostComment_' + pid + '\').focus()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> <span id="artistCommentCount_' + pid + '">' + counts.comments + '</span> Comment</button>' +
                             '<div class="share-dropdown-container" style="position:relative;margin-left:auto;">' +
-                                '<button class="post-stat" onclick="this.nextElementSibling.classList.toggle(\'active\')" style="cursor:pointer;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> Share</button>' +
+                                '<button class="post-stat" onclick="aiadOpenShareMenu(this,\'' + pid + '\')" style="cursor:pointer;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> Share</button>' +
                                 '<div class="share-dropdown" style="position:absolute;bottom:100%;right:0;left:auto;transform:none;min-width:180px;">' +
-                                    '<button class="share-dropdown-item" onclick="sharePostTo(\'instagram\',\'' + pid + '\')"><div class="share-dropdown-icon instagram"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><rect x="2" y="2" width="20" height="20" rx="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2"/></svg></div>Instagram</button>' +
-                                    '<button class="share-dropdown-item" onclick="sharePostTo(\'tiktok\',\'' + pid + '\')"><div class="share-dropdown-icon tiktok"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 00-.79-.05A6.34 6.34 0 003.15 15.2a6.34 6.34 0 007.04 6.3 6.34 6.34 0 005.63-6.3V9.41a8.16 8.16 0 004.77 1.53V7.49a4.85 4.85 0 01-1-.8z"/></svg></div>TikTok</button>' +
-                                    '<button class="share-dropdown-item" onclick="sharePostTo(\'twitter\',\'' + pid + '\')"><div class="share-dropdown-icon twitter"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></div>X / Twitter</button>' +
-                                    '<button class="share-dropdown-item" onclick="sharePostTo(\'copy\',\'' + pid + '\')"><div class="share-dropdown-icon copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></div>Copy link</button>' +
+                                    '<button class="share-dropdown-item" onclick="sharePostTo(\'instagram\',\'' + pid + '\',this)"><div class="share-dropdown-icon instagram"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><rect x="2" y="2" width="20" height="20" rx="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2"/></svg></div>Instagram</button>' +
+                                    '<button class="share-dropdown-item" onclick="sharePostTo(\'tiktok\',\'' + pid + '\',this)"><div class="share-dropdown-icon tiktok"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 00-.79-.05A6.34 6.34 0 003.15 15.2a6.34 6.34 0 007.04 6.3 6.34 6.34 0 005.63-6.3V9.41a8.16 8.16 0 004.77 1.53V7.49a4.85 4.85 0 01-1-.8z"/></svg></div>TikTok</button>' +
+                                    '<button class="share-dropdown-item" onclick="sharePostTo(\'twitter\',\'' + pid + '\',this)"><div class="share-dropdown-icon twitter"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></div>X / Twitter</button>' +
+                                    '<button class="share-dropdown-item" onclick="sharePostTo(\'copy\',\'' + pid + '\',this)"><div class="share-dropdown-icon copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></div>Copy link</button>' +
                                 '</div>' +
                             '</div>' +
                         '</div>' +
@@ -26632,15 +26632,15 @@ function _openFanPost(idx) {
                         'Tip' +
                     '</button>' +
                     '<div class="share-dropdown-container" style="position:relative;">' +
-                        '<button class="fan-action-btn" onclick="this.nextElementSibling.classList.toggle(\'active\')">' +
+                        '<button class="fan-action-btn" onclick="aiadOpenShareMenu(this,\'' + pid + '\')">' +
                             '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>' +
                             'Share' +
                         '</button>' +
                         '<div class="share-dropdown" style="position:absolute;bottom:100%;right:0;left:auto;transform:none;min-width:180px;">' +
-                            '<button class="share-dropdown-item" onclick="sharePostTo(\'instagram\',\'' + pid + '\')"><div class="share-dropdown-icon instagram"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><rect x="2" y="2" width="20" height="20" rx="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17.5" cy="6.5" r="1.5"/></svg></div>Instagram</button>' +
-                            '<button class="share-dropdown-item" onclick="sharePostTo(\'tiktok\',\'' + pid + '\')"><div class="share-dropdown-icon tiktok"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 00-.79-.05A6.34 6.34 0 003.15 15.2a6.34 6.34 0 007.04 6.3 6.34 6.34 0 005.63-6.3V9.41a8.16 8.16 0 004.77 1.53V7.49a4.85 4.85 0 01-1-.8z"/></svg></div>TikTok</button>' +
-                            '<button class="share-dropdown-item" onclick="sharePostTo(\'twitter\',\'' + pid + '\')"><div class="share-dropdown-icon twitter"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></div>X / Twitter</button>' +
-                            '<button class="share-dropdown-item" onclick="sharePostTo(\'copy\',\'' + pid + '\')"><div class="share-dropdown-icon copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></div>Copy link</button>' +
+                            '<button class="share-dropdown-item" onclick="sharePostTo(\'instagram\',\'' + pid + '\',this)"><div class="share-dropdown-icon instagram"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><rect x="2" y="2" width="20" height="20" rx="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17.5" cy="6.5" r="1.5"/></svg></div>Instagram</button>' +
+                            '<button class="share-dropdown-item" onclick="sharePostTo(\'tiktok\',\'' + pid + '\',this)"><div class="share-dropdown-icon tiktok"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 00-.79-.05A6.34 6.34 0 003.15 15.2a6.34 6.34 0 007.04 6.3 6.34 6.34 0 005.63-6.3V9.41a8.16 8.16 0 004.77 1.53V7.49a4.85 4.85 0 01-1-.8z"/></svg></div>TikTok</button>' +
+                            '<button class="share-dropdown-item" onclick="sharePostTo(\'twitter\',\'' + pid + '\',this)"><div class="share-dropdown-icon twitter"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></div>X / Twitter</button>' +
+                            '<button class="share-dropdown-item" onclick="sharePostTo(\'copy\',\'' + pid + '\',this)"><div class="share-dropdown-icon copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></div>Copy link</button>' +
                         '</div>' +
                     '</div>' +
                 '</div>' +
@@ -26777,23 +26777,127 @@ function fanTipArtist(artistId, artistName) {
     fanOpenSupportModal(artistId, artistName);
 }
 
-async function sharePostTo(platform, postId) {
-    document.querySelectorAll('.share-dropdown').forEach(function(d) { d.classList.remove('active'); });
-    // Look up the real post so the share carries the caption, image and a link that resolves.
-    var caption = '', mediaUrl = '', username = '';
-    try {
-        var r = await db.from('artist_posts').select('content,media_url,user_id').eq('id', postId).maybeSingle();
+// Media a post carries can be tens of megabytes of video. Fetching it inside the click
+// handler burns the tap's transient user activation, so navigator.share() throws
+// NotAllowedError by the time the blob lands. Instead we start the whole lookup the
+// moment the share menu opens, and the click reads the finished payload synchronously.
+window.__aiadShareCache = new Map();
+var _AIAD_SHARE_CACHE_MAX = 8;
+
+// The carousel keeps its active slide in a closure, but the dots mirror it in the DOM.
+function _shareCarouselFor(anchorEl) {
+    var node = anchorEl;
+    while (node && node !== document.body) {
+        if (node.querySelector) {
+            var car = node.querySelector('.aiad-carousel');
+            if (car) return car;
+        }
+        node = node.parentElement;
+    }
+    return null;
+}
+
+function _shareActiveIndex(anchorEl) {
+    var car = _shareCarouselFor(anchorEl);
+    if (!car) return 0;
+    var dots = car.querySelectorAll('.aiad-carousel-dot');
+    for (var i = 0; i < dots.length; i++) {
+        if (dots[i].classList.contains('active')) return i;
+    }
+    return 0;
+}
+
+function _shareFileFromBlob(blob, item) {
+    var url = String((item && item.url) || '').split('?')[0].split('#')[0];
+    var urlExt = ((url.match(/\.([a-z0-9]{2,5})$/i) || [])[1] || '').toLowerCase();
+    var isVideo = (item && item.type === 'video') || /^video\//.test(blob.type || '');
+    var type = blob.type || '';
+    if (!type && urlExt) {
+        type = (isVideo ? 'video/' : 'image/') + (urlExt === 'jpg' ? 'jpeg' : urlExt);
+    }
+    var ext = urlExt || ((type.split('/')[1] || (isVideo ? 'mp4' : 'jpg')).split('+')[0]);
+    return new File([blob], 'aiad-post.' + ext, { type: type || 'application/octet-stream' });
+}
+
+// Kicked off when the share menu opens. Resolves to the payload the click handler needs,
+// or null if anything along the way failed — the caller then falls back to a link share.
+function _sharePrefetch(postId, anchorEl) {
+    if (!postId) return null;
+    var index = _shareActiveIndex(anchorEl);
+    var cache = window.__aiadShareCache;
+    var existing = cache.get(postId);
+    if (existing && existing.index === index) return existing;
+
+    var entry = { index: index, value: null, promise: null };
+    cache.set(postId, entry);
+    // Blobs are held in memory, so keep only the handful of posts recently opened.
+    if (cache.size > _AIAD_SHARE_CACHE_MAX) {
+        var oldest = cache.keys().next();
+        if (!oldest.done) cache.delete(oldest.value);
+    }
+
+    entry.promise = (async function () {
+        var caption = '', username = '', item = null;
+        var r = await db.from('artist_posts').select('content,media,media_url,media_type,user_id').eq('id', postId).maybeSingle();
         var post = r && r.data;
         if (post) {
             caption = post.content || '';
-            mediaUrl = post.media_url || '';
+            // media holds the ordered carousel array; media_url only ever mirrors item 0.
+            var items = (window.aiadPostMedia ? window.aiadPostMedia(post) : []) || [];
+            item = items[index] || items[0] || null;
             if (post.user_id) {
                 var pr = await db.from('profiles').select('username').eq('id', post.user_id).maybeSingle();
                 if (pr && pr.data) username = pr.data.username || '';
             }
         }
-    } catch (e) {}
+        var file = null;
+        if (item && item.url) {
+            try {
+                var blob = await (await fetch(item.url)).blob();
+                file = _shareFileFromBlob(blob, item);
+                // Burn the AIAD mark + @handle into stills so the branding travels when reposted.
+                if (/^image\//.test(file.type)) file = await _watermarkImageFile(file, username);
+            } catch (e) {}
+        }
+        return { caption: caption, username: username, file: file, url: (item && item.url) || '' };
+    })().then(function (v) {
+        entry.value = v;
+        return v;
+    }, function () {
+        // A failed lookup must not be cached as good — drop it so the next open retries.
+        if (cache.get(postId) === entry) cache.delete(postId);
+        return null;
+    });
+
+    return entry;
+}
+
+// Replaces the inline `this.nextElementSibling.classList.toggle('active')` on every share
+// button so opening the menu also starts the media prefetch.
+window.aiadOpenShareMenu = function (btn, postId) {
+    var dropdown = btn && btn.nextElementSibling;
+    if (!dropdown) return;
+    var opening = !dropdown.classList.contains('active');
+    dropdown.classList.toggle('active');
+    if (opening) { try { _sharePrefetch(postId, btn); } catch (e) {} }
+};
+
+async function sharePostTo(platform, postId, anchorEl) {
+    document.querySelectorAll('.share-dropdown').forEach(function(d) { d.classList.remove('active'); });
+
     var shareUrl = window.location.origin + '/post/' + postId;
+    var entry = window.__aiadShareCache.get(postId);
+    // Read the prefetched payload synchronously. Awaiting anything here — even a settled
+    // promise on a slow frame — is how the tap's activation gets spent.
+    var data = (entry && entry.value) || null;
+    var wasWarm = !!data;
+    if (!data) {
+        entry = entry || _sharePrefetch(postId, anchorEl);
+        data = entry ? await entry.promise : null;
+    }
+
+    var caption = (data && data.caption) || '';
+    var file = (data && data.file) || null;
     var caps = caption || 'Check out this post on AIAD';
 
     if (platform === 'twitter') {
@@ -26806,23 +26910,29 @@ async function sharePostTo(platform, postId) {
 
     // Instagram / TikTok have no web "compose" URL and — on desktop — don't appear in the OS
     // share sheet at all. So we only use the native sheet on phones; on desktop we go straight
-    // to download-image + copy-caption, which is the only real way to post there.
+    // to download-media + copy-caption, which is the only real way to post there.
     var appName = (platform === 'tiktok' ? 'TikTok' : 'Instagram');
     var isMobile = (navigator.maxTouchPoints > 1 && /Mac|iPhone|iPad|iPod|Android/i.test(navigator.platform + navigator.userAgent))
         || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
         || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
-    var file = null;
-    if (mediaUrl) {
-        try {
-            var blob = await (await fetch(mediaUrl)).blob();
-            var ext = ((blob.type.split('/')[1]) || 'jpg').split('+')[0];
-            file = new File([blob], 'aiad-post.' + ext, { type: blob.type });
-        } catch (e) {}
-    }
-    // Burn the AIAD mark + @handle into the image so the branding travels when reposted (TikTok-style).
-    if (file && /^image\//.test(file.type)) { file = await _watermarkImageFile(file, username); }
+    var isVideo = !!(file && /^video\//.test(file.type));
+
     // Mobile: open the native share sheet (Instagram / TikTok show up there) with the real media.
     if (isMobile && navigator.share) {
+        // A file we hold but the platform refuses: Android MIME restrictions, or a video over
+        // the OS share-sheet size cap. The generic path would open a bare link sheet with no
+        // explanation, so handle it here and say what actually happened. The clipboard write
+        // goes first — it shares this tap's activation, and the toast promises the link is
+        // already in the buffer.
+        if (file && navigator.canShare && !navigator.canShare({ files: [file] })) {
+            _shareCopy((caption ? caption + '\n' : '') + shareUrl);
+            try { await navigator.share({ text: caps, url: shareUrl || undefined }); }
+            catch (e) { /* cancelled or refused — the link is copied either way */ }
+            showToast(isVideo
+                ? 'Video too large to share directly — link copied.'
+                : 'This file can\'t be shared directly — link copied.');
+            return;
+        }
         try {
             if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
                 await navigator.share({ files: [file], text: caption ? (caption + (shareUrl ? '\n' + shareUrl : '')) : shareUrl });
@@ -26830,9 +26940,21 @@ async function sharePostTo(platform, postId) {
                 await navigator.share({ title: 'AIAD', text: caps, url: shareUrl || undefined });
             }
             return;
-        } catch (e) { if (e && e.name === 'AbortError') return; }
+        } catch (e) {
+            if (e && e.name === 'AbortError') return;
+            // NotAllowedError means the activation was gone before the sheet opened — almost
+            // always the media download for a large video. It is cached now, so a second tap
+            // goes straight through. Falling through to the desktop copy here would tell the
+            // user their media downloaded on a phone, which it did not.
+            if (e && e.name === 'NotAllowedError') {
+                showToast(wasWarm
+                    ? 'Couldn\'t open the share sheet — tap Share again.'
+                    : ((isVideo ? 'Video' : 'Media') + ' is ready — tap Share again to post to ' + appName + '.'));
+                return;
+            }
+        }
     }
-    // Desktop: download the image + copy the caption so it can be uploaded in the app.
+    // Desktop: download the media + copy the caption so it can be uploaded in the app.
     if (file) {
         var u = URL.createObjectURL(file);
         var a = document.createElement('a'); a.href = u; a.download = file.name;
@@ -26841,7 +26963,7 @@ async function sharePostTo(platform, postId) {
     }
     _shareCopy((caption ? caption + '\n' : '') + (shareUrl || ''));
     showToast(file
-        ? (appName + ' doesn\'t allow web posting on desktop — image downloaded + caption copied. Upload it in the ' + appName + ' app.')
+        ? (appName + ' doesn\'t allow web posting on desktop — ' + (isVideo ? 'video' : 'image') + ' downloaded + caption copied. Upload it in the ' + appName + ' app.')
         : ('Caption copied — open ' + appName + ' to post.'));
 }
 
