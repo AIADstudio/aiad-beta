@@ -5563,6 +5563,10 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                             <div class="context-summary-title">Your Current Context</div>
                             <div class="context-items">
                                 <div class="context-item">
+                                    <div class="context-item-value" id="agentCtxPlan">—</div>
+                                    <div class="context-item-label">Plan</div>
+                                </div>
+                                <div class="context-item">
                                     <div class="context-item-value" id="agentCtxLevel">—</div>
                                     <div class="context-item-label">Artist Level</div>
                                 </div>
@@ -10723,7 +10727,10 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 upsellTo: 'artist_premier'
             },
             artist_premier: {
-                name: 'Established',
+                // Named for the plan key, not the career stage. This used to read
+                // "Established", which is also a career_stage value, so a badge could not
+                // tell you whether it was describing what you pay for or where you are.
+                name: 'Premier',
                 price: 99,
                 priceLabel: '$99/mo',
                 aiCredits: 2000,
@@ -12393,6 +12400,17 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     role: 'artist',
                     industry: AppState.userIndustry || 'music',
                 }, { onConflict: 'id' });
+                // profiles.plan defaults to 'free' and this upsert never named a plan, so
+                // an artist could finish signup on the explore-only tier — which is how
+                // three artist rows ended up on free with no artist_profile, no posts and
+                // no tracks. Free browses; it does not create. Written as a separate
+                // conditional update so a returning artist's paid plan is never clobbered.
+                try {
+                    await db.from('profiles')
+                        .update({ plan: 'artist_starter' })
+                        .eq('id', AppState.currentUser.id)
+                        .or('plan.is.null,plan.eq.free');
+                } catch (e) {}
             }
 
             AppState.artistProfile.artistName = document.getElementById('artistName').value.trim();
@@ -12570,6 +12588,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 AppState.aiCreditsMax = tierConfig.aiCredits;
                 AppState.aiCreditsRemaining = tierConfig.aiCredits;
                 if (typeof window.loadAiCredits === 'function') window.loadAiCredits();
+                if (typeof window.aiadLoadPlan === 'function') window.aiadLoadPlan();
             }
 
             localStorage.setItem('aiad_subscription_tier', AppState.selectedTier);
@@ -15024,6 +15043,52 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             } catch (e) { if (st) st.textContent = 'Failed: ' + (e.message || e); }
             if (btn) btn.disabled = false;
         }
+        // AppState.artistProfile.plan was read in two places and written in none, so both
+        // label sites fell through to 'Free' — which is how a founding artist_premier row
+        // rendered as Free on the dashboard. profiles.plan is the field; read it.
+        //
+        // A trial is not a plan: the founding trial is expressed as founding_free_until in
+        // the future, and profiles.plan already holds the CHOSEN plan throughout it. So
+        // there is nothing to translate here, and nothing may downgrade a trialing artist
+        // to free.
+        async function aiadLoadPlan() {
+            try {
+                const uid = window.aiadResolvedUserId && window.aiadResolvedUserId();
+                if (!uid) return;
+                const r = await db.from('profiles')
+                    .select('plan,founding_member,founding_number,founding_free_until,all_access')
+                    .eq('id', uid).maybeSingle();
+                if (r.error || !r.data) return;
+                AppState.planKey = r.data.plan || 'free';
+                AppState.founding = { member: !!r.data.founding_member,
+                                      number: r.data.founding_number || null,
+                                      freeUntil: r.data.founding_free_until || null };
+                AppState.allAccess = !!r.data.all_access;
+                if (window.aiadPaintPlanLabels) window.aiadPaintPlanLabels();
+            } catch (e) {}
+        }
+        window.aiadLoadPlan = aiadLoadPlan;
+
+        window.aiadPaintPlanLabels = function () {
+            const set = function (id, v) { const el = document.getElementById(id); if (el) el.textContent = v; };
+            set('agentCtxPlan', window.aiadPlanLabel());
+            set('agentCtxLevel', window.aiadCareerLabel());
+        };
+
+        // The plan the artist pays for.
+        window.aiadPlanLabel = function () {
+            const k = (window.AppState && AppState.planKey) || 'free';
+            const t = (typeof SubscriptionTiers !== 'undefined' && SubscriptionTiers[k]) || null;
+            return (t && t.name) || 'Free';
+        };
+        // Where they are in their career. A different field, from artist_profiles, and
+        // shown separately so neither one is mistaken for the other.
+        window.aiadCareerLabel = function () {
+            const c = (window.AppState && AppState.artistProfile && AppState.artistProfile.artistLevel) || '';
+            if (!c) return '\u2014';
+            return String(c).charAt(0).toUpperCase() + String(c).slice(1);
+        };
+
         async function loadAccountUsage() {
             const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
             try {
@@ -17357,10 +17422,10 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             // Level from AppState
             try {
                 const profile = AppState.artistProfile;
-                const plan = profile?.plan || profile?.subscriptionTier || localStorage.getItem('aiad_plan') || 'Free';
-                const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1);
+                const planEl = document.getElementById('agentCtxPlan');
+                if (planEl) planEl.textContent = window.aiadPlanLabel();
                 const lvlEl = document.getElementById('agentCtxLevel');
-                if (lvlEl) lvlEl.textContent = planLabel;
+                if (lvlEl) lvlEl.textContent = window.aiadCareerLabel();
 
                 // Resolve the Supabase client (declared as `db` elsewhere in the app).
                 const client = (typeof db !== 'undefined' && db) || window.db;
@@ -18041,6 +18106,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             // a DB read happened to overwrite it. The real balance comes from
             // loadAiCredits() below; leave it unknown until then.
             if (typeof window.loadAiCredits === 'function') window.loadAiCredits();
+            if (typeof window.aiadLoadPlan === 'function') window.aiadLoadPlan();
             updateAICreditsDisplay();
         }
 
@@ -18224,6 +18290,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             AppState.aiCreditsMax = tierConfig.aiCredits;
             AppState.aiCreditsRemaining = tierConfig.aiCredits;
             if (typeof window.loadAiCredits === 'function') window.loadAiCredits();
+            if (typeof window.aiadLoadPlan === 'function') window.aiadLoadPlan();
 
             localStorage.setItem('aiad_subscription_tier', tier);
             localStorage.setItem('aiad_ai_credits', AppState.aiCreditsRemaining);
@@ -25305,7 +25372,8 @@ document.addEventListener('keydown', function(e) {
                     { label: 'Posts',           val: posts.length,       change: null },
                     { label: 'Tracks',          val: tracks.length,      change: null },
                     { label: 'Active Projects', val: activeProj,         change: null },
-                    { label: 'Artist Level',    val: AppState.artistProfile?.plan || 'Free', change: null },
+                    { label: 'Plan',            val: window.aiadPlanLabel(),   change: null },
+                    { label: 'Artist Level',    val: window.aiadCareerLabel(), change: null },
                 ];
 
                 // Build HTML — duplicate for seamless scroll loop
