@@ -185,6 +185,76 @@
         // migration.
         window.AIAD_WATERMARK = true;  // temporary launch-era branding — set false to remove from photos and videos everywhere
 
+        // Industries closed to NEW signups. This hides the sign-up card and refuses the
+        // value if a card is reached some other way; it removes nothing. The fashion
+        // dashboard, fashion-theme, switchDashboard('fashion') and the fashion onboarding
+        // container are all still built and still reachable — this is a closed door, not a
+        // demolition, so reopening is emptying the array and nothing else.
+        window.AIAD_CLOSED_INDUSTRIES = ['fashion'];  // temporarily closed to new signups — empty the array to reopen
+
+        window.aiadIndustryClosed = function (value) {
+            var list = window.AIAD_CLOSED_INDUSTRIES;
+            return !!value && Array.isArray(list) && list.indexOf(value) !== -1;
+        };
+
+        // Hides closed cards and re-seats the radiogroup's single tab stop. Idempotent, and
+        // it un-hides anything no longer listed, so editing the array and re-running this is
+        // enough to reopen without a reload.
+        window.aiadApplyClosedIndustries = function () {
+            var list = window.AIAD_CLOSED_INDUSTRIES;
+            var closed = Array.isArray(list) ? list : [];
+
+            // #page-industry-selection carries `active` in the static markup, so it paints
+            // before DOMContentLoaded fires. The first call below runs while the cards are
+            // still unparsed, so emitting the rule here means a closed card is never painted
+            // at all, rather than appearing and then vanishing. Rewritten on every call, so
+            // emptying the array really does reopen without a reload.
+            var st = document.getElementById('aiadClosedIndustries');
+            if (closed.length) {
+                if (!st) {
+                    st = document.createElement('style');
+                    st.id = 'aiadClosedIndustries';
+                    (document.head || document.documentElement).appendChild(st);
+                }
+                st.textContent = closed.map(function (v) {
+                    // Values are matched, not trusted: a stray entry must not build a selector.
+                    return '.card--industry[data-value="' + String(v).replace(/[^a-z0-9_-]/gi, '') + '"]';
+                }).join(',') + '{display:none;}';
+            } else if (st && st.parentNode) {
+                st.parentNode.removeChild(st);
+            }
+
+            var cards = document.querySelectorAll('.card--industry[data-value]');
+            if (!cards.length) return;
+            var firstVisible = null, checked = null;
+            Array.prototype.forEach.call(cards, function (card) {
+                if (window.aiadIndustryClosed(card.dataset.value)) {
+                    card.style.display = 'none';
+                    card.setAttribute('aria-hidden', 'true');
+                    // A closed industry must not stay selected if it somehow already was.
+                    card.setAttribute('aria-checked', 'false');
+                    return;
+                }
+                card.style.display = '';
+                card.removeAttribute('aria-hidden');
+                if (!firstVisible) firstVisible = card;
+                if (card.getAttribute('aria-checked') === 'true') checked = card;
+            });
+            // Roving radiogroup: exactly one tab stop. A selected card keeps it, otherwise
+            // the first card still on screen is the way in — never a hidden one.
+            var owner = checked || firstVisible;
+            Array.prototype.forEach.call(cards, function (card) {
+                card.setAttribute('tabindex', card === owner ? '0' : '-1');
+            });
+        };
+
+        // Runs twice on purpose: now, to emit the rule before the cards are parsed, and
+        // again once they exist so the inline display and the tab stop can be set.
+        window.aiadApplyClosedIndustries();
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', window.aiadApplyClosedIndustries);
+        }
+
         // ?demo=1 hides founder-only chrome (the Admin pill, the Preview role
         // panel, the Review queue nav item) so the app can be filmed on the
         // founder account without internal tooling on screen. Presentation only:
@@ -10794,6 +10864,12 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         }
 
         function selectIndustryCard(card) {
+            if (!card) return;
+            // Closed to new signups. Refused here as well as hidden, because the card is not
+            // the only way in: arrow-key nav, a restored selection, or a direct call all land
+            // here. Silent by design — the card is not on screen, so a toast would be
+            // explaining away something the user never saw.
+            if (window.aiadIndustryClosed && window.aiadIndustryClosed(card.dataset.value)) return;
             console.log('[AIAD] Industry selected:', card.dataset.value);
 
             document.querySelectorAll('#page-industry-selection .card').forEach(c => {
@@ -31631,11 +31707,11 @@ Be direct and concrete with real industry insight — never generic filler. When
 
         document.addEventListener('DOMContentLoaded', () => {
             lockIndustrySelectFn(); wireCollabPersistence();
-            setTimeout(() => { hookSettings(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); applyLiveMeta(); ensureArtistStats(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); wireFashionAgent(); wireAddCategory(); wireFashionDashboardExtras(); wsSync(); loadVerifiedNames().then(() => decorateBadges()); }, 1500);
+            setTimeout(() => { hookSettings(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); applyLiveMeta(); ensureArtistStats(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); window.aiadApplyClosedIndustries && window.aiadApplyClosedIndustries(); wireCollabPersistence(); wireSyncMarketplace(); wireFashionAgent(); wireAddCategory(); wireFashionDashboardExtras(); wsSync(); loadVerifiedNames().then(() => decorateBadges()); }, 1500);
         });
         // Re-decorate + (re)mount buttons/pickers as auth state / views change.
         setInterval(() => { try { window.aiadMountWsSwitcher && window.aiadMountWsSwitcher(); } catch (e) {}
-            if (_verifiedNames) decorateBadges(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); wireCollabPersistence(); wireSyncMarketplace(); wireFashionAgent(); wireAddCategory(); wireFashionDashboardExtras(); wsSync(); renderWsSwitcher(); }, 2500);
+            if (_verifiedNames) decorateBadges(); buildFounderConsole(); buildAdminButton(); buildSupportButton(); injectStudioModelPickers(); wrapCreativeStudio(); lockNonMusicIndustries(); lockIndustrySelectFn(); window.aiadApplyClosedIndustries && window.aiadApplyClosedIndustries(); wireCollabPersistence(); wireSyncMarketplace(); wireFashionAgent(); wireAddCategory(); wireFashionDashboardExtras(); wsSync(); renderWsSwitcher(); }, 2500);
     })();
     </script>
 <!-- AIAD usage tracking (self-contained, fail-safe) -->
