@@ -790,29 +790,12 @@ html, body {
         box-sizing: border-box !important;
     }
 
-    /* 9. Stats ticker.
-       The marquee is deliberately OFF on mobile. iOS Safari would not run this
-       animation reliably and a stalled marquee reads as a broken one, so the row is
-       static and swipeable instead — motion that does not work is worse than none.
-       The bar keeps the label pinned and scrolls only the stats, so the label can
-       never end up over the numbers. */
-    .live-stats-bar {
-        overflow: hidden !important;
-        -webkit-overflow-scrolling: touch;
-    }
-    .live-stats-bar::-webkit-scrollbar { display: none; }
-    .live-stats-ticker {
-        animation: none !important;
-        transform: none !important;
-        overflow-x: auto;
-        scrollbar-width: none;
-        -webkit-overflow-scrolling: touch;
-        min-width: 0;
-    }
-    .live-stats-ticker::-webkit-scrollbar { display: none; }
-    /* The duplicate half exists only to make the marquee loop seamlessly. With no
-       marquee it is just the same six stats a second time. */
-    .live-stats-ticker .live-stat-item.is-loop-copy { display: none; }
+    /* 9. Stats ticker: not on a phone.
+       It is a desktop element — a marquee iOS would not run, carrying numbers that are
+       all available in the stats view. The LIVE pill goes with it; it only ever
+       labelled the ticker. Nothing is lost here, the home screen just stops carrying
+       it. Desktop keeps the bar and the marquee unchanged. */
+    .live-stats-bar { display: none !important; }
 
     /* 10. Grids */
     .quick-metrics-bar { overflow-x: auto !important; flex-wrap: nowrap !important; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
@@ -26897,6 +26880,85 @@ async function loadFanDiscover() { setTimeout(()=>_execDiscoverSearch(),100); }
         // Following was only ever visible from the fan dashboard, so an artist
         // had no way to see who they had followed. This keeps the list on the
         // screen they actually use, and every chip opens that artist's page.
+        // Founding pill and Following chip on one row, so the whole strip between the
+        // header and the content is a single line of chips. Idempotent: renderCountdown
+        // re-inserts its strip on a timer and this runs alongside it.
+        window.aiadLayoutChipRow = function () {
+            const main = document.querySelector('#artistDashboard .dash-main');
+            if (!main) return;
+            const mobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+            let row = document.getElementById('aiadChipRow');
+            const fs = document.getElementById('aiadFoundingStrip');
+            const fl = document.getElementById('aiadFollowingStrip');
+            if (!mobile) {
+                // Put both back where the desktop layout expects them and drop the row.
+                if (row) {
+                    if (fs) main.insertBefore(fs, main.firstChild);
+                    if (fl) {
+                        const sw = document.getElementById('aiadArtistSearchWrap');
+                        if (sw && sw.parentNode) sw.parentNode.insertBefore(fl, sw.nextSibling);
+                        else main.appendChild(fl);
+                    }
+                    row.remove();
+                }
+                return;
+            }
+            if (!row) { row = document.createElement('div'); row.id = 'aiadChipRow'; }
+            if (row.parentNode !== main || main.firstChild !== row) main.insertBefore(row, main.firstChild);
+            if (fs && fs.parentNode !== row) row.appendChild(fs);
+            if (fl && fl.parentNode !== row) row.appendChild(fl);
+            // Founding first, and only touched when it is actually out of order.
+            if (fs && fl && fs.nextElementSibling !== fl) row.insertBefore(fs, fl);
+        };
+
+        // The search field becomes an icon in the mobile header. The wrap itself is what
+        // opens, so every existing handler on the input keeps working — nothing is moved
+        // and no second field exists to fall out of sync.
+        window.aiadToggleSearch = function (open) {
+            const wrap = document.getElementById('aiadArtistSearchWrap');
+            if (!wrap) return;
+            const isOpen = wrap.classList.contains('is-open');
+            if (open === isOpen) return;
+            if (open) {
+                wrap.classList.add('is-open');
+                const inp = document.getElementById('aiadArtistSearchInput');
+                if (inp) setTimeout(function () { try { inp.focus(); } catch (e) {} }, 30);
+                // A history entry so the phone's back gesture collapses it instead of
+                // leaving the dashboard.
+                try { history.pushState({ aiadSearch: 1 }, ''); } catch (e) {}
+            } else {
+                wrap.classList.remove('is-open');
+                const box = document.getElementById('aiadArtistSearchResults');
+                if (box) box.style.display = 'none';
+                try {
+                    if (history.state && history.state.aiadSearch) history.back();
+                } catch (e) {}
+            }
+        };
+
+        window.addEventListener('popstate', function () {
+            const wrap = document.getElementById('aiadArtistSearchWrap');
+            if (wrap && wrap.classList.contains('is-open')) wrap.classList.remove('is-open');
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') window.aiadToggleSearch(false);
+        });
+
+        // The icon lives in the header's right-hand group, beside the avatar.
+        window.aiadEnsureSearchIcon = function () {
+            const hdr = document.querySelector('.dash-mobile-header');
+            if (!hdr || hdr.querySelector('.aiad-search-icon')) return;
+            const right = hdr.children[1] || hdr;
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'aiad-search-icon';
+            b.setAttribute('aria-label', 'Search artists');
+            b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;">'
+                + '<circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>';
+            b.onclick = function () { window.aiadToggleSearch(true); };
+            right.insertBefore(b, right.firstChild);
+        };
+
         // One place decides whether the strip is a row or a chip, so a resize does not
         // leave a phone showing the desktop row.
         window.aiadPaintFollowing = function () {
@@ -26947,6 +27009,7 @@ async function loadFanDiscover() { setTimeout(()=>_execDiscoverSearch(),100); }
 
         window.addEventListener('resize', function () {
             try { window.aiadPaintFollowing(); } catch (e) {}
+            try { window.aiadLayoutChipRow(); } catch (e) {}
         });
 
         window.aiadLoadFollowingStrip = async function (force) {
@@ -26997,6 +27060,7 @@ async function loadFanDiscover() { setTimeout(()=>_execDiscoverSearch(),100); }
                     return { id: id, name: names[id] || 'Artist', avatar: avs[id] || '', amount: amt[id] || 0 };
                 });
                 window.aiadPaintFollowing();
+                if (window.aiadLayoutChipRow) window.aiadLayoutChipRow();
             } catch (err) {
                 console.warn('[AIAD] following strip:', err && err.message);
             } finally { strip.dataset.loading = '0'; }
@@ -27008,12 +27072,20 @@ async function loadFanDiscover() { setTimeout(()=>_execDiscoverSearch(),100); }
                 const bar = document.createElement('div');
                 bar.id = 'aiadArtistSearchWrap';
                 bar.style.cssText = 'display:flex;align-items:center;gap:12px;margin:6px 0 18px;';
-                bar.innerHTML = '<div style="position:relative;flex:1;max-width:520px;"><input id="aiadArtistSearchInput" type="text" placeholder="Search artists by name or @username…" autocomplete="off" oninput="aiadDoArtistSearch(this.value)" style="width:100%;box-sizing:border-box;background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:10px;padding:11px 14px 11px 38px;font-size:0.9rem;outline:none;">'
+                bar.innerHTML = '<div style="position:relative;flex:1;max-width:520px;"><input id="aiadArtistSearchInput" type="text" placeholder="Search artists" autocomplete="off" oninput="aiadDoArtistSearch(this.value)" style="width:100%;box-sizing:border-box;background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:10px;padding:11px 14px 11px 38px;font-size:0.9rem;outline:none;">'
                     + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute;left:12px;top:12px;width:16px;height:16px;color:var(--text-muted);pointer-events:none;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>'
                     + '<div id="aiadArtistSearchResults" style="display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:500;background:var(--bg-card);border:1px solid var(--border-default);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,0.5);max-height:420px;overflow-y:auto;"></div></div>';
                 const stats = main.querySelector('#liveStatsBar');
                 if (stats && stats.parentNode === main) main.insertBefore(bar, stats.nextSibling);
                 else main.insertBefore(bar, main.firstChild);
+                // Collapse control for the mobile search overlay; hidden on desktop.
+                const xb = document.createElement('button');
+                xb.type = 'button'; xb.className = 'aiad-search-close';
+                xb.setAttribute('aria-label', 'Close search');
+                xb.innerHTML = '&times;';
+                xb.onclick = function () { window.aiadToggleSearch(false); };
+                bar.appendChild(xb);
+
                 const strip = document.createElement('div');
                 strip.id = 'aiadFollowingStrip';
                 strip.style.cssText = 'display:none;margin:0 0 20px;padding:14px 16px;background:var(--bg-card);border:1px solid var(--border-default);border-radius:12px;';
@@ -27021,8 +27093,13 @@ async function loadFanDiscover() { setTimeout(()=>_execDiscoverSearch(),100); }
                 const acctW = document.getElementById('acctMenuWrap');
                 if (acctW) { acctW.style.display='block'; acctW.style.position='relative'; acctW.style.top='auto'; acctW.style.right='auto'; acctW.style.height='auto'; acctW.style.marginLeft='auto'; acctW.style.flexShrink='0'; bar.appendChild(acctW); }
             }
-            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ensure); else ensure();
-            setInterval(ensure, 2500);
+            const ensureAll = function () {
+                ensure();
+                try { window.aiadEnsureSearchIcon(); } catch (e) {}
+                try { window.aiadLayoutChipRow(); } catch (e) {}
+            };
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ensureAll); else ensureAll();
+            setInterval(ensureAll, 2500);
             // Auth restores after this bar is injected, so a single load on inject
             // would run with no session and leave the strip empty for good. The
             // loadedFor guard makes every repeat after the first one free.
@@ -39763,6 +39840,10 @@ window.AIAD_PROMPTS = [
   font-size: 0.82rem; color: var(--text-secondary, rgba(255,255,255,0.65)); line-height: 1.45;
 }
 .aiad-founding-strip strong { color: var(--text-primary, #fff); font-weight: 700; }
+/* The strip carries both lengths of its wording and CSS picks one. Desktop shows the
+   long form; the mobile block below swaps them. Exactly one is ever visible. */
+.aiad-founding-strip .fs-short { display: none; }
+.aiad-founding-strip .fs-long { display: inline; }
 .aiad-founding-strip .fs-count {
   margin-left: auto; font-weight: 700; color: var(--teal-light, #00D4FF);
   white-space: nowrap; font-variant-numeric: tabular-nums;
@@ -39786,7 +39867,6 @@ window.AIAD_PROMPTS = [
      box that clipped the agent card and its input. Children keep their natural
      height; .dash-main does the scrolling, exactly as it did before. */
   .dash-main > * { flex: 0 0 auto; }
-  .dash-main > .dash-view.active { order: -1; }
   .dash-main > .aiad-site-footer { order: 99; }
 
   /* Founding strip collapses to one line: the name and the countdown, with the
@@ -39827,8 +39907,49 @@ window.AIAD_PROMPTS = [
     color: var(--text-primary); font-weight: 700; font-variant-numeric: tabular-nums;
   }
 
-  /* The search bar is not the reason anyone opens the dashboard. */
-  #aiadArtistSearchWrap { margin: 4px 0 12px !important; }
+  /* Founding pill and Following chip share one row; nothing else sits between the
+     header and the content. */
+  #aiadChipRow {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    margin: 10px 0 12px; flex: 0 0 auto;
+  }
+  /* The chip sets its own margin and align-self for the standalone case; inside the
+     row it is one of two pills that have to line up. Addressed by id because the chip's
+     own margin is !important, and a bottom margin under align-items:center pushes it off
+     the shared baseline. */
+  #aiadChipRow > *,
+  #aiadChipRow > #aiadFollowingStrip,
+  #aiadChipRow > #aiadFoundingStrip { margin: 0 !important; align-self: center !important; }
+
+  /* Founding drops to a pill on that row rather than its own full-width bar. */
+  .aiad-founding-strip {
+    width: auto; font-size: 0.76rem; border-radius: 999px;
+    padding: 7px 26px 7px 13px; gap: 6px;
+  }
+  .aiad-founding-strip .fs-long { display: none; }
+  .aiad-founding-strip .fs-short { display: inline; }
+  .aiad-founding-strip.is-open { border-radius: 12px; width: 100%; }
+  .aiad-founding-strip.is-open .fs-long { display: inline; }
+  .aiad-founding-strip.is-open .fs-short { display: none; }
+
+  /* The search bar is not the reason anyone opens the dashboard, and at this width its
+     own placeholder truncated. It becomes an icon in the header; tapping it drops the
+     full-width field below the header with the keyboard up. */
+  #aiadArtistSearchWrap { display: none !important; }
+  #aiadArtistSearchWrap.is-open {
+    display: flex !important; position: fixed; left: 0; right: 0; top: 56px;
+    z-index: 100040; margin: 0 !important; padding: 8px 12px;
+    background: var(--bg-secondary); border-bottom: 1px solid var(--border-default);
+  }
+  #aiadArtistSearchWrap.is-open > div { max-width: none !important; }
+  .aiad-search-icon {
+    background: none; border: none; color: var(--text-secondary); cursor: pointer;
+    padding: 6px; display: flex; align-items: center;
+  }
+  .aiad-search-close {
+    background: none; border: none; color: var(--text-secondary); cursor: pointer;
+    font-size: 1.4rem; line-height: 1; padding: 0 6px; flex: 0 0 auto;
+  }
 
   /* The agent view's own header is chrome too. The subtitle explains a screen the
      artist is already looking at, and the space it takes is the difference between
@@ -39840,6 +39961,10 @@ window.AIAD_PROMPTS = [
   /* Nothing should end up under the fixed bottom nav. */
   .dash-main { padding-bottom: 96px !important; }
 }
+
+/* The header search icon and the overlay's close button exist only on a phone. */
+.aiad-search-icon, .aiad-search-close { display: none; }
+@media (max-width: 768px) { .aiad-search-icon { display: flex; } .aiad-search-close { display: block; } }
 
 /* Following sheet — mobile only, but the rules are harmless anywhere. */
 .aiad-follow-sheet {
@@ -39920,8 +40045,17 @@ window.AIAD_PROMPTS = [
 
     // ── Founding window ─────────────────────────────────────────────────────
     function windowOpen() { return Date.now() <= FOUNDING_END; }
+    // A founding member's strip lives or dies by THEIR founding_free_until, read from
+    // their profile. Once that instant has passed the strip renders nothing at all — it
+    // is a countdown, and a countdown that has finished is just clutter. Falls back to
+    // the programme close date only when the profile has no date of its own.
+    function memberEnd() { return state.freeUntil || FOUNDING_END; }
+    function memberWindowOpen() { return Date.now() <= memberEnd(); }
     function daysLeft() {
         return Math.max(0, Math.ceil((FOUNDING_END - Date.now()) / 86400000));
+    }
+    function memberDaysLeft() {
+        return Math.max(0, Math.ceil((memberEnd() - Date.now()) / 86400000));
     }
     function endLabel() {
         return new Date(FOUNDING_END).toLocaleDateString('en-US', { day: 'numeric', month: 'long' });
@@ -39936,7 +40070,7 @@ window.AIAD_PROMPTS = [
         if (!db || !uid) { state.loaded = true; return state; }
 
         var prof = await db.from('profiles')
-            .select('plan,founding_member,founding_number').eq('id', uid).limit(1);
+            .select('plan,founding_member,founding_number,founding_free_until').eq('id', uid).limit(1);
         if (prof.error) {
             console.warn('[AIAD pricing] profile read failed:', prof.error.message);
             if (window.reportDbError) window.reportDbError('profiles', 'select', prof.error, { via: 'pricing' });
@@ -39944,6 +40078,11 @@ window.AIAD_PROMPTS = [
             state.plan = prof.data[0].plan || 'free';
             state.founding = !!prof.data[0].founding_member;
             state.foundingNumber = prof.data[0].founding_number || null;
+            // The member's own end date. FOUNDING_END is when the programme closes to new
+            // members, which is not necessarily when THIS member's free window ends.
+            var _fu = prof.data[0].founding_free_until;
+            var _t = _fu ? Date.parse(_fu) : NaN;
+            state.freeUntil = isNaN(_t) ? null : _t;
         }
 
         var cnt = await db.rpc('founding_member_count', { p_role: 'artist' });
@@ -40048,23 +40187,33 @@ window.AIAD_PROMPTS = [
        it ends. This is the only surface that tells them. */
     function renderCountdown() {
         var existing = document.getElementById('aiadFoundingStrip');
-        if (!windowOpen() || (!state.founding && !(state.spotsLeft > 0))) {
+        // A member is gated on their own expiry; the recruiting pitch is gated on the
+        // programme's. Either way, expired means the element is removed, not hidden.
+        var alive = state.founding ? memberWindowOpen() : (windowOpen() && state.spotsLeft > 0);
+        if (!alive) {
             if (existing) existing.remove();
+            if (window.aiadLayoutChipRow) window.aiadLayoutChipRow();
             return;
         }
         var dash = document.getElementById('artistDashboard');
         var main = dash ? dash.querySelector('.dash-main') : null;
         if (!main) return;
 
-        var d = daysLeft();
+        var d = state.founding ? memberDaysLeft() : daysLeft();
         var p = plan(state.plan) || plan('artist_pro');
         var html, cls;
         if (state.founding) {
             cls = 'is-member' + (d <= 7 ? ' is-urgent' : '');
-            html = '<strong>Founding Artist' + (state.foundingNumber ? ' #' + state.foundingNumber : '') + '</strong>' +
-                '<span>Free until ' + esc(endLabel()) + ' — then $' + foundingMonthly(p) + '/mo for ' +
+            // Two lengths of the same words. CSS picks one, so the pill and the bar can
+            // never drift apart in wording.
+            html = '<strong><span class="fs-long">Founding Artist</span>'
+                 + '<span class="fs-short">Founding</span>'
+                 + (state.foundingNumber ? ' #' + state.foundingNumber : '') + '</strong>' +
+                '<span>Free until ' + esc(new Date(memberEnd()).toLocaleDateString('en-US', { day: 'numeric', month: 'long' }))
+                + ' — then $' + foundingMonthly(p) + '/mo for ' +
                 FOUNDING_DISCOUNT_MONTHS + ' months on ' + esc(p.name) + '.</span>' +
-                '<span class="fs-count">' + d + ' day' + (d === 1 ? '' : 's') + ' left</span>';
+                '<span class="fs-count">' + d + ' day' + (d === 1 ? '' : 's')
+                + '<span class="fs-long"> left</span></span>';
         } else {
             cls = '';
             html = '<strong>Founding programme</strong>' +
