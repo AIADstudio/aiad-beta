@@ -15331,6 +15331,12 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
 
         window.aiadPostMedia = function (post) {
             if (!post) return [];
+            // Every renderer enumerates a post's media through here, so this is the one place
+            // that sees an unmarked video on screen no matter which feed drew it. The helper
+            // is inert unless the row is old enough and carries an unmarked video, and it
+            // needs created_at, which the narrow select in _sharePrefetch does not ask for —
+            // so a share never triggers an encode.
+            _aiadMaybeRetryWatermark(post);
             var raw = post.media;
             if (typeof raw === 'string') { try { raw = JSON.parse(raw); } catch (e) { raw = null; } }
             if (Array.isArray(raw) && raw.length) {
@@ -15769,6 +15775,16 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         }
         function removeMedia() { clearPostMedia(); }
 
+        // One place that knows the request shape, so the publish path and the retry below
+        // cannot drift apart. Returns the fetch promise; callers decide whether to track it.
+        function _aiadSendWatermark(postId, itemIndex, videoUrl, token) {
+            return fetch('/api/watermark', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                body: JSON.stringify({ postId: postId, itemIndex: itemIndex, videoUrl: videoUrl })
+            });
+        }
+
         // Ask the server to burn the AIAD mark into each posted video. Canvas cannot touch
         // video and iOS Safari has no captureStream, so the encode happens on Vercel and the
         // result is written back to artist_posts.media[i].watermarked_url. Strictly
@@ -15780,18 +15796,70 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 if (!postId || !Array.isArray(mediaRows)) return;
                 var indices = [];
                 for (var i = 0; i < mediaRows.length; i++) {
-                    if (mediaRows[i] && mediaRows[i].type === 'video' && mediaRows[i].url) indices.push(i);
+                    var _m = mediaRows[i];
+                    // Already marked items are skipped so this is safe to re-run over a
+                    // whole post; at publish time nothing is marked yet, so nothing changes.
+                    if (_m && _m.type === 'video' && _m.url && !_m.watermarked_url) indices.push(i);
                 }
                 if (!indices.length) return;
                 db.auth.getSession().then(function (r) {
                     var token = r && r.data && r.data.session && r.data.session.access_token;
                     if (!token) return;
                     indices.forEach(function (i) {
-                        fetch('/api/watermark', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                            body: JSON.stringify({ postId: postId, itemIndex: i, videoUrl: mediaRows[i].url })
-                        }).catch(function () {});
+                        _aiadSendWatermark(postId, i, mediaRows[i].url, token).catch(function () {});
+                    });
+                }).catch(function () {});
+            } catch (e) {}
+        }
+
+        // The publish-time request is the only one that ever fires, so closing the tab while
+        // it is in flight leaves that video permanently unmarked with nothing to recover it.
+        // This is the recovery: any renderer that enumerates a post's media gives an unmarked
+        // video one more chance. Once per item per session, capped, and completely silent —
+        // an unmarked video is a worse post, not a broken one.
+        var _wmRetried = new Set();     // postId:itemIndex, so one failure is not retried all session
+        var _wmInFlight = 0;
+        var AIAD_WM_RETRY_MAX = 3;      // concurrent retries; browsing a long feed must not flood
+        var AIAD_WM_RETRY_MIN_AGE = 5 * 60 * 1000;
+
+        function _aiadMaybeRetryWatermark(post) {
+            try {
+                if (window.AIAD_WATERMARK === false) return;
+                if (!post || !post.id || !post.created_at) return;
+                // Younger than this and the publish-time request is probably still encoding,
+                // so a retry would only duplicate work that is already under way.
+                var age = Date.now() - new Date(post.created_at).getTime();
+                if (!(age >= AIAD_WM_RETRY_MIN_AGE)) return;   // also skips an unparseable date
+
+                var media = post.media;
+                if (typeof media === 'string') { try { media = JSON.parse(media); } catch (e) { return; } }
+                // Pre-migration rows have no media array and therefore no per-item slot to
+                // write watermarked_url into; the server would reject them as no_such_item.
+                if (!Array.isArray(media)) return;
+
+                var pending = [];
+                for (var i = 0; i < media.length; i++) {
+                    var m = media[i];
+                    if (!m || m.type !== 'video' || !m.url || m.watermarked_url) continue;
+                    var key = post.id + ':' + i;
+                    if (_wmRetried.has(key)) continue;
+                    pending.push({ index: i, url: m.url, key: key });
+                }
+                if (!pending.length) return;
+
+                db.auth.getSession().then(function (r) {
+                    var token = r && r.data && r.data.session && r.data.session.access_token;
+                    if (!token) return;
+                    pending.forEach(function (it) {
+                        // At the cap, leave it unclaimed: a later render picks it up rather
+                        // than burning this item's one attempt on a request never sent.
+                        if (_wmInFlight >= AIAD_WM_RETRY_MAX) return;
+                        if (_wmRetried.has(it.key)) return;
+                        _wmRetried.add(it.key);
+                        _wmInFlight++;
+                        _aiadSendWatermark(post.id, it.index, it.url, token)
+                            .catch(function () {})
+                            .then(function () { _wmInFlight--; });
                     });
                 }).catch(function () {});
             } catch (e) {}
