@@ -156,6 +156,37 @@ function fanQuestionTopic(t){
   return hit || 'Other';
 }
 
+// Anthropic streams Server-Sent Events: "event: x\ndata: {json}\n\n". Yields the
+// parsed data objects in order. Only `data:` lines carry anything we use.
+async function* sseEvents(body){
+  const reader = body.getReader();
+  const dec = new TextDecoder();
+  let buf = '';
+  while(true){
+    const { value, done } = await reader.read();
+    if(done) break;
+    buf += dec.decode(value, { stream: true });
+    let nl;
+    while((nl = buf.indexOf('\n')) !== -1){
+      const line = buf.slice(0, nl).replace(/\r$/, '');
+      buf = buf.slice(nl + 1);
+      if(!line.startsWith('data:')) continue;
+      const raw = line.slice(5).trim();
+      if(!raw) continue;
+      try{ yield JSON.parse(raw); }catch(_){ /* a partial or non-JSON line is skipped */ }
+    }
+  }
+}
+
+// Measured before this was written (warm isolate, ~1,100 input / ~300 output
+// tokens): auth ~100ms, every database round trip together ~175ms, the isolate
+// itself under 300ms — and the model call 10.5-12.8s, returned all at once because
+// the request was not streamed. So the answer is streamed to the client as NDJSON
+// when the body asks for it (`stream: true`); the first words land in about a
+// second and the rest arrive as the model writes them. Callers that do not ask
+// still get the one-shot JSON they always did. Nothing about what is stored
+// changes: the sanitised full answer is written to agent_results before the
+// stream closes, exactly as before.
 Deno.serve(async (req)=>{
   if(req.method==='OPTIONS') return new Response('ok',{headers:cors});
 
@@ -170,6 +201,31 @@ Deno.serve(async (req)=>{
   let convoTitle = null;
   let firstInThread = true;
 
+  // Write the failure down and hand the credit back. Returning a soft empty
+  // state here is what made these disappear: the artist was charged, saw
+  // filler text, and nothing was ever recorded. Used by the catch below and by
+  // the streaming path, where a failure can arrive after the response began.
+  const recordFailure = async (msg) => {
+    if(!(admin && userId)) return;
+    // Thrown before the body was read: the question still gets a thread of its own.
+    if(!conversationId) conversationId = crypto.randomUUID();
+    if(!convoTitle) convoTitle = deriveTitle(question);
+    try{
+      await admin.from('agent_results').insert({
+        question_id: questionId, [ownerKey]: userId,
+        question, topic, answer: msg, model: MODEL, status: 'Failed',
+        conversation_id: conversationId,
+        ...(firstInThread && convoTitle ? { title: convoTitle } : {}),
+      });
+    }catch(_){}
+    // Reverses exactly the spend the client made. A missing or already-refunded
+    // id refunds nothing rather than inventing credits.
+    try{
+      await admin.rpc('refund_ai_credit', {
+        p_user: userId, p_action: CREDIT_ACTION, p_spend_txn_id: spendTxnId });
+    }catch(_){}
+  };
+
   try{
     // Identity before anything else, and never from the body.
     userId = await callerId(req);
@@ -183,6 +239,7 @@ Deno.serve(async (req)=>{
     topic = (body.topic != null && String(body.topic).trim()) ? String(body.topic).trim() : null;
     spendTxnId = (typeof body.spend_txn_id === 'string' && body.spend_txn_id) ? body.spend_txn_id : null;
     question = String(message ?? '');
+    const wantStream = body.stream === true;
 
     // No id, or one we don't recognise as a uuid, starts a new thread.
     const rawConvo = (typeof body.conversation_id === 'string') ? body.conversation_id.trim() : '';
@@ -267,21 +324,9 @@ Deno.serve(async (req)=>{
     if(Array.isArray(conversationHistory)) for(const m of conversationHistory) if(m&&m.role&&m.content) messages.push({role:m.role,content:m.content});
     messages.push({role:'user',content:question});
 
-    const r = await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':ANTHROPIC_KEY,'anthropic-version':'2023-06-01'},body:JSON.stringify({model:MODEL,max_tokens:MAX_TOKENS,system:systemPrompt,messages})});
-    const data = await r.json();
-
-    // An HTTP error, a refusal, or a shape we don't recognise are all failures —
-    // none of them may be written down as if they were an answer.
-    if(!r.ok || data.error || !(data.content && data.content[0] && data.content[0].text)){
-      const detail = (data && data.error && data.error.message) ? data.error.message
-                   : ('anthropic http ' + r.status);
-      throw new Error(detail);
-    }
-    // Strip before it is saved as well as before it is returned, so history and
-    // the live answer are the same text.
-    const answer = sanitizeAnswer(data.content[0].text);
-
-    if(admin && userId){
+    // Writes the answered row; shared by both response paths.
+    const recordAnswer = async (answer) => {
+      if(!(admin && userId)) return;
       try{
         const ins = await admin.from('agent_results').insert({
           question_id: questionId, [ownerKey]: userId,
@@ -291,35 +336,78 @@ Deno.serve(async (req)=>{
         });
         if(ins.error) console.error('[ai-agent] agent_results insert:', ins.error.message);
       }catch(e){ console.error('[ai-agent] agent_results threw:', String(e)); }
+    };
+
+    const r = await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':ANTHROPIC_KEY,'anthropic-version':'2023-06-01'},body:JSON.stringify({model:MODEL,max_tokens:MAX_TOKENS,system:systemPrompt,messages,...(wantStream?{stream:true}:{})})});
+
+    if(!wantStream){
+      const data = await r.json();
+
+      // An HTTP error, a refusal, or a shape we don't recognise are all failures —
+      // none of them may be written down as if they were an answer.
+      if(!r.ok || data.error || !(data.content && data.content[0] && data.content[0].text)){
+        const detail = (data && data.error && data.error.message) ? data.error.message
+                     : ('anthropic http ' + r.status);
+        throw new Error(detail);
+      }
+      // Strip before it is saved as well as before it is returned, so history and
+      // the live answer are the same text.
+      const answer = sanitizeAnswer(data.content[0].text);
+      await recordAnswer(answer);
+      return new Response(JSON.stringify({answer, question_id: questionId, conversation_id: conversationId, model: MODEL}),{headers:{...cors,'Content-Type':'application/json'}});
     }
 
-    return new Response(JSON.stringify({answer, question_id: questionId, conversation_id: conversationId, model: MODEL}),{headers:{...cors,'Content-Type':'application/json'}});
+    // An HTTP error before any token is a plain failure, thrown into the catch
+    // below so the client sees the same JSON 500 it always has.
+    if(!r.ok || !r.body){
+      let detail = 'anthropic http ' + r.status;
+      try{ const data = await r.json(); if(data && data.error && data.error.message) detail = data.error.message; }catch(_){}
+      throw new Error(detail);
+    }
+
+    // NDJSON, one object per line:
+    //   {type:"meta", conversation_id, question_id, model}   first
+    //   {type:"delta", text}                                  as the model writes
+    //   {type:"done", answer}                                 the sanitised full answer, stored
+    //   {type:"error", error}                                 instead of done; the credit is refunded
+    const enc = new TextEncoder();
+    const upstream = r.body;
+    const streamOut = new ReadableStream({
+      async start(controller){
+        const send = (o) => { try{ controller.enqueue(enc.encode(JSON.stringify(o) + '\n')); }catch(_){} };
+        send({ type:'meta', conversation_id: conversationId, question_id: questionId, model: MODEL });
+        let full = '';
+        try{
+          for await (const ev of sseEvents(upstream)){
+            if(ev.type === 'content_block_delta' && ev.delta && ev.delta.type === 'text_delta' && ev.delta.text){
+              full += ev.delta.text;
+              send({ type:'delta', text: ev.delta.text });
+            }else if(ev.type === 'error'){
+              throw new Error((ev.error && ev.error.message) || 'stream error');
+            }else if(ev.type === 'message_delta' && ev.delta && ev.delta.stop_reason === 'refusal'){
+              throw new Error('The model declined to answer.');
+            }
+          }
+          if(!full.trim()) throw new Error('The model returned no answer.');
+          // The same strip the one-shot path applies, on the whole text, so what is
+          // stored and what the client settles on are identical.
+          const answer = sanitizeAnswer(full);
+          await recordAnswer(answer);
+          send({ type:'done', answer });
+        }catch(e){
+          const msg = String((e&&e.message)||e);
+          await recordFailure(msg);
+          send({ type:'error', error: msg });
+        }finally{
+          try{ controller.close(); }catch(_){}
+        }
+      }
+    });
+    return new Response(streamOut, {headers:{...cors,'Content-Type':'application/x-ndjson; charset=utf-8','Cache-Control':'no-cache, no-transform','X-Accel-Buffering':'no'}});
 
   }catch(e){
     const msg = String((e&&e.message)||e);
-
-    // Write the failure down and hand the credit back. Returning a soft empty
-    // state here is what made these disappear: the artist was charged, saw
-    // filler text, and nothing was ever recorded.
-    if(admin && userId){
-      // Thrown before the body was read: the question still gets a thread of its own.
-      if(!conversationId) conversationId = crypto.randomUUID();
-      if(!convoTitle) convoTitle = deriveTitle(question);
-      try{
-        await admin.from('agent_results').insert({
-          question_id: questionId, [ownerKey]: userId,
-          question, topic, answer: msg, model: MODEL, status: 'Failed',
-          conversation_id: conversationId,
-          ...(firstInThread && convoTitle ? { title: convoTitle } : {}),
-        });
-      }catch(_){}
-      // Reverses exactly the spend the client made. A missing or already-refunded
-      // id refunds nothing rather than inventing credits.
-      try{
-        await admin.rpc('refund_ai_credit', {
-          p_user: userId, p_action: CREDIT_ACTION, p_spend_txn_id: spendTxnId });
-      }catch(_){}
-    }
+    await recordFailure(msg);
     return new Response(JSON.stringify({error: msg}),{status:500,headers:{...cors,'Content-Type':'application/json'}});
   }
 });

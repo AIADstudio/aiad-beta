@@ -552,12 +552,18 @@
         // Supporters and revenue for one artist, read once from fan_support so
         // every surface that shows them agrees. The ticker and the agent context
         // card each used to query this themselves and disagreed on screen.
-        window.aiadSupportStats = async function (uid) {
+        // Also the source for the Supporters chip and its sheet, which is why the rows
+        // carry fan_id. Calls that overlap share one request: the ticker, the agent card
+        // and the chip all ask at boot.
+        var _supportStatsInflight = {};
+        window.aiadSupportStats = function (uid) {
             var empty = { rows: [], supporters: 0, revenue: 0, revenueLabel: '$0' };
-            if (!uid) return empty;
+            if (!uid) return Promise.resolve(empty);
+            if (_supportStatsInflight[uid]) return _supportStatsInflight[uid];
+            var p = (async function () {
             var client = window.db || (typeof db !== 'undefined' ? db : null);
             if (!client || typeof client.from !== 'function') return empty;
-            var r = await client.from('fan_support').select('amount, created_at').eq('artist_id', uid);
+            var r = await client.from('fan_support').select('fan_id, amount, created_at').eq('artist_id', uid);
             if (r.error) {
                 console.warn('[AIAD] support stats:', r.error.message);
                 return empty;
@@ -570,6 +576,10 @@
                 revenue: revenue,
                 revenueLabel: revenue >= 1000 ? '$' + (revenue / 1000).toFixed(1) + 'K' : '$' + revenue
             };
+            })();
+            _supportStatsInflight[uid] = p;
+            p.then(function () { delete _supportStatsInflight[uid]; }, function () { delete _supportStatsInflight[uid]; });
+            return p;
         };
     })();
     </script>
@@ -15211,33 +15221,80 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         // the future, and profiles.plan already holds the CHOSEN plan throughout it. So
         // there is nothing to translate here, and nothing may downgrade a trialing artist
         // to free.
-        async function aiadLoadPlan() {
-            try {
-                const uid = window.aiadResolvedUserId && window.aiadResolvedUserId();
-                if (!uid) return;
-                const r = await db.from('profiles')
-                    .select('plan,founding_member,founding_number,founding_free_until,all_access')
-                    .eq('id', uid).maybeSingle();
-                if (r.error || !r.data) return;
-                AppState.planKey = r.data.plan || 'free';
-                AppState.founding = { member: !!r.data.founding_member,
-                                      number: r.data.founding_number || null,
-                                      freeUntil: r.data.founding_free_until || null };
-                AppState.allAccess = !!r.data.all_access;
-                if (window.aiadPaintPlanLabels) window.aiadPaintPlanLabels();
-            } catch (e) {}
+        //
+        // This used to run from three places, none of which fire on a plain sign-in:
+        // initializeAICredits at DOMContentLoaded (no user yet when the page loads
+        // signed out, so the uid check returned) and the two tier-pick paths. A reload
+        // found the stored token and worked; signing in did not, and every exit was
+        // silent, so the card showed "Free" for a paying artist with nothing in the
+        // console. It now runs on the same beats as loadAiCredits (boot, auth change,
+        // tab focus), coalesces concurrent calls, and says why when it cannot finish.
+        let _planLoadInflight = null;
+        function aiadLoadPlan() {
+            if (_planLoadInflight) return _planLoadInflight;
+            _planLoadInflight = (async function () {
+                try {
+                    const uid = window.aiadResolvedUserId && window.aiadResolvedUserId();
+                    if (!uid) {
+                        // Signed out, or the session is not restored yet. The auth-change
+                        // beat calls again once it is.
+                        console.info('[plan] no user id yet; waiting for the session');
+                        return false;
+                    }
+                    const r = await db.from('profiles')
+                        .select('plan,founding_member,founding_number,founding_free_until,all_access')
+                        .eq('id', uid).maybeSingle();
+                    if (r.error) {
+                        console.error('[plan] profiles read failed:', r.error.message, r.error);
+                        try { window.reportDbError && window.reportDbError('profiles', 'select', r.error, { where: 'aiadLoadPlan' }); } catch (e) {}
+                        return false;
+                    }
+                    if (!r.data) {
+                        // A user with no profiles row has no plan: that is a known Free,
+                        // not an unknown.
+                        console.warn('[plan] no profiles row for', uid);
+                        AppState.planKey = 'free';
+                        if (window.aiadPaintPlanLabels) window.aiadPaintPlanLabels();
+                        return false;
+                    }
+                    AppState.planKey = r.data.plan || 'free';
+                    AppState.founding = { member: !!r.data.founding_member,
+                                          number: r.data.founding_number || null,
+                                          freeUntil: r.data.founding_free_until || null };
+                    AppState.allAccess = !!r.data.all_access;
+                    if (window.aiadPaintPlanLabels) window.aiadPaintPlanLabels();
+                    return true;
+                } catch (e) {
+                    console.error('[plan] load threw:', e);
+                    return false;
+                } finally {
+                    _planLoadInflight = null;
+                }
+            })();
+            return _planLoadInflight;
         }
         window.aiadLoadPlan = aiadLoadPlan;
 
+        // Every surface that shows the plan, repainted whenever the load resolves —
+        // not only at the moment each surface happened to render.
         window.aiadPaintPlanLabels = function () {
             const set = function (id, v) { const el = document.getElementById(id); if (el) el.textContent = v; };
             set('agentCtxPlan', window.aiadPlanLabel());
             set('agentCtxLevel', window.aiadCareerLabel());
+            // The home ticker builds its items from a snapshot; patch the Plan one in place.
+            try {
+                document.querySelectorAll('.live-stat-item').forEach(function (it) {
+                    const spans = it.querySelectorAll('span');
+                    if (spans.length >= 2 && spans[0].textContent.trim() === 'Plan') spans[1].textContent = window.aiadPlanLabel();
+                });
+            } catch (e) {}
         };
 
-        // The plan the artist pays for.
+        // The plan the artist pays for. Unknown (not loaded yet, or the load failed)
+        // is shown as a dash rather than claimed as Free.
         window.aiadPlanLabel = function () {
-            const k = (window.AppState && AppState.planKey) || 'free';
+            const k = window.AppState && AppState.planKey;
+            if (!k) return '\u2014';
             const t = (typeof SubscriptionTiers !== 'undefined' && SubscriptionTiers[k]) || null;
             return (t && t.name) || 'Free';
         };
@@ -17677,6 +17734,9 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 const profile = AppState.artistProfile;
                 const planEl = document.getElementById('agentCtxPlan');
                 if (planEl) planEl.textContent = window.aiadPlanLabel();
+                // The Agent view can open before any plan load has resolved; ask now and
+                // let aiadPaintPlanLabels fill the card when it lands.
+                if (!AppState.planKey && typeof window.aiadLoadPlan === 'function') window.aiadLoadPlan();
                 const lvlEl = document.getElementById('agentCtxLevel');
                 if (lvlEl) lvlEl.textContent = window.aiadCareerLabel();
 
@@ -17815,7 +17875,43 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             chatThread.appendChild(typingIndicator);
             chatThread.scrollTop = chatThread.scrollHeight;
 
+            // The answer streams in. The function was measured at 10-13s per answer with
+            // 97% of it the model call, returned all at once — so the bubble is created on
+            // the first words (about two seconds in) and fills as the model writes.
             let aiResponse = '';
+            let aiMsg = null;
+            let liveEl = null;
+            let livePaint = null;
+            const ensureBubble = function () {
+                if (aiMsg) return;
+                typingIndicator.remove();
+                aiMsg = document.createElement('div');
+                aiMsg.className = 'chat-message';
+                aiMsg.innerHTML = `
+                    <div class="chat-message-header">
+                        <div class="chat-avatar agent">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+                        </div>
+                        <span class="chat-name">AIAD</span>
+                        <span class="chat-time">Just now</span>
+                    </div>
+                    <div class="chat-content"></div>
+                `;
+                liveEl = aiMsg.querySelector('.chat-content');
+                chatThread.appendChild(aiMsg);
+            };
+            // One paint per frame, however fast the deltas arrive.
+            const paintLive = function (text) {
+                if (livePaint) return;
+                livePaint = requestAnimationFrame(function () {
+                    livePaint = null;
+                    if (!liveEl) return;
+                    const stick = chatThread.scrollHeight - chatThread.scrollTop - chatThread.clientHeight < 80;
+                    liveEl.innerHTML = window.aiadRenderMarkdown(text);
+                    if (stick) chatThread.scrollTop = chatThread.scrollHeight;
+                });
+            };
+
             try {
                 const token = await window.aiadAccessToken();
                 if (!token) throw new Error('Your session expired — sign in again.');
@@ -17827,6 +17923,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                         'apikey': SUPABASE_ANON_KEY,
                     },
                     body: JSON.stringify({
+                        stream: true,
                         message,
                         // Only the active thread. This array is rebuilt whenever a
                         // conversation is opened or started, so a question can no
@@ -17840,19 +17937,54 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                         level: AppState.artistProfile.artistLevel,
                     })
                 });
-                const data = await response.json();
+                const ctype = response.headers.get('content-type') || '';
                 // A non-2xx or an {error} body is a real failure. This used to fall
                 // through to generateContextualResponse(), which serves canned copy
                 // about "248 active supporters" as if it were this artist's advice —
                 // the artist was charged, saw fiction, and nothing was recorded.
-                if (!response.ok || (data && data.error)) {
-                    throw new Error((data && data.error) || ('agent http ' + response.status));
+                if (!response.ok || ctype.indexOf('application/x-ndjson') === -1) {
+                    let data = null;
+                    try { data = await response.json(); } catch (e) { data = null; }
+                    if (!response.ok || (data && data.error)) {
+                        throw new Error((data && data.error) || ('agent http ' + response.status));
+                    }
+                    // A function that does not stream yet answers in one piece.
+                    if (!data || !data.answer) throw new Error('The agent returned no answer.');
+                    aiResponse = data.answer;
+                    if (data.conversation_id) aiadAdoptConversation(data.conversation_id, message, aiResponse);
+                } else {
+                    // NDJSON: meta, then deltas, then done (the sanitised full answer) or error.
+                    const reader = response.body.getReader();
+                    const dec = new TextDecoder();
+                    let buf = '', live = '', finalAnswer = null, streamErr = null, convoId = null;
+                    while (true) {
+                        const { value, done } = await reader.read();
+                        if (done) break;
+                        buf += dec.decode(value, { stream: true });
+                        let nl;
+                        while ((nl = buf.indexOf('\n')) !== -1) {
+                            const line = buf.slice(0, nl); buf = buf.slice(nl + 1);
+                            if (!line.trim()) continue;
+                            let ev = null;
+                            try { ev = JSON.parse(line); } catch (e) { continue; }
+                            if (ev.type === 'meta') { convoId = ev.conversation_id || null; }
+                            else if (ev.type === 'delta') { live += ev.text || ''; ensureBubble(); paintLive(live); }
+                            else if (ev.type === 'done') { finalAnswer = ev.answer; }
+                            else if (ev.type === 'error') { streamErr = ev.error || 'The agent failed.'; }
+                        }
+                    }
+                    if (livePaint) { cancelAnimationFrame(livePaint); livePaint = null; }
+                    if (streamErr) throw new Error(streamErr);
+                    if (finalAnswer == null) {
+                        // The connection dropped before "done": what arrived is not a
+                        // stored answer, so treat it as the failure it is.
+                        throw new Error('The connection dropped before the answer finished.');
+                    }
+                    aiResponse = finalAnswer;
+                    // The function opens a thread when we send no id; from here on
+                    // every question in this thread carries it.
+                    if (convoId) aiadAdoptConversation(convoId, message, aiResponse);
                 }
-                if (!data || !data.answer) throw new Error('The agent returned no answer.');
-                aiResponse = data.answer;
-                // The function opens a thread when we send no id; from here on
-                // every question in this thread carries it.
-                if (data.conversation_id) aiadAdoptConversation(data.conversation_id, message, aiResponse);
                 try { window.aiadTrackAction && window.aiadTrackAction('agent_submit', { ok: true }); } catch (e) {}
             } catch (err) {
                 const detail = (err && err.message) || String(err);
@@ -17860,27 +17992,16 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 aiResponse = 'That did not go through — ' + detail + '\n\nYour credit has been returned. Try again in a moment.';
             }
 
-            typingIndicator.remove();
+            if (typingIndicator.parentNode) typingIndicator.remove();
 
             artistAgentHistory.push({ role: 'assistant', content: aiResponse });
 
             autoCapureDecisionMemory(message, aiResponse);
 
-            const aiMsg = document.createElement('div');
-                aiMsg.className = 'chat-message';
-                aiMsg.innerHTML = `
-                    <div class="chat-message-header">
-                        <div class="chat-avatar agent">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-                        </div>
-                        <span class="chat-name">AIAD</span>
-                        <span class="chat-time">Just now</span>
-                    </div>
-                    <div class="chat-content">${window.aiadRenderMarkdown(aiResponse)}</div>
-                    ${aiadPlanActions(aiResponse, message)}
-                `;
-                chatThread.appendChild(aiMsg);
-                chatThread.scrollTop = chatThread.scrollHeight;
+            ensureBubble();
+            liveEl.innerHTML = window.aiadRenderMarkdown(aiResponse);
+            aiMsg.insertAdjacentHTML('beforeend', aiadPlanActions(aiResponse, message));
+            chatThread.scrollTop = chatThread.scrollHeight;
         }
 
         // Past conversations are a rail now, not an inline transcript. This used to
@@ -27041,6 +27162,7 @@ async function loadFanDiscover() { setTimeout(()=>_execDiscoverSearch(),100); }
             let row = document.getElementById('aiadChipRow');
             const fs = document.getElementById('aiadFoundingStrip');
             const fl = document.getElementById('aiadFollowingStrip');
+            const sp = document.getElementById('aiadSupportersStrip');
             if (!mobile) {
                 // Put both back where the desktop layout expects them and drop the row.
                 if (row) {
@@ -27052,14 +27174,18 @@ async function loadFanDiscover() { setTimeout(()=>_execDiscoverSearch(),100); }
                     }
                     row.remove();
                 }
+                // On desktop the Supporters chip lives in the Following strip's header.
+                if (sp && window.aiadPaintSupporters) window.aiadPaintSupporters();
                 return;
             }
             if (!row) { row = document.createElement('div'); row.id = 'aiadChipRow'; }
             if (row.parentNode !== main || main.firstChild !== row) main.insertBefore(row, main.firstChild);
             if (fs && fs.parentNode !== row) row.appendChild(fs);
             if (fl && fl.parentNode !== row) row.appendChild(fl);
-            // Founding first, and only touched when it is actually out of order.
+            if (sp && sp.parentNode !== row) row.appendChild(sp);
+            // Founding, Following, Supporters — only touched when actually out of order.
             if (fs && fl && fs.nextElementSibling !== fl) row.insertBefore(fs, fl);
+            if (fl && sp && fl.nextElementSibling !== sp) row.insertBefore(sp, fl.nextSibling);
         };
 
         // The search field becomes an icon in the mobile header. The wrap itself is what
@@ -27128,34 +27254,113 @@ async function loadFanDiscover() { setTimeout(()=>_execDiscoverSearch(),100); }
                 strip.onclick = null;
                 strip.style.display = 'block';
             }
+            if (window.aiadPaintSupporters) window.aiadPaintSupporters();
         };
 
-        window.aiadOpenFollowingSheet = function () {
-            const list = window.__aiadFollowingList || [];
-            if (!list.length) return;
+        // ── Supporters chip ───────────────────────────────────────────────────
+        // The other half of the pair: who follows THIS artist, from the same
+        // fan_support rows aiadSupportStats already reads for the ticker. On a phone
+        // it is the chip beside Following; on desktop it sits in the Following strip's
+        // header line. Either way it opens the same sheet Following uses.
+        window.__aiadSupportersList = null;   // null = not loaded yet
+        window.aiadPaintSupporters = function () {
+            const fl = document.getElementById('aiadFollowingStrip');
+            if (!fl) return;
+            const list = window.__aiadSupportersList;
+            if (list == null) return;
+            let el = document.getElementById('aiadSupportersStrip');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'aiadSupportersStrip';
+                el.className = 'aiad-following-chip';
+                el.setAttribute('role', 'button');
+                el.onclick = function () { window.aiadOpenSupportersSheet(); };
+            }
+            el.innerHTML = 'Supporters <b>' + list.length + '</b>';
+            const mobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+            const row = document.getElementById('aiadChipRow');
+            if (mobile && row) {
+                if (el.parentNode !== row) row.appendChild(el);
+                if (fl.parentNode === row && fl.nextElementSibling !== el) row.insertBefore(el, fl.nextSibling);
+            } else if (fl.style.display !== 'none' && fl.dataset.full && !fl.classList.contains('aiad-following-chip')) {
+                // Desktop: the first child of the full strip is the "Following · n" line.
+                const head = fl.firstElementChild;
+                if (head) {
+                    if (!head.classList.contains('aiad-following-head')) {
+                        head.classList.add('aiad-following-head');
+                    }
+                    if (el.parentNode !== head) head.appendChild(el);
+                }
+            } else if (el.parentNode !== fl.parentNode || fl.nextElementSibling !== el) {
+                // Nothing to follow yet: the chip stands alone after the strip.
+                fl.parentNode.insertBefore(el, fl.nextSibling);
+            }
+            el.style.display = 'inline-flex';
+        };
+
+        window.aiadLoadSupporters = async function (uid) {
+            try {
+                const st = await window.aiadSupportStats(uid);
+                const rows = (st && st.rows) || [];
+                const ids = [...new Set(rows.map((r) => r.fan_id).filter(Boolean))];
+                const amt = {}; rows.forEach((r) => { if (r.fan_id) amt[r.fan_id] = Math.max(amt[r.fan_id] || 0, r.amount || 0); });
+                let names = {}, artists = {};
+                if (ids.length) {
+                    // A supporter may be a fan with only a profiles row, or an artist too.
+                    const [pr, ap] = await Promise.all([
+                        db.from('profiles').select('id,username').in('id', ids),
+                        db.from('artist_profiles').select('user_id,artist_name,username').in('user_id', ids)
+                    ]);
+                    (pr.data || []).forEach((r) => { names[r.id] = r.username || ''; });
+                    (ap.data || []).forEach((a) => { artists[a.user_id] = true; if (a.artist_name || a.username) names[a.user_id] = a.artist_name || a.username; });
+                }
+                const avs = ids.length ? await window.aiadAvatarsFor(ids).catch(() => ({})) : {};
+                window.__aiadSupportersList = ids.map(function (id) {
+                    return { id: id, name: names[id] || 'Supporter', avatar: avs[id] || '', amount: amt[id] || 0, artist: !!artists[id] };
+                });
+            } catch (err) {
+                console.warn('[AIAD] supporters:', err && err.message);
+                if (window.__aiadSupportersList == null) window.__aiadSupportersList = [];
+            }
+            window.aiadPaintSupporters();
+        };
+
+        // One sheet for both lists. A row opens the artist page when the person has
+        // one; a fan-only supporter is listed but not a link.
+        window.aiadOpenPeopleSheet = function (label, list, emptyText) {
             const e = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
             const ov = document.createElement('div');
             ov.className = 'aiad-follow-sheet';
-            ov.innerHTML = '<div class="aiad-follow-sheet-inner" role="dialog" aria-label="Following">'
-                + '<div class="aiad-follow-sheet-head"><span>Following \u00b7 ' + list.length + '</span>'
+            ov.innerHTML = '<div class="aiad-follow-sheet-inner" role="dialog" aria-label="' + e(label) + '">'
+                + '<div class="aiad-follow-sheet-head"><span>' + e(label) + ' \u00b7 ' + list.length + '</span>'
                 + '<button type="button" class="aiad-follow-sheet-x" aria-label="Close">&times;</button></div>'
-                + list.map(function (a) {
+                + (list.length ? list.map(function (a) {
                     const pic = (a.avatar && (a.avatar.indexOf('http') === 0 || a.avatar.indexOf('data:') === 0))
                         ? '<img src="' + e(a.avatar) + '" alt="">'
                         : '<div class="ph"></div>';
-                    return '<div class="aiad-follow-sheet-row" data-id="' + e(a.id) + '">' + pic
+                    const link = a.artist !== false;
+                    return '<div class="aiad-follow-sheet-row"' + (link ? ' data-id="' + e(a.id) + '"' : ' style="cursor:default;"') + '>' + pic
                         + '<div style="min-width:0;"><div style="font-size:0.9rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + e(a.name) + '</div>'
                         + (a.amount > 0 ? '<div style="font-size:0.68rem;color:var(--teal-light);">$' + a.amount + '/mo</div>' : '')
                         + '</div></div>';
-                }).join('')
+                }).join('') : '<div style="font-size:0.85rem;color:var(--text-muted);padding:8px 4px 4px;">' + e(emptyText || 'Nobody yet.') + '</div>')
                 + '</div>';
             const close = function () { ov.remove(); };
             ov.addEventListener('click', function (ev) {
                 if (ev.target === ov || ev.target.closest('.aiad-follow-sheet-x')) { close(); return; }
                 const row = ev.target.closest('.aiad-follow-sheet-row');
-                if (row && window.loadArtistPage) { close(); window.loadArtistPage(row.dataset.id); }
+                if (row && row.dataset.id && window.loadArtistPage) { close(); window.loadArtistPage(row.dataset.id); }
             });
             document.body.appendChild(ov);
+        };
+
+        window.aiadOpenFollowingSheet = function () {
+            const list = window.__aiadFollowingList || [];
+            if (!list.length) return;
+            window.aiadOpenPeopleSheet('Following', list);
+        };
+        window.aiadOpenSupportersSheet = function () {
+            window.aiadOpenPeopleSheet('Supporters', window.__aiadSupportersList || [], 'No supporters yet \u2014 share your page to change that.');
         };
 
         window.addEventListener('resize', function () {
@@ -27171,6 +27376,8 @@ async function loadFanDiscover() { setTimeout(()=>_execDiscoverSearch(),100); }
             if (strip.dataset.loading === '1') return;
             if (!force && strip.dataset.loadedFor === uid) return;
             strip.dataset.loading = '1';
+            // The other chip loads in parallel from the ticker's own source.
+            window.aiadLoadSupporters(uid);
             try {
                 const { data: fs } = await db.from('fan_support').select('artist_id,amount').eq('fan_id', uid);
                 const rows = Array.isArray(fs) ? fs : [];
@@ -27179,6 +27386,7 @@ async function loadFanDiscover() { setTimeout(()=>_execDiscoverSearch(),100); }
                 if (!ids.length) {
                     strip.innerHTML = '<div style="font-size:0.78rem;color:var(--text-muted);">You are not following anyone yet — search above to find artists.</div>';
                     strip.style.display = 'block';
+                    if (window.aiadPaintSupporters) window.aiadPaintSupporters();
                     return;
                 }
                 let names = {};
@@ -29021,7 +29229,12 @@ function toggleAgeRange(btn) {
         // whatever AppState happened to hold stayed on screen. Load it on boot, on auth
         // change, and when the tab regains focus.
         (function scheduleCreditLoads() {
-            const run = () => { try { loadAiCredits(); } catch (e) {} };
+            // The plan rides the same beats: it has the same "signed in later than
+            // DOMContentLoaded" problem the credits balance had.
+            const run = () => {
+                try { loadAiCredits(); } catch (e) {}
+                try { if (typeof window.aiadLoadPlan === 'function') window.aiadLoadPlan(); } catch (e) {}
+            };
             if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
             else run();
             try {
@@ -40054,9 +40267,6 @@ window.AIAD_PROMPTS = [
     border-radius: 999px !important; cursor: pointer;
     font-size: 0.76rem; color: var(--text-secondary);
   }
-  #aiadFollowingStrip.aiad-following-chip b {
-    color: var(--text-primary); font-weight: 700; font-variant-numeric: tabular-nums;
-  }
 
   /* Founding pill and Following chip share one row; nothing else sits between the
      header and the content. */
@@ -40070,6 +40280,7 @@ window.AIAD_PROMPTS = [
      the shared baseline. */
   #aiadChipRow > *,
   #aiadChipRow > #aiadFollowingStrip,
+  #aiadChipRow > #aiadSupportersStrip,
   #aiadChipRow > #aiadFoundingStrip { margin: 0 !important; align-self: center !important; }
 
   /* Founding drops to a pill on that row rather than its own full-width bar. */
@@ -40116,6 +40327,22 @@ window.AIAD_PROMPTS = [
 /* The header search icon and the overlay's close button exist only on a phone. */
 .aiad-search-icon, .aiad-search-close { display: none; }
 @media (max-width: 768px) { .aiad-search-icon { display: flex; } .aiad-search-close { display: block; } }
+
+/* The Following / Supporters pair. Following is a chip only on a phone (the desktop
+   strip is the avatar row); Supporters is a chip at every width, so its look is keyed
+   on the class rather than the media query. */
+.aiad-following-chip b {
+  color: var(--text-primary); font-weight: 700; font-variant-numeric: tabular-nums;
+}
+#aiadSupportersStrip {
+  display: inline-flex; align-items: center; gap: 8px; align-self: flex-start;
+  width: auto; flex: 0 0 auto; padding: 7px 14px; margin: 0;
+  background: var(--bg-card); border: 1px solid var(--border-default);
+  border-radius: 999px; cursor: pointer; font-size: 0.76rem; color: var(--text-secondary);
+  text-transform: none; letter-spacing: normal;
+}
+.aiad-following-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.aiad-following-head > #aiadSupportersStrip { margin: -6px 0; }
 
 /* Following sheet — mobile only, but the rules are harmless anywhere. */
 .aiad-follow-sheet {
