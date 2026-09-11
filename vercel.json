@@ -45,6 +45,9 @@
   "functions": {
     "api/watermark.js": {
       "includeFiles": "{assets,node_modules/ffmpeg-static}/**"
+    },
+    "api/plan-pdf.js": {
+      "includeFiles": "assets/**"
     }
   }
 }

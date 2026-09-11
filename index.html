@@ -66,6 +66,19 @@
     .aiad-md hr { border: none; border-top: 1px solid var(--border-default); margin: 12px 0; }
     .aiad-md code { background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 4px; font-size: 0.88em; }
     .aiad-md strong { color: var(--text-primary); }
+    /* The one action row under an agent answer (and on a decision card). A plan
+       exports as a PDF from here; there is no print path, this is the export. */
+    .agent-msg-actions { display: flex; gap: 8px; margin: 8px 0 0 42px; }
+    .decision-card .agent-msg-actions { margin: 14px 0 0; }
+    .agent-msg-btn { background: rgba(255,255,255,0.04); color: var(--text-secondary); border: 1px solid var(--border-default);
+        border-radius: 8px; padding: 6px 12px; font-size: 0.76rem; font-family: var(--font-body); cursor: pointer;
+        display: inline-flex; align-items: center; gap: 6px; text-decoration: none; transition: color var(--transition-fast), border-color var(--transition-fast); }
+    .agent-msg-btn:hover { color: var(--text-primary); border-color: var(--border-hover); }
+    .agent-msg-btn[disabled] { opacity: 0.7; cursor: progress; }
+    .agent-msg-btn svg { width: 13px; height: 13px; }
+    .agent-msg-btn .agent-msg-spin { width: 11px; height: 11px; border: 2px solid rgba(255,255,255,0.25); border-top-color: currentColor;
+        border-radius: 50%; animation: agentMsgSpin 0.8s linear infinite; }
+    @keyframes agentMsgSpin { to { transform: rotate(360deg); } }
     </style>
     <style>
     /* ── Agent conversations: tabs, thread rail, mobile drawer ────────────
@@ -407,6 +420,133 @@
             }
             flush();
             return '<div class="aiad-md">' + out.join('') + '</div>';
+        };
+
+        /* ── Plan export ─────────────────────────────────────────────
+           Any agent answer shaped like a plan, and any saved decision, exports
+           through api/plan-pdf as a branded PDF. The markdown is parked here by
+           id rather than stuffed into a data attribute: a plan can run to
+           60,000 characters. */
+        var _planStore = {};
+        var _planSeq = 0;
+
+        // A "plan" is an answer with structure: headings or a real list. A
+        // two-line reply gets no export button.
+        window.aiadLooksLikePlan = function (md) {
+            var s = String(md || '');
+            if (s.length < 240) return false;
+            if (/^\s{0,3}#{1,6}\s+\S/m.test(s)) return true;
+            var items = s.match(/^\s*(?:[-*+]|\d+[.)])\s+\S/mg);
+            return !!(items && items.length >= 3);
+        };
+
+        // First "# heading" in the plan, else the caller's hint (the question,
+        // the thread title), else a generic name.
+        window.aiadPlanTitle = function (md, hint) {
+            var h = /^\s{0,3}#{1,2}\s+(.+?)\s*#*\s*$/m.exec(String(md || ''));
+            var t = h ? h[1] : String(hint || '');
+            t = t.replace(/[*_`~]/g, '').replace(/\s+/g, ' ').trim();
+            if (t.length > 90) t = t.slice(0, 90).trim() + '\u2026';
+            return t || 'AIAD Plan';
+        };
+
+        // Returns the action-row markup for an answer, or '' when it is not a plan.
+        window.aiadPlanActions = function (md, hint, force) {
+            if (!force && !window.aiadLooksLikePlan(md)) return '';
+            var id = 'plan' + (++_planSeq);
+            _planStore[id] = { markdown: String(md || ''), title: window.aiadPlanTitle(md, hint) };
+            return '<div class="agent-msg-actions">'
+                + '<button type="button" class="agent-msg-btn" data-plan="' + id + '" onclick="aiadDownloadPlanPdf(this)">'
+                + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>'
+                + 'Download PDF</button></div>';
+        };
+
+        function _planIsIOS() {
+            var ua = navigator.userAgent || '';
+            return /iP(hone|ad|od)/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+        }
+        function _planIsStandalone() {
+            try {
+                if (navigator.standalone === true) return true;
+                return !!(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+            } catch (e) { return false; }
+        }
+
+        window.aiadDownloadPlanPdf = async function (btn) {
+            var entry = btn && _planStore[btn.getAttribute('data-plan')];
+            if (!entry || btn.disabled) return;
+            var label = btn.innerHTML;
+            btn.disabled = true;
+            btn.setAttribute('aria-busy', 'true');
+            btn.innerHTML = '<span class="agent-msg-spin"></span>Generating PDF\u2026';
+
+            var restore = function () {
+                btn.disabled = false;
+                btn.removeAttribute('aria-busy');
+                btn.innerHTML = label;
+            };
+
+            var blob = null, filename = 'aiad-plan.pdf';
+            try {
+                var token = await window.aiadAccessToken();
+                if (!token) throw new Error('Your session expired \u2014 sign in again.');
+                var artistName = '';
+                try { artistName = (window.AppState && AppState.artistProfile && AppState.artistProfile.artistName) || ''; } catch (e) {}
+                var r = await fetch('/api/plan-pdf', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                    body: JSON.stringify({ title: entry.title, markdown: entry.markdown, artistName: artistName })
+                });
+                if (!r.ok) {
+                    if (r.status === 413) throw new Error('This plan is too long to export as one PDF.');
+                    if (r.status === 401) throw new Error('Your session expired \u2014 sign in again.');
+                    throw new Error('The PDF could not be generated (' + r.status + ').');
+                }
+                var cd = r.headers.get('Content-Disposition') || '';
+                var fm = /filename="([^"]+)"/.exec(cd);
+                if (fm) filename = fm[1];
+                blob = await r.blob();
+            } catch (err) {
+                restore();
+                try { window.aiadTrackError && window.aiadTrackError((err && err.message) || String(err), { action: 'plan_pdf' }); } catch (e) {}
+                if (typeof showToast === 'function') showToast((err && err.message) || 'Could not export the PDF.');
+                return;
+            }
+
+            var url = URL.createObjectURL(blob);
+            // The object URL has to outlive a user who reads the fallback link
+            // for a while before tapping it.
+            setTimeout(function () { try { URL.revokeObjectURL(url); } catch (e) {} }, 5 * 60 * 1000);
+
+            // In an iOS home-screen (standalone) app a download="" click does nothing —
+            // no error, no file. So a fresh tab is the first choice there, and the same
+            // fallback catches any browser where the anchor throws or lacks download.
+            var a = document.createElement('a');
+            var canAnchor = ('download' in a) && !(_planIsIOS() && _planIsStandalone());
+            var opened = false;
+            if (canAnchor) {
+                try {
+                    a.href = url; a.download = filename; a.rel = 'noopener';
+                    document.body.appendChild(a); a.click(); a.remove();
+                    opened = true;
+                } catch (e) { opened = false; }
+            }
+            if (!opened) {
+                var w = null;
+                try { w = window.open(url, '_blank'); } catch (e) { w = null; }
+                if (!w) {
+                    // Popup blocked (an async open has no gesture behind it). Leave the
+                    // user a real link in the button's place — a tap on it is a gesture.
+                    btn.outerHTML = '<a class="agent-msg-btn" href="' + url + '" target="_blank" rel="noopener">'
+                        + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>'
+                        + 'Open PDF</a>';
+                    if (typeof showToast === 'function') showToast('PDF ready \u2014 tap Open PDF, then use Share to save it.');
+                    return;
+                }
+                if (typeof showToast === 'function') showToast('PDF opened in a new tab \u2014 use Share to save it.');
+            }
+            restore();
+            try { window.aiadTrackAction && window.aiadTrackAction('plan_pdf', { ok: true }); } catch (e) {}
         };
 
         // Supporters and revenue for one artist, read once from fan_support so
@@ -13570,39 +13710,6 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             }
         }
 
-        async function loadDecisionMemories() {
-            const uid = aiadResolvedUserId();
-            if (!uid) return;
-            try {
-                const { data, error } = await db.from('decision_memories')
-                    .select('*')
-                    .eq('user_id', uid)
-                    .order('created_at', { ascending: false })
-                    .limit(10);
-
-                const container = document.getElementById('decisionMemoryCards');
-                if (!container) return;
-
-                if (!data || data.length === 0) {
-                    container.innerHTML = '<div style="font-size:0.85rem;color:var(--text-muted);padding:20px 0;">No decisions recorded yet. Add your first memory to help AIAD understand your reasoning.</div>';
-                    return;
-                }
-
-                container.innerHTML = data.map(m => `
-                    <div class="decision-card">
-                        <div class="decision-card-header">
-                            <span class="decision-type ${m.category}">${m.category.charAt(0).toUpperCase() + m.category.slice(1)}</span>
-                            <span class="decision-date">${new Date(m.created_at).toLocaleDateString('en-US', { month:'short', year:'numeric' })}</span>
-                        </div>
-                        <p class="decision-reasoning">"${m.reasoning}"</p>
-                        ${m.tradeoff ? `<div class="decision-tradeoff"><div class="decision-tradeoff-label">Trade-off acknowledged</div>${m.tradeoff}</div>` : ''}
-                    </div>
-                `).join('');
-            } catch (err) {
-                console.error('Error loading memories:', err);
-            }
-        }
-
         async function autoCapureDecisionMemory(userMessage, agentResponse) {
             const uid = aiadResolvedUserId();
             if (!uid) return;
@@ -14539,12 +14646,52 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         }
 
         // Real Decision Memory list (empty for everyone today — no fabricated entries).
+        // A saved decision goes out through the same export as a plan: the card
+        // is rebuilt as a short markdown document and handed to aiadPlanActions.
+        function aiadDecisionTitle(m) {
+            const cat = String(m.category || 'strategy');
+            const when = new Date(m.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+            return cat.charAt(0).toUpperCase() + cat.slice(1) + ' decision \u2014 ' + when;
+        }
+        function aiadDecisionMarkdown(m) {
+            let md = '# ' + aiadDecisionTitle(m) + '\n\n' + String(m.reasoning || '').trim() + '\n';
+            if (m.tradeoff) md += '\n## Trade-off acknowledged\n\n' + String(m.tradeoff).trim() + '\n';
+            return md;
+        }
+
+        // Two surfaces read the same rows: the Decisions tab in the agent view
+        // (#decisionMemoryCards) and the list in Settings (#decisionMemoryList).
+        // There used to be one function per surface under the same name in this
+        // scope, so the second silently replaced the first and the Decisions tab
+        // never rendered anything.
+        function renderDecisionCards(rows) {
+            const container = document.getElementById('decisionMemoryCards');
+            if (!container) return;
+            if (!rows.length) {
+                container.innerHTML = '<div style="font-size:0.85rem;color:var(--text-muted);padding:20px 0;">No decisions recorded yet. As you confirm decisions with AIAD, they\'ll be recorded here.</div>';
+                return;
+            }
+            const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+            container.innerHTML = rows.map((m) => {
+                const cat = String(m.category || 'strategy');
+                return '<div class="decision-card">'
+                    + '<div class="decision-card-header">'
+                    + '<span class="decision-type ' + esc(cat) + '">' + esc(cat.charAt(0).toUpperCase() + cat.slice(1)) + '</span>'
+                    + '<span class="decision-date">' + esc(new Date(m.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })) + '</span>'
+                    + '</div>'
+                    + '<p class="decision-reasoning">"' + esc(m.reasoning) + '"</p>'
+                    + (m.tradeoff ? '<div class="decision-tradeoff"><div class="decision-tradeoff-label">Trade-off acknowledged</div>' + esc(m.tradeoff) + '</div>' : '')
+                    + aiadPlanActions(aiadDecisionMarkdown(m), aiadDecisionTitle(m), true)
+                    + '</div>';
+            }).join('');
+        }
+
         async function loadDecisionMemories() {
             const uid = aiadResolvedUserId();
             if (!uid) return;
             const list = document.getElementById('decisionMemoryList');
             const countEl = document.getElementById('decisionMemoryCount');
-            if (!AppState.currentUser || !list) return;
+            if (!AppState.currentUser) return;
             try {
                 const { data, error } = await db.from('decision_memories')
                     .select('id,category,reasoning,tradeoff,created_at')
@@ -14553,7 +14700,9 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     .limit(50);
                 if (error) { window.reportDbError && window.reportDbError('decision_memories', 'select', error, { where: 'loadDecisionMemories' }); return; }
                 const rows = data || [];
+                renderDecisionCards(rows);
                 if (countEl) countEl.textContent = rows.length;
+                if (!list) return;
                 if (!rows.length) return; // keep the empty-state message already in the DOM
                 const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
                 list.innerHTML = rows.map((r) => {
@@ -17728,6 +17877,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                         <span class="chat-time">Just now</span>
                     </div>
                     <div class="chat-content">${window.aiadRenderMarkdown(aiResponse)}</div>
+                    ${aiadPlanActions(aiResponse, message)}
                 `;
                 chatThread.appendChild(aiMsg);
                 chatThread.scrollTop = chatThread.scrollHeight;
@@ -17979,7 +18129,8 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 + '<div class="chat-avatar agent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></div>'
                 + '<span class="chat-name">AIAD</span></div>'
                 + '<div class="chat-content"' + (failed ? ' style="color:#f87171;"' : '') + '>'
-                + (failed ? 'This one failed: ' : '') + window.aiadRenderMarkdown(answer) + '</div>';
+                + (failed ? 'This one failed: ' : '') + window.aiadRenderMarkdown(answer) + '</div>'
+                + (failed ? '' : window.aiadPlanActions(answer, question));
             thread.appendChild(ai);
         }
 
