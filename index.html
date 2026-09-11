@@ -17900,16 +17900,19 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 liveEl = aiMsg.querySelector('.chat-content');
                 chatThread.appendChild(aiMsg);
             };
-            // One paint per frame, however fast the deltas arrive.
+            // One paint per frame, however fast the deltas arrive. A hidden tab gets no
+            // animation frames, so it paints on a timer instead and the answer is there
+            // when the artist switches back rather than appearing all at once on "done".
             const paintLive = function (text) {
                 if (livePaint) return;
-                livePaint = requestAnimationFrame(function () {
+                const paint = function () {
                     livePaint = null;
                     if (!liveEl) return;
                     const stick = chatThread.scrollHeight - chatThread.scrollTop - chatThread.clientHeight < 80;
                     liveEl.innerHTML = window.aiadRenderMarkdown(text);
                     if (stick) chatThread.scrollTop = chatThread.scrollHeight;
-                });
+                };
+                livePaint = document.hidden ? { t: setTimeout(paint, 250) } : requestAnimationFrame(paint);
             };
 
             try {
@@ -17973,7 +17976,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                             else if (ev.type === 'error') { streamErr = ev.error || 'The agent failed.'; }
                         }
                     }
-                    if (livePaint) { cancelAnimationFrame(livePaint); livePaint = null; }
+                    if (livePaint) { if (livePaint.t) clearTimeout(livePaint.t); else cancelAnimationFrame(livePaint); livePaint = null; }
                     if (streamErr) throw new Error(streamErr);
                     if (finalAnswer == null) {
                         // The connection dropped before "done": what arrived is not a
