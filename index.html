@@ -43120,9 +43120,9 @@ window.AIAD_PROMPTS = [
         if (!s || !s.user) return;
         var r = await window.db.rpc('aiad_access_state');
         if (r.error) {
-            // Fail OPEN here on purpose: a network blip must not lock a paying
-            // artist out of their own dashboard. spend_ai_credit_tx enforces the
-            // same rule server-side, so a bypass still cannot generate anything.
+            // Fail OPEN on purpose: a network blip must not lock a paying artist
+            // out of their dashboard. spend_ai_credit_tx enforces the same rule
+            // server-side, so a client bypass still cannot generate anything.
             console.error('[aiadCheckAccess]', r.error);
             return;
         }
@@ -43140,7 +43140,6 @@ window.AIAD_PROMPTS = [
         }
     }, 500);
 
-    // Returning from a successful checkout should clear the gate without a manual reload.
     if (new URLSearchParams(location.search).get('billing') === 'success') {
         setTimeout(function () {
             var g = document.getElementById('aiadAccessGate'); if (g) g.remove();
