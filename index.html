@@ -6283,12 +6283,10 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                             <div id="aiadPricingMountSettings" class="aiad-pricing-mount"></div>
                             <details style="margin-top: var(--space-lg);"><summary style="cursor: pointer; font-size: 0.9375rem; color: var(--text-secondary);">Billing History</summary>
                                 <table class="settings-billing-table" style="margin-top: var(--space-md);"><thead><tr><th>Date</th><th>Description</th><th>Amount</th><th></th></tr></thead><tbody>
-                                    <tr><td>Jan 21, 2026</td><td>Pro Plan - Monthly</td><td>$19.00</td><td><a href="#" class="settings-billing-link">Download</a></td></tr>
-                                    <tr><td>Dec 21, 2025</td><td>Pro Plan - Monthly</td><td>$19.00</td><td><a href="#" class="settings-billing-link">Download</a></td></tr>
-                                    <tr><td>Nov 21, 2025</td><td>Pro Plan - Monthly</td><td>$19.00</td><td><a href="#" class="settings-billing-link">Download</a></td></tr>
+                                    <tr><td colspan="4" style="color:var(--text-muted);font-size:0.875rem;">Invoices are available in the Stripe billing portal.</td></tr>
                                 </tbody></table>
                             </details>
-                            <div class="settings-actions"><button class="settings-btn danger" onclick="openSupportForm()">Cancel subscription</button></div>
+                            <div class="settings-actions"><button class="settings-btn danger" onclick="window.aiadCancelSubscription()">Cancel subscription</button></div>
                         </div>
 <div class="settings-section" id="fanSupportSection" style="display:none">
                             <div class="settings-section-header">
@@ -28612,6 +28610,29 @@ function toggleAgeRange(btn) {
             }
         };
 
+        // Cancel path: Stripe portal first, support form as fallback. Most accounts
+        // have no subscriptions row (webhook not live), so the portal will 4xx for them.
+        window.aiadCancelSubscription = async function () {
+            const sess = getSession();
+            if (!sess?.user) { (window.showToast || alert)('Please sign in first'); return; }
+            try {
+                const { url } = await callEdge('stripe-portal', { user_id: sess.user.id });
+                if (!url) throw new Error('stripe-portal returned no url');
+                window.location.href = url;
+            } catch (err) {
+                console.error('[aiadCancelSubscription]', err);
+                if (typeof window.openSupportForm === 'function') {
+                    window.openSupportForm();
+                    const s = document.getElementById('aiadHelpSubject');
+                    const m = document.getElementById('aiadHelpMsg');
+                    if (s && !s.value) s.value = 'Cancel my subscription';
+                    if (m && !m.value) m.value = 'I would like to cancel my subscription. Account email: ' + (sess.user.email || '');
+                } else {
+                    (window.showToast || alert)('Could not open billing. Email support@aiad.studio and we will cancel it for you.');
+                }
+            }
+        };
+
         // Surface checkout result to the user when Stripe redirects back.
         document.addEventListener('DOMContentLoaded', () => {
             const p = new URLSearchParams(location.search);
@@ -32044,6 +32065,7 @@ Be direct and concrete with real industry insight — never generic filler. When
             }
             ov.style.display = 'flex';
         }
+        window.openSupportForm = openSupportForm;
         window.submitSupport = async (btn) => {
             const subject = (document.getElementById('aiadHelpSubject').value || '').trim();
             const msg = (document.getElementById('aiadHelpMsg').value || '').trim();
