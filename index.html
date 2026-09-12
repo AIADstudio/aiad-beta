@@ -32179,8 +32179,7 @@ Be direct and concrete with real industry insight — never generic filler. When
                         <div style="font-size:1.15rem;font-weight:700;color:#fff;">Your trial is running</div>
                         <p id="aiadTrialCopy" style="color:#94a3b8;font-size:0.85rem;margin:8px 0 18px;"></p>
                         <button id="aiadCardNowBtn" onclick="aiadAddCardNow('${dash}')" style="width:100%;background:linear-gradient(135deg,#06b6d4,#3b82f6);color:#fff;border:none;border-radius:10px;padding:12px;font-size:0.92rem;font-weight:700;cursor:pointer;">Add a card now</button>
-                        <button onclick="aiadAddCardLater('${dash}')" style="width:100%;margin-top:8px;background:transparent;color:#94a3b8;border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:11px;font-size:0.88rem;font-weight:600;cursor:pointer;">Add it later →</button>
-                        <p style="color:#64748b;font-size:0.72rem;margin:12px 0 0;">Adding a card now means you keep your plan when the trial ends. Without one, you move to Free (20 credits/mo) — nothing is charged either way.</p>
+                        <p style="color:#64748b;font-size:0.72rem;margin:12px 0 0;">A card is required to finish setup. Nothing is charged during your trial, and you can cancel any time before it ends.</p>
                     </div>
                 </div>`;
             document.body.appendChild(ov);
@@ -32424,8 +32423,17 @@ Be direct and concrete with real industry insight — never generic filler. When
                 if (window.startCheckout) { await window.startCheckout(planKey, 'monthly'); return; }
                 throw new Error('Checkout unavailable');
             } catch (e) {
-                (window.showToast || alert)('Could not open checkout: ' + (e.message || e) + ' — you can add a card later in Settings.');
+                (window.showToast || alert)('Could not open checkout: ' + (e.message || e));
                 if (btn) { btn.disabled = false; btn.textContent = 'Add a card now'; }
+                const box = document.getElementById('aiadObStepCard');
+                if (box && !document.getElementById('aiadCardHelpLink')) {
+                    const a = document.createElement('button');
+                    a.id = 'aiadCardHelpLink';
+                    a.textContent = 'Having trouble? Contact support';
+                    a.style.cssText = 'width:100%;margin-top:10px;background:transparent;color:#94a3b8;border:none;font-size:0.8rem;text-decoration:underline;cursor:pointer;';
+                    a.onclick = function () { if (window.openSupportForm) window.openSupportForm(); };
+                    box.appendChild(a);
+                }
             }
         };
         async function aiadCurrentPlanKey() {
@@ -32435,7 +32443,6 @@ Be direct and concrete with real industry insight — never generic filler. When
                 return Array.isArray(rows) && rows[0] ? rows[0].plan : null;
             } catch (e) { return null; }
         }
-        window.aiadAddCardLater = function (dash) { window.aiadFinishOnboarding(dash, true); };
         window.aiadSkipObStats = function (dash) { window.aiadShowObPricing(dash); };
         window.aiadSubmitObStats = async function (btn, dash) {
             const msg = document.getElementById('aiadObStatsMsg');
@@ -43046,6 +43053,61 @@ window.AIAD_PROMPTS = [
             window.aiadCompletePasswordReset();
         }
     });
+})();
+</script>
+<script>
+(function () {
+    var KEY = 'aiad_card_notice_dismissed_until';
+    function dismissed() {
+        try { return Date.now() < Number(localStorage.getItem(KEY) || 0); } catch (e) { return false; }
+    }
+    async function hasCard(uid) {
+        try {
+            var r = await window.db.from('subscriptions')
+                .select('stripe_customer_id').eq('user_id', uid)
+                .not('stripe_customer_id', 'is', null).limit(1).maybeSingle();
+            if (r.error) { console.error('[cardNotice]', r.error); return true; }
+            return !!(r.data && r.data.stripe_customer_id);
+        } catch (e) { console.error('[cardNotice]', e); return true; }
+    }
+    window.aiadAddCardFromBanner = async function () {
+        try {
+            var s = window.__aiadGetSessionSync && window.__aiadGetSessionSync();
+            if (!s || !s.user) { (window.showToast || alert)('Please sign in first'); return; }
+            var rows = await window.db.from('profiles').select('plan').eq('id', s.user.id).maybeSingle();
+            var plan = (rows && rows.data && rows.data.plan) || 'artist_pro';
+            if (plan === 'free') plan = 'artist_starter';
+            await window.startCheckout(plan, 'month');
+        } catch (e) {
+            console.error('[aiadAddCardFromBanner]', e);
+            (window.showToast || alert)('Could not open checkout: ' + (e.message || e));
+        }
+    };
+    async function render() {
+        if (dismissed() || document.getElementById('aiadCardNotice')) return;
+        var s = window.__aiadGetSessionSync && window.__aiadGetSessionSync();
+        if (!s || !s.user) return;
+        var prof = await window.db.from('profiles').select('role').eq('id', s.user.id).maybeSingle();
+        if (!prof || !prof.data || prof.data.role !== 'artist') return;
+        if (await hasCard(s.user.id)) return;
+        var bar = document.createElement('div');
+        bar.id = 'aiadCardNotice';
+        bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99990;background:linear-gradient(135deg,#0f172a,#1e293b);border-bottom:1px solid rgba(255,255,255,0.12);color:#e2e8f0;padding:10px 16px;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;font-size:0.85rem;';
+        bar.innerHTML = '<span>A card on file is required from <strong style="color:#fff;">October 1</strong> to keep using AIAD. Nothing is charged before then.</span>'
+            + '<button onclick="window.aiadAddCardFromBanner()" style="background:linear-gradient(135deg,#06b6d4,#3b82f6);color:#fff;border:none;border-radius:8px;padding:7px 16px;font-size:0.82rem;font-weight:700;cursor:pointer;">Add a card</button>'
+            + '<button id="aiadCardNoticeX" style="background:none;border:none;color:#94a3b8;font-size:1.1rem;cursor:pointer;line-height:1;">×</button>';
+        document.body.appendChild(bar);
+        document.getElementById('aiadCardNoticeX').onclick = function () {
+            try { localStorage.setItem(KEY, String(Date.now() + 86400000)); } catch (e) {}
+            bar.remove();
+        };
+        document.body.style.paddingTop = bar.offsetHeight + 'px';
+    }
+    var tries = 0;
+    var t = setInterval(function () {
+        if (++tries > 40) { clearInterval(t); return; }
+        if (window.db && window.__aiadGetSessionSync) { clearInterval(t); render(); }
+    }, 500);
 })();
 </script>
 </body>
