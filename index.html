@@ -43058,56 +43058,96 @@ window.AIAD_PROMPTS = [
 <script>
 (function () {
     var KEY = 'aiad_card_notice_dismissed_until';
+    var state = null;
+
     function dismissed() {
         try { return Date.now() < Number(localStorage.getItem(KEY) || 0); } catch (e) { return false; }
     }
-    async function hasCard(uid) {
-        try {
-            var r = await window.db.from('subscriptions')
-                .select('stripe_customer_id').eq('user_id', uid)
-                .not('stripe_customer_id', 'is', null).limit(1).maybeSingle();
-            if (r.error) { console.error('[cardNotice]', r.error); return true; }
-            return !!(r.data && r.data.stripe_customer_id);
-        } catch (e) { console.error('[cardNotice]', e); return true; }
-    }
-    window.aiadAddCardFromBanner = async function () {
+
+    window.aiadAddCardFromNotice = async function () {
         try {
             var s = window.__aiadGetSessionSync && window.__aiadGetSessionSync();
             if (!s || !s.user) { (window.showToast || alert)('Please sign in first'); return; }
-            var rows = await window.db.from('profiles').select('plan').eq('id', s.user.id).maybeSingle();
-            var plan = (rows && rows.data && rows.data.plan) || 'artist_pro';
+            var r = await window.db.from('profiles').select('plan').eq('id', s.user.id).maybeSingle();
+            var plan = (r && r.data && r.data.plan) || 'artist_pro';
             if (plan === 'free') plan = 'artist_starter';
             await window.startCheckout(plan, 'month');
         } catch (e) {
-            console.error('[aiadAddCardFromBanner]', e);
+            console.error('[aiadAddCardFromNotice]', e);
             (window.showToast || alert)('Could not open checkout: ' + (e.message || e));
         }
     };
-    async function render() {
+
+    function showGate() {
+        if (document.getElementById('aiadAccessGate')) return;
+        var ov = document.createElement('div');
+        ov.id = 'aiadAccessGate';
+        ov.style.cssText = 'position:fixed;inset:0;z-index:100002;background:rgba(3,5,12,0.94);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:20px;';
+        ov.innerHTML = '<div style="background:#0d0f17;border:1px solid rgba(255,255,255,0.1);border-radius:16px;max-width:440px;width:100%;padding:28px;text-align:center;">'
+            + '<div style="font-size:1.2rem;font-weight:700;color:#fff;margin-bottom:8px;">A card is required to continue</div>'
+            + '<p style="color:#94a3b8;font-size:0.86rem;line-height:1.6;margin:0 0 20px;">As of October 1, AIAD requires a card on file. Add one to restore access to your account — everything you have made is safe and waiting.</p>'
+            + '<button onclick="window.aiadAddCardFromNotice()" style="width:100%;background:linear-gradient(135deg,#06b6d4,#3b82f6);color:#fff;border:none;border-radius:10px;padding:12px;font-size:0.92rem;font-weight:700;cursor:pointer;">Add a card</button>'
+            + '<button id="aiadGateHelp" style="width:100%;margin-top:10px;background:transparent;color:#94a3b8;border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:11px;font-size:0.85rem;cursor:pointer;">Contact support</button>'
+            + '<button onclick="handleSignOut()" style="margin-top:14px;background:none;border:none;color:#64748b;font-size:0.78rem;text-decoration:underline;cursor:pointer;">Sign out</button>'
+            + '</div>';
+        document.body.appendChild(ov);
+        document.getElementById('aiadGateHelp').onclick = function () {
+            if (window.openSupportForm) window.openSupportForm();
+        };
+    }
+
+    function showBanner() {
         if (dismissed() || document.getElementById('aiadCardNotice')) return;
-        var s = window.__aiadGetSessionSync && window.__aiadGetSessionSync();
-        if (!s || !s.user) return;
-        var prof = await window.db.from('profiles').select('role').eq('id', s.user.id).maybeSingle();
-        if (!prof || !prof.data || prof.data.role !== 'artist') return;
-        if (await hasCard(s.user.id)) return;
+        var d = state && state.deadline ? new Date(state.deadline) : null;
+        var label = d ? d.toLocaleDateString(undefined, { month: 'long', day: 'numeric' }) : 'October 1';
         var bar = document.createElement('div');
         bar.id = 'aiadCardNotice';
         bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99990;background:linear-gradient(135deg,#0f172a,#1e293b);border-bottom:1px solid rgba(255,255,255,0.12);color:#e2e8f0;padding:10px 16px;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;font-size:0.85rem;';
-        bar.innerHTML = '<span>A card on file is required from <strong style="color:#fff;">October 1</strong> to keep using AIAD. Nothing is charged before then.</span>'
-            + '<button onclick="window.aiadAddCardFromBanner()" style="background:linear-gradient(135deg,#06b6d4,#3b82f6);color:#fff;border:none;border-radius:8px;padding:7px 16px;font-size:0.82rem;font-weight:700;cursor:pointer;">Add a card</button>'
+        bar.innerHTML = '<span>A card on file is required from <strong style="color:#fff;">' + label + '</strong> to keep using AIAD. Nothing is charged before then.</span>'
+            + '<button onclick="window.aiadAddCardFromNotice()" style="background:linear-gradient(135deg,#06b6d4,#3b82f6);color:#fff;border:none;border-radius:8px;padding:7px 16px;font-size:0.82rem;font-weight:700;cursor:pointer;">Add a card</button>'
             + '<button id="aiadCardNoticeX" style="background:none;border:none;color:#94a3b8;font-size:1.1rem;cursor:pointer;line-height:1;">×</button>';
         document.body.appendChild(bar);
         document.getElementById('aiadCardNoticeX').onclick = function () {
             try { localStorage.setItem(KEY, String(Date.now() + 86400000)); } catch (e) {}
             bar.remove();
+            document.body.style.paddingTop = '';
         };
         document.body.style.paddingTop = bar.offsetHeight + 'px';
     }
+
+    window.aiadCheckAccess = async function () {
+        var s = window.__aiadGetSessionSync && window.__aiadGetSessionSync();
+        if (!s || !s.user) return;
+        var r = await window.db.rpc('aiad_access_state');
+        if (r.error) {
+            // Fail OPEN here on purpose: a network blip must not lock a paying
+            // artist out of their own dashboard. spend_ai_credit_tx enforces the
+            // same rule server-side, so a bypass still cannot generate anything.
+            console.error('[aiadCheckAccess]', r.error);
+            return;
+        }
+        state = r.data;
+        if (state.entitled === false) { showGate(); return; }
+        if (state.has_card === false && state.reason === 'before_deadline') showBanner();
+    };
+
     var tries = 0;
     var t = setInterval(function () {
         if (++tries > 40) { clearInterval(t); return; }
-        if (window.db && window.__aiadGetSessionSync) { clearInterval(t); render(); }
+        if (window.db && window.__aiadGetSessionSync) {
+            clearInterval(t);
+            window.aiadCheckAccess();
+        }
     }, 500);
+
+    // Returning from a successful checkout should clear the gate without a manual reload.
+    if (new URLSearchParams(location.search).get('billing') === 'success') {
+        setTimeout(function () {
+            var g = document.getElementById('aiadAccessGate'); if (g) g.remove();
+            var b = document.getElementById('aiadCardNotice'); if (b) { b.remove(); document.body.style.paddingTop = ''; }
+            window.aiadCheckAccess && window.aiadCheckAccess();
+        }, 2500);
+    }
 })();
 </script>
 </body>
