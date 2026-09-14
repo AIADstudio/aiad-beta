@@ -40,6 +40,10 @@
     {
       "source": "/contact",
       "destination": "/contact.html"
+    },
+    {
+      "source": "/clips",
+      "destination": "/clips.html"
     }
   ],
   "functions": {
@@ -48,6 +52,9 @@
     },
     "api/plan-pdf.js": {
       "includeFiles": "assets/**"
+    },
+    "api/render.js": {
+      "includeFiles": "node_modules/ffmpeg-static/**"
     }
   }
 }

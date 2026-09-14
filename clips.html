@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Clip Studio — AIAD</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --teal-light:#00D4FF;--teal:#00B4D8;--teal-dark:#0077B6;
+  --magenta-light:#FF66FF;--magenta:#FF00FF;--magenta-dark:#E040FB;
+  --bg-primary:#0A0A0A;--bg-secondary:#111;--bg-card:#161616;
+  --text-primary:#fff;--text-secondary:rgba(255,255,255,.6);--text-muted:rgba(255,255,255,.4);
+  --text-hint:rgba(255,255,255,.3);
+  --border-default:rgba(255,255,255,.08);--border-hover:rgba(255,255,255,.15);
+  --font-body:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{font-size:16px;-webkit-font-smoothing:antialiased;}
+body{font-family:var(--font-body);background:var(--bg-primary);color:var(--text-primary);
+  min-height:100dvh;display:flex;flex-direction:column;overscroll-behavior:none;}
+button{font-family:inherit;}
+:focus-visible{outline:2px solid var(--teal);outline-offset:2px;}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;}}
+
+/* header */
+.cs-head{display:flex;align-items:center;gap:12px;padding:12px 16px;
+  border-bottom:1px solid var(--border-default);flex:0 0 auto;
+  padding-top:calc(12px + env(safe-area-inset-top));}
+.cs-back{background:none;border:none;color:var(--text-secondary);cursor:pointer;
+  display:flex;align-items:center;gap:6px;font-size:.85rem;padding:6px 8px;border-radius:8px;}
+.cs-back:hover{color:var(--text-primary);background:rgba(255,255,255,.05);}
+.cs-brand{font-size:.95rem;font-weight:600;letter-spacing:-.01em;}
+.cs-brand span{color:var(--text-muted);font-weight:400;}
+.cs-head-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
+.cs-export{padding:9px 20px;border-radius:10px;border:none;cursor:pointer;font-weight:600;
+  font-size:.85rem;color:#000;background:linear-gradient(90deg,var(--teal-light),var(--teal));}
+.cs-export:disabled{opacity:.4;cursor:not-allowed;background:rgba(255,255,255,.1);color:var(--text-muted);}
+
+/* start screen */
+.cs-start{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:20px;padding:32px 20px;text-align:center;}
+.cs-start h1{font-size:clamp(1.5rem,5vw,2rem);font-weight:600;letter-spacing:-.02em;}
+.cs-start p{color:var(--text-secondary);font-size:.95rem;max-width:34ch;line-height:1.6;font-weight:300;}
+.cs-drop{width:100%;max-width:440px;border:1px dashed var(--border-hover);border-radius:18px;
+  padding:40px 24px;cursor:pointer;background:var(--bg-card);transition:border-color .2s,background .2s;}
+.cs-drop:hover,.cs-drop.over{border-color:var(--teal);background:rgba(0,180,216,.06);}
+.cs-drop-title{font-weight:600;margin-bottom:6px;}
+.cs-drop-sub{font-size:.8rem;color:var(--text-muted);}
+.cs-picks{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;max-width:560px;}
+.cs-pick{width:92px;height:92px;border-radius:12px;overflow:hidden;border:1px solid var(--border-default);
+  background:#000;cursor:pointer;position:relative;padding:0;}
+.cs-pick video,.cs-pick img{width:100%;height:100%;object-fit:cover;pointer-events:none;}
+.cs-pick:hover{border-color:var(--teal);}
+
+/* editor */
+.cs-editor{flex:1;display:none;min-height:0;}
+.cs-editor.on{display:flex;flex-direction:column;}
+@media (min-width:1000px){.cs-editor.on{flex-direction:row;}}
+
+.cs-stage-wrap{background:#000;display:flex;align-items:center;justify-content:center;
+  flex:1 1 auto;min-height:0;position:relative;padding:12px;}
+@media (min-width:1000px){.cs-stage-wrap{flex:1 1 auto;padding:24px;}}
+
+/* the frame: this IS the output, cropped and composited live */
+.cs-frame{position:relative;overflow:hidden;background:#000;max-width:100%;max-height:100%;
+  box-shadow:0 0 0 1px rgba(255,255,255,.12),0 18px 60px rgba(0,0,0,.7);}
+.cs-frame video{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;}
+.cs-txt{position:absolute;transform:translate(-50%,-50%);text-align:center;line-height:1.15;
+  white-space:pre-wrap;pointer-events:none;max-width:92%;font-weight:700;}
+.cs-txt.sel{outline:1px dashed rgba(255,255,255,.5);outline-offset:6px;}
+
+.cs-play{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);width:52px;height:52px;
+  border-radius:50%;border:none;background:rgba(0,0,0,.6);backdrop-filter:blur(8px);color:#fff;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.cs-play svg{width:22px;height:22px;}
+
+/* panel */
+.cs-panel{flex:0 0 auto;border-top:1px solid var(--border-default);background:var(--bg-primary);
+  display:flex;flex-direction:column;max-height:52dvh;}
+@media (min-width:1000px){
+  .cs-panel{flex:0 0 380px;border-top:none;border-left:1px solid var(--border-default);max-height:none;}
+}
+
+/* timeline */
+.cs-time{padding:12px 14px 6px;flex:0 0 auto;}
+.cs-rail{position:relative;height:52px;border-radius:10px;background:var(--bg-secondary);
+  border:1px solid var(--border-default);touch-action:none;overflow:hidden;}
+.cs-seg{position:absolute;top:0;bottom:0;background:rgba(0,180,216,.2);
+  border-top:1px solid var(--teal);border-bottom:1px solid var(--teal);}
+.cs-gap{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(45deg,
+  rgba(255,255,255,.04) 0 6px,transparent 6px 12px);}
+.cs-h{position:absolute;top:50%;transform:translate(-50%,-50%);width:40px;height:52px;
+  display:flex;align-items:center;justify-content:center;cursor:ew-resize;touch-action:none;background:none;border:none;padding:0;}
+.cs-h::after{content:"";width:7px;height:34px;border-radius:4px;background:var(--teal);
+  box-shadow:0 1px 5px rgba(0,0,0,.6);}
+.cs-playhead{position:absolute;top:0;bottom:0;width:2px;background:#fff;opacity:.9;pointer-events:none;}
+.cs-times{display:flex;justify-content:space-between;font-size:.72rem;color:var(--text-muted);
+  font-variant-numeric:tabular-nums;margin-top:6px;}
+.cs-cutrow{display:flex;gap:8px;margin-top:8px;}
+.cs-mini{flex:1;padding:9px;border-radius:9px;border:1px solid var(--border-default);
+  background:transparent;color:var(--text-secondary);font-size:.78rem;cursor:pointer;}
+.cs-mini:hover{border-color:var(--border-hover);color:var(--text-primary);}
+.cs-mini[disabled]{opacity:.35;cursor:default;}
+
+/* tabs */
+.cs-tabs{display:flex;gap:6px;padding:10px 14px 0;flex:0 0 auto;}
+.cs-tab{flex:1;padding:9px 4px;border-radius:9px;border:1px solid var(--border-default);
+  background:transparent;color:var(--text-secondary);font-size:.78rem;cursor:pointer;}
+.cs-tab.on{border-color:var(--teal);color:var(--text-primary);background:rgba(0,180,216,.1);}
+.cs-body{overflow-y:auto;padding:14px 14px calc(18px + env(safe-area-inset-bottom));flex:1 1 auto;-webkit-overflow-scrolling:touch;}
+.cs-pane{display:none;}
+.cs-pane.on{display:block;}
+
+.cs-label{font-size:.72rem;color:var(--text-muted);margin:14px 0 8px;}
+.cs-label:first-child{margin-top:0;}
+.cs-chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;}
+.cs-chips::-webkit-scrollbar{display:none;}
+.cs-chip{flex:0 0 auto;padding:8px 14px;border-radius:999px;border:1px solid var(--border-default);
+  background:transparent;color:var(--text-secondary);font-size:.78rem;cursor:pointer;}
+.cs-chip.on{border-color:var(--teal);color:var(--text-primary);background:rgba(0,180,216,.12);}
+.cs-slider{width:100%;accent-color:var(--teal);cursor:pointer;}
+.cs-row{display:flex;align-items:center;gap:12px;}
+.cs-row .cs-slider{flex:1;}
+.cs-val{font-size:.75rem;color:var(--text-secondary);min-width:40px;text-align:right;
+  font-variant-numeric:tabular-nums;}
+.cs-input,.cs-area{width:100%;padding:11px 13px;border-radius:10px;background:var(--bg-secondary);
+  border:1px solid var(--border-default);color:var(--text-primary);font-family:inherit;font-size:.9rem;}
+.cs-input:focus,.cs-area:focus{outline:none;border-color:var(--teal);}
+.cs-area{min-height:64px;resize:vertical;}
+.cs-add{width:100%;padding:12px;border-radius:10px;border:1px dashed var(--border-hover);
+  background:transparent;color:var(--text-secondary);font-size:.82rem;cursor:pointer;margin-top:10px;}
+.cs-add:hover{border-color:var(--teal);color:var(--teal-light);}
+.cs-layer{border:1px solid var(--border-default);border-radius:12px;padding:12px;margin-bottom:10px;
+  background:var(--bg-card);}
+.cs-layer.on{border-color:var(--teal);}
+.cs-layer-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.cs-layer-name{flex:1;font-size:.82rem;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cs-x{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.1rem;
+  line-height:1;padding:2px 6px;border-radius:6px;}
+.cs-x:hover{color:#FF6B6B;background:rgba(255,100,100,.1);}
+.cs-swatches{display:flex;gap:8px;flex-wrap:wrap;}
+.cs-sw{width:28px;height:28px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0;}
+.cs-sw.on{border-color:var(--teal);}
+.cs-hint{font-size:.75rem;color:var(--text-muted);line-height:1.55;margin-top:8px;}
+.cs-file{display:none;}
+
+/* export overlay */
+.cs-over{position:fixed;inset:0;background:rgba(0,0,0,.86);display:none;align-items:center;
+  justify-content:center;padding:20px;z-index:100;}
+.cs-over.on{display:flex;}
+.cs-modal{background:var(--bg-card);border:1px solid var(--border-default);border-radius:18px;
+  padding:26px;width:100%;max-width:420px;text-align:center;}
+.cs-modal h2{font-size:1.1rem;font-weight:600;margin-bottom:8px;}
+.cs-modal p{font-size:.88rem;color:var(--text-secondary);line-height:1.6;}
+.cs-bar{height:5px;border-radius:3px;background:rgba(255,255,255,.1);overflow:hidden;margin:18px 0 10px;}
+.cs-bar i{display:block;height:100%;width:0;border-radius:3px;
+  background:linear-gradient(90deg,var(--teal),var(--magenta-dark));transition:width .3s ease;}
+.cs-result video{width:100%;border-radius:12px;margin-bottom:16px;background:#000;}
+.cs-acts{display:flex;gap:10px;}
+.cs-acts button,.cs-acts a{flex:1;padding:12px;border-radius:10px;font-size:.85rem;font-weight:600;
+  cursor:pointer;border:1px solid var(--border-default);background:transparent;color:var(--text-secondary);
+  text-decoration:none;display:flex;align-items:center;justify-content:center;font-family:inherit;}
+.cs-acts .cs-primary{background:linear-gradient(90deg,var(--teal-light),var(--teal));
+  border-color:transparent;color:#000;}
+.cs-toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(90px);
+  background:var(--bg-card);border:1px solid var(--border-default);padding:11px 20px;border-radius:10px;
+  font-size:.85rem;z-index:200;opacity:0;transition:all .3s ease;pointer-events:none;}
+.cs-toast.on{transform:translateX(-50%) translateY(0);opacity:1;}
+</style>
+</head>
+<body>
+
+<header class="cs-head">
+  <button class="cs-back" id="backBtn">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    Dashboard
+  </button>
+  <div class="cs-brand">Clip Studio <span id="csState"></span></div>
+  <div class="cs-head-right">
+    <button class="cs-export" id="exportBtn" disabled>Export</button>
+  </div>
+</header>
+
+<section class="cs-start" id="startScreen">
+  <h1>Cut a clip</h1>
+  <p>Trim it, frame it for where it's going, drop text on it, put a track under it.</p>
+  <div class="cs-drop" id="dropZone">
+    <div class="cs-drop-title">Choose a video</div>
+    <div class="cs-drop-sub">MP4 or MOV, up to 10 minutes</div>
+  </div>
+  <input type="file" accept="video/*" class="cs-file" id="fileInput">
+  <div id="recentWrap" style="display:none">
+    <div class="cs-label" style="text-align:center">Or pick one you already posted</div>
+    <div class="cs-picks" id="recentPicks"></div>
+  </div>
+</section>
+
+<main class="cs-editor" id="editor">
+  <div class="cs-stage-wrap">
+    <div class="cs-frame" id="frame">
+      <video id="vid" playsinline webkit-playsinline preload="metadata"></video>
+      <div id="textLayer"></div>
+    </div>
+    <button class="cs-play" id="playBtn" aria-label="Play">
+      <svg viewBox="0 0 24 24" fill="currentColor" id="playIcon"><path d="M8 5v14l11-7z"/></svg>
+    </button>
+  </div>
+
+  <div class="cs-panel">
+    <div class="cs-time">
+      <div class="cs-rail" id="rail">
+        <div class="cs-playhead" id="playhead" style="left:0"></div>
+      </div>
+      <div class="cs-times"><span id="tIn">0:00.0</span><span id="tOut">0:00.0</span></div>
+      <div class="cs-cutrow">
+        <button class="cs-mini" id="cutBtn">Cut selection</button>
+        <button class="cs-mini" id="resetBtn">Undo cuts</button>
+      </div>
+    </div>
+
+    <div class="cs-tabs">
+      <button class="cs-tab on" data-pane="frame">Frame</button>
+      <button class="cs-tab" data-pane="text">Text</button>
+      <button class="cs-tab" data-pane="sound">Sound</button>
+      <button class="cs-tab" data-pane="look">Look</button>
+    </div>
+
+    <div class="cs-body">
+      <div class="cs-pane on" data-pane="frame">
+        <div class="cs-label">Shape</div>
+        <div class="cs-chips" id="aspectChips"></div>
+        <div class="cs-label">Framing</div>
+        <div class="cs-row"><span class="cs-val" style="text-align:left">Across</span>
+          <input type="range" class="cs-slider" id="focusX" min="0" max="100" value="50"></div>
+        <div class="cs-row" style="margin-top:10px"><span class="cs-val" style="text-align:left">Up/down</span>
+          <input type="range" class="cs-slider" id="focusY" min="0" max="100" value="50"></div>
+        <p class="cs-hint">Going vertical from a wide shot throws away most of the width. Slide until the subject sits where you want it.</p>
+      </div>
+
+      <div class="cs-pane" data-pane="text">
+        <div id="textList"></div>
+        <button class="cs-add" id="addText">Add text</button>
+      </div>
+
+      <div class="cs-pane" data-pane="sound">
+        <div class="cs-label">Original audio</div>
+        <div class="cs-row">
+          <input type="range" class="cs-slider" id="srcVol" min="0" max="150" value="100">
+          <span class="cs-val" id="srcVolVal">100%</span>
+        </div>
+        <div class="cs-label">Music under it</div>
+        <div id="musicBox"></div>
+        <button class="cs-add" id="addMusic">Add a track</button>
+        <input type="file" accept="audio/*" class="cs-file" id="musicInput">
+        <p class="cs-hint">The track is cut to the length of the clip and faded out at the end.</p>
+      </div>
+
+      <div class="cs-pane" data-pane="look">
+        <div class="cs-label">Filter</div>
+        <div class="cs-chips" id="filterChips"></div>
+        <p class="cs-hint">The same six looks as the post composer, so a filter means the same thing everywhere.</p>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="cs-over" id="overlay">
+  <div class="cs-modal" id="modal"></div>
+</div>
+<div class="cs-toast" id="toast"></div>
+
+<script type="module">
+// Pinned deliberately. index.html loads supabase-js at an unpinned major, which means a
+// minor the vendor publishes reaches production without anyone deploying. Not repeating
+// that here.
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
+
+const SUPABASE_URL = 'https://uapiytquwuhtewqieegx.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhcGl5dHF1d3VodGV3cWllZWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NzcwMTksImV4cCI6MjA4OTI1MzAxOX0.BLs2RdStghm0_cF8t70cBTX1GWcowGRwID7TAG8Mg38';
+const BUCKET = 'artist-media';
+const PUBLIC = SUPABASE_URL + '/storage/v1/object/public/' + BUCKET + '/';
+
+// Same storage key as index.html, so a session started on the dashboard is already valid
+// here — this page never asks anyone to sign in twice.
+const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+});
+
+const $ = (id) => document.getElementById(id);
+const el = {
+    start: $('startScreen'), editor: $('editor'), drop: $('dropZone'), file: $('fileInput'),
+    frame: $('frame'), vid: $('vid'), textLayer: $('textLayer'), play: $('playBtn'), playIcon: $('playIcon'),
+    rail: $('rail'), playhead: $('playhead'), tIn: $('tIn'), tOut: $('tOut'),
+    cut: $('cutBtn'), reset: $('resetBtn'), exportBtn: $('exportBtn'), state: $('csState'),
+    aspect: $('aspectChips'), focusX: $('focusX'), focusY: $('focusY'),
+    textList: $('textList'), addText: $('addText'),
+    srcVol: $('srcVol'), srcVolVal: $('srcVolVal'), musicBox: $('musicBox'),
+    addMusic: $('addMusic'), musicInput: $('musicInput'),
+    filters: $('filterChips'), overlay: $('overlay'), modal: $('modal'), toast: $('toast'),
+    recentWrap: $('recentWrap'), recentPicks: $('recentPicks'), back: $('backBtn')
+};
+
+const ASPECTS = [
+    { key: 'source', label: 'As shot', r: null },
+    { key: '9:16',   label: 'Reels / TikTok', r: 9 / 16 },
+    { key: '1:1',    label: 'Square', r: 1 },
+    { key: '4:5',    label: 'Feed', r: 4 / 5 },
+    { key: '16:9',   label: 'YouTube', r: 16 / 9 }
+];
+// Rebuilt from the same numbers as the post composer's VPRESETS and api/watermark.js.
+const FILTERS = [
+    { key: 'none', label: 'None', css: 'none' },
+    { key: 'mono', label: 'Mono', css: 'brightness(1.05) contrast(1.12) saturate(0)' },
+    { key: 'fade', label: 'Fade', css: 'brightness(1.08) contrast(0.82) saturate(0.88) sepia(0.08)' },
+    { key: 'warm', label: 'Warm', css: 'brightness(1.03) contrast(1.06) saturate(1.12) sepia(0.3)' },
+    { key: 'cold', label: 'Cold', css: 'brightness(1) contrast(1.08) saturate(0.96) hue-rotate(-12deg)' },
+    { key: 'film', label: 'Film', css: 'brightness(0.98) contrast(1.18) saturate(0.86) sepia(0.14) hue-rotate(4deg)' }
+];
+const SWATCHES = ['#FFFFFF', '#000000', '#00D4FF', '#FF00FF', '#FFD700', '#FF4D4D'];
+
+const S = {
+    user: null, file: null, sourceUrl: null, objectUrl: null,
+    dur: 0, vw: 0, vh: 0,
+    segments: [],            // kept ranges in SOURCE time, in order
+    sel: { start: 0, end: 0 },
+    aspect: 'source', focusX: .5, focusY: .5, filter: 'none',
+    texts: [], selText: null,
+    srcVol: 1, music: null,
+    playing: false, seg: 0
+};
+
+function toast(msg) {
+    el.toast.textContent = msg; el.toast.classList.add('on');
+    clearTimeout(toast._t); toast._t = setTimeout(() => el.toast.classList.remove('on'), 2600);
+}
+const fmt = (t) => {
+    t = Math.max(0, t || 0);
+    const m = Math.floor(t / 60), s = t - m * 60;
+    return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1);
+};
+const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const totalKept = () => S.segments.reduce((n, s) => n + (s.end - s.start), 0);
+
+// ── auth ────────────────────────────────────────────────────────────────────────────
+(async function boot() {
+    const { data } = await db.auth.getSession();
+    if (!data || !data.session) {
+        el.start.innerHTML = '<h1>Sign in first</h1>'
+            + '<p>Clip Studio works off your AIAD account — open the dashboard, sign in, then come back.</p>'
+            + '<div class="cs-drop" style="max-width:260px" onclick="location.href=\'/\'">'
+            + '<div class="cs-drop-title">Go to AIAD</div></div>';
+        return;
+    }
+    S.user = data.session.user;
+    loadRecent();
+})();
+
+el.back.onclick = () => { location.href = '/'; };
+
+// ── source ──────────────────────────────────────────────────────────────────────────
+el.drop.onclick = () => el.file.click();
+el.drop.addEventListener('dragover', (e) => { e.preventDefault(); el.drop.classList.add('over'); });
+el.drop.addEventListener('dragleave', () => el.drop.classList.remove('over'));
+el.drop.addEventListener('drop', (e) => {
+    e.preventDefault(); el.drop.classList.remove('over');
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) useFile(f);
+});
+el.file.onchange = () => { if (el.file.files[0]) useFile(el.file.files[0]); };
+
+function useFile(f) {
+    if (!/^video\//.test(f.type)) return toast('That is not a video file.');
+    if (f.size > 350 * 1024 * 1024) return toast('That file is over 350MB. Trim it down first.');
+    S.file = f; S.sourceUrl = null;
+    if (S.objectUrl) URL.revokeObjectURL(S.objectUrl);
+    S.objectUrl = URL.createObjectURL(f);
+    openSource(S.objectUrl);
+}
+
+// A clip already in AIAD needs no upload at export time — it is in the bucket the renderer
+// reads from, so the round trip is skipped entirely.
+async function loadRecent() {
+    try {
+        const r = await db.from('artist_posts').select('media,media_url,media_type,created_at')
+            .eq('user_id', S.user.id).order('created_at', { ascending: false }).limit(24);
+        if (r.error || !r.data) return;
+        const vids = [];
+        for (const row of r.data) {
+            let m = row.media;
+            if (typeof m === 'string') { try { m = JSON.parse(m); } catch (e) { m = null; } }
+            if (Array.isArray(m)) {
+                for (const it of m) if (it && it.type === 'video' && it.url) vids.push(it.url);
+            } else if (row.media_type === 'video' && row.media_url) vids.push(row.media_url);
+        }
+        const uniq = [...new Set(vids)].slice(0, 8);
+        if (!uniq.length) return;
+        el.recentWrap.style.display = '';
+        el.recentPicks.innerHTML = uniq.map((u) =>
+            '<button class="cs-pick" data-url="' + esc(u) + '"><video src="' + esc(u)
+            + '#t=0.5" muted playsinline preload="metadata"></video></button>').join('');
+        el.recentPicks.querySelectorAll('.cs-pick').forEach((b) => {
+            b.onclick = () => { S.file = null; S.sourceUrl = b.dataset.url; openSource(b.dataset.url); };
+        });
+    } catch (e) {}
+}
+
+function openSource(src) {
+    el.vid.crossOrigin = 'anonymous';
+    el.vid.src = src;
+    el.vid.onloadedmetadata = () => {
+        S.dur = el.vid.duration || 0;
+        S.vw = el.vid.videoWidth; S.vh = el.vid.videoHeight;
+        if (!S.dur || !isFinite(S.dur)) return toast('Could not read that video.');
+        S.segments = [{ start: 0, end: S.dur }];
+        S.sel = { start: 0, end: S.dur };
+        el.start.style.display = 'none';
+        el.editor.classList.add('on');
+        el.exportBtn.disabled = false;
+        buildChips();
+        layoutFrame(); drawRail(); renderTexts(); updateState();
+    };
+    el.vid.onerror = () => toast('That video would not open.');
+}
+
+// ── frame geometry — the preview crops exactly the way api/render.js does ────────────
+function targetRatio() {
+    const a = ASPECTS.find((x) => x.key === S.aspect);
+    return a && a.r ? a.r : (S.vw && S.vh ? S.vw / S.vh : 9 / 16);
+}
+function layoutFrame() {
+    const wrap = el.frame.parentElement;
+    const availW = wrap.clientWidth - 24, availH = wrap.clientHeight - 24;
+    const r = targetRatio();
+    let w = availW, h = w / r;
+    if (h > availH) { h = availH; w = h * r; }
+    el.frame.style.width = Math.max(80, Math.round(w)) + 'px';
+    el.frame.style.height = Math.max(80, Math.round(h)) + 'px';
+    el.frame.style.borderRadius = '4px';
+
+    // object-fit:cover already crops to the frame; object-position places the surviving
+    // slice, which is the browser's equivalent of the crop x/y the renderer computes.
+    el.vid.style.objectPosition = (S.focusX * 100).toFixed(1) + '% ' + (S.focusY * 100).toFixed(1) + '%';
+    el.vid.style.filter = (FILTERS.find((f) => f.key === S.filter) || FILTERS[0]).css;
+    renderTexts();
+}
+window.addEventListener('resize', layoutFrame);
+
+function buildChips() {
+    el.aspect.innerHTML = ASPECTS.map((a) =>
+        '<button class="cs-chip' + (a.key === S.aspect ? ' on' : '') + '" data-k="' + a.key + '">'
+        + esc(a.label) + '</button>').join('');
+    el.aspect.querySelectorAll('.cs-chip').forEach((b) => {
+        b.onclick = () => { S.aspect = b.dataset.k; buildChips(); layoutFrame(); };
+    });
+    el.filters.innerHTML = FILTERS.map((f) =>
+        '<button class="cs-chip' + (f.key === S.filter ? ' on' : '') + '" data-k="' + f.key + '">'
+        + esc(f.label) + '</button>').join('');
+    el.filters.querySelectorAll('.cs-chip').forEach((b) => {
+        b.onclick = () => { S.filter = b.dataset.k; buildChips(); layoutFrame(); };
+    });
+}
+el.focusX.oninput = () => { S.focusX = el.focusX.value / 100; layoutFrame(); };
+el.focusY.oninput = () => { S.focusY = el.focusY.value / 100; layoutFrame(); };
+
+// ── timeline ────────────────────────────────────────────────────────────────────────
+function drawRail() {
+    const w = el.rail.clientWidth || 1;
+    const px = (t) => (t / (S.dur || 1)) * w;
+    let html = '<div class="cs-gap" style="left:0;right:0"></div>';
+    for (const s of S.segments) {
+        html += '<div class="cs-seg" style="left:' + px(s.start) + 'px;width:'
+            + Math.max(2, px(s.end - s.start)) + 'px"></div>';
+    }
+    html += '<div class="cs-playhead" id="playhead" style="left:' + px(el.vid.currentTime || 0) + 'px"></div>';
+    html += '<button class="cs-h" id="hIn" aria-label="Selection start" style="left:' + px(S.sel.start) + 'px"></button>';
+    html += '<button class="cs-h" id="hOut" aria-label="Selection end" style="left:' + px(S.sel.end) + 'px"></button>';
+    el.rail.innerHTML = html;
+    el.playhead = $('playhead');
+    el.tIn.textContent = fmt(S.sel.start);
+    el.tOut.textContent = fmt(S.sel.end);
+    bindHandle($('hIn'), 'start');
+    bindHandle($('hOut'), 'end');
+    el.cut.disabled = S.sel.end - S.sel.start < 0.1;
+    updateState();
+}
+function bindHandle(node, which) {
+    if (!node) return;
+    const move = (clientX) => {
+        const box = el.rail.getBoundingClientRect();
+        const t = clamp((clientX - box.left) / box.width, 0, 1) * S.dur;
+        if (which === 'start') S.sel.start = Math.min(t, S.sel.end - 0.05);
+        else S.sel.end = Math.max(t, S.sel.start + 0.05);
+        S.sel.start = clamp(S.sel.start, 0, S.dur);
+        S.sel.end = clamp(S.sel.end, 0, S.dur);
+        el.vid.currentTime = which === 'start' ? S.sel.start : S.sel.end;
+        drawRail();
+    };
+    node.addEventListener('pointerdown', (e) => {
+        e.preventDefault(); node.setPointerCapture(e.pointerId);
+        const onMove = (ev) => move(ev.clientX);
+        const onUp = (ev) => {
+            node.releasePointerCapture(e.pointerId);
+            node.removeEventListener('pointermove', onMove);
+            node.removeEventListener('pointerup', onUp);
+        };
+        node.addEventListener('pointermove', onMove);
+        node.addEventListener('pointerup', onUp);
+    });
+}
+el.rail.addEventListener('pointerdown', (e) => {
+    if (e.target.classList.contains('cs-h')) return;
+    const box = el.rail.getBoundingClientRect();
+    el.vid.currentTime = clamp((e.clientX - box.left) / box.width, 0, 1) * S.dur;
+    drawRail();
+});
+
+// Removing a slice from the middle is why the renderer concatenates rather than seeking:
+// one range cannot express "keep the start and the end, drop what is between them".
+el.cut.onclick = () => {
+    const a = S.sel.start, b = S.sel.end;
+    const next = [];
+    for (const s of S.segments) {
+        if (b <= s.start || a >= s.end) { next.push(s); continue; }
+        if (a > s.start) next.push({ start: s.start, end: a });
+        if (b < s.end) next.push({ start: b, end: s.end });
+    }
+    if (!next.length) return toast('That would remove the whole clip.');
+    if (next.length > 20) return toast('Twenty pieces is the limit.');
+    S.segments = next;
+    S.sel = { start: next[0].start, end: next[0].end };
+    drawRail();
+    toast('Cut. ' + fmt(totalKept()) + ' left.');
+};
+el.reset.onclick = () => {
+    S.segments = [{ start: 0, end: S.dur }];
+    S.sel = { start: 0, end: S.dur };
+    drawRail();
+};
+
+function updateState() {
+    if (!S.dur) return;
+    el.state.textContent = '· ' + fmt(totalKept())
+        + (S.segments.length > 1 ? ' · ' + S.segments.length + ' pieces' : '');
+}
+
+// ── playback across the kept segments ───────────────────────────────────────────────
+el.play.onclick = () => {
+    if (S.playing) { el.vid.pause(); return; }
+    const t = el.vid.currentTime;
+    const inSeg = S.segments.some((s) => t >= s.start - 0.05 && t < s.end);
+    if (!inSeg) { S.seg = 0; el.vid.currentTime = S.segments[0].start; }
+    el.vid.play().catch(() => toast('Tap the video to allow playback.'));
+};
+el.vid.onplay = () => { S.playing = true; el.playIcon.innerHTML = '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>'; };
+el.vid.onpause = () => { S.playing = false; el.playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>'; };
+el.vid.ontimeupdate = () => {
+    const t = el.vid.currentTime;
+    let idx = S.segments.findIndex((s) => t >= s.start - 0.02 && t < s.end);
+    if (idx === -1) {
+        const nxt = S.segments.find((s) => s.start > t);
+        if (nxt) { el.vid.currentTime = nxt.start; }
+        else { el.vid.pause(); el.vid.currentTime = S.segments[0].start; }
+    } else { S.seg = idx; }
+    if (el.playhead) el.playhead.style.left = ((t / (S.dur || 1)) * (el.rail.clientWidth || 1)) + 'px';
+    syncTextVisibility();
+};
+
+// Virtual time: where we are in the FINISHED clip, not in the source. Text timings are
+// authored against the finished clip, because that is what the artist is looking at.
+function virtualTime() {
+    const t = el.vid.currentTime;
+    let acc = 0;
+    for (const s of S.segments) {
+        if (t < s.start) break;
+        if (t < s.end) return acc + (t - s.start);
+        acc += s.end - s.start;
+    }
+    return acc;
+}
+
+// ── text layers ─────────────────────────────────────────────────────────────────────
+function newText() {
+    return {
+        id: 'tx' + Date.now() + Math.random().toString(36).slice(2, 6),
+        text: 'Your text', size: 7, color: '#FFFFFF', shadow: true,
+        x: .5, y: .82, start: 0, end: Math.max(1, totalKept())
+    };
+}
+el.addText.onclick = () => {
+    if (S.texts.length >= 8) return toast('Eight text layers is the limit.');
+    const t = newText(); S.texts.push(t); S.selText = t.id;
+    renderTexts(); renderTextList();
+};
+function renderTexts() {
+    el.textLayer.innerHTML = S.texts.map((t) => {
+        const px = (t.size / 100) * (el.frame.clientHeight || 400);
+        return '<div class="cs-txt' + (S.selText === t.id ? ' sel' : '') + '" data-id="' + t.id + '" style="'
+            + 'left:' + (t.x * 100) + '%;top:' + (t.y * 100) + '%;'
+            + 'font-size:' + px.toFixed(1) + 'px;color:' + esc(t.color) + ';'
+            + (t.shadow ? 'text-shadow:0 2px 12px rgba(0,0,0,.65);' : '')
+            + '">' + esc(t.text) + '</div>';
+    }).join('');
+    syncTextVisibility();
+}
+function syncTextVisibility() {
+    const vt = virtualTime();
+    el.textLayer.querySelectorAll('.cs-txt').forEach((n) => {
+        const t = S.texts.find((x) => x.id === n.dataset.id);
+        if (!t) return;
+        n.style.opacity = (vt >= t.start - .02 && vt <= t.end + .02) ? '1' : (S.playing ? '0' : '.25');
+    });
+}
+function renderTextList() {
+    if (!S.texts.length) {
+        el.textList.innerHTML = '<p class="cs-hint">Nothing on screen yet. A title, a lyric, a handle — add one and drag it where you want it.</p>';
+        return;
+    }
+    const tot = Math.max(1, totalKept());
+    el.textList.innerHTML = S.texts.map((t) => `
+      <div class="cs-layer${S.selText === t.id ? ' on' : ''}" data-id="${t.id}">
+        <div class="cs-layer-head">
+          <div class="cs-layer-name">${esc(t.text.split('\n')[0] || 'Text')}</div>
+          <button class="cs-x" data-del="${t.id}" aria-label="Remove">&times;</button>
+        </div>
+        <textarea class="cs-area" data-f="text" data-id="${t.id}">${esc(t.text)}</textarea>
+        <div class="cs-label">Size</div>
+        <div class="cs-row">
+          <input type="range" class="cs-slider" data-f="size" data-id="${t.id}" min="3" max="20" value="${t.size}">
+          <span class="cs-val">${t.size}</span>
+        </div>
+        <div class="cs-label">Colour</div>
+        <div class="cs-swatches">${SWATCHES.map((c) =>
+            `<button class="cs-sw${t.color === c ? ' on' : ''}" data-f="color" data-id="${t.id}" data-c="${c}" style="background:${c}" aria-label="${c}"></button>`).join('')}</div>
+        <div class="cs-label">On screen from ${fmt(t.start)} to ${fmt(t.end)}</div>
+        <div class="cs-row">
+          <input type="range" class="cs-slider" data-f="start" data-id="${t.id}" min="0" max="${tot.toFixed(1)}" step="0.1" value="${t.start}">
+        </div>
+        <div class="cs-row" style="margin-top:8px">
+          <input type="range" class="cs-slider" data-f="end" data-id="${t.id}" min="0" max="${tot.toFixed(1)}" step="0.1" value="${t.end}">
+        </div>
+      </div>`).join('');
+
+    el.textList.querySelectorAll('[data-del]').forEach((b) => {
+        b.onclick = () => {
+            S.texts = S.texts.filter((x) => x.id !== b.dataset.del);
+            renderTexts(); renderTextList();
+        };
+    });
+    el.textList.querySelectorAll('[data-f]').forEach((n) => {
+        const t = S.texts.find((x) => x.id === n.dataset.id);
+        if (!t) return;
+        const f = n.dataset.f;
+        const apply = () => {
+            if (f === 'color') t.color = n.dataset.c;
+            else if (f === 'text') t.text = n.value.slice(0, 200);
+            else if (f === 'size') t.size = +n.value;
+            else if (f === 'start') t.start = Math.min(+n.value, t.end - .1);
+            else if (f === 'end') t.end = Math.max(+n.value, t.start + .1);
+            S.selText = t.id;
+            renderTexts();
+            if (f === 'color' || f === 'start' || f === 'end' || f === 'size') renderTextList();
+        };
+        if (f === 'color') n.onclick = apply; else n.oninput = apply;
+    });
+}
+renderTextList();
+
+// Dragging on the frame moves the selected caption. Typing coordinates would be absurd on
+// a phone, and the frame is already showing the real output.
+el.frame.addEventListener('pointerdown', (e) => {
+    const hit = S.texts.find((t) => t.id === S.selText) || S.texts[S.texts.length - 1];
+    if (!hit) return;
+    S.selText = hit.id;
+    const box = el.frame.getBoundingClientRect();
+    const move = (ev) => {
+        hit.x = clamp((ev.clientX - box.left) / box.width, .05, .95);
+        hit.y = clamp((ev.clientY - box.top) / box.height, .05, .95);
+        renderTexts();
+    };
+    const up = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        renderTextList();
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+});
+
+// ── sound ───────────────────────────────────────────────────────────────────────────
+el.srcVol.oninput = () => {
+    S.srcVol = el.srcVol.value / 100;
+    el.srcVolVal.textContent = el.srcVol.value + '%';
+    el.vid.volume = clamp(S.srcVol, 0, 1);
+};
+el.addMusic.onclick = () => el.musicInput.click();
+el.musicInput.onchange = () => {
+    const f = el.musicInput.files[0];
+    if (!f) return;
+    if (f.size > 40 * 1024 * 1024) return toast('That track is over 40MB.');
+    S.music = { file: f, name: f.name, volume: .6, url: null };
+    renderMusic();
+};
+function renderMusic() {
+    if (!S.music) { el.musicBox.innerHTML = ''; el.addMusic.style.display = ''; return; }
+    el.addMusic.style.display = 'none';
+    el.musicBox.innerHTML = `
+      <div class="cs-layer on">
+        <div class="cs-layer-head">
+          <div class="cs-layer-name">${esc(S.music.name)}</div>
+          <button class="cs-x" id="delMusic" aria-label="Remove">&times;</button>
+        </div>
+        <div class="cs-row">
+          <input type="range" class="cs-slider" id="musicVol" min="0" max="150" value="${Math.round(S.music.volume * 100)}">
+          <span class="cs-val" id="musicVolVal">${Math.round(S.music.volume * 100)}%</span>
+        </div>
+      </div>`;
+    $('delMusic').onclick = () => { S.music = null; renderMusic(); };
+    $('musicVol').oninput = (e) => {
+        S.music.volume = e.target.value / 100;
+        $('musicVolVal').textContent = e.target.value + '%';
+    };
+}
+
+// ── tabs ────────────────────────────────────────────────────────────────────────────
+document.querySelectorAll('.cs-tab').forEach((b) => {
+    b.onclick = () => {
+        document.querySelectorAll('.cs-tab').forEach((x) => x.classList.toggle('on', x === b));
+        document.querySelectorAll('.cs-pane').forEach((p) =>
+            p.classList.toggle('on', p.dataset.pane === b.dataset.pane));
+        if (b.dataset.pane === 'text') renderTextList();
+    };
+});
+
+// ── export ──────────────────────────────────────────────────────────────────────────
+// Output geometry is computed here and mirrored in api/render.js. The text PNGs are
+// authored at exactly these dimensions, so the overlay lands pixel-for-pixel where the
+// preview put it.
+function outputSize() {
+    const r = targetRatio();
+    let cw, ch;
+    if (S.vw / S.vh > r) { ch = S.vh; cw = Math.round(S.vh * r); }
+    else { cw = S.vw; ch = Math.round(S.vw / r); }
+    let ow = cw, oh = ch;
+    if (Math.max(ow, oh) > 1920) { const k = 1920 / Math.max(ow, oh); ow *= k; oh *= k; }
+    const ev = (n) => { const v = Math.round(n); return v % 2 ? v - 1 : v; };
+    return { w: Math.max(2, ev(ow)), h: Math.max(2, ev(oh)) };
+}
+
+async function rasterise(t, size) {
+    const c = document.createElement('canvas');
+    c.width = size.w; c.height = size.h;
+    const ctx = c.getContext('2d');
+    const px = (t.size / 100) * size.h;
+    ctx.font = '700 ' + px + 'px Inter, -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillStyle = t.color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    if (t.shadow) {
+        ctx.shadowColor = 'rgba(0,0,0,0.65)';
+        ctx.shadowBlur = px * 0.25;
+        ctx.shadowOffsetY = px * 0.04;
+    }
+    const lines = String(t.text).split('\n');
+    const lh = px * 1.15;
+    const top = (t.y * size.h) - ((lines.length - 1) * lh) / 2;
+    lines.forEach((ln, i) => ctx.fillText(ln, t.x * size.w, top + i * lh));
+    return await new Promise((res) => c.toBlob(res, 'image/png'));
+}
+
+const rid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+
+async function upload(path, blob, type) {
+    const r = await db.storage.from(BUCKET).upload(path, blob, { contentType: type, upsert: true });
+    if (r.error) throw new Error(r.error.message);
+    return PUBLIC + path;
+}
+
+function progress(pct, line) {
+    el.overlay.classList.add('on');
+    el.modal.innerHTML = '<h2>Rendering</h2><p>' + esc(line) + '</p>'
+        + '<div class="cs-bar"><i style="width:' + pct + '%"></i></div>'
+        + '<p style="font-size:.78rem;color:var(--text-muted)">You can leave this tab open and come back.</p>';
+}
+
+el.exportBtn.onclick = async () => {
+    if (!S.segments.length) return;
+    el.vid.pause();
+    el.exportBtn.disabled = true;
+    const id = rid();
+    const size = outputSize();
+    try {
+        // 1. the source has to be somewhere the renderer can read
+        progress(10, 'Getting the footage ready.');
+        let sourceUrl = S.sourceUrl;
+        if (!sourceUrl) {
+            const ext = (S.file.name.split('.').pop() || 'mp4').toLowerCase().replace(/[^a-z0-9]/g, '');
+            sourceUrl = await upload(S.user.id + '/clips/src-' + id + '.' + (ext || 'mp4'),
+                S.file, S.file.type || 'video/mp4');
+        }
+
+        // 2. text, drawn by the browser so the render matches what was on screen
+        progress(35, 'Drawing the text.');
+        await (document.fonts ? document.fonts.ready : Promise.resolve());
+        const textLayers = [];
+        for (let i = 0; i < S.texts.length; i++) {
+            const t = S.texts[i];
+            if (!String(t.text).trim()) continue;
+            const blob = await rasterise(t, size);
+            const url = await upload(S.user.id + '/clips/' + id + '-t' + i + '.png', blob, 'image/png');
+            textLayers.push({ url: url, start: t.start, end: t.end });
+        }
+
+        // 3. music
+        let music = null;
+        if (S.music) {
+            progress(50, 'Uploading the track.');
+            const url = await upload(S.user.id + '/clips/' + id + '-music',
+                S.music.file, S.music.file.type || 'audio/mpeg');
+            music = { url: url, volume: S.music.volume };
+        }
+
+        // 4. the encode
+        progress(65, 'Cutting and encoding. This is the slow part.');
+        const { data } = await db.auth.getSession();
+        const token = data && data.session && data.session.access_token;
+        const res = await fetch('/api/render', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+            body: JSON.stringify({
+                renderId: id,
+                sourceUrl: sourceUrl,
+                segments: S.segments,
+                aspectRatio: targetRatio(),
+                focusX: S.focusX, focusY: S.focusY,
+                filter: S.filter,
+                textLayers: textLayers,
+                sourceVolume: S.srcVol,
+                music: music
+            })
+        });
+        const out = await res.json().catch(() => null);
+        if (!res.ok || !out || !out.ok) throw new Error((out && out.error) || 'render_failed');
+
+        progress(100, 'Done.');
+        el.modal.innerHTML = '<div class="cs-result">'
+            + '<h2 style="margin-bottom:14px">Your clip</h2>'
+            + '<video src="' + esc(out.url) + '" controls playsinline poster="' + esc(out.poster || '') + '"></video>'
+            + '<p style="margin-bottom:16px;font-size:.8rem;color:var(--text-muted)">'
+            + out.width + '×' + out.height + ' · ' + out.duration + 's · '
+            + (out.bytes / 1048576).toFixed(1) + 'MB</p>'
+            + '<div class="cs-acts">'
+            + '<button id="closeModal">Keep editing</button>'
+            + '<a class="cs-primary" href="' + esc(out.url) + '" download>Download</a>'
+            + '</div></div>';
+        $('closeModal').onclick = () => el.overlay.classList.remove('on');
+    } catch (e) {
+        const why = {
+            too_large: 'That file is too big to render.',
+            too_long: 'The source is longer than ten minutes.',
+            output_too_long: 'The finished clip would run over five minutes. Cut more.',
+            undecodable: 'The renderer could not read that video.',
+            encode_failed: 'The encode failed. Try a shorter selection.',
+            unauthorized: 'Your session expired. Reload and sign in again.'
+        }[e.message] || 'Something went wrong rendering that clip.';
+        el.modal.innerHTML = '<h2>Did not render</h2><p>' + esc(why) + '</p>'
+            + '<div class="cs-acts" style="margin-top:18px">'
+            + '<button id="closeModal" class="cs-primary">Back to the edit</button></div>';
+        $('closeModal').onclick = () => el.overlay.classList.remove('on');
+    } finally {
+        el.exportBtn.disabled = false;
+    }
+};
+</script>
+</body>
+</html>
