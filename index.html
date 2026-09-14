@@ -8,6 +8,8 @@
     <!-- Lora is the Plan PDF's heading face. Loaded on the page, not at print
          time, so it is already cached when the print dialog renders. -->
     <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Streaming vertical: Newsreader for display, Inter Tight for UI. -->
+    <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Inter+Tight:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#0A0A0A">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -208,7 +210,7 @@
         // The industries lockNonMusicIndustries leaves live; everything else is greyed with a
         // "Soon" badge at sign-up. It reads this list rather than its own copy, so selectable
         // has exactly one definition: unlocked, minus closed.
-        window.AIAD_UNLOCKED_INDUSTRIES = ['music', 'fashion'];
+        window.AIAD_UNLOCKED_INDUSTRIES = ['music', 'fashion', 'streaming'];
 
         window.aiadIndustryClosed = function (value) {
             var list = window.AIAD_CLOSED_INDUSTRIES;
@@ -3990,7 +3992,7 @@ html, body {
             <button class="dash-mobile-nav-item" onclick="showArtistView('agent');setMobileNav(this)">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>Agent
             </button>
-            <button class="dash-mobile-nav-item" onclick="showArtistView('music');setMobileNav(this)">
+            <button class="dash-mobile-nav-item" id="mobileNavStudio" onclick="showArtistView('music');setMobileNav(this)">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Studio
             </button>
             <button class="dash-mobile-nav-item" onclick="showArtistView('supporters');setMobileNav(this)">
@@ -4007,8 +4009,8 @@ html, body {
                     <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiBmaWxsPSJub25lIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NCIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiIG9wYWNpdHk9IjAuOTUiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzNCIgZmlsbD0iI2ZmZmZmZiIvPjxyZWN0IHg9IjE4IiB5PSI0MSIgd2lkdGg9IjY0IiBoZWlnaHQ9IjE4IiByeD0iOSIgZmlsbD0iIzBhMGEwZiIvPjxjaXJjbGUgY3g9IjM2IiBjeT0iNTAiIHI9IjMuMiIgZmlsbD0iI2ZmZmZmZiIvPjxjaXJjbGUgY3g9IjY0IiBjeT0iNTAiIHI9IjMuMiIgZmlsbD0iI2ZmZmZmZiIvPjwvc3ZnPg==" alt="AIAD" class="dash-logo-img">
                     <span class="dash-logo-text">AIAD</span>
                 </div>
-                <div class="dash-subtitle">Artist Dashboard</div>
-                <nav class="dash-nav">
+                <div class="dash-subtitle" id="artistDashSubtitle">Artist Dashboard</div>
+                <nav class="dash-nav" id="artistNavDefault">
                     <div class="dash-nav-item" id="navHome" data-view="home" onclick="showArtistView('home')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span> Home</span></div>
                     <div class="dash-nav-item active" data-view="posts" onclick="showArtistView('posts')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/></svg><span> Posts</span></div>
                     <div class="dash-nav-item" data-view="agent" onclick="showArtistView('agent')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span> AIAD Agent</span></div>
@@ -4037,6 +4039,56 @@ html, body {
                         <div class="dash-nav-subitem" onclick="window.location.href='/clips';"><svg class="dash-nav-subicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg> Clip Studio</div>
                         <div class="dash-nav-subitem" onclick="showArtistView('merch'); restoreLastMerchDesign();"><svg class="dash-nav-subicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0"/></svg> Merch</div>
                                             </div>
+                </nav>
+                <!-- Streaming vertical: the artist nav relabelled and grouped. Shown when
+                     profiles.industry = 'streaming'; the default nav above is hidden then.
+                     Items carry data-view so showArtistView's active-marking works on both. -->
+                <nav class="dash-nav snav" id="streamingNav" style="display:none;">
+                    <div class="snav-group open" data-group="create">
+                        <div class="snav-head" onclick="AIADStreaming.toggleGroup(this)"><span>Create</span><span class="snav-count" data-n="0"></span><svg class="snav-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>
+                        <div class="snav-items">
+                            <div class="dash-nav-item" data-view="episodes" onclick="showArtistView('episodes')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="17 2 12 7 7 2"/></svg><span> Episodes</span></div>
+                            <div class="dash-nav-item" data-view="publish" onclick="showArtistView('publish')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5"/><polyline points="5 12 12 5 19 12"/><line x1="4" y1="21" x2="20" y2="21"/></svg><span> Publish</span></div>
+                            <div class="dash-nav-item" data-view="posts" onclick="showArtistView('posts')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/></svg><span> Posts</span></div>
+                        </div>
+                    </div>
+                    <div class="snav-group open" data-group="studio">
+                        <div class="snav-head" onclick="AIADStreaming.toggleGroup(this)"><span>Creative Studio</span><span class="snav-count" data-n="0"></span><svg class="snav-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>
+                        <div class="snav-items">
+                            <div class="dash-nav-item" data-view="clips" onclick="window.location.href='/clips';"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg><span> Clip Studio</span></div>
+                            <div class="dash-nav-item" data-view="mixmedia" onclick="showArtistView('mixmedia')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg><span> Mix-Media</span></div>
+                            <div class="dash-nav-item" data-view="merch" onclick="showArtistView('merch'); restoreLastMerchDesign();"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0"/></svg><span> Merch Studio</span></div>
+                        </div>
+                    </div>
+                    <div class="snav-group open" data-group="earn">
+                        <div class="snav-head" onclick="AIADStreaming.toggleGroup(this)"><span>Earn</span><span class="snav-count" data-n="0"></span><svg class="snav-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>
+                        <div class="snav-items">
+                            <div class="dash-nav-item" data-view="supporters" onclick="showArtistView('supporters')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg><span> Supporters</span></div>
+                            <div class="dash-nav-item" data-view="revenue" onclick="showArtistView('revenue')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg><span> Revenue</span></div>
+                            <div class="dash-nav-item" data-view="store" onclick="showArtistView('store')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg><span> Store</span></div>
+                            <div class="dash-nav-item" data-view="synclibrary" onclick="showArtistView('synclibrary')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><span> Brand Briefs</span></div>
+                            <div class="dash-nav-item" data-view="payouts" onclick="showArtistView('payouts')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg><span> Payouts</span></div>
+                        </div>
+                    </div>
+                    <div class="snav-group" data-group="run">
+                        <div class="snav-head" onclick="AIADStreaming.toggleGroup(this)"><span>Run</span><span class="snav-count" data-n="0"></span><svg class="snav-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>
+                        <div class="snav-items">
+                            <div class="dash-nav-item" data-view="inbox" onclick="showArtistView('inbox')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><span> Inbox</span><span id="streamingInboxBadge" style="display:none;margin-left:auto;background:#f59e0b;color:#111;font-size:0.6rem;font-weight:700;min-width:16px;height:16px;border-radius:999px;align-items:center;justify-content:center;padding:0 5px;">0</span></div>
+                            <div class="dash-nav-item" data-view="plan" onclick="showArtistView('plan')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span> Projects &amp; Schedule</span></div>
+                            <div class="dash-nav-item" data-view="milestones" onclick="showArtistView('milestones')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span> Milestones</span></div>
+                            <div class="dash-nav-item" data-view="collaborators" onclick="showArtistView('collaborators')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg><span> Collaborators</span></div>
+                            <div class="dash-nav-item" data-view="settings" onclick="showArtistView('settings')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg><span> Settings</span></div>
+                        </div>
+                    </div>
+                    <div class="snav-group" data-group="intelligence">
+                        <div class="snav-head" onclick="AIADStreaming.toggleGroup(this)"><span>Intelligence</span><span class="snav-count" data-n="0"></span><svg class="snav-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>
+                        <div class="snav-items">
+                            <div class="dash-nav-item" data-view="analytics" onclick="showArtistView('analytics')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span> Analytics</span></div>
+                            <div class="dash-nav-item" data-view="mystats" onclick="showArtistView('mystats')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span> My Stats</span></div>
+                            <div class="dash-nav-item" data-view="agent" onclick="showArtistView('agent')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span> Agents</span></div>
+                            <div class="dash-nav-item" data-view="decisions" onclick="AIADStreaming.go('decisions')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="13" y2="13"/></svg><span> Decision Memory</span></div>
+                        </div>
+                    </div>
                 </nav>
                 </aside>
             <main class="dash-main">
@@ -5658,6 +5710,33 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 <div class="dash-view" id="artistLibraryView"></div>
 
                 <div class="dash-view" id="artistReviewView"></div>
+
+                <!-- ══════ STREAMING: Episodes ══════ -->
+                <div class="dash-view sv" id="episodesView">
+                    <div class="sv-head">
+                        <div>
+                            <div class="sv-kicker">Create</div>
+                            <h1 class="sv-title">Episodes</h1>
+                            <p class="sv-sub">Every episode from idea to published, in one list.</p>
+                        </div>
+                        <div class="sv-head-actions" id="svEpisodesActions" style="display:none;">
+                            <button type="button" class="sv-btn sv-btn-primary" onclick="AIADStreaming.newEpisode()">New episode</button>
+                        </div>
+                    </div>
+                    <div id="svEpisodesBody"><div class="sv-muted">Loading…</div></div>
+                </div>
+
+                <!-- ══════ STREAMING: Publish ══════ -->
+                <div class="dash-view sv" id="publishView">
+                    <div class="sv-head">
+                        <div>
+                            <div class="sv-kicker">Create</div>
+                            <h1 class="sv-title">Publish</h1>
+                            <p class="sv-sub">Members first, then everywhere else.</p>
+                        </div>
+                    </div>
+                    <div id="svPublishBody"><div class="sv-muted">Loading…</div></div>
+                </div>
 
                 <div class="dash-view" id="artistDistributeView">
                     <div class="view-header">
@@ -11246,7 +11325,9 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 if (industry === 'fashion') {
                     showFashionOnboarding();
                 } else if (industry === 'streaming') {
-                    showStreamerOnboarding();
+                    // Streaming creators take the real signup path (account, card,
+                    // onboarding) — the old streamer walkthrough created no account.
+                    navigateTo('artist-profile');
                 } else if (industry === 'visual_arts') {
                     showVisualArtsOnboarding();
                 } else if (industry === 'writing_publishing') {
@@ -11608,9 +11689,9 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             AppState.userRole = 'creator';
             AppState.industryConfig = IndustryConfig.streaming;
             AppState.rolePermissions = RolePermissions.creator;
-            const streamerDash = document.getElementById('streamerDashboard');
-            streamerDash.style.display = '';
-            streamerDash.classList.add('active');
+            // The static Stream Studio demo is retired; streaming creators use the
+            // artist dashboard with the relabelled nav.
+            jumpToDashboard('streamer');
             window.scrollTo(0, 0);
         }
 
@@ -14307,10 +14388,13 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     fashionDash.style.display = '';
                     fashionDash.classList.add('active');
                 } else if (AppState.userIndustry === 'streaming') {
-                    localStorage.setItem('aiad_last_dashboard', 'streamer');
-                    const streamerDash = document.getElementById('streamerDashboard');
-                    streamerDash.style.display = '';
-                    streamerDash.classList.add('active');
+                    // Streaming uses the artist dashboard with the relabelled nav.
+                    localStorage.setItem('aiad_last_dashboard', 'artist');
+                    const artistDash = document.getElementById('artistDashboard');
+                    artistDash.style.display = '';
+                    artistDash.classList.add('active');
+                    try { window.aiadApplyIndustryNav && window.aiadApplyIndustryNav(); } catch (e) {}
+                    setTimeout(() => populateArtistDashboard(), 100);
                 } else {
 
                     localStorage.setItem('aiad_last_dashboard', 'artist');
@@ -14884,7 +14968,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 try { window.aiadLoadAgentConvos && window.aiadLoadAgentConvos(); } catch (e) {}
             }, 0);
 
-            const allViews = ['artistLibraryView', 'artistReviewView', 'artistPlanView', 'artistHomeView', 'artistPostsView', 'artistSupportersView', 'artistProjectsView', 'artistRevenueView', 'artistScheduleView', 'artistCollaboratorsView', 'artistMusicView', 'artistSongwritingView', 'artistMixMediaView', 'artistMerchView', 'artistSyncLibraryView', 'artistMilestonesView', 'artistAnalyticsView', 'artistMyStatsView', 'artistAgentsView', 'artistInboxView', 'artistSettingsView', 'artistStoreView', 'artistPayoutsView', 'artistDistributeView'];
+            const allViews = ['artistLibraryView', 'artistReviewView', 'artistPlanView', 'artistHomeView', 'artistPostsView', 'artistSupportersView', 'artistProjectsView', 'artistRevenueView', 'artistScheduleView', 'artistCollaboratorsView', 'artistMusicView', 'artistSongwritingView', 'artistMixMediaView', 'artistMerchView', 'artistSyncLibraryView', 'artistMilestonesView', 'artistAnalyticsView', 'artistMyStatsView', 'artistAgentsView', 'artistInboxView', 'artistSettingsView', 'artistStoreView', 'artistPayoutsView', 'artistDistributeView', 'episodesView', 'publishView'];
             allViews.forEach(v => {
                 const el = document.getElementById(v);
                 if (el) el.classList.remove('active');
@@ -14931,7 +15015,10 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 'payouts': 'artistPayoutsView',
                 'distribute': 'artistDistributeView',
                 'library': 'artistLibraryView',
-                'review': 'artistReviewView'
+                'review': 'artistReviewView',
+                // Streaming vertical
+                'episodes': 'episodesView',
+                'publish': 'publishView'
             };
 
             const viewId = viewIdMap[view];
@@ -15050,6 +15137,14 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 viewEl.classList.add('active');
                 const _nd = document.getElementById('navDistribute'); if (_nd) _nd.classList.add('active');
                 setTimeout(() => { if (window.AIADRelease) AIADRelease.open(); }, 60);
+            } else if (view === 'episodes') {
+                viewEl.classList.add('active');
+                markNav('episodes');
+                setTimeout(() => { if (window.AIADStreaming) AIADStreaming.openEpisodes(); }, 40);
+            } else if (view === 'publish') {
+                viewEl.classList.add('active');
+                markNav('publish');
+                setTimeout(() => { if (window.AIADStreaming) AIADStreaming.openPublish(); }, 40);
             } else if (view === 'library') {
                 viewEl.classList.add('active');
                 markNav('library');
@@ -17569,6 +17664,13 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
 
         function switchDashboard(target) {
             console.log('[Dashboard] Switching to:', target);
+            // Streaming creators use the artist dashboard with a relabelled nav
+            // (aiadApplyIndustryNav), not the old static Stream Studio demo.
+            if (target === 'streamer') {
+                AppState.userIndustry = 'streaming';
+                localStorage.setItem('aiad_user_industry', 'streaming');
+                target = 'artist';
+            }
 
             document.querySelector('.header').style.display = 'none';
             document.querySelector('.main').style.display = 'none';
@@ -17588,6 +17690,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 document.getElementById('artistDashboard').classList.add('active');
                 AppState.userRole = 'creator';
                 localStorage.setItem('aiad_last_dashboard', 'artist');
+                try { window.aiadApplyIndustryNav && window.aiadApplyIndustryNav(); } catch (e) {}
                 setTimeout(() => renderIndustryAIPrompts(), 200);
             } else if (target === 'fashion') {
                 const fashionDash = document.getElementById('fashionDashboard');
@@ -24399,7 +24502,8 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
 
                 const savedIndustry = localStorage.getItem('aiad_user_industry');
                 const savedRole = localStorage.getItem('aiad_user_role');
-                const lastDashboard = localStorage.getItem('aiad_last_dashboard');
+                // 'streamer' was the old static demo; streaming creators live on the artist dashboard now.
+                const lastDashboard = localStorage.getItem('aiad_last_dashboard') === 'streamer' ? 'artist' : localStorage.getItem('aiad_last_dashboard');
 
                 if (savedIndustry && savedRole && lastDashboard && IndustryConfig[savedIndustry] && RolePermissions[savedRole]) {
                     console.log('[AIAD] Restoring state: industry=' + savedIndustry + ', role=' + savedRole + ', dashboard=' + lastDashboard);
@@ -24427,6 +24531,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                             const dash = document.getElementById('artistDashboard');
                             dash.style.display = '';
                             dash.classList.add('active');
+                            try { window.aiadApplyIndustryNav && window.aiadApplyIndustryNav(); } catch (e) {}
                             // Fetch current user's profile from Supabase to ensure data isolation
                             (async () => {
                                 try {
@@ -24551,12 +24656,18 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 AppState.industryConfig = IndustryConfig.fashion;
                 localStorage.setItem('aiad_user_industry', 'fashion');
             } else if (dashboard === 'streamer') {
+                // Streaming = the artist dashboard relabelled (see aiadApplyIndustryNav).
                 AppState.userIndustry = 'streaming';
                 AppState.industryConfig = IndustryConfig.streaming;
                 localStorage.setItem('aiad_user_industry', 'streaming');
+                dashboard = 'artist';
             } else if (dashboard === 'collab') {
                 AppState.userIndustry = AppState.userIndustry || 'music';
                 localStorage.setItem('aiad_user_industry', AppState.userIndustry);
+            } else if (dashboard === 'artist' && AppState.userIndustry === 'streaming') {
+                // A streaming creator re-entering via the generic path keeps their industry.
+                AppState.industryConfig = IndustryConfig.streaming;
+                localStorage.setItem('aiad_user_industry', 'streaming');
             } else {
                 AppState.userIndustry = AppState.userIndustry || 'music';
                 AppState.industryConfig = IndustryConfig.music;
@@ -24581,6 +24692,11 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 AppState.userRole = 'creator';
                 AppState.rolePermissions = RolePermissions.creator;
                 document.getElementById('artistDashboard').classList.add('active');
+                try { window.aiadApplyIndustryNav && window.aiadApplyIndustryNav(); } catch (e) {}
+                // Streaming creators land on Episodes unless a deep link names a view.
+                if (AppState.userIndustry === 'streaming' && !/^#artist\//.test(location.hash || '')) {
+                    setTimeout(() => { try { showArtistView('episodes'); } catch (e) {} }, 250);
+                }
                 setTimeout(() => renderIndustryAIPrompts(), 200);
             } else if (dashboard === 'fashion') {
                 AppState.userRole = 'creator';
@@ -29004,10 +29120,10 @@ function toggleAgeRange(btn) {
             if (!me) return;
             var n = 0;
             try { var r = await db.from('messages').select('id', { count: 'exact', head: true }).eq('recipient_id', me).eq('read', false); n = r.count || 0; } catch (e) { return; }
-            ['artistInboxBadge', 'collabInboxBadge'].forEach(function (id) {
+            ['artistInboxBadge', 'streamingInboxBadge', 'collabInboxBadge'].forEach(function (id) {
                 var b = document.getElementById(id);
                 if (!b) return;
-                if (n > 0) { b.textContent = n; b.style.display = (id === 'artistInboxBadge') ? 'inline-flex' : 'inline-block'; }
+                if (n > 0) { b.textContent = n; b.style.display = (id === 'collabInboxBadge') ? 'inline-block' : 'inline-flex'; }
                 else { b.style.display = 'none'; }
             });
         }
@@ -43150,6 +43266,647 @@ window.AIAD_PROMPTS = [
     }
 })();
 </script>
+<style id="aiad-streaming-css">
+/* ══════════════ STREAMING VERTICAL ══════════════
+   Nav groups (relabelled artist nav) + the Episodes / Publish views.
+   Dark ground, teal accent, Newsreader display serif, Inter Tight UI,
+   hairline rules instead of cards. Mobile overrides live in the last
+   <style> block before </body>. */
+#streamingNav{gap:0 !important;}
+.snav-head{display:flex;align-items:center;gap:8px;padding:14px 12px 6px;font-family:var(--font-body);font-size:0.62rem;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);cursor:pointer;user-select:none;border-top:1px solid var(--border-default);margin-top:6px;}
+.snav-group:first-child .snav-head{border-top:0;margin-top:0;padding-top:4px;}
+.snav-head:hover{color:var(--text-secondary);}
+.snav-items{display:flex;flex-direction:column;gap:2px;}
+.snav-group:not(.open) .snav-items{display:none;}
+.snav-arrow{width:12px;height:12px;margin-left:auto;flex-shrink:0;transition:transform var(--transition-fast);}
+.snav-group.open .snav-arrow{transform:rotate(180deg);}
+.snav-count{display:none;min-width:16px;height:16px;border-radius:999px;background:#f59e0b;color:#111;font-size:0.6rem;font-weight:700;align-items:center;justify-content:center;padding:0 5px;letter-spacing:0;margin-left:2px;}
+.snav-group:not(.open) .snav-count.has{display:inline-flex;}
+/* Rail mode (56px, icon-only): the group label and arrow collapse like the item
+   labels do, leaving the hairline and any badge count. */
+.dash-sidebar-left .snav-head > span:not(.snav-count),.dash-sidebar-left .snav-arrow{opacity:0;max-width:0;overflow:hidden;white-space:nowrap;display:inline-block;transition:opacity .2s ease,max-width .2s ease;}
+.dash-sidebar-left .snav-head{min-height:10px;}
+@media (hover: hover) and (pointer: fine) {
+.dash-sidebar-left:hover .snav-head > span:not(.snav-count),.dash-sidebar-left:hover .snav-arrow{opacity:1;max-width:200px;}
+}
+
+.sv{--sv-serif:'Newsreader',Georgia,'Times New Roman',serif;--sv-sans:'Inter Tight','Inter',-apple-system,BlinkMacSystemFont,sans-serif;--sv-rule:rgba(255,255,255,0.1);font-family:var(--sv-sans);max-width:860px;}
+.sv-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;padding-bottom:18px;border-bottom:1px solid var(--sv-rule);margin-bottom:8px;}
+.sv-kicker{font-size:0.62rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--teal-light);margin-bottom:6px;}
+.sv-title{font-family:var(--sv-serif);font-weight:400;font-size:2.1rem;line-height:1.05;letter-spacing:-0.01em;color:var(--text-primary);margin:0;}
+.sv-sub{font-size:0.86rem;color:var(--text-secondary);margin:8px 0 0;}
+.sv-muted{font-size:0.82rem;color:var(--text-muted);padding:18px 0;line-height:1.5;}
+.sv-error{font-size:0.84rem;color:#fca5a5;padding:16px 0;border-bottom:1px solid var(--sv-rule);line-height:1.5;}
+.sv-btn{font-family:var(--sv-sans);font-size:0.8rem;font-weight:500;padding:9px 16px;border:1px solid var(--border-hover);background:transparent;color:var(--text-primary);cursor:pointer;border-radius:0;line-height:1.2;}
+.sv-btn:hover{border-color:var(--text-secondary);}
+.sv-btn-primary{background:var(--teal);border-color:var(--teal);color:#041014;}
+.sv-btn-primary:hover{background:var(--teal-light);border-color:var(--teal-light);}
+.sv-btn:disabled{opacity:.45;cursor:default;}
+.sv-btn:disabled:hover{border-color:var(--border-hover);}
+.sv-btn-sm{padding:6px 11px;font-size:0.74rem;}
+.sv-link{background:none;border:none;padding:0;color:var(--teal-light);font:inherit;cursor:pointer;text-decoration:underline;text-underline-offset:3px;}
+.sv-empty{padding:36px 0 24px;}
+.sv-empty h2{font-family:var(--sv-serif);font-weight:400;font-size:1.6rem;margin:0 0 6px;color:var(--text-primary);letter-spacing:-0.01em;}
+.sv-empty p{font-size:0.86rem;color:var(--text-secondary);margin:0 0 22px;max-width:48ch;line-height:1.55;}
+.sv-empty-actions{display:flex;flex-direction:column;border-top:1px solid var(--sv-rule);}
+.sv-empty-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px 0;border:0;border-bottom:1px solid var(--sv-rule);background:none;color:inherit;text-align:left;cursor:pointer;font-family:inherit;width:100%;border-radius:0;}
+.sv-empty-row:hover .sv-empty-name{color:var(--teal-light);}
+.sv-empty-name{font-size:0.95rem;font-weight:500;color:var(--text-primary);}
+.sv-empty-hint{font-size:0.76rem;color:var(--text-muted);margin-top:3px;line-height:1.45;}
+.sv-empty-row svg{width:16px;height:16px;color:var(--text-muted);flex-shrink:0;}
+.sv-list{border-top:1px solid var(--sv-rule);}
+.sv-row{display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;padding:14px 0;border-bottom:1px solid var(--sv-rule);cursor:pointer;}
+.sv-row:hover .sv-row-title{color:var(--teal-light);}
+.sv-num{font-family:var(--sv-serif);font-size:1.25rem;color:var(--text-muted);}
+.sv-row-title{font-size:0.95rem;font-weight:500;color:var(--text-primary);}
+.sv-row-meta{font-size:0.74rem;color:var(--text-muted);margin-top:3px;display:flex;flex-wrap:wrap;gap:4px 10px;}
+.sv-pill{font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;padding:3px 8px;border:1px solid var(--border-hover);color:var(--text-secondary);white-space:nowrap;}
+.sv-pill.published{border-color:var(--teal);color:var(--teal-light);}
+.sv-pill.scheduled{border-color:#f59e0b;color:#fbbf24;}
+.sv-pill.archived{opacity:.5;}
+.sv-stages{display:flex;gap:3px;margin-top:8px;max-width:180px;}
+.sv-stage{flex:1;height:3px;background:rgba(255,255,255,0.12);}
+.sv-stage.done{background:var(--teal);}
+.sv-back{padding:12px 0 4px;}
+.sv-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 28px;}
+.sv-field{display:flex;flex-direction:column;padding:12px 0;border-bottom:1px solid var(--sv-rule);min-width:0;}
+.sv-field.wide{grid-column:1/-1;}
+.sv-field label{font-size:0.62rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;}
+.sv-field input,.sv-field select,.sv-field textarea{background:transparent;border:0;outline:0;color:var(--text-primary);font-family:var(--sv-sans);font-size:0.92rem;padding:2px 0;width:100%;border-radius:0;}
+.sv-field textarea{resize:vertical;min-height:64px;line-height:1.5;}
+.sv-field select option{background:#111;}
+.sv-field input::placeholder,.sv-field textarea::placeholder{color:var(--text-hint);}
+.sv-field input[type=datetime-local]{color-scheme:dark;}
+.sv-check{display:flex;align-items:center;gap:10px;font-size:0.88rem;color:var(--text-primary);padding:14px 0;border-bottom:1px solid var(--sv-rule);cursor:pointer;}
+.sv-check input{width:16px;height:16px;accent-color:var(--teal);margin:0;}
+.sv-check small{color:var(--text-muted);font-size:0.74rem;}
+.sv-section{font-family:var(--sv-serif);font-size:1.15rem;color:var(--text-primary);padding:24px 0 2px;grid-column:1/-1;}
+.sv-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:20px 0;}
+.sv-select-row{display:flex;align-items:center;gap:14px;padding:16px 0;border-bottom:1px solid var(--sv-rule);flex-wrap:wrap;}
+.sv-select-row select{background:transparent;border:0;border-bottom:1px solid var(--border-hover);color:var(--text-primary);font-family:var(--sv-sans);font-size:0.95rem;padding:6px 0;min-width:260px;outline:0;border-radius:0;}
+.sv-select-row select option{background:#111;}
+.sv-first{padding:16px 0;border-bottom:1px solid var(--sv-rule);font-size:0.86rem;color:var(--text-secondary);line-height:1.6;}
+.sv-first strong{color:var(--text-primary);font-weight:500;}
+.sv-inline{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;font-size:0.82rem;color:var(--text-secondary);}
+.sv-window{display:flex;margin-top:12px;}
+.sv-inline input[type=number]{width:58px;background:transparent;border:0;border-bottom:1px solid var(--border-hover);color:var(--text-primary);font-family:var(--sv-sans);font-size:0.9rem;padding:2px 4px;outline:0;text-align:center;border-radius:0;}
+.sv-dest{display:grid;grid-template-columns:1fr auto;gap:8px 16px;padding:18px 0;border-bottom:1px solid var(--sv-rule);align-items:center;}
+.sv-dest-name{font-size:1rem;font-weight:500;color:var(--text-primary);display:flex;align-items:center;gap:10px;}
+.sv-dest-sub{font-size:0.78rem;color:var(--text-muted);margin-top:4px;line-height:1.5;}
+.sv-dest-sub a{color:var(--teal-light);}
+.sv-dest-ctl{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;}
+.sv-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,0.2);flex-shrink:0;}
+.sv-dot.live{background:var(--teal-light);box-shadow:0 0 0 3px rgba(0,212,255,0.18);}
+.sv-dot.pending{background:#f59e0b;}
+.sv-dest.off .sv-dest-name{color:var(--text-secondary);}
+</style>
+
+<script>
+/* ══════════════ STREAMING VERTICAL ══════════════
+   Creator = profiles.role 'artist' + industry 'streaming'. They use the artist
+   dashboard with the nav relabelled and grouped (#streamingNav), plus two views
+   of their own: Episodes (public.episodes, owner-scoped RLS) and Publish
+   (episodes.destinations). Every db.from('episodes') call reads `error`. */
+(function () {
+    'use strict';
+
+    var STAGES = ['Idea', 'Outline', 'Record', 'Edit', 'Assets', 'Review', 'Schedule', 'Live'];
+    var TARGETS = [
+        { key: 'aiad',    name: 'AIAD members', hint: 'Your supporters on AIAD. They always get it first.' },
+        { key: 'youtube', name: 'YouTube',      hint: 'Publishes the video cut to your channel.' },
+        { key: 'rss',     name: 'Podcast RSS',  hint: 'Feeds Apple Podcasts, Spotify and every RSS app.' },
+    ];
+    // Only AIAD publishes today. YouTube and RSS show as "not connected" until
+    // their OAuth lands — the rows are real so the creator sees where it's going.
+    var CONNECTED = { aiad: true, youtube: false, rss: false };
+
+    var S = { list: [], loaded: false, loading: null, error: null, editing: null, selected: null, publicUrl: undefined };
+
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+    function el(id) { return document.getElementById(id); }
+    function uid() {
+        try { if (window.aiadResolvedUserId) { var u = aiadResolvedUserId(); if (u) return u; } } catch (e) {}
+        return (window.AppState && AppState.currentUser && AppState.currentUser.id) || null;
+    }
+    function toast(m) { try { (window.showToast || alert)(m); } catch (e) {} }
+    function streaming() {
+        var i = (window.AppState && AppState.userIndustry) || null;
+        try { i = i || localStorage.getItem('aiad_user_industry'); } catch (e) {}
+        return i === 'streaming';
+    }
+    function dbErr(op, error, where) {
+        try { window.reportDbError && window.reportDbError('episodes', op, error, { where: 'AIADStreaming.' + where }); } catch (e) {}
+    }
+    function fmtDate(iso) {
+        if (!iso) return '';
+        var d = new Date(iso); if (isNaN(d)) return '';
+        return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    }
+    function fmtRuntime(sec) {
+        if (!sec) return '';
+        var m = Math.round(sec / 60);
+        return m >= 60 ? Math.floor(m / 60) + 'h ' + (m % 60) + 'm' : m + ' min';
+    }
+    function toLocalInput(iso) {
+        if (!iso) return '';
+        var d = new Date(iso); if (isNaN(d)) return '';
+        var p = function (n) { return (n < 10 ? '0' : '') + n; };
+        return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+    }
+    function dests(e) { return Array.isArray(e && e.destinations) ? e.destinations : []; }
+    function getDest(e, key) { return dests(e).filter(function (d) { return d && d.target === key; })[0] || null; }
+
+    /* ── Nav: grouped, collapsible, badge counts on collapsed heads ── */
+    var GROUP_KEY = 'aiad_snav_groups';
+    function saveGroups() {
+        var o = {};
+        document.querySelectorAll('#streamingNav .snav-group').forEach(function (g) { o[g.dataset.group] = g.classList.contains('open'); });
+        try { localStorage.setItem(GROUP_KEY, JSON.stringify(o)); } catch (e) {}
+    }
+    function restoreGroups() {
+        var o = null;
+        try { o = JSON.parse(localStorage.getItem(GROUP_KEY) || 'null'); } catch (e) {}
+        if (!o) return;
+        document.querySelectorAll('#streamingNav .snav-group').forEach(function (g) {
+            if (g.dataset.group in o) g.classList.toggle('open', !!o[g.dataset.group]);
+        });
+    }
+    function toggleGroup(head) {
+        var g = head && head.closest('.snav-group'); if (!g) return;
+        g.classList.toggle('open');
+        saveGroups();
+        refreshCounts();
+    }
+    function refreshCounts() {
+        document.querySelectorAll('#streamingNav .snav-group').forEach(function (g) {
+            var n = 0;
+            g.querySelectorAll('.snav-items [id$="Badge"], .snav-items .lb-navcount').forEach(function (b) {
+                if (b.style.display === 'none') return;
+                n += parseInt(b.textContent, 10) || 0;
+            });
+            var c = g.querySelector('.snav-count'); if (!c) return;
+            c.textContent = n; c.setAttribute('data-n', String(n)); c.classList.toggle('has', n > 0);
+        });
+    }
+    // Views that have no item of their own light up the closest one.
+    var ALIAS = { projects: 'plan', schedule: 'plan', agents: 'agent', feed: 'posts', music: 'episodes', library: 'episodes', distribute: 'publish' };
+    function markActive(view) {
+        var nav = el('streamingNav'); if (!nav) return;
+        view = ALIAS[view] || view;
+        nav.querySelectorAll('.dash-nav-item').forEach(function (it) { it.classList.toggle('active', it.dataset.view === view); });
+        var act = nav.querySelector('.dash-nav-item.active');
+        var g = act && act.closest('.snav-group');
+        // The group holding the active view is forced open; the user's own
+        // collapsed/open choice for the other groups is left alone.
+        if (g) g.classList.add('open');
+        refreshCounts();
+    }
+    function watchBadges() {
+        var b = el('streamingInboxBadge');
+        if (!b || !window.MutationObserver) return;
+        new MutationObserver(refreshCounts).observe(b, { attributes: true, childList: true, characterData: true, subtree: true });
+    }
+    function hookNav() {
+        var orig = window.showArtistView;
+        if (typeof orig !== 'function' || orig.__streamingHooked) return;
+        var w = function (v) {
+            var r = orig.apply(this, arguments);
+            try { if (streaming()) markActive(v); } catch (e) {}
+            return r;
+        };
+        w.__streamingHooked = true;
+        if (orig.__pricingHooked) w.__pricingHooked = true;   // hookSettings must not wrap twice
+        window.showArtistView = w;
+    }
+
+    // Called from every artist-dashboard entry point (jumpToDashboard,
+    // switchDashboard, boot restore). Idempotent.
+    window.aiadApplyIndustryNav = function () {
+        var on = streaming();
+        var def = el('artistNavDefault'), sn = el('streamingNav'), dash = el('artistDashboard');
+        if (def) def.style.display = on ? 'none' : '';
+        if (sn) sn.style.display = on ? '' : 'none';
+        if (dash) dash.classList.toggle('is-streaming', on);
+        var sub = el('artistDashSubtitle'); if (sub) sub.textContent = on ? 'Creator Dashboard' : 'Artist Dashboard';
+        var ms = el('mobileNavStudio');
+        if (ms) {
+            ms.setAttribute('onclick', on ? "showArtistView('episodes');setMobileNav(this)" : "showArtistView('music');setMobileNav(this)");
+            if (ms.lastChild && ms.lastChild.nodeType === 3) ms.lastChild.nodeValue = on ? 'Episodes' : 'Studio';
+        }
+        // Brand Briefs is the Sync Library relabelled — same listings, same brief system.
+        var sl = document.querySelector('#artistSyncLibraryView h1'); if (sl) sl.textContent = on ? 'Brand Briefs' : 'Sync Library';
+        if (on) {
+            restoreGroups();
+            var h = (location.hash || '').replace(/^#artist\//, '');
+            var cur = document.querySelector('#artistDashboard .dash-nav-item.active');
+            markActive(h || (cur && cur.dataset.view) || 'posts');
+        }
+    };
+
+    /* ── Data ── */
+    async function load() {
+        var u = uid();
+        S.error = null;
+        if (!u) { S.error = 'Sign in to see your episodes.'; S.list = []; S.loaded = true; return false; }
+        if (!window.db) { S.error = 'Database not ready.'; S.loaded = true; return false; }
+        var r = await window.db.from('episodes').select('*').eq('user_id', u)
+            .order('episode_number', { ascending: false, nullsFirst: false })
+            .order('created_at', { ascending: false });
+        if (r.error) { dbErr('select', r.error, 'load'); S.error = r.error.message; S.loaded = true; return false; }
+        S.list = r.data || []; S.loaded = true;
+        return true;
+    }
+    function merge(row) {
+        var i = S.list.findIndex(function (e) { return e.id === row.id; });
+        if (i >= 0) S.list[i] = row; else S.list.unshift(row);
+        S.list.sort(function (a, b) {
+            var an = a.episode_number == null ? -Infinity : a.episode_number, bn = b.episode_number == null ? -Infinity : b.episode_number;
+            return bn - an || String(b.created_at).localeCompare(String(a.created_at));
+        });
+    }
+    async function save(patch) {
+        var u = uid();
+        if (!u) { toast('Sign in first'); return null; }
+        var r, op;
+        if (patch.id) {
+            var id = patch.id; delete patch.id; op = 'update';
+            r = await window.db.from('episodes').update(patch).eq('id', id).eq('user_id', u).select().single();
+        } else {
+            patch.user_id = u; op = 'insert';
+            r = await window.db.from('episodes').insert(patch).select().single();
+        }
+        if (r.error) { dbErr(op, r.error, 'save'); toast('Could not save — ' + r.error.message); return null; }
+        merge(r.data);
+        return r.data;
+    }
+    async function publicUrl() {
+        if (S.publicUrl !== undefined) return S.publicUrl;
+        var u = uid(); if (!u || !window.db) return null;
+        var r = await window.db.from('profiles').select('username').eq('id', u).maybeSingle();
+        if (r.error) { try { window.reportDbError && window.reportDbError('profiles', 'select', r.error, { where: 'AIADStreaming.publicUrl' }); } catch (e) {} return null; }
+        S.publicUrl = (r.data && r.data.username) ? location.origin + '/artist/' + encodeURIComponent(r.data.username) : null;
+        return S.publicUrl;
+    }
+    function ensureLoaded(then) {
+        if (S.loaded) { then(); }
+        if (!S.loading) S.loading = load().finally(function () { S.loading = null; });
+        S.loading.then(then);
+    }
+
+    /* ── Episodes view ── */
+    function openEpisodes() {
+        S.editing = null;
+        renderEpisodes();
+        ensureLoaded(renderEpisodes);
+    }
+    function nextNumber() {
+        var m = 0;
+        S.list.forEach(function (e) { if (typeof e.episode_number === 'number' && e.episode_number > m) m = e.episode_number; });
+        return m + 1;
+    }
+    function stagesHtml(stage) {
+        var out = '';
+        for (var i = 1; i <= 8; i++) out += '<span class="sv-stage' + (i <= stage ? ' done' : '') + '"></span>';
+        return '<div class="sv-stages" title="Stage ' + stage + ' of 8 · ' + STAGES[stage - 1] + '">' + out + '</div>';
+    }
+    function destSummary(e) {
+        var live = dests(e).filter(function (d) { return d.status === 'published'; }).map(function (d) {
+            var t = TARGETS.filter(function (x) { return x.key === d.target; })[0]; return t ? t.name : d.target;
+        });
+        return live.length ? 'Live: ' + live.join(', ') : '';
+    }
+    function rowHtml(e) {
+        var st = e.status || 'draft';
+        var stage = Math.min(8, Math.max(1, parseInt(e.stage, 10) || 1));
+        var meta = [
+            e.format || null,
+            e.air_at ? fmtDate(e.air_at) : null,
+            e.runtime_seconds ? fmtRuntime(e.runtime_seconds) : null,
+            e.guest_name ? 'with ' + e.guest_name : null,
+            e.members_only ? 'members only' : (e.members_early_hours > 0 ? 'members ' + e.members_early_hours + 'h early' : null),
+            destSummary(e) || null,
+        ].filter(Boolean);
+        return '<div class="sv-row" onclick="AIADStreaming.edit(\'' + esc(e.id) + '\')">'
+            + '<div class="sv-num">' + (e.episode_number != null ? esc(e.episode_number) : '—') + '</div>'
+            + '<div style="min-width:0;"><div class="sv-row-title">' + esc(e.title) + '</div>'
+            + '<div class="sv-row-meta">' + meta.map(function (m) { return '<span>' + esc(m) + '</span>'; }).join('') + '</div>'
+            + stagesHtml(stage) + '</div>'
+            + '<span class="sv-pill ' + esc(st) + '">' + esc(st) + '</span></div>';
+    }
+    var ARROW = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>';
+    function emptyHtml() {
+        return '<div class="sv-empty">'
+            + '<h2>No episodes yet.</h2>'
+            + '<p>Bring in what you have already made, or start fresh. Either way your members get it first.</p>'
+            + '<div class="sv-empty-actions">'
+            + '<button type="button" class="sv-empty-row" onclick="AIADStreaming.importRss()"><span><div class="sv-empty-name">Import from RSS</div><div class="sv-empty-hint">Pull your back catalogue from an existing podcast feed.</div></span>' + ARROW + '</button>'
+            + '<button type="button" class="sv-empty-row" onclick="AIADStreaming.importYouTube()"><span><div class="sv-empty-name">Import from YouTube</div><div class="sv-empty-hint">Bring your channel uploads in as episodes.</div></span>' + ARROW + '</button>'
+            + '<button type="button" class="sv-empty-row" onclick="AIADStreaming.startFirst()"><span><div class="sv-empty-name">Start episode 1</div><div class="sv-empty-hint">Open a blank episode and build it stage by stage.</div></span>' + ARROW + '</button>'
+            + '</div></div>';
+    }
+    function field(id, label, value, opts) {
+        opts = opts || {};
+        var inner;
+        if (opts.textarea) inner = '<textarea id="' + id + '" placeholder="' + esc(opts.placeholder || '') + '">' + esc(value) + '</textarea>';
+        else if (opts.options) inner = '<select id="' + id + '">' + opts.options.map(function (o) {
+            var v = Array.isArray(o) ? o[0] : o, l = Array.isArray(o) ? o[1] : o;
+            return '<option value="' + esc(v) + '"' + (String(v) === String(value) ? ' selected' : '') + '>' + esc(l) + '</option>';
+        }).join('') + '</select>';
+        else inner = '<input id="' + id + '" type="' + (opts.type || 'text') + '" value="' + esc(value == null ? '' : value) + '" placeholder="' + esc(opts.placeholder || '') + '"' + (opts.attrs || '') + '>';
+        return '<div class="sv-field' + (opts.wide ? ' wide' : '') + '"><label for="' + id + '">' + esc(label) + '</label>' + inner + '</div>';
+    }
+    function editorHtml(e) {
+        var isNew = !e.id;
+        var stageOpts = STAGES.map(function (s, i) { return [i + 1, (i + 1) + ' · ' + s]; });
+        return '<div class="sv-back"><button type="button" class="sv-link" onclick="AIADStreaming.cancel()">← All episodes</button></div>'
+            + '<div class="sv-editor"><div class="sv-grid">'
+            + field('sv_title', 'Title', e.title || '', { wide: true, placeholder: 'What is this episode called?' })
+            + field('sv_number', 'Episode number', e.episode_number, { type: 'number', attrs: ' min="1" step="1" inputmode="numeric"' })
+            + field('sv_format', 'Format', e.format || 'video', { options: [['video', 'Video'], ['audio', 'Audio'], ['live', 'Live']] })
+            + field('sv_topic', 'Topic', e.topic || '', { wide: true, placeholder: 'One line on what it covers' })
+            + field('sv_summary', 'Summary', e.summary || '', { wide: true, textarea: true, placeholder: 'Show notes, description, the pitch…' })
+            + '<div class="sv-section">Progress</div>'
+            + field('sv_stage', 'Stage', e.stage || 1, { options: stageOpts })
+            + field('sv_status', 'Status', e.status || 'draft', { options: [['draft', 'Draft'], ['scheduled', 'Scheduled'], ['published', 'Published'], ['archived', 'Archived']] })
+            + field('sv_air', 'Air date', toLocalInput(e.air_at), { type: 'datetime-local' })
+            + field('sv_runtime', 'Runtime (minutes)', e.runtime_seconds ? Math.round(e.runtime_seconds / 60) : '', { type: 'number', attrs: ' min="0" step="1" inputmode="numeric"' })
+            + '<div class="sv-section">Members first</div>'
+            + '<div class="sv-field"><label for="sv_early">Members get it early (hours)</label><input id="sv_early" type="number" min="0" step="1" inputmode="numeric" value="' + esc(e.members_early_hours == null ? 24 : e.members_early_hours) + '"></div>'
+            + '<label class="sv-check" for="sv_members_only"><input id="sv_members_only" type="checkbox"' + (e.members_only ? ' checked' : '') + '><span>Members only <small>— never goes public</small></span></label>'
+            + '<div class="sv-section">People &amp; money</div>'
+            + field('sv_guest', 'Guest', e.guest_name || '', { placeholder: 'Name' })
+            + field('sv_sponsor', 'Sponsor', e.sponsor_name || '', { placeholder: 'Brand' })
+            + field('sv_sponsor_amt', 'Sponsor amount ($)', e.sponsor_amount_cents != null ? (e.sponsor_amount_cents / 100) : '', { type: 'number', attrs: ' min="0" step="0.01" inputmode="decimal"' })
+            + '<div class="sv-section">Files</div>'
+            + field('sv_artwork', 'Artwork URL', e.artwork_url || '', { wide: true, type: 'url', placeholder: 'https://' })
+            + field('sv_video', 'Video URL', e.video_url || '', { wide: true, type: 'url', placeholder: 'https://' })
+            + field('sv_audio', 'Audio URL', e.audio_url || '', { wide: true, type: 'url', placeholder: 'https://' })
+            + '</div>'
+            + '<div class="sv-actions">'
+            + '<button type="button" class="sv-btn sv-btn-primary" id="svSaveBtn" onclick="AIADStreaming.save()">' + (isNew ? 'Create episode' : 'Save changes') + '</button>'
+            + (isNew ? '' : '<button type="button" class="sv-btn" onclick="AIADStreaming.publishFrom(\'' + esc(e.id) + '\')">Publish →</button>')
+            + '<button type="button" class="sv-btn" onclick="AIADStreaming.cancel()">Cancel</button>'
+            + '</div></div>';
+    }
+    function renderEpisodes() {
+        var body = el('svEpisodesBody'), actions = el('svEpisodesActions');
+        if (!body) return;
+        var showActions = false;
+        if (S.editing) {
+            body.innerHTML = editorHtml(S.editing);
+        } else if (S.error) {
+            body.innerHTML = '<div class="sv-error">Couldn’t load episodes — ' + esc(S.error) + ' <button type="button" class="sv-link" onclick="AIADStreaming.openEpisodes()">Retry</button></div>';
+        } else if (!S.loaded) {
+            body.innerHTML = '<div class="sv-muted">Loading…</div>';
+        } else if (!S.list.length) {
+            body.innerHTML = emptyHtml();
+        } else {
+            showActions = true;
+            body.innerHTML = '<div class="sv-list">' + S.list.map(rowHtml).join('') + '</div>';
+        }
+        if (actions) actions.style.display = showActions ? '' : 'none';
+    }
+    function newEpisode(number) {
+        var n = number || nextNumber();
+        S.editing = { title: 'Episode ' + n, episode_number: n, status: 'draft', stage: 1, format: 'video',
+                      members_early_hours: 24, members_only: false, destinations: [], pipeline: {} };
+        renderEpisodes();
+        setTimeout(function () { var t = el('sv_title'); if (t) { t.focus(); t.select(); } }, 30);
+    }
+    function edit(id) {
+        var e = S.list.filter(function (x) { return x.id === id; })[0];
+        if (!e) return;
+        S.editing = Object.assign({}, e);
+        renderEpisodes();
+        try { el('episodesView').scrollIntoView({ block: 'start' }); } catch (err) {}
+    }
+    function cancel() { S.editing = null; renderEpisodes(); }
+    function collect() {
+        var v = function (id) { var n = el(id); return n ? String(n.value).trim() : ''; };
+        var title = v('sv_title');
+        if (!title) { toast('Give the episode a title'); var t = el('sv_title'); if (t) t.focus(); return null; }
+        var num = parseInt(v('sv_number'), 10);
+        var mins = parseFloat(v('sv_runtime'));
+        var amt = parseFloat(v('sv_sponsor_amt'));
+        var air = v('sv_air');
+        var stage = parseInt(v('sv_stage'), 10);
+        return {
+            id: S.editing.id || undefined,
+            title: title,
+            episode_number: isNaN(num) ? null : num,
+            topic: v('sv_topic') || null,
+            summary: v('sv_summary') || null,
+            format: v('sv_format') || 'video',
+            status: v('sv_status') || 'draft',
+            stage: Math.min(8, Math.max(1, isNaN(stage) ? 1 : stage)),
+            air_at: air ? new Date(air).toISOString() : null,
+            runtime_seconds: isNaN(mins) ? null : Math.round(mins * 60),
+            members_early_hours: Math.max(0, parseInt(v('sv_early'), 10) || 0),
+            members_only: !!(el('sv_members_only') && el('sv_members_only').checked),
+            guest_name: v('sv_guest') || null,
+            sponsor_name: v('sv_sponsor') || null,
+            sponsor_amount_cents: isNaN(amt) ? null : Math.round(amt * 100),
+            artwork_url: v('sv_artwork') || null,
+            video_url: v('sv_video') || null,
+            audio_url: v('sv_audio') || null,
+        };
+    }
+    async function saveEditor() {
+        if (!S.editing) return;
+        var patch = collect(); if (!patch) return;
+        var btn = el('svSaveBtn'); if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+        var row = await save(patch);
+        if (btn) { btn.disabled = false; btn.textContent = patch.id ? 'Save changes' : 'Create episode'; }
+        if (!row) return;
+        toast(patch.id ? 'Episode saved' : 'Episode ' + (row.episode_number != null ? row.episode_number + ' ' : '') + 'created');
+        S.selected = row.id;
+        S.editing = null;
+        renderEpisodes();
+    }
+    function publishFrom(id) { S.selected = id; S.editing = null; window.showArtistView('publish'); }
+    function importRss() { toast('RSS import isn’t wired yet — start episode 1 and your feed can be imported later.'); }
+    function importYouTube() { toast('YouTube import isn’t wired yet — it lands with the YouTube connection.'); }
+
+    /* ── Publish view ── */
+    function openPublish() {
+        renderPublish();
+        ensureLoaded(renderPublish);
+    }
+    function current() {
+        return S.list.filter(function (e) { return e.id === S.selected; })[0] || null;
+    }
+    function publicOpensAt(e) {
+        // Members-first: the public window opens members_early_hours after the
+        // members release. Nothing here is written for YouTube/RSS yet — it is the
+        // schedule those connections will inherit.
+        var a = getDest(e, 'aiad'); if (!a) return null;
+        var base = a.status === 'published' ? (a.published_at || null) : a.status === 'scheduled' ? (a.scheduled_at || null) : null;
+        if (!base) return null;
+        var d = new Date(base); if (isNaN(d)) return null;
+        return new Date(d.getTime() + (e.members_early_hours || 0) * 3600000);
+    }
+    function firstHtml(e) {
+        var line;
+        if (e.members_only) line = '<strong>Members only.</strong> This episode never goes public.';
+        else if (e.members_early_hours > 0) line = '<strong>Members first.</strong> Supporters get it ' + esc(e.members_early_hours) + ' hours before anyone else.';
+        else line = '<strong>Everyone at once.</strong> Give members a head start by setting an early window.';
+        var opens = publicOpensAt(e);
+        if (opens && !e.members_only) line += ' Public window opens ' + esc(fmtDate(opens.toISOString())) + '.';
+        return '<div class="sv-first">' + line
+            + '<div class="sv-inline sv-window">Members get it <input id="sv_pub_early" type="number" min="0" step="1" inputmode="numeric" value="' + esc(e.members_early_hours || 0) + '"' + (e.members_only ? ' disabled' : '') + '> hours early'
+            + '<label class="sv-inline" style="margin:0;"><input id="sv_pub_only" type="checkbox"' + (e.members_only ? ' checked' : '') + ' style="accent-color:var(--teal);"> members only</label>'
+            + '<button type="button" class="sv-btn sv-btn-sm" onclick="AIADStreaming.saveWindow()">Save</button></div></div>';
+    }
+    function destHtml(e, t) {
+        var d = getDest(e, t.key);
+        var status = d ? d.status : null;
+        var connected = !!CONNECTED[t.key];
+        var dot = !connected ? '' : status === 'published' ? ' live' : status === 'scheduled' ? ' pending' : '';
+        var sub, ctl;
+        if (!connected) {
+            sub = 'Not connected · ' + esc(t.hint);
+            ctl = '<button type="button" class="sv-btn sv-btn-sm" disabled title="Connection coming soon">Connect ' + esc(t.name) + '</button>';
+        } else if (status === 'published') {
+            sub = 'Live for members since ' + esc(fmtDate(d.published_at || e.updated_at))
+                + (d.url ? ' · <a href="' + esc(d.url) + '" target="_blank" rel="noopener">View page</a>' : '');
+            ctl = '<button type="button" class="sv-btn sv-btn-sm" onclick="AIADStreaming.unpublishAiad()">Unpublish</button>';
+        } else if (status === 'scheduled') {
+            sub = 'Scheduled for ' + esc(fmtDate(d.scheduled_at)) + ' · goes live for members automatically.';
+            ctl = '<button type="button" class="sv-btn sv-btn-sm sv-btn-primary" onclick="AIADStreaming.publishAiad(\'now\')">Publish now</button>'
+                + '<button type="button" class="sv-btn sv-btn-sm" onclick="AIADStreaming.unpublishAiad()">Cancel</button>';
+        } else {
+            var future = e.air_at && new Date(e.air_at).getTime() > Date.now();
+            sub = future ? 'Air date is ' + esc(fmtDate(e.air_at)) + '. Schedule it, or publish to members now.' : esc(t.hint);
+            ctl = '<button type="button" class="sv-btn sv-btn-sm sv-btn-primary" onclick="AIADStreaming.publishAiad(\'now\')">Publish to members</button>'
+                + (future ? '<button type="button" class="sv-btn sv-btn-sm" onclick="AIADStreaming.publishAiad(\'schedule\')">Schedule</button>' : '');
+        }
+        return '<div class="sv-dest' + (connected ? '' : ' off') + '">'
+            + '<div><div class="sv-dest-name"><span class="sv-dot' + dot + '"></span>' + esc(t.name) + '</div><div class="sv-dest-sub">' + sub + '</div></div>'
+            + '<div class="sv-dest-ctl">' + ctl + '</div></div>';
+    }
+    function renderPublish() {
+        var body = el('svPublishBody'); if (!body) return;
+        if (S.error) {
+            body.innerHTML = '<div class="sv-error">Couldn’t load episodes — ' + esc(S.error) + ' <button type="button" class="sv-link" onclick="AIADStreaming.openPublish()">Retry</button></div>';
+            return;
+        }
+        if (!S.loaded) { body.innerHTML = '<div class="sv-muted">Loading…</div>'; return; }
+        var eps = S.list.filter(function (e) { return e.status !== 'archived'; });
+        if (!eps.length) {
+            body.innerHTML = '<div class="sv-empty"><h2>Nothing to publish yet.</h2><p>Create an episode first, then come back here to send it out.</p>'
+                + '<button type="button" class="sv-btn sv-btn-primary" onclick="showArtistView(\'episodes\')">Go to Episodes</button></div>';
+            return;
+        }
+        if (!S.selected || !eps.some(function (e) { return e.id === S.selected; })) S.selected = eps[0].id;
+        var e = current();
+        body.innerHTML = '<div class="sv-select-row"><span class="sv-kicker" style="margin:0;">Episode</span>'
+            + '<select onchange="AIADStreaming.select(this.value)">' + eps.map(function (x) {
+                return '<option value="' + esc(x.id) + '"' + (x.id === e.id ? ' selected' : '') + '>' + (x.episode_number != null ? esc(x.episode_number) + ' · ' : '') + esc(x.title) + '</option>';
+            }).join('') + '</select>'
+            + '<button type="button" class="sv-link" onclick="AIADStreaming.editFromPublish()">Edit episode</button></div>'
+            + firstHtml(e)
+            + TARGETS.map(function (t) { return destHtml(e, t); }).join('');
+    }
+    function select(id) { S.selected = id; renderPublish(); }
+    function editFromPublish() { var e = current(); if (!e) return; window.showArtistView('episodes'); setTimeout(function () { edit(e.id); }, 80); }
+    async function saveWindow() {
+        var e = current(); if (!e) return;
+        var only = !!(el('sv_pub_only') && el('sv_pub_only').checked);
+        var hrs = Math.max(0, parseInt(el('sv_pub_early') && el('sv_pub_early').value, 10) || 0);
+        var row = await save({ id: e.id, members_only: only, members_early_hours: hrs });
+        if (!row) return;
+        toast('Members window saved');
+        renderPublish();
+    }
+    async function publishAiad(mode) {
+        var e = current(); if (!e) return;
+        var others = dests(e).filter(function (d) { return !d || d.target !== 'aiad'; });
+        var url = await publicUrl();
+        var now = new Date().toISOString();
+        var entry, patch;
+        if (mode === 'schedule' && e.air_at) {
+            entry = { target: 'aiad', status: 'scheduled', url: url, scheduled_at: e.air_at };
+            patch = { status: 'scheduled', stage: Math.max(e.stage || 1, 7) };
+        } else {
+            entry = { target: 'aiad', status: 'published', url: url, scheduled_at: null, published_at: now };
+            patch = { status: 'published', stage: 8, air_at: e.air_at || now };
+        }
+        patch.id = e.id;
+        patch.destinations = others.concat([entry]);
+        var row = await save(patch);
+        if (!row) return;
+        toast(entry.status === 'published' ? 'Live for members' : 'Scheduled for members');
+        renderPublish();
+    }
+    async function unpublishAiad() {
+        var e = current(); if (!e) return;
+        var a = getDest(e, 'aiad');
+        var msg = a && a.status === 'published' ? 'Take this episode down for members?' : 'Cancel the scheduled release?';
+        if (!window.confirm(msg)) return;
+        var row = await save({ id: e.id, destinations: dests(e).filter(function (d) { return !d || d.target !== 'aiad'; }), status: 'draft' });
+        if (!row) return;
+        toast(a && a.status === 'published' ? 'Unpublished' : 'Schedule cancelled');
+        renderPublish();
+    }
+
+    function boot() {
+        hookNav();
+        watchBadges();
+        refreshCounts();
+        var dash = el('artistDashboard');
+        if (dash && dash.classList.contains('active')) { try { window.aiadApplyIndustryNav(); } catch (e) {} }
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+
+    window.AIADStreaming = {
+        toggleGroup: toggleGroup, go: function (view) {
+            if (view === 'decisions') {
+                window.showArtistView('agent');
+                setTimeout(function () { try { window.aiadAgentTab && aiadAgentTab('decisions'); } catch (e) {} markActive('decisions'); }, 120);
+                return;
+            }
+            window.showArtistView(view);
+        },
+        openEpisodes: openEpisodes, openPublish: openPublish,
+        newEpisode: function () { newEpisode(); }, startFirst: function () { newEpisode(1); },
+        edit: edit, cancel: cancel, save: saveEditor, publishFrom: publishFrom,
+        importRss: importRss, importYouTube: importYouTube,
+        select: select, editFromPublish: editFromPublish, saveWindow: saveWindow,
+        publishAiad: publishAiad, unpublishAiad: unpublishAiad,
+        reload: function () { S.loaded = false; return load(); },
+        state: function () { return S; }
+    };
+})();
+</script>
+
+<style id="aiad-streaming-mobile-css">
+/* Streaming vertical — mobile overrides. Keep this the last <style> before </body>. */
+@media (max-width: 768px) {
+  .sv{max-width:none;}
+  .sv-title{font-size:1.75rem;}
+  .sv-head{flex-direction:column;align-items:flex-start;}
+  .sv-head-actions{width:100%;}
+  .sv-head-actions .sv-btn{width:100%;}
+  .sv-grid{grid-template-columns:1fr;}
+  .sv-field.wide{grid-column:auto;}
+  .sv-section{grid-column:auto;}
+  .sv-row{grid-template-columns:32px 1fr;}
+  .sv-row .sv-pill{grid-column:2;justify-self:start;}
+  .sv-stages{max-width:none;}
+  .sv-dest{grid-template-columns:1fr;}
+  .sv-dest-ctl{justify-content:flex-start;}
+  .sv-select-row select{min-width:0;width:100%;}
+  .sv-actions .sv-btn{flex:1 1 auto;}
+  .sv-empty-row{padding:14px 0;}
+  #streamingNav .snav-head{padding:16px 12px 8px;font-size:0.66rem;}
+  .dash-sidebar-left .snav-head > span:not(.snav-count),.dash-sidebar-left .snav-arrow{opacity:1 !important;max-width:none !important;}
+  #streamingNav .dash-nav-item{padding:11px 12px !important;font-size:0.9rem;}
+}
+</style>
 </body>
 
 
