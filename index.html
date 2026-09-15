@@ -6271,17 +6271,12 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                             </div>
                             <div class="settings-field">
                                 <label class="settings-label">Tagline / Role</label>
-                                <input type="text" class="settings-input" id="settingsTagline" value="Afro Fusion">
+                                <input type="text" class="settings-input" id="settingsTagline" placeholder="Afro Fusion">
                                 <p class="settings-helper">A short descriptor shown below your name.</p>
                             </div>
                             <div class="settings-field">
-                                <label class="settings-label">Short Bio</label>
-                                <textarea class="settings-input settings-textarea" id="settingsShortBio" maxlength="120">Blending cinematic soundscapes with Afrobeat rhythms and retro-futuristic aesthetics.</textarea>
-                                <p class="settings-char-count">82/120</p>
-                            </div>
-                            <div class="settings-field">
                                 <label class="settings-label">Full Bio</label>
-                                <textarea class="settings-input settings-textarea" id="settingsFullBio" style="min-height: 150px;">Creating music that bridges cultures and unites a global audience through sonic storytelling. From the streets of Lagos to stages worldwide, every track is a journey through sound, memory, and possibility.</textarea>
+                                <textarea class="settings-input settings-textarea" id="settingsFullBio" style="min-height: 150px;" placeholder="Who you are, what you make, and why it matters. This is the bio that shows on your profile."></textarea>
                             </div>
                             <div class="settings-field">
                                 <label class="settings-label">Profile Image</label>
@@ -14598,7 +14593,6 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 const updates = {
                     artist_name: document.getElementById('settingsArtistName')?.value?.trim(),
                     tagline: document.getElementById('settingsTagline')?.value?.trim(),
-                    short_bio: document.getElementById('settingsShortBio')?.value?.trim(),
                     full_bio: document.getElementById('settingsFullBio')?.value?.trim(),
                     location: document.getElementById('settingsLocation')?.value?.trim(),
                     primary_genre: document.getElementById('settingsPrimaryGenre')?.value?.trim() || AppState.artistProfile?.primaryGenre || null,
@@ -14879,7 +14873,6 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
 
                 if (document.getElementById('settingsArtistName')) document.getElementById('settingsArtistName').value = data.artist_name || '';
                 if (document.getElementById('settingsTagline')) document.getElementById('settingsTagline').value = data.tagline || '';
-                if (document.getElementById('settingsShortBio')) document.getElementById('settingsShortBio').value = data.short_bio || '';
                 if (document.getElementById('settingsFullBio')) document.getElementById('settingsFullBio').value = data.full_bio || '';
                 if (document.getElementById('settingsLocation')) document.getElementById('settingsLocation').value = data.location || '';
 
@@ -33938,7 +33931,7 @@ Be direct and concrete with real industry insight — never generic filler. When
     ov.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;padding:20px;font-family:Inter,-apple-system,sans-serif';
     ov.innerHTML='<div style="background:#141414;border:1px solid rgba(255,255,255,.1);border-radius:18px;max-width:520px;width:100%;max-height:85vh;overflow:auto;padding:24px;color:#fff">'
       +'<div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="display:flex;gap:14px;align-items:center">'+av+'<div><div style="font-weight:800;font-size:1.2rem">'+(ap.artist_name||'Artist')+'</div><div style="color:#9aa;font-size:.85rem">'+[ap.primary_genre,ap.location].filter(Boolean).join(' · ')+'</div></div></div><span style="cursor:pointer;opacity:.6;font-size:1.2rem" onclick="var m=document.getElementById(\'aiadArtistModal\');if(m)m.remove()">&#10005;</span></div>'
-      +((ap.short_bio||ap.tagline)?'<div style="margin-top:14px;color:#cfcfcf;font-size:.9rem;line-height:1.5">'+(ap.short_bio||ap.tagline)+'</div>':'')
+      +((ap.tagline||ap.short_bio)?'<div style="margin-top:14px;color:#cfcfcf;font-size:.9rem;line-height:1.5">'+(ap.tagline||ap.short_bio)+'</div>':'')
       +'<div style="margin-top:18px;font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:#888">Recent public tracks</div>'+tks
       +'</div>';
     ov.addEventListener('click',function(e){ if(e.target===ov) ov.remove(); });
