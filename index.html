@@ -4861,7 +4861,6 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                             </div>
                             <div style="display:flex;gap:4px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:4px;width:fit-content;">
                                 <button id="musicTabCreate" onclick="switchMusicTab('create')" style="padding:7px 18px;background:rgba(255,255,255,0.1);border:none;border-radius:7px;color:var(--text-primary);font-size:0.8rem;font-weight:500;cursor:pointer;">Create</button>
-                                <button id="musicTabLibrary" onclick="switchMusicTab('library')" style="padding:7px 18px;background:transparent;border:none;border-radius:7px;color:var(--text-muted);font-size:0.8rem;cursor:pointer;">Library</button>
                                 <button id="musicTabPlaylists" onclick="switchMusicTab('playlists')" style="padding:7px 18px;background:transparent;border:none;border-radius:7px;color:var(--text-muted);font-size:0.8rem;cursor:pointer;">Playlists</button>
                             </div>
                         </div>
@@ -33796,22 +33795,20 @@ Be direct and concrete with real industry insight — never generic filler. When
         if(!tr.ok){ msg.textContent='Could not save track ('+tr.status+').'; return; }
         msg.textContent='Done! Added to your library.';
       }
-      setTimeout(function(){ try{ var m=document.getElementById('aiadUpModal'); if(m)m.remove(); if(typeof loadTracks==='function'){ loadTracks(); } else { location.reload(); } }catch(e){ location.reload(); } }, 800);
+      setTimeout(function(){
+        try{
+          var m=document.getElementById('aiadUpModal'); if(m)m.remove();
+          if(window.AIADLibrary && typeof window.AIADLibrary.reload==='function'){ window.AIADLibrary.reload(); }
+          else if(typeof loadTracks==='function'){ loadTracks(); }
+          else { location.reload(); }
+        }catch(e){ location.reload(); }
+      }, 800);
     }catch(e){ msg.textContent='Error: '+e.message; }
   }
-  function ensureBtn(){
-    try{
-      var lib=document.getElementById('musicLibraryList');
-      if(lib && lib.parentNode && !document.getElementById('aiadUploadBtn')){
-        var b=document.createElement('button'); b.id='aiadUploadBtn'; b.type='button';
-        b.textContent='⬆ Upload your music';
-        b.style.cssText='display:block;width:100%;margin:0 0 14px;background:linear-gradient(135deg,#00D4FF,#0077B6);color:#001018;font-weight:700;border:none;border-radius:10px;padding:12px;cursor:pointer;font-size:.9rem';
-        b.onclick=openModal;
-        lib.parentNode.insertBefore(b, lib);
-      }
-    }catch(e){}
-  }
-  setInterval(ensureBtn, 1500);
+  // Upload belongs to Library. This used to inject a button above #musicLibraryList on a
+  // setInterval that never cleared — a timer for the life of the tab to place one control
+  // in the wrong view. Library renders its own button and calls this.
+  window.AIADUploadTrack = openModal;
 })();
 </script>
 <script>
@@ -42044,6 +42041,14 @@ window.AIAD_PROMPTS = [
 </script>
 <style>
 /* ── Library + review queue ─────────────────────────────────────────────── */
+#artistLibraryView .lb-upload{
+  display:inline-flex;align-items:center;gap:7px;padding:10px 18px;border:none;border-radius:10px;
+  background:linear-gradient(90deg,var(--teal-light,#00D4FF),var(--teal,#00B4D8));
+  color:#001018;font-family:inherit;font-size:0.85rem;font-weight:600;cursor:pointer;
+  flex-shrink:0;
+}
+#artistLibraryView .lb-upload svg{width:15px;height:15px;}
+#artistLibraryView .lb-upload:hover{filter:brightness(1.08);}
 #artistLibraryView .lb-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 20px;border-bottom:1px solid var(--border-default,rgba(255,255,255,0.08));padding-bottom:10px;}
 #artistLibraryView .lb-tab{background:none;border:1px solid transparent;border-radius:999px;padding:7px 14px;font-size:0.8rem;color:var(--text-muted,rgba(255,255,255,0.4));cursor:pointer;white-space:nowrap;}
 #artistLibraryView .lb-tab:hover{color:var(--text-secondary,rgba(255,255,255,0.62));}
@@ -42453,7 +42458,15 @@ window.AIAD_PROMPTS = [
             '<div class="view-header"><div>' +
               '<h1 class="view-title">Library</h1>' +
               '<p class="view-subtitle">Everything you have made, in one place.</p>' +
-            '</div></div>' +
+            '</div>' +
+              // Guarded: the upload module is a separate script block, and a header that
+              // throws would take the whole Library view down with it.
+              '<button type="button" class="lb-upload" onclick="window.AIADUploadTrack ? window.AIADUploadTrack() : null">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">' +
+                  '<path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/>' +
+                '</svg> Upload a track' +
+              '</button>' +
+            '</div>' +
             '<div class="lb-tabs">' + tabs + '</div>' +
             '<div id="lbPanel" class="lb-panel">' + body + '</div>';
 
