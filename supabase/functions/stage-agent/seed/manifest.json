@@ -1,0 +1,65 @@
+[
+  {
+    "slug": "discover",
+    "name": "Discover (A&R and talent evaluation)",
+    "bytes": 5750,
+    "chars": 5750,
+    "sha256": "4b390438811d6e2154be8a9ee50a626b257c6a2dcc6ca65954a23e59842a2b0d"
+  },
+  {
+    "slug": "develop",
+    "name": "Develop (artist development and creative direction)",
+    "bytes": 5512,
+    "chars": 5512,
+    "sha256": "5f43d7574fc50bf725e03b9257afa5b4f661911d1bb042fb62aa61bd27ed2231"
+  },
+  {
+    "slug": "record_release",
+    "name": "Record and Release operations",
+    "bytes": 5717,
+    "chars": 5717,
+    "sha256": "34d9aaa61c01765b9e7143989c6dc91e70716279b7b58672057c3287480394d5"
+  },
+  {
+    "slug": "rights_royalties",
+    "name": "Rights, publishing and royalties",
+    "bytes": 6537,
+    "chars": 6537,
+    "sha256": "92f83ee5931e94a83cad4de642ba14fdbdbfbdfea9ee6a394c490f9f85e37f99"
+  },
+  {
+    "slug": "touring_live",
+    "name": "Touring and live",
+    "bytes": 5657,
+    "chars": 5657,
+    "sha256": "8991a2bcdc0f8a146824181d7108391ebe0b64f682e85e43a5dcb97e1f4b7a4f"
+  },
+  {
+    "slug": "brand_sync",
+    "name": "Brand, sync and partnerships",
+    "bytes": 5642,
+    "chars": 5642,
+    "sha256": "953cfd147c88184b266919478ec42ea407594451739dfe0792c3ca86756f362b"
+  },
+  {
+    "slug": "finances",
+    "name": "Financial management",
+    "bytes": 5519,
+    "chars": 5519,
+    "sha256": "e90e1e240206c9072422eac3924b61010cf779eaeeba5b5d62d8f3c8c6e4bdfe"
+  },
+  {
+    "slug": "strategy_team",
+    "name": "Career strategy and team operations",
+    "bytes": 5350,
+    "chars": 5350,
+    "sha256": "084b2cebf4445a4ee10d8c2b5a3f3be62bd90c7203c4085dc3aafc6d2eefcd2e"
+  },
+  {
+    "slug": "contract_review",
+    "name": "Contract review (cross-stage sub-agent)",
+    "bytes": 12198,
+    "chars": 12198,
+    "sha256": "d4bf4ee9bddeaabe03f751854f5baa2f33161fa285f22ff34a933f0fc95a3a7e"
+  }
+]
