@@ -16424,6 +16424,82 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 + '</div>';
         };
 
+        // A stored cover frame if the watermark pass produced one. Same lookup the grid
+        // thumbnail uses -- centralised here so every player agrees on what the cover is.
+        window.aiadPostPoster = function (post) {
+            var items = (window.aiadPostMedia ? window.aiadPostMedia(post) : []) || [];
+            for (var i = 0; i < items.length; i++) {
+                if (items[i] && items[i].type === 'video' && items[i].poster_url) return items[i].poster_url;
+            }
+            return null;
+        };
+
+        // Attributes for a <video> so it shows a picture instead of black. With a stored
+        // poster that is just the attribute. Without one -- a legacy row, or a clip whose
+        // watermark pass has not run yet -- nudging currentTime forces the browser to decode
+        // and paint one frame. Deliberately NOT the "#t=0.5" trick, which paints a frame by
+        // permanently moving the start point and quietly eats the first half second.
+        window.aiadVideoCover = function (post) {
+            var p = window.aiadPostPoster(post);
+            if (p) return ' poster="' + String(p).replace(/"/g, '&quot;') + '" preload="metadata"';
+            return ' preload="metadata" onloadeddata="if(!this.dataset.seeded){this.dataset.seeded=1;this.currentTime=0.1;}"';
+        };
+
+        // Audio posts ship no artwork, so a bare <audio> bar sits on nothing. Prefer a real
+        // image from the same post, then any cover frame, then the artist avatar, and fall
+        // back to a branded tile rather than a black rectangle.
+        window.aiadAudioCoverHtml = function (post) {
+            var items = (window.aiadPostMedia ? window.aiadPostMedia(post) : []) || [];
+            var art = null;
+            for (var i = 0; i < items.length; i++) {
+                if (!items[i]) continue;
+                if (items[i].type === 'photo' && items[i].url) { art = items[i].url; break; }
+                if (!art && items[i].poster_url) art = items[i].poster_url;
+            }
+            if (!art) {
+                try {
+                    art = (post && (post.artist_avatar_url || post.avatar_url))
+                        || localStorage.getItem('aiad_artist_avatar_url')
+                        || localStorage.getItem('aiad_avatar_url') || null;
+                } catch (e) {}
+            }
+            if (art && !(String(art).indexOf('http') === 0 || String(art).indexOf('data:') === 0)) art = null;
+            if (art) {
+                return '<div style="position:relative;width:100%;aspect-ratio:16/9;max-height:220px;overflow:hidden;background:#000;">'
+                    + '<img src="' + String(art).replace(/"/g, '&quot;') + '" alt="" loading="lazy" '
+                    + 'style="width:100%;height:100%;object-fit:cover;display:block;filter:brightness(0.72);">'
+                    + '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" '
+                    + 'style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:34px;height:34px;'
+                    + 'filter:drop-shadow(0 2px 6px rgba(0,0,0,0.6));"><path d="M9 18V5l12-2v13"/>'
+                    + '<circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>';
+            }
+            return '<div style="position:relative;width:100%;aspect-ratio:16/9;max-height:220px;'
+                + 'background:linear-gradient(135deg,rgba(0,180,216,0.22),rgba(224,64,251,0.22));'
+                + 'display:flex;align-items:center;justify-content:center;">'
+                + '<svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.8)" stroke-width="1.5" '
+                + 'style="width:34px;height:34px;"><path d="M9 18V5l12-2v13"/>'
+                + '<circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>';
+        };
+
+        // Closing a modal by hiding it leaves the media element in the DOM, and a hidden
+        // <video> keeps playing -- which is the whole bug. Pause, rewind and detach the
+        // source before anything else. Detaching matters on mobile Safari, where a paused
+        // element with a live src can still hold the audio session.
+        window.aiadStopMediaIn = function (node) {
+            if (!node) return;
+            try {
+                var m = node.querySelectorAll('video, audio');
+                for (var i = 0; i < m.length; i++) {
+                    try {
+                        m[i].pause();
+                        m[i].currentTime = 0;
+                        m[i].removeAttribute('src');
+                        m[i].load();
+                    } catch (e) {}
+                }
+            } catch (e) {}
+        };
+
         window.aiadMultiBadge = function (post) {
             if (window.aiadPostMedia(post).length < 2) return '';
             _aiadCarouselCss();
@@ -17342,12 +17418,12 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             } else if (post.media_type === 'photo' && post.media_url) {
                 mediaHtml = '<div style="margin:12px 0;border-radius:12px;overflow:hidden;text-align:center;background:#000;cursor:zoom-in;" onclick="_zoomPostImage(\'' + post.media_url + '\')"><img src="' + post.media_url + '" style="max-width:100%;max-height:60vh;object-fit:contain;display:block;margin:0 auto;"></div>';
             } else if (post.media_type === 'video' && post.media_url) {
-                mediaHtml = '<div style="margin:12px 0;border-radius:12px;overflow:hidden;"><video src="' + post.media_url + '" controls style="width:100%;max-height:60vh;background:#000;display:block;"></video></div>';
+                mediaHtml = '<div style="margin:12px 0;border-radius:12px;overflow:hidden;"><video src="' + post.media_url + '" controls' + window.aiadVideoCover(post) + ' style="width:100%;max-height:60vh;background:#000;display:block;"></video></div>';
             } else if (post.media_type === 'audio' && post.media_url) {
                 mediaHtml = '<div style="margin:12px 0;background:var(--bg-secondary);border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px;">' +
                     '<div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--magenta),var(--magenta-dark));display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>' +
                     '<div style="flex:1;min-width:0;"><div style="font-size:0.82rem;font-weight:600;margin-bottom:2px;">' + (post.media_name || 'Track') + '</div>' +
-                    '<audio controls style="width:100%;height:32px;" src="' + post.media_url + '"></audio></div></div>';
+                    window.aiadAudioCoverHtml(post) + '<audio controls style="width:100%;height:32px;margin-top:10px;" src="' + post.media_url + '"></audio></div></div>';
             }
             var contentHtml = post.content ? '<div style="font-size:0.92rem;line-height:1.65;color:var(--text-primary);margin:0 0 4px;">' + post.content.replace(/\n/g, '<br>') + '</div>' : '';
             var counts = _artistPostCounts[pid] || {likes:0,comments:0};
@@ -17394,6 +17470,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
 
         function _closeArtistPost() {
             var m = document.getElementById('artistPostModal');
+            window.aiadStopMediaIn(m);
             if (m) m.style.display = 'none';
             document.body.style.overflow = '';
         }
@@ -24154,7 +24231,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     const isImage = mUrl.includes('.jpg') || mUrl.includes('.jpeg') || mUrl.includes('.png') || mUrl.includes('.gif') || mUrl.includes('.webp') || mUrl.startsWith('data:image');
                     const isVideo = mUrl.includes('.mp4') || mUrl.includes('.mov') || mUrl.includes('.webm');
                     if (isImage) mediaHtml = '<img src="' + mUrl + '" style="width:100%;max-height:300px;object-fit:cover;display:block;" onerror="this.style.display=\'none\'">';
-                    else if (isVideo) mediaHtml = '<video src="' + mUrl + '" controls playsinline style="width:100%;max-height:300px;background:#000;display:block;"></video>';
+                    else if (isVideo) mediaHtml = '<video src="' + mUrl + '" controls playsinline' + window.aiadVideoCover(p) + ' style="width:100%;max-height:300px;background:#000;display:block;"></video>';
                 }
                 return '<div class="dash-post" style="background:var(--bg-card);border-radius:14px;overflow:hidden;border:1px solid var(--border-default);" data-rel="' + p._relType + '">' +
                     '<div style="display:flex;align-items:center;gap:10px;padding:14px 16px;">' +
@@ -27613,7 +27690,7 @@ function _feedPostCard(p) {
         media = window.aiadCarouselHtml(_items);
     } else if (p.media_url) {
         if (p.media_type === 'video') {
-            media = '<video src="' + escapeHtml(p.media_url) + '" controls playsinline style="width:100%;max-height:560px;background:#000;border-radius:12px;margin-top:10px;display:block"></video>';
+            media = '<video src="' + escapeHtml(p.media_url) + '" controls playsinline' + window.aiadVideoCover(p) + ' style="width:100%;max-height:560px;background:#000;border-radius:12px;margin-top:10px;display:block"></video>';
         } else {
             media = '<img src="' + escapeHtml(p.media_url) + '" alt="" style="width:100%;border-radius:12px;margin-top:10px;display:block">';
         }
@@ -28122,14 +28199,14 @@ function _openFanPost(idx) {
         var isVideo = mUrl.includes('.mp4') || mUrl.includes('.mov') || mUrl.includes('.webm') || mUrl.includes('.avi') || (p.post_type && p.post_type === 'video');
         var isImage = mUrl.includes('.jpg') || mUrl.includes('.jpeg') || mUrl.includes('.png') || mUrl.includes('.gif') || mUrl.includes('.webp') || mUrl.startsWith('data:image');
         if (isVideo) {
-            mediaHtml = '<div style="margin:12px 0;border-radius:12px;overflow:hidden;"><video src="' + p.media_url + '" controls playsinline style="width:100%;max-height:60vh;background:#000;display:block;border-radius:12px;"></video></div>';
+            mediaHtml = '<div style="margin:12px 0;border-radius:12px;overflow:hidden;"><video src="' + p.media_url + '" controls playsinline' + window.aiadVideoCover(p) + ' style="width:100%;max-height:60vh;background:#000;display:block;border-radius:12px;"></video></div>';
         } else if (isAudio) {
             mediaHtml = '<div style="margin:12px 0;background:var(--bg-secondary);border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px;">' +
                 '<div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--teal),#0d2f3f);display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
                     '<svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>' +
                 '</div>' +
                 '<div style="flex:1;min-width:0;"><div style="font-size:0.82rem;font-weight:600;margin-bottom:2px;">Music</div>' +
-                '<audio controls style="width:100%;height:32px;border-radius:8px;" src="' + p.media_url + '"></audio></div></div>';
+                window.aiadAudioCoverHtml(p) + '<audio controls style="width:100%;height:32px;border-radius:8px;margin-top:10px;" src="' + p.media_url + '"></audio></div></div>';
         } else if (isImage) {
             mediaHtml = '<div style="margin:12px 0;border-radius:12px;overflow:hidden;text-align:center;background:#000;cursor:zoom-in;" onclick="_zoomPostImage(this.querySelector(\'img\').src)"><img src="' + p.media_url + '" style="max-width:100%;max-height:60vh;object-fit:contain;display:block;margin:0 auto;"></div>';
         } else if (p.media_url.startsWith('data:')) {
@@ -28212,6 +28289,7 @@ function _openFanPost(idx) {
 
 function _closeFanPost() {
     var m = document.getElementById('fanPostModal');
+    window.aiadStopMediaIn(m);
     if (m) m.style.display = 'none';
     document.body.style.overflow = '';
 }
@@ -33827,13 +33905,13 @@ Be direct and concrete with real industry insight — never generic filler. When
     var _items = window.aiadPostMedia(p);
     var media = _items.length > 1
       ? window.aiadCarouselHtml(_items)
-      : (isImg(mUrl) ? '<img src="'+mUrl+'" style="width:100%;max-height:70vh;object-fit:contain;background:#000">' : (isVid(mUrl) ? '<video src="'+mUrl+'" controls autoplay playsinline style="width:100%;max-height:70vh;background:#000"></video>' : ''));
+      : (isImg(mUrl) ? '<img src="'+mUrl+'" style="width:100%;max-height:70vh;object-fit:contain;background:#000">' : (isVid(mUrl) ? '<video src="'+mUrl+'" controls autoplay playsinline'+window.aiadVideoCover(p)+' style="width:100%;max-height:70vh;background:#000"></video>' : ''));
     var ov=document.createElement('div'); ov.id='aiadFeedLightbox';
     ov.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:20px';
     ov.innerHTML='<div style="max-width:640px;width:100%;max-height:90vh;overflow:auto;background:#141414;border-radius:16px">'
-      +'<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px"><div style="font-weight:700;color:#fff">'+name+'</div><span style="cursor:pointer;color:#fff;opacity:.7;font-size:1.2rem" onclick="var m=document.getElementById(\'aiadFeedLightbox\');if(m)m.remove()">&#10005;</span></div>'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px"><div style="font-weight:700;color:#fff">'+name+'</div><span style="cursor:pointer;color:#fff;opacity:.7;font-size:1.2rem" onclick="var m=document.getElementById(\'aiadFeedLightbox\');if(m){window.aiadStopMediaIn(m);m.remove();}">&#10005;</span></div>'
       +media+(p.content?'<div style="padding:14px 16px;color:#ddd;font-size:.9rem;line-height:1.6">'+p.content+'</div>':'')+'</div>';
-    ov.addEventListener('click',function(e){ if(e.target===ov) ov.remove(); });
+    ov.addEventListener('click',function(e){ if(e.target===ov){ window.aiadStopMediaIn(ov); ov.remove(); } });
     document.body.appendChild(ov);
     window.aiadInitCarousels && window.aiadInitCarousels(ov);
   };
