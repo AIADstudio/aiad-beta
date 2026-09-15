@@ -10961,10 +10961,11 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 upsellTo: 'artist_premier'
             },
             artist_premier: {
-                // Named for the plan key, not the career stage. This used to read
-                // "Established", which is also a career_stage value, so a badge could not
+                // Named for the plan key, not the career stage. This must NOT read
+                // "Established": that is also a career_stage value, so a badge could not
                 // tell you whether it was describing what you pay for or where you are.
-                name: 'Premier',
+                // Matches AIADPricing.PLANS, which is what every paid surface renders.
+                name: 'Studio',   // <- third-tier name
                 price: 99,
                 priceLabel: '$99/mo',
                 aiCredits: 2000,
@@ -32825,7 +32826,16 @@ Be direct and concrete with real industry insight — never generic filler. When
         };
 
         // Multi-industry pricing: each added industry = its tier − 20%; All-Access = $300/mo, all industries, max credits.
-        const WS_TIER_PRICES = [['starter', 'Starter', 29], ['pro', 'Pro', 59], ['studio', 'Studio', 149]];
+        // ids are load-bearing (aiadPickAddTier stores them, checkout reads them) so they
+        // stay literal; the NAME and PRICE come from AIADPricing.PLANS, in ladder order.
+        const WS_TIER_IDS = ['starter', 'pro', 'studio'];
+        function wsTierPrices() {
+            const plans = (window.AIADPricing && window.AIADPricing.PLANS) || [];
+            return WS_TIER_IDS.map(function (id, i) {
+                const p = plans[i];
+                return [id, p ? p.name : id, p ? p.monthly : 0];
+            });
+        }
         const WS_ADDON_DISCOUNT = 0.20;
         const WS_ALL_ACCESS_PRICE = 300;
         const wsDisc = p => Math.round(p * (1 - WS_ADDON_DISCOUNT));
@@ -32842,7 +32852,7 @@ Be direct and concrete with real industry insight — never generic filler. When
                 return;
             }
             const label = WS_LABELS[ind] || ind;
-            const tierRows = WS_TIER_PRICES.map(([id, name, price]) => `
+            const tierRows = wsTierPrices().map(([id, name, price]) => `
                 <div onclick="aiadPickAddTier('${ind}','${id}',${wsDisc(price)})" style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 16px;border:1px solid rgba(255,255,255,0.1);border-radius:12px;cursor:pointer;background:rgba(255,255,255,0.02);" onmouseover="this.style.borderColor='rgba(20,197,209,0.5)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.1)'">
                     <div><div style="font-size:0.95rem;font-weight:600;color:#fff;">${name}</div><div style="font-size:0.72rem;color:#64748b;margin-top:2px;">for ${label}</div></div>
                     <div style="text-align:right;"><span style="color:#64748b;text-decoration:line-through;font-size:0.82rem;">$${price}</span> <span style="color:#14c5d1;font-weight:700;font-size:1.05rem;">$${wsDisc(price)}</span><span style="color:#94a3b8;font-size:0.72rem;">/mo</span><div style="font-size:0.66rem;color:#5cc98a;margin-top:1px;">20% multi-industry discount</div></div>
@@ -40406,6 +40416,11 @@ window.AIAD_PROMPTS = [
 .pt-credits { font-size: 0.8rem; color: var(--text-secondary, rgba(255,255,255,0.65)); margin-top: 7px; font-weight: 500; }
 .pt-pos { font-size: 0.75rem; color: var(--text-muted, rgba(255,255,255,0.45)); margin: 5px 0 10px; line-height: 1.45; }
 .pt-features { list-style: none; margin: 0; padding: 0; flex: 1; }
+.pt-features li.pt-inherit {
+  padding-left: 0; font-weight: 600; color: var(--text-primary, #fff);
+  margin-bottom: 2px;
+}
+.pt-features li.pt-inherit::before { content: none; }
 .pt-features li {
   font-size: 0.75rem; color: var(--text-secondary, rgba(255,255,255,0.6));
   padding: 3px 0 3px 15px; position: relative; line-height: 1.45;
@@ -40611,15 +40626,18 @@ window.AIAD_PROMPTS = [
     var YEARLY_MONTHS_CHARGED = 10;    // pay 10, get 12
 
     var PLANS = [
+        // `features` is what this tier ADDS. The card prepends "Everything in <previous>,
+        // plus" for every plan after the first, so anything repeated here would be listed
+        // twice. Credits are deliberately absent: cardHtml prints them on their own line.
         { key: 'artist_starter', name: 'Starter', monthly: 29, credits: 150,
           positioning: 'For artists just getting started.',
-          features: ['150 credits a month', 'Music, images and songwriting', 'AIAD Agent', 'Fan Q&A'] },
-        { key: 'artist_pro', name: 'Professional', monthly: 59, credits: 500, popular: true,
+          features: ['Music, images and songwriting', 'AIAD Agent', 'Fan Q&A'] },
+        { key: 'artist_pro', name: 'Pro', monthly: 59, credits: 500, popular: true,
           positioning: 'For artists actively building momentum.',
-          features: ['500 credits a month', 'Commercial rights included', 'Collaborator network', 'Social analytics'] },
-        { key: 'artist_premier', name: 'Studio', monthly: 99, credits: 2000,
+          features: ['Commercial rights included', 'Collaborator network', 'Social analytics'] },
+        { key: 'artist_premier', name: 'Studio', monthly: 99, credits: 2000,   // <- third-tier name
           positioning: 'For serious working artists.',
-          features: ['2,000 credits a month', 'Priority generation queue', 'Sync library listing', 'Dedicated support'] }
+          features: ['Priority generation queue', 'Sync library listing', 'Dedicated support'] }
     ];
 
     function esc(s) {
@@ -40702,7 +40720,7 @@ window.AIAD_PROMPTS = [
     }
 
     // ── Cards ───────────────────────────────────────────────────────────────
-    var selected = 'artist_pro';       // Professional is the founding default
+    var selected = 'artist_pro';       // Pro is the founding default
     var interval = 'month';
 
     function cardHtml(p, opts) {
@@ -40725,6 +40743,10 @@ window.AIAD_PROMPTS = [
             '<div class="pt-credits">' + p.credits.toLocaleString() + ' credits a month</div>' +
             '<p class="pt-pos">' + esc(p.positioning) + '</p>' +
             '<ul class="pt-features">' +
+              (function () {
+                  var i = PLANS.indexOf(p);
+                  return i > 0 ? '<li class="pt-inherit">Everything in ' + esc(PLANS[i - 1].name) + ', plus</li>' : '';
+              })() +
               p.features.map(function (f) { return '<li>' + esc(f) + '</li>'; }).join('') +
             '</ul>' +
             (opts.cta
