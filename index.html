@@ -27417,28 +27417,22 @@ async function loadFanDiscover() { setTimeout(()=>_execDiscoverSearch(),100); }
             const fs = document.getElementById('aiadFoundingStrip');
             const fl = document.getElementById('aiadFollowingStrip');
             const sp = document.getElementById('aiadSupportersStrip');
-            if (!mobile) {
-                // Put both back where the desktop layout expects them and drop the row.
-                if (row) {
-                    if (fs) main.insertBefore(fs, main.firstChild);
-                    if (fl) {
-                        const sw = document.getElementById('aiadArtistSearchWrap');
-                        if (sw && sw.parentNode) sw.parentNode.insertBefore(fl, sw.nextSibling);
-                        else main.appendChild(fl);
-                    }
-                    row.remove();
-                }
-                // On desktop the Supporters chip lives in the Following strip's header.
-                if (sp && window.aiadPaintSupporters) window.aiadPaintSupporters();
-                return;
-            }
             if (!row) { row = document.createElement('div'); row.id = 'aiadChipRow'; }
-            if (row.parentNode !== main || main.firstChild !== row) main.insertBefore(row, main.firstChild);
-            if (fs && fs.parentNode !== row) row.appendChild(fs);
+            // Following and Supporters are a pair of pills at every width now. Founding
+            // keeps its own full-width bar on desktop and only joins the row on a phone.
+            const sw = document.getElementById('aiadArtistSearchWrap');
+            if (mobile) {
+                if (row.parentNode !== main || main.firstChild !== row) main.insertBefore(row, main.firstChild);
+                if (fs && fs.parentNode !== row) row.appendChild(fs);
+            } else {
+                if (fs && fs.parentNode === row) main.insertBefore(fs, main.firstChild);
+                if (row.parentNode !== main || row.previousSibling !== sw) {
+                    main.insertBefore(row, (sw && sw.parentNode === main) ? sw.nextSibling : main.firstChild);
+                }
+            }
             if (fl && fl.parentNode !== row) row.appendChild(fl);
             if (sp && sp.parentNode !== row) row.appendChild(sp);
-            // Founding, Following, Supporters — only touched when actually out of order.
-            if (fs && fl && fs.nextElementSibling !== fl) row.insertBefore(fs, fl);
+            if (mobile && fs && fl && fs.nextElementSibling !== fl) row.insertBefore(fs, fl);
             if (fl && sp && fl.nextElementSibling !== sp) row.insertBefore(sp, fl.nextSibling);
         };
 
@@ -27490,131 +27484,212 @@ async function loadFanDiscover() { setTimeout(()=>_execDiscoverSearch(),100); }
             right.insertBefore(b, right.firstChild);
         };
 
-        // One place decides whether the strip is a row or a chip, so a resize does not
-        // leave a phone showing the desktop row.
+        // Following and Supporters are two counts in one short row of pills. The
+        // avatar row this used to draw was a phone-screen of chrome above the thing
+        // the artist came to use, and it cost a profile-and-avatar fetch for faces
+        // nobody clicked. The pill carries the count; the faces live in the modal.
+        window.__aiadFollowingIds   = null;   // null = not loaded yet
+        window.__aiadFollowingCount = null;
+        window.__aiadFollowingAmt   = {};
+
         window.aiadPaintFollowing = function () {
             const strip = document.getElementById('aiadFollowingStrip');
-            if (!strip || !strip.dataset.full) return;
-            const list = window.__aiadFollowingList || [];
-            const mobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
-            if (mobile && list.length) {
-                strip.classList.add('aiad-following-chip');
-                strip.innerHTML = 'Following <b>' + list.length + '</b>';
-                strip.onclick = window.aiadOpenFollowingSheet;
-                strip.style.display = 'inline-flex';
-            } else {
-                strip.classList.remove('aiad-following-chip');
-                strip.innerHTML = strip.dataset.full;
-                strip.onclick = null;
-                strip.style.display = 'block';
-            }
+            if (!strip) return;
+            const n = window.__aiadFollowingCount;
+            if (n == null) return;
+            strip.className = 'aiad-people-pill';
+            strip.innerHTML = 'Following <b>' + n + '</b>';
+            strip.setAttribute('aria-label', 'Following, ' + n + (n === 1 ? ' artist' : ' artists'));
+            strip.onclick = function () { window.aiadOpenPeopleModal('following', strip); };
+            strip.style.display = 'inline-flex';
             if (window.aiadPaintSupporters) window.aiadPaintSupporters();
         };
 
-        // ── Supporters chip ───────────────────────────────────────────────────
-        // The other half of the pair: who follows THIS artist, from the same
-        // fan_support rows aiadSupportStats already reads for the ticker. On a phone
-        // it is the chip beside Following; on desktop it sits in the Following strip's
-        // header line. Either way it opens the same sheet Following uses.
-        window.__aiadSupportersList = null;   // null = not loaded yet
+        // ── Supporters pill ───────────────────────────────────────────────────
+        // The other half of the pair: who follows THIS artist, counted from the same
+        // fan_support rows aiadSupportStats already reads for the ticker.
+        window.__aiadSupportersIds   = null;
+        window.__aiadSupportersCount = null;
+        window.__aiadSupportersAmt   = {};
+
         window.aiadPaintSupporters = function () {
             const fl = document.getElementById('aiadFollowingStrip');
             if (!fl) return;
-            const list = window.__aiadSupportersList;
-            if (list == null) return;
+            const n = window.__aiadSupportersCount;
+            if (n == null) return;
             let el = document.getElementById('aiadSupportersStrip');
             if (!el) {
-                el = document.createElement('div');
+                el = document.createElement('button');
+                el.type = 'button';
                 el.id = 'aiadSupportersStrip';
-                el.className = 'aiad-following-chip';
-                el.setAttribute('role', 'button');
-                el.onclick = function () { window.aiadOpenSupportersSheet(); };
+                el.className = 'aiad-people-pill';
+                el.onclick = function () { window.aiadOpenPeopleModal('supporters', el); };
             }
-            el.innerHTML = 'Supporters <b>' + list.length + '</b>';
-            const mobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
-            const row = document.getElementById('aiadChipRow');
-            if (mobile && row) {
-                if (el.parentNode !== row) row.appendChild(el);
-                if (fl.parentNode === row && fl.nextElementSibling !== el) row.insertBefore(el, fl.nextSibling);
-            } else if (fl.style.display !== 'none' && fl.dataset.full && !fl.classList.contains('aiad-following-chip')) {
-                // Desktop: the first child of the full strip is the "Following · n" line.
-                const head = fl.firstElementChild;
-                if (head) {
-                    if (!head.classList.contains('aiad-following-head')) {
-                        head.classList.add('aiad-following-head');
-                    }
-                    if (el.parentNode !== head) head.appendChild(el);
-                }
-            } else if (el.parentNode !== fl.parentNode || fl.nextElementSibling !== el) {
-                // Nothing to follow yet: the chip stands alone after the strip.
+            el.innerHTML = 'Supporters <b>' + n + '</b>';
+            el.setAttribute('aria-label', 'Supporters, ' + n + (n === 1 ? ' person' : ' people'));
+            if (el.parentNode !== fl.parentNode || fl.nextElementSibling !== el) {
                 fl.parentNode.insertBefore(el, fl.nextSibling);
             }
             el.style.display = 'inline-flex';
+            if (window.aiadLayoutChipRow) window.aiadLayoutChipRow();
         };
 
+        // Count only. The names and avatars behind it are fetched when the modal opens.
         window.aiadLoadSupporters = async function (uid) {
             try {
                 const st = await window.aiadSupportStats(uid);
                 const rows = (st && st.rows) || [];
-                const ids = [...new Set(rows.map((r) => r.fan_id).filter(Boolean))];
-                const amt = {}; rows.forEach((r) => { if (r.fan_id) amt[r.fan_id] = Math.max(amt[r.fan_id] || 0, r.amount || 0); });
-                let names = {}, artists = {};
-                if (ids.length) {
-                    // A supporter may be a fan with only a profiles row, or an artist too.
-                    const [pr, ap] = await Promise.all([
-                        db.from('profiles').select('id,username').in('id', ids),
-                        db.from('artist_profiles').select('user_id,artist_name,username').in('user_id', ids)
-                    ]);
-                    (pr.data || []).forEach((r) => { names[r.id] = r.username || ''; });
-                    (ap.data || []).forEach((a) => { artists[a.user_id] = true; if (a.artist_name || a.username) names[a.user_id] = a.artist_name || a.username; });
-                }
-                const avs = ids.length ? await window.aiadAvatarsFor(ids).catch(() => ({})) : {};
-                window.__aiadSupportersList = ids.map(function (id) {
-                    return { id: id, name: names[id] || 'Supporter', avatar: avs[id] || '', amount: amt[id] || 0, artist: !!artists[id] };
-                });
+                const amt = {};
+                rows.forEach((r) => { if (r.fan_id) amt[r.fan_id] = Math.max(amt[r.fan_id] || 0, r.amount || 0); });
+                window.__aiadSupportersAmt = amt;
+                window.__aiadSupportersIds = [...new Set(rows.map((r) => r.fan_id).filter(Boolean))];
+                window.__aiadSupportersCount = window.__aiadSupportersIds.length;
             } catch (err) {
                 console.warn('[AIAD] supporters:', err && err.message);
-                if (window.__aiadSupportersList == null) window.__aiadSupportersList = [];
+                if (window.__aiadSupportersCount == null) {
+                    window.__aiadSupportersIds = []; window.__aiadSupportersCount = 0;
+                }
             }
             window.aiadPaintSupporters();
         };
 
-        // One sheet for both lists. A row opens the artist page when the person has
-        // one; a fan-only supporter is listed but not a link.
-        window.aiadOpenPeopleSheet = function (label, list, emptyText) {
-            const e = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-            const ov = document.createElement('div');
-            ov.className = 'aiad-follow-sheet';
-            ov.innerHTML = '<div class="aiad-follow-sheet-inner" role="dialog" aria-label="' + e(label) + '">'
-                + '<div class="aiad-follow-sheet-head"><span>' + e(label) + ' \u00b7 ' + list.length + '</span>'
-                + '<button type="button" class="aiad-follow-sheet-x" aria-label="Close">&times;</button></div>'
-                + (list.length ? list.map(function (a) {
-                    const pic = (a.avatar && (a.avatar.indexOf('http') === 0 || a.avatar.indexOf('data:') === 0))
-                        ? '<img src="' + e(a.avatar) + '" alt="">'
-                        : '<div class="ph"></div>';
-                    const link = a.artist !== false;
-                    return '<div class="aiad-follow-sheet-row"' + (link ? ' data-id="' + e(a.id) + '"' : ' style="cursor:default;"') + '>' + pic
-                        + '<div style="min-width:0;"><div style="font-size:0.9rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + e(a.name) + '</div>'
-                        + (a.amount > 0 ? '<div style="font-size:0.68rem;color:var(--teal-light);">$' + a.amount + '/mo</div>' : '')
-                        + '</div></div>';
-                }).join('') : '<div style="font-size:0.85rem;color:var(--text-muted);padding:8px 4px 4px;">' + e(emptyText || 'Nobody yet.') + '</div>')
-                + '</div>';
-            const close = function () { ov.remove(); };
-            ov.addEventListener('click', function (ev) {
-                if (ev.target === ov || ev.target.closest('.aiad-follow-sheet-x')) { close(); return; }
-                const row = ev.target.closest('.aiad-follow-sheet-row');
-                if (row && row.dataset.id && window.loadArtistPage) { close(); window.loadArtistPage(row.dataset.id); }
+        // ── People modal ──────────────────────────────────────────────────────
+        // One modal for both pills, built on the app's own .modal-overlay /
+        // .modal-content pattern rather than a second overlay system. A row opens the
+        // artist page through loadArtistPage, exactly as the old avatars did; a
+        // fan-only supporter is listed but is not a link.
+        const _peopleEsc = (v) => String(v == null ? '' : v)
+            .replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+        // The same two queries the strip ran on load, moved to the point of use.
+        window.aiadFetchPeople = async function (kind) {
+            const ids = (kind === 'following' ? window.__aiadFollowingIds : window.__aiadSupportersIds) || [];
+            if (!ids.length) return [];
+            const amt = (kind === 'following' ? window.__aiadFollowingAmt : window.__aiadSupportersAmt) || {};
+            const names = {}, handles = {}, artists = {};
+            if (kind === 'following') {
+                const ap = await db.from('artist_profiles').select('user_id,artist_name,username').in('user_id', ids);
+                if (ap.error) throw new Error(ap.error.message);
+                (ap.data || []).forEach((a) => {
+                    artists[a.user_id] = true;
+                    names[a.user_id] = a.artist_name || a.username || '';
+                    handles[a.user_id] = a.username || '';
+                });
+            } else {
+                // A supporter may be a fan with only a profiles row, or an artist too.
+                const [pr, ap] = await Promise.all([
+                    db.from('profiles').select('id,username').in('id', ids),
+                    db.from('artist_profiles').select('user_id,artist_name,username').in('user_id', ids),
+                ]);
+                if (pr.error) throw new Error(pr.error.message);
+                if (ap.error) throw new Error(ap.error.message);
+                (pr.data || []).forEach((r) => { names[r.id] = r.username || ''; handles[r.id] = r.username || ''; });
+                (ap.data || []).forEach((a) => {
+                    artists[a.user_id] = true;
+                    if (a.artist_name || a.username) names[a.user_id] = a.artist_name || a.username;
+                    if (a.username) handles[a.user_id] = a.username;
+                });
+            }
+            const avs = await window.aiadAvatarsFor(ids).catch(() => ({}));
+            return ids.map(function (id) {
+                return {
+                    id: id,
+                    name: names[id] || (kind === 'following' ? 'Artist' : 'Supporter'),
+                    handle: handles[id] || '',
+                    avatar: avs[id] || '',
+                    amount: amt[id] || 0,
+                    artist: !!artists[id],
+                };
             });
-            document.body.appendChild(ov);
         };
 
-        window.aiadOpenFollowingSheet = function () {
-            const list = window.__aiadFollowingList || [];
-            if (!list.length) return;
-            window.aiadOpenPeopleSheet('Following', list);
-        };
-        window.aiadOpenSupportersSheet = function () {
-            window.aiadOpenPeopleSheet('Supporters', window.__aiadSupportersList || [], 'No supporters yet \u2014 share your page to change that.');
+        let _peopleModal = null, _peopleReturn = null;
+
+        function peopleRowsHtml(kind, list) {
+            if (!list.length) {
+                return '<div class="aiad-people-empty">'
+                    + (kind === 'following' ? 'Not following anyone yet.' : 'No supporters yet.')
+                    + '</div>';
+            }
+            return list.map(function (a) {
+                const av = a.avatar;
+                const pic = (av && (av.indexOf('http') === 0 || av.indexOf('data:') === 0))
+                    ? '<img class="aiad-people-av" src="' + _peopleEsc(av) + '" alt="">'
+                    // Same initial-letter fallback circle the avatar row drew.
+                    : '<span class="aiad-people-av is-ph">' + _peopleEsc(String(a.name).slice(0, 1).toUpperCase()) + '</span>';
+                const sub = [a.handle ? '@' + a.handle : (a.artist ? 'Artist' : 'Supporter'),
+                             a.amount > 0 ? '$' + a.amount + '/mo' : ''].filter(Boolean).join(' · ');
+                // The name sits alone in a leaf element so decorateBadges() can still
+                // hang the verified check on it.
+                return '<button type="button" class="aiad-people-row"' + (a.artist ? ' data-id="' + _peopleEsc(a.id) + '"' : ' disabled')
+                    + ' aria-label="' + _peopleEsc(a.name) + '">' + pic
+                    + '<span class="aiad-people-txt"><span class="aiad-people-name">' + _peopleEsc(a.name) + '</span>'
+                    + '<span class="aiad-people-sub">' + _peopleEsc(sub) + '</span></span></button>';
+            }).join('');
+        }
+
+        window.aiadOpenPeopleModal = function (kind, opener) {
+            const label = kind === 'following' ? 'Following' : 'Supporters';
+            const count = (kind === 'following' ? window.__aiadFollowingCount : window.__aiadSupportersCount) || 0;
+            _peopleReturn = opener || document.activeElement;
+
+            const ov = document.createElement('div');
+            _peopleModal = ov;
+            ov.className = 'modal-overlay aiad-people-modal active';
+            ov.innerHTML = '<div class="modal-content" role="dialog" aria-modal="true" aria-label="' + _peopleEsc(label) + '">'
+                + '<button type="button" class="modal-close" aria-label="Close">&times;</button>'
+                + '<div class="modal-body">'
+                + '<div class="aiad-people-head"><h2>' + _peopleEsc(label) + '</h2><span>' + count + '</span></div>'
+                + '<div class="aiad-people-list"><div class="aiad-people-empty">Loading…</div></div>'
+                + '</div></div>';
+
+            const listEl = ov.querySelector('.aiad-people-list');
+            const close = function () {
+                if (_peopleModal !== ov) return;
+                document.removeEventListener('keydown', onKey, true);
+                ov.remove();
+                _peopleModal = null;
+                if (_peopleReturn && typeof _peopleReturn.focus === 'function') {
+                    try { _peopleReturn.focus(); } catch (e) {}
+                }
+                _peopleReturn = null;
+            };
+            const onKey = function (ev) {
+                if (ev.key === 'Escape') { ev.preventDefault(); close(); return; }
+                if (ev.key !== 'Tab') return;
+                const f = [...ov.querySelectorAll('button:not([disabled]),a[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')]
+                    .filter((el) => el.offsetParent !== null);
+                if (!f.length) return;
+                const first = f[0], last = f[f.length - 1];
+                if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus(); }
+                else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
+            };
+            ov.addEventListener('click', function (ev) {
+                if (ev.target === ov || ev.target.closest('.modal-close')) { close(); return; }
+                if (ev.target.closest('.aiad-people-retry')) { load(); return; }
+                const row = ev.target.closest('.aiad-people-row');
+                if (row && row.dataset.id && window.loadArtistPage) { close(); window.loadArtistPage(row.dataset.id); }
+            });
+            document.addEventListener('keydown', onKey, true);
+            document.body.appendChild(ov);
+            const x = ov.querySelector('.modal-close');
+            if (x) setTimeout(function () { try { x.focus(); } catch (e) {} }, 0);
+
+            function load() {
+                listEl.innerHTML = '<div class="aiad-people-empty">Loading…</div>';
+                window.aiadFetchPeople(kind).then(function (list) {
+                    if (_peopleModal !== ov) return;
+                    listEl.innerHTML = peopleRowsHtml(kind, list);
+                    // Keep the verified checks the avatar row used to show.
+                    try { window.aiadDecorateBadges && window.aiadDecorateBadges(listEl); } catch (e) {}
+                }).catch(function (err) {
+                    if (_peopleModal !== ov) return;
+                    console.error('[AIAD] people modal:', err);
+                    listEl.innerHTML = '<div class="aiad-people-empty is-warn">Could not load this list. '
+                        + '<button type="button" class="aiad-people-retry">Retry</button></div>';
+                });
+            }
+            load();
         };
 
         window.addEventListener('resize', function () {
@@ -27630,48 +27705,20 @@ async function loadFanDiscover() { setTimeout(()=>_execDiscoverSearch(),100); }
             if (strip.dataset.loading === '1') return;
             if (!force && strip.dataset.loadedFor === uid) return;
             strip.dataset.loading = '1';
-            // The other chip loads in parallel from the ticker's own source.
+            // The other pill loads in parallel from the ticker's own source.
             window.aiadLoadSupporters(uid);
             try {
                 const { data: fs } = await db.from('fan_support').select('artist_id,amount').eq('fan_id', uid);
                 const rows = Array.isArray(fs) ? fs : [];
                 const ids = [...new Set(rows.map((r) => r.artist_id).filter(Boolean))];
                 strip.dataset.loadedFor = uid;
-                if (!ids.length) {
-                    strip.innerHTML = '<div style="font-size:0.78rem;color:var(--text-muted);">You are not following anyone yet — search above to find artists.</div>';
-                    strip.style.display = 'block';
-                    if (window.aiadPaintSupporters) window.aiadPaintSupporters();
-                    return;
-                }
-                let names = {};
-                try {
-                    const { data: aps } = await db.from('artist_profiles').select('user_id,artist_name,username').in('user_id', ids);
-                    (aps || []).forEach((a) => { names[a.user_id] = a.artist_name || a.username || ''; });
-                } catch (e) {}
-                const avs = await window.aiadAvatarsFor(ids).catch(() => ({}));
-                const amt = {}; rows.forEach((r) => { amt[r.artist_id] = Math.max(amt[r.artist_id] || 0, r.amount || 0); });
-                const e = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-                const chips = ids.map((id) => {
-                    const nm = names[id] || 'Artist';
-                    const av = avs[id] || '';
-                    const pic = (av && (av.indexOf('http') === 0 || av.indexOf('data:') === 0))
-                        ? '<img src="' + e(av) + '" style="width:44px;height:44px;border-radius:50%;object-fit:cover;">'
-                        : '<div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#0d2f3f,#1a4a5e);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--teal-light);">' + e(nm.slice(0, 1).toUpperCase()) + '</div>';
-                    const tag = amt[id] > 0 ? '<div style="font-size:0.64rem;color:var(--teal-light);">$' + amt[id] + '/mo</div>' : '';
-                    return '<div onclick="loadArtistPage(\'' + e(id) + '\')" title="' + e(nm) + '" style="flex:0 0 auto;width:64px;text-align:center;cursor:pointer;">'
-                        + pic
-                        + '<div style="font-size:0.68rem;margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + e(nm) + '</div>'
-                        + tag + '</div>';
-                }).join('');
-                const _full = '<div style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Following \u00b7 ' + ids.length + '</div>'
-                    + '<div style="display:flex;gap:14px;overflow-x:auto;padding-bottom:4px;">' + chips + '</div>';
-                // The avatar row is a phone-screen's worth of chrome above the thing the
-                // artist actually came to use. On mobile it becomes a count you can tap;
-                // the row itself moves into a sheet, unchanged.
-                strip.dataset.full = _full;
-                window.__aiadFollowingList = ids.map(function (id) {
-                    return { id: id, name: names[id] || 'Artist', avatar: avs[id] || '', amount: amt[id] || 0 };
-                });
+                // Count only. The names and avatars the old row drew are fetched by
+                // the modal, from the same two queries, when someone opens it.
+                const amt = {};
+                rows.forEach((r) => { amt[r.artist_id] = Math.max(amt[r.artist_id] || 0, r.amount || 0); });
+                window.__aiadFollowingAmt = amt;
+                window.__aiadFollowingIds = ids;
+                window.__aiadFollowingCount = ids.length;
                 window.aiadPaintFollowing();
                 if (window.aiadLayoutChipRow) window.aiadLayoutChipRow();
             } catch (err) {
@@ -27699,9 +27746,11 @@ async function loadFanDiscover() { setTimeout(()=>_execDiscoverSearch(),100); }
                 xb.onclick = function () { window.aiadToggleSearch(false); };
                 bar.appendChild(xb);
 
-                const strip = document.createElement('div');
+                const strip = document.createElement('button');
+                strip.type = 'button';
                 strip.id = 'aiadFollowingStrip';
-                strip.style.cssText = 'display:none;margin:0 0 20px;padding:14px 16px;background:var(--bg-card);border:1px solid var(--border-default);border-radius:12px;';
+                strip.className = 'aiad-people-pill';
+                strip.style.display = 'none';
                 bar.parentNode.insertBefore(strip, bar.nextSibling);
                 const acctW = document.getElementById('acctMenuWrap');
                 if (acctW) { acctW.style.display='block'; acctW.style.position='relative'; acctW.style.top='auto'; acctW.style.right='auto'; acctW.style.height='auto'; acctW.style.marginLeft='auto'; acctW.style.flexShrink='0'; bar.appendChild(acctW); }
@@ -40852,31 +40901,10 @@ window.AIAD_PROMPTS = [
   .aiad-founding-strip.is-open > span:not(.fs-count) { display: block; flex: 1 0 100%; }
   .aiad-founding-strip.is-open::after { transform: rotate(-135deg); }
 
-  /* Following becomes a chip; the avatars move into a sheet. */
-  #aiadFollowingStrip.aiad-following-chip {
-    display: inline-flex !important; align-items: center; gap: 8px;
-    /* .dash-main is a flex column here, so a stretched item would fill the width and
-       stop being a chip. */
-    align-self: flex-start; width: auto; flex: 0 0 auto;
-    padding: 7px 14px !important; margin: 0 0 12px !important;
-    border-radius: 999px !important; cursor: pointer;
-    font-size: 0.76rem; color: var(--text-secondary);
-  }
-
-  /* Founding pill and Following chip share one row; nothing else sits between the
-     header and the content. */
-  #aiadChipRow {
-    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-    margin: 10px 0 12px; flex: 0 0 auto;
-  }
-  /* The chip sets its own margin and align-self for the standalone case; inside the
-     row it is one of two pills that have to line up. Addressed by id because the chip's
-     own margin is !important, and a bottom margin under align-items:center pushes it off
-     the shared baseline. */
-  #aiadChipRow > *,
-  #aiadChipRow > #aiadFollowingStrip,
-  #aiadChipRow > #aiadSupportersStrip,
-  #aiadChipRow > #aiadFoundingStrip { margin: 0 !important; align-self: center !important; }
+  /* Founding joins the two pills on a phone, and the three must not wrap off the
+     edge of a 375px screen. */
+  #aiadChipRow { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  #aiadChipRow::-webkit-scrollbar { display: none; }
 
   /* Founding drops to a pill on that row rather than its own full-width bar. */
   .aiad-founding-strip {
@@ -40923,47 +40951,77 @@ window.AIAD_PROMPTS = [
 .aiad-search-icon, .aiad-search-close { display: none; }
 @media (max-width: 768px) { .aiad-search-icon { display: flex; } .aiad-search-close { display: block; } }
 
-/* The Following / Supporters pair. Following is a chip only on a phone (the desktop
-   strip is the avatar row); Supporters is a chip at every width, so its look is keyed
-   on the class rather than the media query. */
-.aiad-following-chip b {
-  color: var(--text-primary); font-weight: 700; font-variant-numeric: tabular-nums;
-}
+/* The Following / Supporters pair — one pill style at every width. The Supporters
+   look was the one that already read right, so its declarations are what both pills
+   use; the id keeps matching so nothing about that pill changes. Both are buttons
+   now, hence the control reset and the 44px tap target. */
+.aiad-people-pill,
 #aiadSupportersStrip {
   display: inline-flex; align-items: center; gap: 8px; align-self: flex-start;
   width: auto; flex: 0 0 auto; padding: 7px 14px; margin: 0;
   background: var(--bg-card); border: 1px solid var(--border-default);
   border-radius: 999px; cursor: pointer; font-size: 0.76rem; color: var(--text-secondary);
   text-transform: none; letter-spacing: normal;
+  appearance: none; -webkit-appearance: none; font-family: var(--font-body);
+  min-height: 44px; white-space: nowrap; line-height: 1;
 }
-.aiad-following-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.aiad-following-head > #aiadSupportersStrip { margin: -6px 0; }
+.aiad-people-pill:hover, #aiadSupportersStrip:hover { border-color: var(--border-hover); color: var(--text-primary); }
+.aiad-people-pill b {
+  color: var(--text-primary); font-weight: 700; font-variant-numeric: tabular-nums;
+}
 
-/* Following sheet — mobile only, but the rules are harmless anywhere. */
-.aiad-follow-sheet {
-  position: fixed; inset: 0; z-index: 100050; background: rgba(0,0,0,0.6);
-  display: flex; align-items: flex-end;
+/* Both pills share one row at every width. */
+#aiadChipRow {
+  display: flex; align-items: center; gap: 8px; flex-wrap: nowrap;
+  margin: 10px 0 12px; flex: 0 0 auto;
 }
-.aiad-follow-sheet-inner {
-  width: 100%; max-height: 72vh; overflow-y: auto;
-  background: var(--bg-card); border-top-left-radius: 18px; border-top-right-radius: 18px;
-  padding: 16px 16px 28px; border-top: 1px solid var(--border-default);
+#aiadChipRow > * { margin: 0 !important; align-self: center !important; }
+
+/* People modal — the app's .modal-overlay / .modal-content, scoped. */
+.aiad-people-modal .modal-content { max-width: 420px; width: 92vw; }
+.aiad-people-modal .modal-body { padding: 20px; }
+.aiad-people-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 14px; }
+.aiad-people-head h2 { margin: 0; font-size: 1.05rem; font-weight: 700; }
+.aiad-people-head span { font-size: 0.85rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.aiad-people-list { max-height: 70vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.aiad-people-row {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  padding: 8px 4px; background: none; border: 0; border-radius: 10px; cursor: pointer;
+  font-family: var(--font-body); color: inherit; min-height: 56px;
 }
-.aiad-follow-sheet-head {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 14px; font-size: 0.72rem; letter-spacing: 0.1em;
-  text-transform: uppercase; color: var(--text-muted);
+.aiad-people-row:hover:not([disabled]) { background: var(--bg-secondary); }
+.aiad-people-row[disabled] { cursor: default; opacity: 1; }
+.aiad-people-av {
+  width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0;
+  background: var(--bg-secondary); display: flex; align-items: center; justify-content: center;
 }
-.aiad-follow-sheet-x {
-  background: none; border: none; color: var(--text-secondary);
-  font-size: 1.4rem; line-height: 1; cursor: pointer; padding: 0 4px;
+.aiad-people-av.is-ph {
+  background: linear-gradient(135deg,#0d2f3f,#1a4a5e); color: var(--teal-light); font-weight: 700;
 }
-.aiad-follow-sheet-row {
-  display: flex; align-items: center; gap: 12px; padding: 10px 4px; cursor: pointer;
+.aiad-people-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.aiad-people-name {
+  font-size: 0.9rem; color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.aiad-follow-sheet-row img, .aiad-follow-sheet-row .ph {
-  width: 40px; height: 40px; border-radius: 50%; object-fit: cover;
-  flex-shrink: 0; background: var(--bg-secondary);
+.aiad-people-sub {
+  font-size: 0.72rem; color: var(--text-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.aiad-people-empty { font-size: 0.85rem; color: var(--text-muted); padding: 14px 4px; }
+.aiad-people-empty.is-warn { color: #f59e0b; }
+.aiad-people-retry {
+  appearance: none; cursor: pointer; background: none; border: 1px solid currentColor;
+  border-radius: 8px; margin-left: 8px; padding: 5px 12px;
+  font-family: var(--font-body); font-size: 0.75rem; color: inherit;
+}
+/* The app already opens sheets from the bottom on a phone; this follows that. */
+@media (max-width: 768px) {
+  .aiad-people-modal { align-items: flex-end; }
+  .aiad-people-modal .modal-content {
+    width: 100%; max-width: none; max-height: 86vh;
+    border-radius: 18px 18px 0 0;
+  }
+  .aiad-people-list { max-height: 66vh; }
 }
 
 </style>
