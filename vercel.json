@@ -19,15 +19,15 @@
     },
     {
       "source": "/artist/:username",
-      "destination": "/artist"
+      "destination": "/api/og?kind=artist&slug=:username"
     },
     {
       "source": "/store/:username",
-      "destination": "/store"
+      "destination": "/api/og?kind=store&slug=:username"
     },
     {
       "source": "/post/:id",
-      "destination": "/post"
+      "destination": "/api/og?kind=post&slug=:id"
     },
     {
       "source": "/admin",
@@ -55,6 +55,9 @@
     },
     "api/render.js": {
       "includeFiles": "node_modules/ffmpeg-static/**"
+    },
+    "api/og.js": {
+      "includeFiles": "{store.html,artist.html,post.html}"
     }
   }
 }
