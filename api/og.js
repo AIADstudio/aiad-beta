@@ -19,7 +19,9 @@ import { fileURLToPath } from 'node:url';
 const SUPABASE_URL = 'https://uapiytquwuhtewqieegx.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhcGl5dHF1d3VodGV3cWllZWd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NzcwMTksImV4cCI6MjA4OTI1MzAxOX0.BLs2RdStghm0_cF8t70cBTX1GWcowGRwID7TAG8Mg38';
 
-const SITE = 'https://aiad.studio';
+// The canonical host: the apex 308s to www, and a crawler that will not follow a
+// redirect on og:image would render the fallback icon as nothing at all.
+const SITE = 'https://www.aiad.studio';
 const FALLBACK_IMAGE = SITE + '/icon-512.png';
 const TIMEOUT_MS = 3000;
 const MAX_DESC = 160;
