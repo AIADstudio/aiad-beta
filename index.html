@@ -5686,8 +5686,9 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                          until something is pending. -->
                     <div id="storeStagedPanel" style="display:none;margin-bottom:18px;"></div>
 
-                    <div id="storeCatTabs" style="display:none;gap:6px;overflow-x:auto;padding-bottom:2px;margin-bottom:14px;-webkit-overflow-scrolling:touch;"></div>
-                    <div id="storeProductsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;"></div>
+                    <!-- Header, category filter and tiles are all drawn by
+                         aiadStoreGrid(), the one renderer every store surface uses. -->
+                    <div id="storeProductsGrid"></div>
 
                     <div style="margin-top:28px;">
                         <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:12px;">Recent sales</div>
@@ -20643,7 +20644,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         }
 
         // The mockup names the artist picks are not the store's category names, so
-        // map onto STORE_CATEGORIES exactly — the product editor requires a category
+        // map onto the product editor's category list exactly — it requires a category
         // and would reject a row that carried a mockup label or a null.
         function merchCategoryFor(product) {
             var p = String(product || '');
@@ -26278,11 +26279,13 @@ document.addEventListener('keydown', function(e) {
         thinking.textContent = reply;
         // Cards are built server-side from rows a search actually returned, so what
         // renders here can only be a real product — the provenance gate, client side.
-        if (products && products.length && window.renderStorefrontCard) {
+        if (products && products.length && window.aiadStoreGrid) {
             const wrap = document.createElement('div');
-            wrap.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:8px 0 4px;';
-            wrap.innerHTML = products.map(window.renderStorefrontCard).join('');
             msgs.appendChild(wrap);
+            // narrow: the agent column is ~320px, so the viewport-width column
+            // counts would shrink these tiles past legibility. No header either \u2014
+            // these are answers to a question, not the artist's whole shop.
+            window.aiadStoreGrid(wrap, products, { editable: false, header: false, narrow: true });
         }
     } catch(e) {
         thinking.textContent = (e && e.message) ? e.message : 'Connection error — try again.';
@@ -34327,9 +34330,9 @@ Be direct and concrete with real industry insight — never generic filler. When
     async function loadStoreManager() {
         const grid = document.getElementById('storeProductsGrid');
         if (!grid) return;
-        grid.innerHTML = '<div style="grid-column:1/-1;color:var(--text-muted);font-size:0.85rem;padding:20px;text-align:center;">Loading your products…</div>';
+        storeNote(grid, 'Loading your products…');
         const me = await uid();
-        if (!me) { grid.innerHTML = '<div style="grid-column:1/-1;color:var(--text-muted);font-size:0.85rem;padding:20px;text-align:center;">Sign in to manage your store.</div>'; return; }
+        if (!me) { storeNote(grid, 'Sign in to manage your store.'); return; }
         try {
             const [{ data: prof }, { data: ap }] = await Promise.all([
                 window.db.from('profiles').select('username').eq('id', me).maybeSingle(),
@@ -34344,75 +34347,373 @@ Be direct and concrete with real industry insight — never generic filler. When
         const { data, error } = await window.db.from('products')
             .select('*').eq('artist_id', me).order('created_at', { ascending: false });
         if (error) {
-            grid.innerHTML = '<div style="grid-column:1/-1;color:#f59e0b;font-size:0.85rem;padding:20px;text-align:center;">Could not load products: ' + esc(error.message) + '</div>';
+            console.error('[store] could not load products', error);
+            storeNote(grid, 'Could not load your products \u2014 ' + esc(error.message)
+                + ' <button type="button" class="aiad-store-retry" onclick="loadStoreManager()">Retry</button>', 'is-warn');
             return;
         }
         window._storeProducts = data || [];
-        if (!window._storeCatFilter) window._storeCatFilter = 'all';
-        renderStoreCatTabs();
-        renderStoreGrid();
+        window.aiadStoreGrid(grid, window._storeProducts, {
+            editable: true,
+            empty: 'Add your first one \u2014 a beat pack, a track, a shirt.',
+        });
 
         renderOnboardBanner();
         loadRecentSales(me);
         loadStagedChanges();
     }
 
-    const STORE_CATEGORIES = ['T-Shirts','Hoodies & Sweats','Hats & Beanies','Jackets & Outerwear','Bottoms','Footwear','Accessories','Luxury','Basics','Vinyl & Music','Digital','Other'];
-    function renderStoreCatTabs() {
-        const bar = document.getElementById('storeCatTabs');
-        if (!bar) return;
-        const rows = window._storeProducts || [];
-        const present = STORE_CATEGORIES.filter(c => rows.some(p => (p.category || '') === c));
-        if (!rows.length || present.length < 1) { bar.style.display = 'none'; bar.innerHTML = ''; return; }
-        bar.style.display = 'flex';
-        const cur = window._storeCatFilter || 'all';
-        const tab = (val, label, count) => {
-            const active = cur === val;
-            return '<button onclick="setStoreCatFilter(this.dataset.v)" data-v="' + esc(val) + '" '
-              + 'style="flex:0 0 auto;height:36px;padding:0 16px;border-radius:8px;border:1px solid '
-              + (active ? 'var(--teal)' : 'var(--border-default)') + ';background:' + (active ? 'rgba(0,212,255,0.12)' : 'var(--bg-secondary)')
-              + ';color:' + (active ? 'var(--teal-light)' : 'var(--text-secondary)') + ';font-size:0.8rem;font-weight:600;white-space:nowrap;cursor:pointer;font-family:var(--font-body);">'
-              + esc(label) + ' <span style="opacity:.55;">' + count + '</span></button>';
+    // ── Shared product grid ────────────────────────────────────────────────
+    // Every surface that lists products renders through here: the artist's own
+    // store manager (#storeProductsGrid), the public artist page storefront
+    // (#fanArtistStore) and the fan shopping agent's result strip. Artist-owned
+    // surfaces pass editable:true to keep the Edit/Delete affordance; nothing
+    // else differs, so the three surfaces cannot drift apart again.
+    //
+    // The tile itself is one button that opens the product drawer. Buying only
+    // ever happens from the drawer's CTA, which calls the same buyProduct() the
+    // old per-card Buy button did.
+
+    // Apparel colour names an artist actually types. Anything unrecognised is
+    // validated by the browser before it reaches CSS, so a listing can never
+    // inject a declaration through the colors jsonb.
+    const SWATCH_HEX = {
+        black: '#111111', white: '#FFFFFF', cream: '#F2EAD9', ivory: '#F5F1E6',
+        bone: '#E8E2D6', 'off white': '#EFEBE3', natural: '#E6DFD2', sand: '#D8C8AE',
+        tan: '#C79F6A', khaki: '#B5A277', beige: '#E4D8C4', camel: '#C19A6B',
+        brown: '#6B4A2F', chocolate: '#3E2A20', grey: '#8A8A8A', gray: '#8A8A8A',
+        'heather grey': '#B3B3B3', 'heather gray': '#B3B3B3', charcoal: '#36393B',
+        silver: '#C0C0C0', navy: '#1B2A4A', blue: '#2B5CB8', 'royal blue': '#2B4FCC',
+        'sky blue': '#7EC8E3', 'baby blue': '#A9CCE3', teal: '#1F7A8C',
+        green: '#2E6B3E', olive: '#6B6B3A', forest: '#1E4620', sage: '#A8B79A',
+        mint: '#BFE3D0', red: '#B4222B', burgundy: '#5C1A2B', maroon: '#5C1A2B',
+        wine: '#5C1A2B', pink: '#E8A0B4', 'hot pink': '#E8437F', purple: '#5B3A8C',
+        lilac: '#C3B1E1', lavender: '#CDB8E3', orange: '#D2692B', rust: '#9C4A26',
+        yellow: '#E3C04A', gold: '#C5A253', mustard: '#C9A227', lime: '#A8C93A',
+    };
+    let _colourProbe = null;
+    function swatchColor(name) {
+        const k = String(name == null ? '' : name).trim().toLowerCase();
+        if (!k) return '#B9B4AE';
+        if (SWATCH_HEX[k]) return SWATCH_HEX[k];
+        if (/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(k)) return k;
+        // Let the browser decide whether the raw word is a colour at all. An
+        // unknown word leaves style.color empty and falls through to neutral.
+        if (!_colourProbe) _colourProbe = document.createElement('span');
+        _colourProbe.style.color = '';
+        try { _colourProbe.style.color = k; } catch (e) {}
+        return _colourProbe.style.color ? k : '#B9B4AE';
+    }
+
+    // "$75", and "$74.50" only when there are cents to show.
+    function priceText(amt, cur) {
+        const n = Number(amt);
+        if (!Number.isFinite(n)) return '';
+        const whole = n % 1 === 0;
+        try {
+            return n.toLocaleString(undefined, {
+                style: 'currency', currency: (cur || 'usd').toUpperCase(),
+                minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2,
+            });
+        } catch (e) { return '$' + (whole ? String(n) : n.toFixed(2)); }
+    }
+
+    const prodImages = (p) => (Array.isArray(p.images) ? p.images.filter(Boolean)
+        : (p.image_url ? [p.image_url] : []));
+    const soldOut = (p) => p.inventory !== null && p.inventory !== undefined && Number(p.inventory) <= 0;
+    const listOf = (v) => (Array.isArray(v) ? v.filter((x) => x != null && String(x).trim() !== '') : []);
+
+    function storeNote(host, html, tone) {
+        host.classList.add('aiad-store');
+        host.removeAttribute('style');
+        host.innerHTML = '<div class="aiad-store-note' + (tone ? ' ' + tone : '') + '">' + html + '</div>';
+    }
+
+    function swatchesHtml(colors) {
+        const cols = listOf(colors);
+        if (!cols.length) return '';
+        const shown = cols.slice(0, 5);
+        const more = cols.length - shown.length;
+        return '<span class="aiad-store-swatches">'
+            + shown.map((c) => '<span class="aiad-store-swatch" style="background:' + swatchColor(c) + ';" title="' + esc(c) + '"></span>').join('')
+            + (more > 0 ? '<span class="aiad-store-swatch-more">+' + more + '</span>' : '')
+            + '</span>';
+    }
+
+    function storeTile(p, o) {
+        const imgs = prodImages(p);
+        const out  = soldOut(p);
+        const price = priceText(p.price, p.currency);
+        const label = p.name + ' — ' + (out ? 'sold out' : price) + '. Open product details.';
+        let pic = '<span class="aiad-store-pic' + (out ? ' is-out' : '') + '">';
+        if (imgs.length) {
+            pic += '<img class="aiad-store-img is-front" src="' + esc(imgs[0]) + '" alt="" loading="lazy" decoding="async">';
+            if (imgs[1]) pic += '<img class="aiad-store-img is-back" src="' + esc(imgs[1]) + '" alt="" loading="lazy" decoding="async">';
+        } else {
+            pic += '<span class="aiad-store-noimg"></span>';
+        }
+        pic += '<span class="aiad-store-quick" aria-hidden="true">Quick view</span></span>';
+
+        const hidden = (o.editable && p.is_active === false)
+            ? '<span class="aiad-store-flag">Hidden</span>' : '';
+
+        return '<div class="aiad-store-tile">'
+            + '<button type="button" class="aiad-store-hit" data-open="' + esc(p.id) + '" aria-label="' + esc(label) + '">'
+            + pic
+            + '<span class="aiad-store-meta">'
+            + '<span class="aiad-store-name">' + esc(p.name) + '</span>'
+            + (out ? '<span class="aiad-store-oos">Sold out</span>'
+                   : '<span class="aiad-store-price">' + esc(price) + '</span>')
+            + swatchesHtml(p.colors)
+            + '</span></button>'
+            + hidden
+            + (o.editable
+                ? '<div class="aiad-store-admin">'
+                  + '<button type="button" class="aiad-store-adminbtn" data-edit="' + esc(p.id) + '">Edit</button>'
+                  + '<button type="button" class="aiad-store-adminbtn" data-del="' + esc(p.id) + '">Delete</button>'
+                  + '</div>'
+                : '')
+            + '</div>';
+    }
+
+    function paintStore(host) {
+        const st = host._aiadStore;
+        if (!st) return;
+        const o = st.opts, rows = st.rows;
+        const cats = [];
+        rows.forEach((p) => {
+            const c = String(p.category == null ? '' : p.category).trim();
+            if (c && cats.indexOf(c) === -1) cats.push(c);
+        });
+        if (st.filter !== 'all' && cats.indexOf(st.filter) === -1) st.filter = 'all';
+        const shown = st.filter === 'all'
+            ? rows : rows.filter((p) => String(p.category == null ? '' : p.category).trim() === st.filter);
+
+        let html = '';
+        if (o.header !== false) {
+            html += '<div class="aiad-store-head">'
+                 +  '<span class="aiad-store-eyebrow">' + esc(o.title || 'Shop') + '</span>'
+                 +  '<span class="aiad-store-count">' + rows.length + (rows.length === 1 ? ' item' : ' items') + '</span>'
+                 +  '</div>';
+            // One category is no choice at all, so the row only earns its space at two.
+            if (cats.length >= 2) {
+                const chip = (v, lbl) => '<button type="button" class="aiad-store-filter'
+                    + (st.filter === v ? ' is-on' : '') + '" data-cat="' + esc(v) + '"'
+                    + (st.filter === v ? ' aria-current="true"' : '') + '>' + esc(lbl) + '</button>';
+                html += '<div class="aiad-store-filters">'
+                     +  [chip('all', 'All')].concat(cats.map((c) => chip(c, c)))
+                            .join('<span class="aiad-store-sep" aria-hidden="true">·</span>')
+                     +  '</div>';
+            }
+        }
+        html += shown.length
+            ? '<div class="aiad-store-grid">' + shown.map((p) => storeTile(p, o)).join('') + '</div>'
+            : '<div class="aiad-store-note">' + esc(st.filter === 'all'
+                ? (o.empty || 'Nothing in the shop yet.')
+                : 'Nothing in this category.') + '</div>';
+        host.innerHTML = html;
+    }
+
+    window.aiadStoreGrid = function (container, products, opts) {
+        const host = typeof container === 'string' ? document.getElementById(container) : container;
+        if (!host) return;
+        const o = opts || {};
+        host.classList.add('aiad-store');
+        if (o.narrow) host.classList.add('aiad-store--narrow');
+        host.removeAttribute('style');
+        const prev = host._aiadStore;
+        host._aiadStore = {
+            rows: Array.isArray(products) ? products.slice() : [],
+            opts: o,
+            filter: (prev && prev.filter) || 'all',
         };
-        let html = tab('all', 'All', rows.length);
-        present.forEach(c => { html += tab(c, c, rows.filter(p => (p.category || '') === c).length); });
-        bar.innerHTML = html;
+        if (!host._aiadBound) {
+            host._aiadBound = true;
+            host.addEventListener('click', function (ev) {
+                const cat = ev.target.closest('[data-cat]');
+                if (cat && host.contains(cat)) {
+                    host._aiadStore.filter = cat.getAttribute('data-cat');
+                    paintStore(host);
+                    return;
+                }
+                const ed = ev.target.closest('[data-edit]');
+                if (ed && host.contains(ed)) { window.openProductEditor(ed.getAttribute('data-edit')); return; }
+                const del = ev.target.closest('[data-del]');
+                if (del && host.contains(del)) { window.deleteProduct(del.getAttribute('data-del')); return; }
+                const hit = ev.target.closest('[data-open]');
+                if (hit && host.contains(hit)) {
+                    const id = hit.getAttribute('data-open');
+                    const row = (host._aiadStore.rows || []).find((p) => String(p.id) === String(id));
+                    if (row) openProductDrawer(row, host._aiadStore.opts);
+                }
+            });
+        }
+        paintStore(host);
+    };
+
+    // ── Product drawer ─────────────────────────────────────────────────────
+    // Right-side panel on desktop, bottom sheet on mobile. It owns the only Buy
+    // button in the store; the handler and its signature are untouched.
+    let _dw = null, _dwReturn = null, _dwState = null;
+
+    function drawerRoot() {
+        if (_dw) return _dw;
+        const d = document.createElement('div');
+        d.className = 'aiad-pdrawer';
+        d.setAttribute('role', 'dialog');
+        d.setAttribute('aria-modal', 'true');
+        d.setAttribute('aria-label', 'Product details');
+        d.innerHTML = '<div class="aiad-pdrawer-scrim" data-dwclose="1"></div>'
+            + '<div class="aiad-pdrawer-panel">'
+            + '<span class="aiad-pdrawer-grab" aria-hidden="true"></span>'
+            + '<button type="button" class="aiad-pdrawer-x" data-dwclose="1" aria-label="Close">&times;</button>'
+            + '<div class="aiad-pdrawer-body"></div></div>';
+        document.body.appendChild(d);
+
+        d.addEventListener('click', function (ev) {
+            if (ev.target.closest('[data-dwclose]')) { closeProductDrawer(); return; }
+            if (!_dwState) return;
+            const sz = ev.target.closest('[data-size]');
+            if (sz) { _dwState.size = sz.getAttribute('data-size'); paintDrawer(); return; }
+            const cl = ev.target.closest('[data-color]');
+            if (cl) { _dwState.color = cl.getAttribute('data-color'); paintDrawer(); return; }
+            const th = ev.target.closest('[data-thumb]');
+            if (th) {
+                const track = d.querySelector('.aiad-pdrawer-track');
+                const i = Number(th.getAttribute('data-thumb')) || 0;
+                if (track && track.children[i]) {
+                    track.scrollTo({ left: track.children[i].offsetLeft - track.offsetLeft, behavior: 'smooth' });
+                }
+                _dwState.shot = i;
+                d.querySelectorAll('[data-thumb]').forEach((t, j) => t.classList.toggle('is-on', j === i));
+                return;
+            }
+            const buy = ev.target.closest('[data-buy]');
+            if (buy && !buy.disabled) {
+                // Same call the old per-card Buy button made. store-checkout takes
+                // product_id and quantity only, so the chosen size/colour has
+                // nowhere to go — the handler's signature is left alone.
+                window.buyProduct(buy.getAttribute('data-buy'), 1);
+            }
+        });
+
+        // Esc closes; Tab stays inside the panel while it is open.
+        d.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Escape') { ev.stopPropagation(); closeProductDrawer(); return; }
+            if (ev.key !== 'Tab') return;
+            const f = [...d.querySelectorAll('button:not([disabled]),a[href],input,select,textarea,summary,[tabindex]:not([tabindex="-1"])')]
+                .filter((el) => el.offsetParent !== null);
+            if (!f.length) return;
+            const first = f[0], last = f[f.length - 1];
+            if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus(); }
+            else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
+        });
+
+        // Swipe the sheet down to dismiss, but only from the top of its scroll.
+        let y0 = null, body = d.querySelector('.aiad-pdrawer-body'), panel = d.querySelector('.aiad-pdrawer-panel');
+        panel.addEventListener('touchstart', function (ev) {
+            y0 = (body.scrollTop <= 0 && ev.touches.length === 1) ? ev.touches[0].clientY : null;
+        }, { passive: true });
+        panel.addEventListener('touchmove', function (ev) {
+            if (y0 === null) return;
+            const dy = ev.touches[0].clientY - y0;
+            panel.style.transform = dy > 0 ? 'translateY(' + dy + 'px)' : '';
+        }, { passive: true });
+        panel.addEventListener('touchend', function (ev) {
+            if (y0 === null) return;
+            const dy = (ev.changedTouches[0] ? ev.changedTouches[0].clientY : y0) - y0;
+            panel.style.transform = '';
+            y0 = null;
+            if (dy > 80) closeProductDrawer();
+        });
+
+        _dw = d;
+        return d;
     }
-    window.setStoreCatFilter = function (v) { window._storeCatFilter = v; renderStoreCatTabs(); renderStoreGrid(); };
-    function renderStoreGrid() {
-        const grid = document.getElementById('storeProductsGrid');
-        if (!grid) return;
-        const rows = window._storeProducts || [];
-        const cur = window._storeCatFilter || 'all';
-        const shown = cur === 'all' ? rows : rows.filter(p => (p.category || '') === cur);
-        grid.innerHTML = shown.length
-            ? shown.map(renderProductAdminCard).join('')
-            : '<div style="grid-column:1/-1;padding:34px 20px;text-align:center;background:var(--bg-card);border:1px dashed var(--border-default);border-radius:14px;">'
-              + '<div style="font-weight:600;margin-bottom:4px;">No products' + (cur === 'all' ? ' yet' : ' in this category') + '</div>'
-              + '<div style="font-size:0.82rem;color:var(--text-muted);">' + (cur === 'all' ? 'Add your first one — a beat pack, a track, a shirt.' : 'Try another category, or add a product in it.') + '</div></div>';
+
+    function paintDrawer() {
+        const d = drawerRoot();
+        const p = _dwState.p, o = _dwState.opts || {};
+        const imgs = prodImages(p);
+        const sizes = listOf(p.sizes);
+        const cols  = listOf(p.colors);
+        const dets  = Array.isArray(p.details) ? p.details.filter((x) => x && (x.label || x.value)) : [];
+        const out   = soldOut(p);
+        const price = priceText(p.price, p.currency);
+        const needsSize = sizes.length > 0 && !_dwState.size;
+
+        let html = '<div class="aiad-pdrawer-gallery">'
+            + '<div class="aiad-pdrawer-track">'
+            + (imgs.length
+                ? imgs.map((u) => '<span class="aiad-pdrawer-shot"><img src="' + esc(u) + '" alt="' + esc(p.name) + '"></span>').join('')
+                : '<span class="aiad-pdrawer-shot"><span class="aiad-store-noimg"></span></span>')
+            + '</div>'
+            + (imgs.length > 1
+                ? '<div class="aiad-pdrawer-thumbs">' + imgs.map((u, i) =>
+                    '<button type="button" class="aiad-pdrawer-thumb' + (i === (_dwState.shot || 0) ? ' is-on' : '')
+                    + '" data-thumb="' + i + '" aria-label="Photo ' + (i + 1) + '"><img src="' + esc(u) + '" alt=""></button>').join('') + '</div>'
+                : '')
+            + '</div>';
+
+        html += '<div class="aiad-pdrawer-info">'
+            + '<h2 class="aiad-pdrawer-name">' + esc(p.name) + '</h2>'
+            + '<div class="aiad-pdrawer-price">' + (out ? 'Sold out' : esc(price)) + '</div>'
+            + (p.description ? '<p class="aiad-pdrawer-desc">' + esc(p.description) + '</p>' : '');
+
+        if (cols.length) {
+            html += '<div class="aiad-pdrawer-group"><div class="aiad-pdrawer-label">Colour'
+                 + (_dwState.color ? ' — ' + esc(_dwState.color) : '') + '</div><div class="aiad-pdrawer-swatches">'
+                 + cols.map((c) => '<button type="button" class="aiad-pdrawer-swatch' + (_dwState.color === c ? ' is-on' : '')
+                        + '" data-color="' + esc(c) + '" aria-label="' + esc(c) + '"'
+                        + (_dwState.color === c ? ' aria-pressed="true"' : ' aria-pressed="false"')
+                        + '><span style="background:' + swatchColor(c) + ';"></span></button>').join('')
+                 + '</div></div>';
+        }
+        if (sizes.length) {
+            html += '<div class="aiad-pdrawer-group"><div class="aiad-pdrawer-label">Size</div><div class="aiad-pdrawer-sizes">'
+                 + sizes.map((s) => '<button type="button" class="aiad-pdrawer-size' + (_dwState.size === s ? ' is-on' : '')
+                        + '" data-size="' + esc(s) + '"' + (_dwState.size === s ? ' aria-pressed="true"' : ' aria-pressed="false"')
+                        + '>' + esc(s) + '</button>').join('')
+                 + '</div></div>';
+        }
+        if (dets.length) {
+            html += '<details class="aiad-pdrawer-details"><summary>Details</summary><dl>'
+                 + dets.map((x) => '<div><dt>' + esc(x.label || '') + '</dt><dd>' + esc(x.value || '') + '</dd></div>').join('')
+                 + '</dl></details>';
+        }
+
+        const disabled = out || needsSize;
+        html += '<button type="button" class="aiad-pdrawer-cta" data-buy="' + esc(p.id) + '"' + (disabled ? ' disabled' : '') + '>'
+             + (out ? 'Sold out' : (needsSize ? 'Select a size' : 'Buy — ' + esc(price))) + '</button>';
+        if (o.editable) {
+            html += '<button type="button" class="aiad-pdrawer-alt" data-edit="' + esc(p.id) + '" onclick="closeProductDrawer();openProductEditor(this.getAttribute(\'data-edit\'))">Edit this product</button>';
+        }
+        html += '</div>';
+
+        d.querySelector('.aiad-pdrawer-body').innerHTML = html;
     }
-    function renderProductAdminCard(p) {
-        const price = money(p.price, p.currency);
-        const kind  = p.product_kind === 'physical' ? 'Physical' : 'Digital';
-        const stock = p.product_kind === 'physical'
-            ? (p.inventory === null || p.inventory === undefined ? 'Unlimited stock' : p.inventory + ' in stock')
-            : 'Digital file';
-        const img = p.image_url
-            ? '<img src="' + esc(p.image_url) + '" alt="" style="width:100%;height:130px;object-fit:cover;border-radius:10px;margin-bottom:10px;">'
-            : '<div style="width:100%;height:130px;border-radius:10px;margin-bottom:10px;background:linear-gradient(135deg,#0d2f3f,#1a4a5e);"></div>';
-        const live = p.is_active
-            ? '<span style="font-size:0.66rem;color:#22c55e;border:1px solid rgba(34,197,94,0.4);border-radius:999px;padding:2px 8px;">Live</span>'
-            : '<span style="font-size:0.66rem;color:var(--text-muted);border:1px solid var(--border-default);border-radius:999px;padding:2px 8px;">Hidden</span>';
-        return '<div style="background:var(--bg-card);border:1px solid var(--border-default);border-radius:14px;padding:14px;">'
-            + img
-            + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;"><div style="font-weight:600;font-size:0.95rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">' + esc(p.name) + '</div>' + live + '</div>'
-            + '<div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:2px;">' + price + '</div>'
-            + '<div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:12px;">' + kind + ' · ' + esc(stock) + '</div>'
-            + '<div style="display:flex;gap:8px;">'
-            + '<button class="artist-action-btn primary" style="flex:1;" onclick="openProductEditor(\'' + esc(p.id) + '\')">Edit</button>'
-            + '<button class="artist-action-btn" style="flex:1;" onclick="deleteProduct(\'' + esc(p.id) + '\')">Delete</button>'
-            + '</div></div>';
+
+    function openProductDrawer(p, opts) {
+        const d = drawerRoot();
+        _dwState = { p: p, opts: opts || {}, size: null, color: null, shot: 0 };
+        _dwReturn = document.activeElement;
+        paintDrawer();
+        d.querySelector('.aiad-pdrawer-body').scrollTop = 0;
+        d.classList.add('is-open');
+        document.body.classList.add('aiad-pdrawer-lock');
+        const x = d.querySelector('.aiad-pdrawer-x');
+        if (x) setTimeout(() => x.focus(), 0);
     }
+
+    window.closeProductDrawer = function () {
+        if (!_dw) return;
+        _dw.classList.remove('is-open');
+        document.body.classList.remove('aiad-pdrawer-lock');
+        _dwState = null;
+        if (_dwReturn && typeof _dwReturn.focus === 'function') { try { _dwReturn.focus(); } catch (e) {} }
+        _dwReturn = null;
+    };
+    const closeProductDrawer = window.closeProductDrawer;
 
     async function renderOnboardBanner() {
         const el = document.getElementById('storeOnboardBanner');
@@ -34800,37 +35101,28 @@ Be direct and concrete with real industry insight — never generic filler. When
         const host = document.getElementById(hostId);
         if (!host || !artistId) return;
         const { data, error } = await window.db.from('products')
-            .select('id,name,description,price,currency,product_kind,image_url,images,inventory')
+            .select('id,name,description,price,currency,product_kind,image_url,images,inventory,category,sizes,colors,details')
             .eq('artist_id', artistId).eq('is_active', true)
             .order('created_at', { ascending: false });
-        const rows = (!error && data) || [];
-        if (!rows.length) { host.innerHTML = ''; return; }
-        host.innerHTML = '<div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin:24px 0 12px;">Store</div>'
-            + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;">'
-            + rows.map(renderStorefrontCard).join('') + '</div>';
-    }
-
-    function renderStorefrontCard(p) {
-        const soldOut = p.product_kind === 'physical' && p.inventory !== null && p.inventory !== undefined && p.inventory <= 0;
-        const _imgs = (Array.isArray(p.images) && p.images.length) ? p.images : (p.image_url ? [p.image_url] : []);
-        const _mid = 'pmain_' + p.id;
-        const img = (_imgs.length
-            ? '<img id="' + _mid + '" src="' + esc(_imgs[0]) + '" alt="" style="width:100%;height:120px;object-fit:cover;border-radius:10px;margin-bottom:6px;">'
-              + (_imgs.length > 1
-                 ? '<div style="display:flex;gap:5px;margin-bottom:9px;overflow-x:auto;">'
-                   + _imgs.map((u) => '<img src="' + esc(u) + '" alt="" onclick="var m=document.getElementById(\'' + _mid + '\');if(m)m.src=this.src;" style="width:32px;height:32px;object-fit:cover;border-radius:6px;cursor:pointer;flex:0 0 auto;border:1px solid var(--border-default);">').join('')
-                   + '</div>'
-                 : '<div style="margin-bottom:3px;"></div>')
-            : '<div style="width:100%;height:120px;border-radius:10px;margin-bottom:9px;background:linear-gradient(135deg,#0d2f3f,#1a4a5e);"></div>');
-        return '<div style="background:var(--bg-card);border:1px solid var(--border-default);border-radius:13px;padding:12px;">'
-            + img
-            + '<div style="font-weight:600;font-size:0.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(p.name) + '</div>'
-            + '<div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:9px;">' + money(p.price, p.currency)
-            + '<span style="color:var(--text-muted);font-size:0.72rem;"> · ' + (p.product_kind === 'physical' ? 'Physical' : 'Digital') + '</span></div>'
-            + (soldOut
-                ? '<button class="artist-action-btn" disabled style="width:100%;opacity:0.6;cursor:not-allowed;">Sold out</button>'
-                : '<button class="artist-action-btn primary" style="width:100%;" onclick="buyProduct(\'' + esc(p.id) + '\')">Buy</button>')
-            + '</div>';
+        if (error) {
+            // A failed fetch is not an empty shop \u2014 say so and offer the retry.
+            console.error('[store] could not load storefront', error);
+            storeNote(host, 'Could not load this shop. <button type="button" class="aiad-store-retry" '
+                + 'data-retry-artist="' + esc(artistId) + '" data-retry-host="' + esc(hostId) + '">Retry</button>', 'is-warn');
+            if (!host._aiadRetry) {
+                host._aiadRetry = true;
+                host.addEventListener('click', function (ev) {
+                    const b = ev.target.closest('[data-retry-artist]');
+                    if (b) loadStorefront(b.getAttribute('data-retry-artist'), b.getAttribute('data-retry-host'));
+                });
+            }
+            return;
+        }
+        const rows = data || [];
+        // No products is not a failure, and an empty shell costs the page something,
+        // so the whole section stays out of the layout.
+        if (!rows.length) { host.innerHTML = ''; host.classList.remove('aiad-store'); return; }
+        window.aiadStoreGrid(host, rows, { editable: false });
     }
 
     window.buyProduct = async function (productId, quantity) {
@@ -34909,11 +35201,10 @@ Be direct and concrete with real industry insight — never generic filler. When
     }
 
     window.loadStoreManager = loadStoreManager;
-    // The fan shopping agent lives in the fan module and renders the same cards the
-    // public storefront does, so both cross the module boundary here rather than
-    // being reimplemented on the other side.
+    // The fan shopping agent lives in the fan module and renders through the same
+    // aiadStoreGrid the public storefront and the artist's own manager use, so all
+    // three cross the module boundary here rather than growing a second card.
     window.aiadStoreInvoke = invokeMsg;
-    window.renderStorefrontCard = renderStorefrontCard;
     window.loadPayouts      = loadPayouts;
     window.loadStorefront   = loadStorefront;
     window.loadMyOrders     = loadMyOrders;
@@ -44083,6 +44374,184 @@ window.AIAD_PROMPTS = [
   #streamingNav .snav-head{padding:16px 12px 8px;font-size:0.66rem;}
   .dash-sidebar-left .snav-head > span:not(.snav-count),.dash-sidebar-left .snav-arrow{opacity:1 !important;max-width:none !important;}
   #streamingNav .dash-nav-item{padding:11px 12px !important;font-size:0.9rem;}
+}
+</style>
+
+<style id="aiad-store-css">
+/* ══════════════ STORE — luxury minimal grid + product drawer ══════════════
+   Everything here is scoped under .aiad-store (the grid) or .aiad-pdrawer (the
+   drawer), so nothing outside the store shifts. No card chrome: the product is
+   the photograph plus the words under it. No teal, no magenta — black, white
+   and greys only, and the app's own font throughout. Built at 375px first. */
+
+.aiad-store{display:block;}
+.aiad-store *{box-sizing:border-box;}
+
+/* ── Section header ─────────────────────────────────────────────────────── */
+.aiad-store-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:24px 0 10px;}
+.aiad-store-eyebrow{font-family:var(--font-body);font-size:12px;font-weight:500;letter-spacing:.18em;text-transform:uppercase;color:var(--text-primary);}
+.aiad-store-count{font-family:var(--font-body);font-size:12px;font-weight:400;letter-spacing:.04em;color:var(--text-muted);}
+
+/* Quiet text filters — the active one is underlined, never a pill. */
+.aiad-store-filters{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 20px;}
+.aiad-store-filter{appearance:none;background:none;border:0;padding:2px 0;margin:0;cursor:pointer;
+  font-family:var(--font-body);font-size:12px;font-weight:400;letter-spacing:.06em;color:var(--text-muted);
+  text-decoration:none;text-underline-offset:4px;transition:color var(--transition-fast);}
+.aiad-store-filter:hover{color:var(--text-primary);}
+.aiad-store-filter.is-on{color:var(--text-primary);text-decoration:underline;text-decoration-thickness:1px;}
+.aiad-store-filter:focus-visible{outline:1px solid var(--text-primary);outline-offset:3px;}
+.aiad-store-sep{font-size:12px;color:var(--text-hint);user-select:none;}
+
+/* ── Grid — 4 / 3 / 2, never 1 ──────────────────────────────────────────── */
+.aiad-store-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));column-gap:16px;row-gap:32px;}
+@media (max-width:1024px){.aiad-store-grid{grid-template-columns:repeat(3,minmax(0,1fr));}}
+@media (max-width:768px){.aiad-store-grid{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:8px;row-gap:24px;}}
+/* The agent's result strip lives in a ~320px column, where viewport-width
+   column counts would shrink a tile past reading. */
+.aiad-store--narrow .aiad-store-grid{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:8px;row-gap:20px;margin:8px 0 4px;}
+
+/* ── Tile ───────────────────────────────────────────────────────────────── */
+.aiad-store-tile{position:relative;min-width:0;}
+.aiad-store-hit{display:block;width:100%;text-align:left;appearance:none;background:none;border:0;padding:0;margin:0;cursor:pointer;font:inherit;color:inherit;}
+.aiad-store-hit:focus-visible{outline:1px solid var(--text-primary);outline-offset:4px;}
+
+/* One tile colour behind every photo, so a white-background shot and a
+   dark-background shot read as one set. contain + padding does the rest. */
+.aiad-store-pic{position:relative;display:block;width:100%;aspect-ratio:4/5;border-radius:2px;background:#EDEBE8;overflow:hidden;}
+.aiad-store-img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:8%;transition:opacity 400ms ease;}
+.aiad-store-img.is-back{opacity:0;}
+.aiad-store-noimg{position:absolute;inset:0;background:#EDEBE8;}
+.aiad-store-pic.is-out .aiad-store-img,.aiad-store-pic.is-out .aiad-store-noimg{opacity:.55;}
+
+/* Hover belongs to pointers. Touch gets the tile as-is. */
+.aiad-store-quick{position:absolute;left:0;right:0;bottom:0;transform:translateY(100%);
+  background:rgba(0,0,0,.85);color:#fff;font-family:var(--font-body);font-size:11px;font-weight:500;
+  letter-spacing:.12em;text-transform:uppercase;text-align:center;padding:9px 6px;
+  transition:transform 260ms ease;pointer-events:none;}
+@media (hover:hover){
+  /* Cross-fade to the second photo, both sitting on the same tile colour. */
+  .aiad-store-hit:hover .aiad-store-pic:not(.is-out) .aiad-store-img.is-back,
+  .aiad-store-hit:focus-visible .aiad-store-pic:not(.is-out) .aiad-store-img.is-back{opacity:1;}
+  .aiad-store-hit:hover .aiad-store-pic:not(.is-out) .aiad-store-img.is-front:not(:only-of-type),
+  .aiad-store-hit:focus-visible .aiad-store-pic:not(.is-out) .aiad-store-img.is-front:not(:only-of-type){opacity:0;}
+  .aiad-store-hit:hover .aiad-store-quick,
+  .aiad-store-hit:focus-visible .aiad-store-quick{transform:translateY(0);}
+}
+
+.aiad-store-meta{display:block;margin-top:12px;}
+.aiad-store-name{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  font-family:var(--font-body);font-size:13px;font-weight:500;line-height:1.35;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--text-primary);overflow-wrap:break-word;}
+.aiad-store-price{display:block;margin-top:4px;font-family:var(--font-body);font-size:13px;font-weight:400;color:var(--text-secondary);}
+.aiad-store-oos{display:block;margin-top:4px;font-family:var(--font-body);font-size:11px;font-weight:400;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);}
+
+.aiad-store-swatches{display:flex;align-items:center;gap:5px;margin-top:8px;flex-wrap:wrap;}
+.aiad-store-swatch{width:10px;height:10px;border-radius:50%;flex:0 0 auto;box-shadow:inset 0 0 0 1px rgba(128,128,128,.45);}
+.aiad-store-swatch-more{font-family:var(--font-body);font-size:10px;letter-spacing:.04em;color:var(--text-muted);}
+
+/* Artist-owned surfaces keep their edit affordance; fans never see this. */
+.aiad-store-admin{display:flex;gap:6px;margin-top:10px;}
+.aiad-store-adminbtn{flex:1;appearance:none;cursor:pointer;background:none;border:1px solid var(--border-default);
+  border-radius:2px;padding:7px 8px;font-family:var(--font-body);font-size:11px;font-weight:500;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--text-secondary);transition:border-color var(--transition-fast),color var(--transition-fast);}
+.aiad-store-adminbtn:hover{border-color:var(--border-hover);color:var(--text-primary);}
+.aiad-store-flag{position:absolute;top:8px;left:8px;background:rgba(0,0,0,.72);color:#fff;
+  font-family:var(--font-body);font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;padding:3px 7px;border-radius:2px;}
+
+.aiad-store-note{padding:28px 16px;text-align:center;font-family:var(--font-body);font-size:13px;color:var(--text-muted);line-height:1.6;}
+.aiad-store-note.is-warn{color:#f59e0b;}
+.aiad-store-retry{appearance:none;cursor:pointer;background:none;border:1px solid currentColor;border-radius:2px;
+  margin-left:8px;padding:5px 12px;font-family:var(--font-body);font-size:11px;font-weight:500;
+  letter-spacing:.1em;text-transform:uppercase;color:inherit;}
+
+/* ── Product drawer ─────────────────────────────────────────────────────── */
+body.aiad-pdrawer-lock{overflow:hidden;}
+.aiad-pdrawer{position:fixed;inset:0;z-index:10050;visibility:hidden;}
+.aiad-pdrawer.is-open{visibility:visible;}
+.aiad-pdrawer-scrim{position:absolute;inset:0;background:rgba(0,0,0,.5);opacity:0;transition:opacity 260ms ease;}
+.aiad-pdrawer.is-open .aiad-pdrawer-scrim{opacity:1;}
+.aiad-pdrawer-panel{position:absolute;top:0;right:0;bottom:0;width:480px;max-width:100%;
+  background:var(--bg-primary);border-left:1px solid var(--border-default);
+  display:flex;flex-direction:column;transform:translateX(100%);transition:transform 300ms ease;}
+.aiad-pdrawer.is-open .aiad-pdrawer-panel{transform:translateX(0);}
+.aiad-pdrawer-grab{display:none;}
+.aiad-pdrawer-x{position:absolute;top:14px;right:14px;z-index:2;appearance:none;cursor:pointer;
+  width:34px;height:34px;border-radius:50%;border:1px solid var(--border-default);background:var(--bg-primary);
+  color:var(--text-secondary);font-size:20px;line-height:1;display:flex;align-items:center;justify-content:center;}
+.aiad-pdrawer-x:hover{color:var(--text-primary);border-color:var(--border-hover);}
+.aiad-pdrawer-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
+
+.aiad-pdrawer-track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+.aiad-pdrawer-track::-webkit-scrollbar{display:none;}
+.aiad-pdrawer-shot{position:relative;flex:0 0 100%;scroll-snap-align:center;aspect-ratio:4/5;background:#EDEBE8;
+  /* 4/5 of a 480px panel is 600px, which would push the CTA off a laptop screen. */
+  max-height:56vh;}
+.aiad-pdrawer-shot img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:8%;}
+.aiad-pdrawer-thumbs{display:flex;gap:6px;padding:8px 20px 0;flex-wrap:wrap;}
+.aiad-pdrawer-thumb{appearance:none;cursor:pointer;padding:0;width:48px;height:60px;border-radius:2px;overflow:hidden;
+  border:1px solid transparent;background:#EDEBE8;opacity:.6;transition:opacity var(--transition-fast),border-color var(--transition-fast);}
+.aiad-pdrawer-thumb img{width:100%;height:100%;object-fit:contain;padding:8%;display:block;}
+.aiad-pdrawer-thumb.is-on,.aiad-pdrawer-thumb:hover{opacity:1;border-color:var(--text-primary);}
+
+.aiad-pdrawer-info{padding:20px;}
+.aiad-pdrawer-name{margin:0;font-family:var(--font-body);font-size:15px;font-weight:500;letter-spacing:.06em;
+  text-transform:uppercase;line-height:1.4;color:var(--text-primary);}
+.aiad-pdrawer-price{margin-top:6px;font-family:var(--font-body);font-size:14px;font-weight:400;color:var(--text-secondary);}
+.aiad-pdrawer-desc{margin:16px 0 0;font-family:var(--font-body);font-size:13px;line-height:1.7;color:var(--text-secondary);white-space:pre-wrap;}
+.aiad-pdrawer-group{margin-top:22px;}
+.aiad-pdrawer-label{font-family:var(--font-body);font-size:11px;font-weight:500;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--text-muted);margin-bottom:9px;}
+.aiad-pdrawer-swatches{display:flex;flex-wrap:wrap;gap:8px;}
+.aiad-pdrawer-swatch{appearance:none;cursor:pointer;padding:2px;background:none;border:1px solid transparent;border-radius:50%;line-height:0;}
+.aiad-pdrawer-swatch span{display:block;width:20px;height:20px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(128,128,128,.45);}
+.aiad-pdrawer-swatch.is-on{border-color:var(--text-primary);}
+.aiad-pdrawer-sizes{display:flex;flex-wrap:wrap;gap:8px;}
+.aiad-pdrawer-size{appearance:none;cursor:pointer;min-width:48px;height:40px;padding:0 12px;border-radius:2px;
+  border:1px solid var(--border-hover);background:none;color:var(--text-secondary);
+  font-family:var(--font-body);font-size:12px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;
+  transition:border-color var(--transition-fast),color var(--transition-fast);}
+.aiad-pdrawer-size:hover{color:var(--text-primary);}
+.aiad-pdrawer-size.is-on{border-color:var(--text-primary);color:var(--text-primary);}
+
+.aiad-pdrawer-details{margin-top:22px;border-top:1px solid var(--border-default);border-bottom:1px solid var(--border-default);}
+.aiad-pdrawer-details summary{cursor:pointer;list-style:none;padding:14px 0;font-family:var(--font-body);
+  font-size:11px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--text-primary);}
+.aiad-pdrawer-details summary::-webkit-details-marker{display:none;}
+.aiad-pdrawer-details summary::after{content:'+';float:right;color:var(--text-muted);}
+.aiad-pdrawer-details[open] summary::after{content:'\2212';}
+.aiad-pdrawer-details dl{margin:0;padding:0 0 14px;}
+.aiad-pdrawer-details dl > div{display:flex;gap:12px;padding:5px 0;font-family:var(--font-body);font-size:12.5px;line-height:1.6;}
+.aiad-pdrawer-details dt{flex:0 0 38%;color:var(--text-muted);margin:0;}
+.aiad-pdrawer-details dd{flex:1;margin:0;color:var(--text-secondary);}
+
+/* Black on light, white on dark. The app ships dark; .fashion-theme is its light. */
+.aiad-pdrawer-cta{display:block;width:100%;margin-top:24px;height:52px;border:0;border-radius:2px;cursor:pointer;
+  background:#FFFFFF;color:#000000;font-family:var(--font-body);font-size:12px;font-weight:600;
+  letter-spacing:.14em;text-transform:uppercase;transition:opacity var(--transition-fast);}
+.aiad-pdrawer-cta:hover{opacity:.85;}
+.aiad-pdrawer-cta[disabled]{opacity:.35;cursor:not-allowed;}
+.fashion-theme .aiad-pdrawer-cta,.light-theme .aiad-pdrawer-cta,[data-theme="light"] .aiad-pdrawer-cta{background:#000000;color:#FFFFFF;}
+.aiad-pdrawer-alt{display:block;width:100%;margin-top:10px;height:44px;cursor:pointer;border-radius:2px;
+  border:1px solid var(--border-default);background:none;color:var(--text-secondary);
+  font-family:var(--font-body);font-size:11px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;}
+.aiad-pdrawer-alt:hover{color:var(--text-primary);border-color:var(--border-hover);}
+
+/* Mobile: full-height bottom sheet, dragged down to dismiss. */
+@media (max-width:768px){
+  .aiad-pdrawer-panel{top:auto;left:0;right:0;bottom:0;width:100%;height:92vh;height:92dvh;
+    border-left:0;border-top:1px solid var(--border-default);border-radius:12px 12px 0 0;
+    transform:translateY(100%);}
+  .aiad-pdrawer.is-open .aiad-pdrawer-panel{transform:translateY(0);}
+  .aiad-pdrawer-grab{display:block;position:absolute;top:8px;left:50%;transform:translateX(-50%);
+    width:38px;height:4px;border-radius:2px;background:var(--border-hover);z-index:2;}
+  .aiad-pdrawer-x{top:16px;}
+  .aiad-pdrawer-body{padding-top:20px;}
+  .aiad-pdrawer-shot{max-height:58vh;}
+  .aiad-pdrawer-thumbs{display:none;}
+}
+@media (prefers-reduced-motion:reduce){
+  .aiad-pdrawer-panel,.aiad-pdrawer-scrim,.aiad-store-img,.aiad-store-quick{transition:none;}
 }
 </style>
 </body>
