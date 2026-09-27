@@ -231,8 +231,9 @@
             return window.aiadSelectableIndustries().length === 1;
         };
 
-        // Hides closed cards and re-seats the radiogroup's single tab stop. Idempotent, and
-        // it un-hides anything no longer listed, so editing the array and re-running this is
+        // Greys closed cards out with a "Soon" badge — on screen but unselectable, like the
+        // locked ones — and re-seats the radiogroup's single tab stop. Idempotent, and it
+        // restores anything no longer listed, so editing the array and re-running this is
         // enough to reopen without a reload.
         window.aiadApplyClosedIndustries = function () {
             var list = window.AIAD_CLOSED_INDUSTRIES;
@@ -240,9 +241,9 @@
 
             // #page-industry-selection carries `active` in the static markup, so it paints
             // before DOMContentLoaded fires. The first call below runs while the cards are
-            // still unparsed, so emitting the rule here means a closed card is never painted
-            // at all, rather than appearing and then vanishing. Rewritten on every call, so
-            // emptying the array really does reopen without a reload.
+            // still unparsed, so emitting the rule here means a closed card is painted greyed
+            // from the start, rather than appearing live and then fading. Rewritten on every
+            // call, so emptying the array really does reopen without a reload.
             // Values are matched, not trusted: a stray entry must not build a selector.
             var sel = function (v) {
                 return '.card--industry[data-value="' + String(v).replace(/[^a-z0-9_-]/gi, '') + '"]';
@@ -255,7 +256,10 @@
             // and would lose every equal-specificity tie to it on source order alone.
             var P = '#page-industry-selection ';
             var css = '';
-            if (closed.length) css += closed.map(function (v) { return P + sel(v); }).join(',') + '{display:none;}';
+            // Same look lockNonMusicIndustries gives a locked card, but as a rule rather than
+            // inline style, so reopening leaves nothing behind to un-set.
+            if (closed.length) css += closed.map(function (v) { return P + sel(v); }).join(',')
+                + '{opacity:0.38;filter:grayscale(1);cursor:not-allowed;position:relative;}';
             if (hero) {
                 // Swap the page's own copy over too, so reopening an industry restores the
                 // menu wording without a second edit somewhere else.
@@ -294,20 +298,42 @@
             if (!cards.length) return;
             var firstVisible = null, checked = null;
             Array.prototype.forEach.call(cards, function (card) {
+                // Capture-phase, so it runs before the card's own onclick. Wired once and
+                // checks the list on every click, so reopening needs no unwiring.
+                if (!card.__aiadClosedWired) {
+                    card.__aiadClosedWired = true;
+                    card.addEventListener('click', function (e) {
+                        if (!window.aiadIndustryClosed(card.dataset.value)) return;
+                        e.stopPropagation(); e.preventDefault();
+                        (window.showToast || function () {})('Not open to new sign-ups yet — coming soon');
+                    }, true);
+                }
+                var badge = card.querySelector('.aiad-soon-badge[data-aiad-closed]');
                 if (window.aiadIndustryClosed(card.dataset.value)) {
-                    card.style.display = 'none';
-                    card.setAttribute('aria-hidden', 'true');
+                    card.setAttribute('aria-disabled', 'true');
                     // A closed industry must not stay selected if it somehow already was.
                     card.setAttribute('aria-checked', 'false');
+                    if (!badge && !card.querySelector('.aiad-soon-badge')) {
+                        badge = document.createElement('span');
+                        badge.className = 'aiad-soon-badge';
+                        badge.setAttribute('data-aiad-closed', '');
+                        badge.textContent = 'Soon';
+                        badge.style.cssText = 'position:absolute;top:8px;right:8px;font-size:0.58rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#fff;background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.22);border-radius:999px;padding:2px 8px;z-index:2;';
+                        card.appendChild(badge);
+                    }
                     return;
                 }
-                card.style.display = '';
-                card.removeAttribute('aria-hidden');
+                // Only undo what this function added; a card lockNonMusicIndustries greyed
+                // keeps its own badge and aria-disabled.
+                if (badge) {
+                    badge.parentNode.removeChild(badge);
+                    if (!card.__aiadLocked) card.removeAttribute('aria-disabled');
+                }
                 if (!firstVisible) firstVisible = card;
                 if (card.getAttribute('aria-checked') === 'true') checked = card;
             });
             // Roving radiogroup: exactly one tab stop. A selected card keeps it, otherwise
-            // the first card still on screen is the way in — never a hidden one.
+            // the first open card is the way in — never a closed one.
             var owner = checked || firstVisible;
             Array.prototype.forEach.call(cards, function (card) {
                 card.setAttribute('tabindex', card === owner ? '0' : '-1');
@@ -1422,7 +1448,7 @@ html, body {
                     </div>
                 </div>
 
-                <p class="industry-hero-note industry-hero-only">Fashion, film, games, visual arts and publishing &mdash; coming soon.</p>
+                <p class="industry-hero-note industry-hero-only">Film, games, visual arts and publishing &mdash; coming soon.</p>
 
                 <div class="actions">
                     <button class="btn-primary" id="industryBtn" disabled onclick="handleIndustryContinue()">
@@ -11182,10 +11208,10 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
 
         function selectIndustryCard(card) {
             if (!card) return;
-            // Closed to new signups. Refused here as well as hidden, because the card is not
-            // the only way in: arrow-key nav, a restored selection, or a direct call all land
-            // here. Silent by design — the card is not on screen, so a toast would be
-            // explaining away something the user never saw.
+            // Closed to new signups. Refused here as well as on the card's own click, because
+            // the click is not the only way in: arrow-key nav, a restored selection, or a
+            // direct call all land here. Silent — the greyed card and its click toast already
+            // say why.
             if (window.aiadIndustryClosed && window.aiadIndustryClosed(card.dataset.value)) return;
             console.log('[AIAD] Industry selected:', card.dataset.value);
 
