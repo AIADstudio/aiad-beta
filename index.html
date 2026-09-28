@@ -22799,7 +22799,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 try { if (window.buildPromptContext) await window.buildPromptContext(); } catch (e) {}
                 try { if (window.renderAllPromptSurfaces) window.renderAllPromptSurfaces(); } catch (e) {}
             }, 400);
-            setTimeout(() => { applyStoredAvatar(); initStudioHistory(); populateLiveStatsBar(); }, 300);
+            setTimeout(() => { applyStoredAvatar(); initStudioHistory(); window.populateLiveStatsBar && window.populateLiveStatsBar(); }, 300);
             // Cache paints instantly; this confirms it against profiles and corrects it.
             setTimeout(() => { try { window.aiadSyncMyAvatar && window.aiadSyncMyAvatar(); } catch (e) {} }, 700);
             // (removed dead exec_sql bootstrap calls — those columns/tables already exist; exec_sql RPC does not exist and must not, it would be arbitrary SQL over the anon key)
@@ -24914,7 +24914,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 } else {
                     applyStoredAvatar();
                 }
-                initStudioHistory(); populateLiveStatsBar(); }, 150);
+                initStudioHistory(); window.populateLiveStatsBar && window.populateLiveStatsBar(); }, 150);
 
             // Deep-link restore: if the URL hash names a view for THIS dashboard, open it
             // instead of the default — so a refresh keeps you on the tab you were on.
@@ -26078,6 +26078,7 @@ document.addEventListener('keydown', function(e) {
                 console.warn('[AIAD] Stats bar error:', e);
             }
         }
+        window.populateLiveStatsBar = populateLiveStatsBar;
 
         // ── Fan Feed: Load real artist posts for supported/followed artists ──
         async function loadFanHomeFeed() {
@@ -43755,7 +43756,7 @@ window.AIAD_PROMPTS = [
         ov.style.cssText = 'position:fixed;inset:0;z-index:100002;background:rgba(3,5,12,0.94);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:20px;';
         ov.innerHTML = '<div style="background:#0d0f17;border:1px solid rgba(255,255,255,0.1);border-radius:16px;max-width:440px;width:100%;padding:28px;text-align:center;">'
             + '<div style="font-size:1.2rem;font-weight:700;color:#fff;margin-bottom:8px;">A card is required to continue</div>'
-            + '<p style="color:#94a3b8;font-size:0.86rem;line-height:1.6;margin:0 0 20px;">As of October 1, AIAD requires a card on file. Add one to restore access to your account — everything you have made is safe and waiting.</p>'
+            + '<p style="color:#94a3b8;font-size:0.86rem;line-height:1.6;margin:0 0 20px;">As of October 15, AIAD requires a card on file. Add one to restore access to your account — everything you have made is safe and waiting.</p>'
             + '<button onclick="window.aiadAddCardFromNotice()" style="width:100%;background:linear-gradient(135deg,#06b6d4,#3b82f6);color:#fff;border:none;border-radius:10px;padding:12px;font-size:0.92rem;font-weight:700;cursor:pointer;">Add a card</button>'
             + '<button id="aiadGateHelp" style="width:100%;margin-top:10px;background:transparent;color:#94a3b8;border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:11px;font-size:0.85rem;cursor:pointer;">Contact support</button>'
             + '<button onclick="handleSignOut()" style="margin-top:14px;background:none;border:none;color:#64748b;font-size:0.78rem;text-decoration:underline;cursor:pointer;">Sign out</button>'
@@ -43769,7 +43770,7 @@ window.AIAD_PROMPTS = [
     function showBanner() {
         if (dismissed() || document.getElementById('aiadCardNotice')) return;
         var d = state && state.deadline ? new Date(state.deadline) : null;
-        var label = d ? d.toLocaleDateString(undefined, { month: 'long', day: 'numeric' }) : 'October 1';
+        var label = d ? d.toLocaleDateString(undefined, { month: 'long', day: 'numeric' }) : 'October 15';
         var bar = document.createElement('div');
         bar.id = 'aiadCardNotice';
         bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99990;background:linear-gradient(135deg,#0f172a,#1e293b);border-bottom:1px solid rgba(255,255,255,0.12);color:#e2e8f0;padding:10px 16px;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;font-size:0.85rem;';
