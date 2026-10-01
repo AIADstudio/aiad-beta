@@ -591,16 +591,91 @@ async function session(){
   return (data&&data.session)||null;
 }
 
+// stage-agent runs Sonnet, and ai_cost_for('text_sonnet') is 1 credit. Named
+// rather than left to default so the ledger note says what was actually bought.
+const CREDIT_ACTION="text_sonnet";
+
+const CREDIT_MSG={
+  out_of_credits:"You're out of AIAD Agent credits for this month. Upgrade for more.",
+  card_required:"AIAD needs a card on file before the agents will run. Add one on your dashboard, then call the room again."
+};
+
+// Same RPC and the same refusal codes index.html's gate reads, but called here
+// rather than reused: spendAiCredit lives in index.html's own script and nothing
+// on this page can reach it. Two deliberate differences from that helper. It
+// passes an action, because spend_ai_credit_tx has no one-argument overload — the
+// agent page calls it without one, the _tx call fails, and it quietly falls
+// through to the REST spend_ai_credit, which drops txn_id. And it does not keep
+// that REST fallback, because without a txn_id the three-argument refund refuses
+// to reverse anything, and the floor needs refunds to work.
+//
+// remaining: -1 out of credits, -2 card on file required, 999999 unlimited,
+// null when the credit service could not be reached at all.
+async function spendCredit(s){
+  try{
+    const {data,error}=await db.rpc("spend_ai_credit_tx",
+      {p_user:s.user.id,p_action:CREDIT_ACTION});
+    if(error){ console.warn("[credits] spend",error.message||error); return {remaining:null,txn:null}; }
+    if(!data||typeof data.remaining!=="number") return {remaining:null,txn:null};
+    return {remaining:data.remaining,txn:data.txn_id||null};
+  }catch(e){ console.warn("[credits] spend",e); return {remaining:null,txn:null}; }
+}
+
+// The three-argument form on purpose: it reverses exactly the row the spend
+// created, refuses one that was already reversed, and puts the credits back in
+// the buckets they came from. The two-argument form guesses at the latest spend.
+async function refundCredit(s,txn){
+  if(!txn) return;
+  try{
+    await db.rpc("refund_ai_credit",
+      {p_user:s.user.id,p_action:CREDIT_ACTION,p_spend_txn_id:txn});
+  }catch(e){ console.warn("[credits] refund",e); }
+}
+
+// Balance without spending anything, read the way index.html paints its counter.
+// spend_ai_credit_tx charges against balance + purchased_balance, so both count.
+// Unlimited plans carry allowance >= 999999 and are never charged.
+async function creditBalance(s){
+  try{
+    const {data,error}=await db.from("ai_credits")
+      .select("balance,purchased_balance,allowance").eq("user_id",s.user.id);
+    if(error){ console.warn("[credits] balance",error.message||error); return null; }
+    if(!Array.isArray(data)||!data.length) return null;
+    const r=data[0];
+    if((r.allowance||0)>=999999) return Infinity;
+    return (r.balance||0)+(r.purchased_balance||0);
+  }catch(e){ console.warn("[credits] balance",e); return null; }
+}
+
 async function callStage(stage,message,context){
   const s=await session();
   if(!s) throw new Error("signed_out");
-  const res=await fetch(SUPABASE_URL+"/functions/v1/stage-agent",{
-    method:"POST",
-    headers:{"Content-Type":"application/json","Authorization":"Bearer "+s.access_token},
-    body:JSON.stringify({stage:stage,user_id:s.user.id,message:message,context:context||""})
-  });
+
+  // Charge before calling out, hand it back if the call fails. The charge belongs
+  // on this page and not inside stage-agent: index.html already charges at its own
+  // stage-agent call site, so moving it into the function would double-bill every
+  // artist on the agent page.
+  const {remaining,txn}=await spendCredit(s);
+  if(remaining===-1) throw new Error("out_of_credits");
+  if(remaining===-2) throw new Error("card_required");
+  // remaining === null is the credit service being unreachable, not a refusal.
+  // index.html fails open there rather than block a paying artist on a transient
+  // error, and the same call is made here: one uncharged answer beats a dead floor.
+
+  let res;
+  try{
+    res=await fetch(SUPABASE_URL+"/functions/v1/stage-agent",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+s.access_token},
+      body:JSON.stringify({stage:stage,user_id:s.user.id,message:message,context:context||""})
+    });
+  }catch(e){ await refundCredit(s,txn); throw e; }
+
   const data=await res.json().catch(()=>null);
-  if(!res.ok||!data||data.error) throw new Error((data&&data.error)||("stage-agent "+res.status));
+  if(!res.ok||!data||data.error){
+    await refundCredit(s,txn);
+    throw new Error((data&&data.error)||("stage-agent "+res.status));
+  }
   return String(data.response||"");
 }
 
@@ -712,12 +787,35 @@ CREW.map(c=>c.id+" — "+c.role+". "+c.brief).join("\n")+
       hud("Your session expired. Reload the page and sign in again.");
       $("go").disabled=false;$("go").textContent="Call the room";return;
     }
+    // A credit refusal stops here rather than falling through to the keyword
+    // router: dispatching on it would send every desk off to fail the same way.
+    if(m==="out_of_credits"||m==="card_required"){
+      hud(CREDIT_MSG[m]);
+      $("go").disabled=false;$("go").textContent="Call the room";return;
+    }
     hud("Couldn't reach the room: "+m+". Splitting the work here instead.");
   }
   if(!tasks||!tasks.length){
     tasks=fallbackTasks(brief);
     planLine=planLine||"Split from the brief here on the floor — the room's planner didn't answer in JSON.";
   }
+
+  // One balance read for the whole dispatch, so five desks don't each walk over
+  // and discover the same wall. The planner's own credit is already spent by now,
+  // so this is what is actually left for the desks. A null read is the service
+  // being unreachable, which fails open exactly as the spend does.
+  const sess=await session();
+  const bal=sess?await creditBalance(sess):null;
+  if(bal!==null&&bal!==Infinity&&bal<tasks.length){
+    const held=tasks.length-(bal>0?bal:0);
+    tasks=bal>0?tasks.slice(0,bal):[];
+    if(!tasks.length){
+      hud("Reading the situation used the last credit. Top up and call the room again.");
+      $("go").disabled=false;$("go").textContent="Call the room";renderCrew();return;
+    }
+    planLine=(planLine?planLine+" ":"")+"Holding "+held+" back on credits.";
+  }
+
   hud((planLine||"Work split.")+" — "+tasks.length+" called in.");
   tasks.forEach((t,i)=>{
     const a=agents.find(x=>x.id===t.agent);
@@ -750,9 +848,16 @@ async function work(a,brief){
   }catch(e){
     a.state="blocked";
     const m=String((e&&e.message)||e||"unknown");
-    a.err=m==="signed_out"?"Your session expired. Reload the page and sign in again."
-      :/rate.?limit|429/i.test(m)?"Hit a rate limit. Give it a minute and try again."
-      :"That call failed: "+m;
+    if(m==="out_of_credits"||m==="card_required"){
+      a.err=CREDIT_MSG[m];
+      // Nothing was charged and nothing was asked, so they are not left sitting at
+      // a desk with an empty page on it. Back to the lounge, standing.
+      a.seated=false; goTo(a,a.home.x,a.home.z,Math.PI,null);
+    }else{
+      a.err=m==="signed_out"?"Your session expired. Reload the page and sign in again."
+        :/rate.?limit|429/i.test(m)?"Hit a rate limit. Give it a minute and try again."
+        :"That call failed: "+m;
+    }
   }
   renderCrew(); if(selId===a.id) renderRead();
   if(!agents.some(x=>x.state==="working")){
