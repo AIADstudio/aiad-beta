@@ -117,11 +117,19 @@ footer{color:var(--soft);font-size:11.5px;text-align:center;padding:18px}
 </div>
 <footer>Each desk is a live model call.</footer>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
 <script type="module">
-// Pinned deliberately, the same way clips.html pins it. index.html loads
-// supabase-js at an unpinned major, which means a minor the vendor publishes
-// reaches production without anyone deploying. Not repeating that here.
+// Both imports pinned deliberately, the same way clips.html pins its supabase
+// import. index.html loads supabase-js at an unpinned major, which means a minor
+// the vendor publishes reaches production without anyone deploying. Not repeating
+// that here.
+//
+// three comes in as a namespace import rather than the UMD build: build/three.js
+// and build/three.min.js are deprecated from r150 and log a console warning
+// saying so. The namespace is what keeps every THREE.* reference below working
+// unchanged, and it is read-only, which is fine because nothing here assigns to
+// one. A failed load now throws instead of leaving THREE undefined, so there is
+// no window.THREE guard any more — it could only ever have been false.
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 
 const SUPABASE_URL = 'https://uapiytquwuhtewqieegx.supabase.co';
@@ -136,7 +144,6 @@ const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 (function(){
 "use strict";
 const $=id=>document.getElementById(id);
-if(!window.THREE){ $("boot").textContent="Couldn't load the 3D engine."; return; }
 
 /* ------------------------------------------------------------------ crew */
 const CREW=[
