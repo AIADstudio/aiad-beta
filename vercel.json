@@ -44,6 +44,10 @@
     {
       "source": "/clips",
       "destination": "/clips.html"
+    },
+    {
+      "source": "/floor",
+      "destination": "/floor.html"
     }
   ],
   "functions": {
