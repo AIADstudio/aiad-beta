@@ -18855,6 +18855,11 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 syncCreditState(0);
                 return false;
             }
+            if (remaining === -2) {                       // card on file required
+                // Balance is intact and nothing was charged, so the counter is left alone.
+                showToast('AIAD needs a card on file before the agents will run. Add one under Settings → Subscription & Plan.', 6000);
+                return false;
+            }
 
             syncCreditState(remaining);
 
@@ -29617,6 +29622,11 @@ function toggleAgeRange(btn) {
                 (window.showToast || alert)("You're out of AIAD Agent credits for this month. Upgrade for more.");
                 if (typeof showArtistView === 'function') { /* leave them on the view */ }
                 updateCreditsDisplay(0);
+                return;
+            }
+            if (remaining === -2) {                       // card on file required
+                // Entitlement block, not an empty balance — the counter is left alone.
+                (window.showToast || alert)("AIAD needs a card on file before the agents will run. Add one under Settings → Subscription & Plan.");
                 return;
             }
             if (remaining !== null) updateCreditsDisplay(remaining);
