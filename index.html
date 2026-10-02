@@ -5950,6 +5950,9 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                                 <h2>AIAD Agent</h2>
                                 <p>Understands your level, goals, supporters, revenue, and milestones</p>
                             </div>
+                            <button type="button" class="collab-btn-secondary" id="agentExportBtn"
+                                    onclick="AIADAgentExport.run()" title="Export this conversation as a PDF"
+                                    style="margin-left:auto;padding:6px 13px;font-size:0.78rem;white-space:nowrap;">Download PDF</button>
                             <div class="agent-credits-indicator" id="agentCreditsIndicator">
                                 <div class="credits-label">AI Credits</div>
                                 <div class="credits-value" id="creditsValue">25 / 25</div>
@@ -40564,7 +40567,7 @@ window.AIAD_PROMPTS = [
 
 @media print {
   /* Hide the app, keep the document. Both are body children, so this is one rule. */
-  body > *:not(#planPrintDoc) { display: none !important; }
+  body > *:not(#planPrintDoc):not(#agentPrintDoc) { display: none !important; }
   html, body {
     display: block !important;
     background: #fff !important;
@@ -45281,6 +45284,209 @@ body.aiad-pdrawer-lock{overflow:hidden;}
             toast('Roles saved.');
         }
     };
+})();
+</script>
+<style id="aiad-agent-print-css">
+/* ── Agent conversation → PDF ────────────────────────────────────────────────
+   The same approach AIADPlanExport uses, and for the same reasons: a print
+   stylesheet and window.print() give a real PDF on desktop and on iOS Safari,
+   keep the text selectable, and add nothing to a file that is already large.
+   No PDF library.
+
+   Agent answers are plain prose by contract — the edge function's rules forbid
+   markdown and emoji, and sanitizeAnswer strips them server side if the model
+   drifts — so the text goes onto the page as written, with no conversion. */
+#agentPrintDoc { display: none; }
+
+@media print {
+  body > *:not(#agentPrintDoc):not(#planPrintDoc) { display: none !important; }
+  html, body {
+    display: block !important;
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  #agentPrintDoc {
+    display: block !important;
+    position: static !important;
+    background: #fff;
+    color: #111;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  @page { size: letter; margin: 14mm; }
+}
+
+/* Outside the print block so the document can be proofed on screen by unhiding
+   #agentPrintDoc, and so print inherits one set of rules. */
+#agentPrintDoc .ad-page {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: #111; background: #fff; font-size: 9.5pt; line-height: 1.55;
+  max-width: 7in; margin: 0 auto;
+}
+#agentPrintDoc .ad-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+#agentPrintDoc .ad-mark-svg { width: 118px; height: 28px; display: block; }
+#agentPrintDoc .ad-head-right { text-align: right; }
+#agentPrintDoc .ad-name { font-size: 17pt; line-height: 1.15; margin: 0; }
+#agentPrintDoc .ad-sub-line { font-size: 8pt; color: #666; margin-top: 2px; letter-spacing: 0.04em; text-transform: uppercase; }
+#agentPrintDoc .ad-rule { height: 2px; background: #111; margin: 12px 0 0; }
+#agentPrintDoc .ad-doctitle { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; margin: 16px 0 6px; }
+#agentPrintDoc .ad-doctitle h2 { font-size: 13pt; margin: 0; }
+#agentPrintDoc .ad-doctitle span { font-size: 8pt; color: #666; }
+/* A question and its answer are one unit; a page break between them reads as a
+   stray answer with no question above it. */
+#agentPrintDoc .ad-turn { margin-top: 15px; page-break-inside: avoid; break-inside: avoid; }
+#agentPrintDoc .ad-q { font-weight: 600; font-size: 10pt; margin: 0 0 1px; }
+#agentPrintDoc .ad-when { font-size: 7.5pt; color: #777; margin: 0 0 5px; letter-spacing: 0.03em; }
+/* The answer is already plain text: pre-wrap keeps the blank lines the response
+   contract puts between its sections without turning them into markup. */
+#agentPrintDoc .ad-a { white-space: pre-wrap; margin: 0; padding-left: 11px; border-left: 1.5px solid #ddd; }
+#agentPrintDoc .ad-failed { color: #777; font-style: italic; }
+#agentPrintDoc .ad-foot { margin-top: 22px; padding-top: 8px; border-top: 1px solid #ddd; font-size: 7.5pt; color: #777; }
+</style>
+<script>
+/* Agent conversation → PDF. Mirrors AIADPlanExport: claim the node, fill it,
+   wait for fonts, print, then empty it so a later manual Ctrl+P cannot print a
+   stale conversation. */
+(function () {
+    'use strict';
+    if (window.AIADAgentExport) return;
+
+    var busy = false;
+
+    function esc(t) {
+        return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+    function toast(m) { if (window.showToast) showToast(m); else console.warn('[AIAD agent export]', m); }
+    function uid() {
+        if (typeof window.aiadResolvedUserId === 'function') {
+            var u = window.aiadResolvedUserId();
+            if (u) return u;
+        }
+        return (window.AppState && AppState.currentUser) ? AppState.currentUser.id : null;
+    }
+    function stamp(v) {
+        if (!v) return '';
+        var d = new Date(v);
+        if (isNaN(d.getTime())) return '';
+        return d.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' }) +
+               ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    }
+    function dayOnly(v) {
+        if (!v) return '—';
+        var d = new Date(v);
+        return isNaN(d.getTime()) ? '—'
+            : d.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
+
+    var MARK =
+        '<svg class="ad-mark-svg" viewBox="0 0 420 100" xmlns="http://www.w3.org/2000/svg" fill="none" aria-label="AIAD">' +
+          '<circle cx="50" cy="50" r="44" stroke="#111111" stroke-width="2" fill="none"/>' +
+          '<circle cx="50" cy="50" r="34" fill="#111111"/>' +
+          '<rect x="18" y="41" width="64" height="18" rx="9" fill="#ffffff"/>' +
+          '<circle cx="36" cy="50" r="3.2" fill="#111111"/>' +
+          '<circle cx="64" cy="50" r="3.2" fill="#111111"/>' +
+          '<text x="112" y="70" font-family="Lora, Georgia, serif" font-weight="600" font-size="58" fill="#111111" letter-spacing="2">AIAD</text>' +
+        '</svg>';
+
+    function fontsReady() {
+        try { return document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve(); }
+        catch (e) { return Promise.resolve(); }
+    }
+
+    async function fetchThread(convoId) {
+        var client = (typeof db !== 'undefined' && db) || window.db;
+        if (!client) throw new Error('not connected');
+        var r = await client.from('agent_results')
+            .select('title,question,answer,status,created_at')
+            .eq('conversation_id', convoId)
+            .order('created_at', { ascending: true });
+        if (r.error) throw new Error(r.error.message);
+        return r.data || [];
+    }
+
+    function buildDoc(rows) {
+        var titled = rows.filter(function (r) { return r.title; })[0];
+        var title = (titled && titled.title) || 'Conversation';
+        var turns = rows.map(function (r) {
+            var failed = String(r.status || '').toLowerCase() === 'failed';
+            return '<div class="ad-turn">' +
+                     '<p class="ad-q">' + esc(r.question) + '</p>' +
+                     (r.created_at ? '<p class="ad-when">' + esc(stamp(r.created_at)) + '</p>' : '') +
+                     '<p class="ad-a' + (failed ? ' ad-failed' : '') + '">' +
+                       esc(failed && !r.answer ? 'This question did not get an answer.' : r.answer) +
+                     '</p>' +
+                   '</div>';
+        }).join('');
+        return '<div class="ad-page">' +
+                 '<div class="ad-head">' + MARK +
+                   '<div class="ad-head-right">' +
+                     '<p class="ad-name">AIAD Agent</p>' +
+                     '<div class="ad-sub-line">Conversation transcript</div>' +
+                   '</div>' +
+                 '</div>' +
+                 '<div class="ad-rule"></div>' +
+                 '<div class="ad-doctitle"><h2>' + esc(title) + '</h2>' +
+                   '<span>' + esc(dayOnly(rows.length ? rows[0].created_at : null)) + '</span></div>' +
+                 turns +
+                 '<div class="ad-foot">' + rows.length + ' question' + (rows.length === 1 ? '' : 's') +
+                   ' · exported ' + esc(dayOnly(new Date().toISOString())) + '</div>' +
+               '</div>';
+    }
+
+    async function run() {
+        if (busy) return;
+        if (!uid()) { toast('Sign in to export a conversation'); return; }
+        var convoId = (typeof window.aiadActiveConversationId === 'function')
+            ? window.aiadActiveConversationId() : null;
+        // A thread only gets an id once something has been asked in it, so this is
+        // the empty-new-conversation case rather than an error.
+        if (!convoId) { toast('Open a conversation to export it'); return; }
+
+        busy = true;
+        var btn = document.getElementById('agentExportBtn');
+        var label = btn ? btn.innerHTML : null;
+        if (btn) { btn.disabled = true; btn.textContent = 'Preparing…'; }
+
+        // Claimed and cleared before fetching, so a failed run cannot leave the
+        // previous conversation sitting in the DOM for a manual Ctrl+P to print.
+        var host = document.getElementById('agentPrintDoc');
+        if (!host) {
+            host = document.createElement('div');
+            host.id = 'agentPrintDoc';
+            document.body.appendChild(host);
+        }
+        host.innerHTML = '';
+
+        try {
+            var rows = await fetchThread(convoId);
+            if (!rows.length) { toast('That conversation has nothing to export yet'); return; }
+            host.innerHTML = buildDoc(rows);
+            await fontsReady();
+
+            var cleanup = function () {
+                window.removeEventListener('afterprint', cleanup);
+                if (host && host.parentNode) host.innerHTML = '';
+            };
+            window.addEventListener('afterprint', cleanup);
+            setTimeout(cleanup, 60000);   // Safari fires afterprint unreliably
+
+            window.print();
+        } catch (err) {
+            console.error('[AIAD agent export]', err);
+            toast('Could not build that conversation: ' + (err.message || 'unknown error'));
+            host.innerHTML = '';
+        } finally {
+            busy = false;
+            if (btn) { btn.disabled = false; if (label !== null) btn.innerHTML = label; }
+        }
+    }
+
+    window.AIADAgentExport = { run: run };
 })();
 </script>
 </body>
