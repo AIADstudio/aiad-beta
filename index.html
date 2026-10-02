@@ -4987,7 +4987,13 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             </div>
                     </div> <!-- /studio-layout --></div>
 
-                <div class="dash-view" id="artistCollaboratorsView">
+                <div class="dash-view" id="artistCollaboratorsView" data-tabhost>
+                    <div class="agent-tabs" role="tablist">
+                        <button type="button" class="agent-tab active" data-agent-tab="roster">Roster</button>
+                        <button type="button" class="agent-tab" data-agent-tab="briefs">Briefs</button>
+                    </div>
+
+                    <div class="agent-tabpanel active" data-agent-panel="roster">
                     <div class="studio-layout">
                     <div> <!-- main -->
                     <div class="view-header">
@@ -5039,6 +5045,9 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 </div>
             </div>
                     </div> <!-- /studio-layout --></div>
+
+                    <div class="agent-tabpanel" data-agent-panel="briefs" id="artistBriefsPanel"></div>
+                </div><!-- /artistCollaboratorsView -->
 
                 <div class="dash-view" id="artistMusicView">
                     <div class="studio-layout">
@@ -9463,6 +9472,10 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                         My Collaborations
                         
                     </div>
+                    <div class="collab-nav-item" onclick="showCollabView('briefs')">
+                        <svg class="collab-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                        Open Briefs
+                    </div>
                     <div class="collab-nav-item" onclick="showCollabView('discover')">
                         <svg class="collab-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
                         Discover Artists
@@ -9572,6 +9585,8 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                         </div>
                     </div>
                 </div>
+
+                <div class="collab-view" id="collabBriefsView" style="display:none;"></div>
 
                 <div class="collab-view" id="collabDiscoverView">
                     <div class="collab-page-header">
@@ -9784,6 +9799,12 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                         <div class="collab-settings-row">
                             <span class="collab-settings-label">Role(s)</span>
                             <span class="collab-settings-value" id="settingsCollabRoles">—</span>
+                            <select id="settingsCollabRolesInput" multiple size="6" class="collab-search-input"
+                                    style="display:none;max-width:260px;padding:6px;height:auto;"></select>
+                            <button type="button" class="collab-btn-secondary" id="collabEditRolesBtn"
+                                    onclick="AIADCollabRoles.edit()" style="padding:5px 12px;font-size:0.78rem;">Edit</button>
+                            <button type="button" class="collab-btn-secondary" id="collabSaveRolesBtn"
+                                    onclick="AIADCollabRoles.save()" style="display:none;padding:5px 12px;font-size:0.78rem;">Save</button>
                         </div>
                         <div class="collab-settings-row">
                             <span class="collab-settings-label">Location</span>
@@ -15116,6 +15137,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             artistMoneyView:    (t) => aiadLoadMoneyTab(t),
             artistStoreHubView: (t) => aiadLoadStoreTab(t),
             artistCatalogView:  (t) => aiadLoadCatalogTab(t),
+            artistCollaboratorsView: (t) => aiadLoadCollabTab(t),
         };
 
         // Lifted verbatim out of the three branches this replaces. The distribute
@@ -15139,6 +15161,15 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             }
         }
         window.aiadLoadCatalogTab = aiadLoadCatalogTab;
+
+        function aiadLoadCollabTab(tab) {
+            if (tab === 'roster') {
+                setTimeout(() => { try { loadCollaborators(); } catch (e) {} }, 100);
+            } else if (tab === 'briefs') {
+                setTimeout(() => { try { window.AIADBriefs && AIADBriefs.open(); } catch (e) {} }, 60);
+            }
+        }
+        window.aiadLoadCollabTab = aiadLoadCollabTab;
 
         function aiadViewTab(hostId, name) {
             const host = document.getElementById(hostId);
@@ -15294,7 +15325,8 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             } else if (view === 'collaborators') {
                 viewEl.classList.add('active');
                 markNav('collaborators');
-                setTimeout(() => { try { loadCollaborators(); } catch (e) {} }, 100);
+                aiadViewTab('artistCollaboratorsView', 'roster');
+                aiadLoadCollabTab('roster');
             } else if (view === 'money' || view === 'revenue' || view === 'payouts'
                        || view === 'analytics' || view === 'mystats') {
                 viewEl.classList.add('active');
@@ -23989,6 +24021,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
 
             const viewMap = {
                 'home': 'collabHomeView',
+                'briefs': 'collabBriefsView',
                 'discover': 'collabDiscoverView',
                 'artists': 'collabArtistsView',
                 'feed': 'collabFeedView',
@@ -24026,8 +24059,9 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             if (viewId === 'feed') setTimeout(loadCollabFeed, 100);
             if (viewId === 'payouts') setTimeout(() => { if (window.loadPayouts) loadPayouts('collabPayoutsBody'); }, 60);
             if (viewId === 'inbox') setTimeout(() => _loadSystemInbox('collabSystemInbox', { replace: true }), 60);
-            if (viewId === 'settings') setTimeout(populateCollabSettings, 100);
+            if (viewId === 'settings') setTimeout(() => { populateCollabSettings(); try { window.AIADCollabRoles && AIADCollabRoles.show(); } catch (e) {} }, 100);
             if (viewId === 'discover') setTimeout(loadCollabDiscover, 100);
+            if (viewId === 'briefs') setTimeout(() => { try { window.AIADOpenBriefs && AIADOpenBriefs.open(); } catch (e) {} }, 60);
         }
 
         function setCollabStatus(status) {
@@ -44781,6 +44815,474 @@ body.aiad-pdrawer-lock{overflow:hidden;}
   .aiad-pdrawer-panel,.aiad-pdrawer-scrim,.aiad-store-img,.aiad-store-quick{transition:none;}
 }
 </style>
+
+<script>
+/* ── Collaborator brief board ────────────────────────────────────────────────
+   Artists post briefs; collaborators quote on them. Three surfaces: the Briefs
+   tab in the artist's Collaborators view, Open Briefs in the collaborator
+   dashboard, and the collab_roles picker in collaborator settings that decides
+   which briefs reach them.
+
+   Reads and writes go through the ordinary anon client, never a service role.
+   RLS already decides what is visible — an artist sees their own briefs and the
+   offers on them, a collaborator sees open briefs and their own offers — so
+   nothing here re-checks ownership on top of it. */
+(function () {
+    'use strict';
+
+    var ROLES = [
+        'Producer', 'Mixing Engineer', 'Mastering Engineer', 'Songwriter', 'Topliner',
+        'Session Musician', 'Photographer', 'Videographer', 'Director',
+        'Graphic Designer', 'Stylist', 'Choreographer', 'Editor', 'Creative Director'
+    ];
+    window.AIAD_COLLAB_ROLES = ROLES;
+
+    function $(id) { return document.getElementById(id); }
+    function esc(v) {
+        return String(v == null ? '' : v).replace(/[&<>"]/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+        });
+    }
+    function uid() {
+        try { if (window.aiadResolvedUserId) return window.aiadResolvedUserId(); } catch (e) {}
+        try { return (window.AppState && AppState.currentUser && AppState.currentUser.id) || null; } catch (e) { return null; }
+    }
+    function toast(m) { try { (window.showToast || window.alert)(m); } catch (e) {} }
+    // Cents in, string out. Never the other direction: quotes are integers of
+    // cents everywhere, and a float would round its way into a wrong invoice.
+    function money(cents, cur) {
+        var n = (Number(cents) || 0) / 100;
+        try { return n.toLocaleString(undefined, { style: 'currency', currency: cur || 'USD' }); }
+        catch (e) { return (cur || 'USD') + ' ' + n.toFixed(2); }
+    }
+    function budget(b) {
+        if (b.budget_min == null && b.budget_max == null) return 'Budget open';
+        var c = b.currency || 'USD';
+        if (b.budget_min != null && b.budget_max != null) return money(b.budget_min * 100, c) + ' – ' + money(b.budget_max * 100, c);
+        return (b.budget_min != null ? 'From ' + money(b.budget_min * 100, c) : 'Up to ' + money(b.budget_max * 100, c));
+    }
+    function roleOptions(sel) {
+        return ROLES.map(function (r) {
+            return '<option value="' + esc(r) + '"' + (r === sel ? ' selected' : '') + '>' + esc(r) + '</option>';
+        }).join('');
+    }
+    // profiles is a separate table from the auth user these rows point at, so the
+    // names come from their own query. A failure here costs a label, not the view.
+    async function nameMap(ids) {
+        var out = {};
+        var want = ids.filter(function (v, i, a) { return v && a.indexOf(v) === i; });
+        if (!want.length) return out;
+        try {
+            var r = await db.from('profiles').select('id,full_name,username').in('id', want);
+            (r.data || []).forEach(function (p) { out[p.id] = p.full_name || p.username || 'A collaborator'; });
+        } catch (e) {}
+        return out;
+    }
+
+    /* ── Moodboard ───────────────────────────────────────────────────────────
+       Same upload path and the same {url,type,name} rows the post composer
+       writes into artist_posts.media, into the same artist-media bucket.
+       sync-masters is for masters and is never touched from here.
+
+       The ten-item ceiling is a CHECK on the column. It is enforced here too, so
+       an eleventh file is refused before it is uploaded rather than after the
+       insert comes back rejected with the bytes already stored. */
+    var MOOD_MAX = 10;
+    var mood = [];
+
+    async function moodAdd(input) {
+        var files = Array.prototype.slice.call(input.files || []);
+        input.value = '';
+        if (!files.length) return;
+        var u = uid();
+        if (!u) { toast('Sign in to add a moodboard.'); return; }
+        if (mood.length + files.length > MOOD_MAX) {
+            toast('A moodboard holds ' + MOOD_MAX + ' items. ' + (MOOD_MAX - mood.length) + ' left.');
+            files = files.slice(0, MOOD_MAX - mood.length);
+            if (!files.length) return;
+        }
+        for (var i = 0; i < files.length; i++) {
+            var f = files[i];
+            var ext = (f.name.split('.').pop() || 'bin').toLowerCase();
+            var path = 'briefs/' + u + '/' + Date.now() + '-' + i + '.' + ext;
+            try {
+                var up = await window.aiadStorageUpload('artist-media', path, f, f.type);
+                if (!up.ok || !up.publicUrl) {
+                    window.__aiadReportError && window.__aiadReportError('storage.upload', 'artist-media', new Error('brief ' + up.status), { path: path });
+                    toast('Could not upload ' + f.name);
+                    continue;
+                }
+                mood.push({ url: up.publicUrl, type: (f.type || '').indexOf('video') === 0 ? 'video' : 'image', name: f.name || null });
+            } catch (e) { toast('Could not upload ' + f.name); }
+        }
+        renderMood();
+    }
+    function moodRemove(i) { mood.splice(i, 1); renderMood(); }
+    function renderMood() {
+        var host = $('briefMoodList');
+        if (!host) return;
+        host.innerHTML = mood.length
+            ? mood.map(function (m, i) {
+                return '<span style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;margin:0 6px 6px 0;' +
+                       'border:1px solid var(--border-default);border-radius:8px;font-size:0.76rem;">' +
+                       esc(m.name || m.type) +
+                       '<button type="button" onclick="AIADBriefs.moodRemove(' + i + ')" ' +
+                       'style="background:none;border:none;color:var(--text-muted);cursor:pointer;">×</button></span>';
+              }).join('')
+            : '<span style="font-size:0.78rem;color:var(--text-muted);">No moodboard items yet.</span>';
+        var c = $('briefMoodCount');
+        if (c) c.textContent = mood.length + ' / ' + MOOD_MAX;
+    }
+
+    /* ── Artist side ─────────────────────────────────────────────────────── */
+    var A = { list: [], err: null, busy: false, openId: null, offers: [], names: {} };
+
+    async function load() {
+        var u = uid();
+        if (!u) { A.err = 'Sign in to post a brief.'; A.list = []; return; }
+        A.busy = true; render();
+        // The embedded offers are what the counts are drawn from; the brief-owner
+        // SELECT policy is what makes them readable.
+        var r = await db.from('collab_briefs')
+            .select('id,role,title,description,budget_min,budget_max,currency,deadline,moodboard,status,created_at,collab_offers(id,status)')
+            .eq('artist_id', u).order('created_at', { ascending: false });
+        A.busy = false;
+        if (r.error) { A.err = r.error.message; A.list = []; return; }
+        A.err = null; A.list = r.data || [];
+    }
+
+    async function openBrief(id) {
+        A.openId = id; A.offers = []; render();
+        var r = await db.from('collab_offers')
+            .select('id,collaborator_id,quote_cents,currency,message,status,platform_fee_bps,created_at')
+            .eq('brief_id', id).order('created_at', { ascending: true });
+        if (r.error) { toast('Could not load offers: ' + r.error.message); return; }
+        A.offers = r.data || [];
+        A.names = await nameMap(A.offers.map(function (o) { return o.collaborator_id; }));
+        render();
+    }
+    function closeBrief() { A.openId = null; A.offers = []; render(); }
+
+    async function accept(offerId) {
+        var r;
+        try { r = await db.rpc('accept_collab_offer', { p_offer_id: offerId }); }
+        catch (e) { toast('Could not accept that quote.'); return; }
+        if (r.error) { toast('Could not accept that quote: ' + r.error.message); return; }
+        var d = r.data || {};
+        // The function reports its own refusals in the payload rather than raising,
+        // so a 200 is not the same as an acceptance.
+        if (!d.ok) {
+            toast({
+                not_authenticated: 'Sign in again to accept this quote.',
+                offer_not_found:   'That quote no longer exists.',
+                brief_not_found:   'That brief no longer exists.',
+                not_brief_owner:   'That brief is not yours to fill.',
+                brief_not_open:    'This brief is already filled or closed.',
+                offer_not_pending: 'That quote is no longer pending.'
+            }[d.error] || ('Could not accept that quote: ' + (d.error || 'unknown')));
+            await load(); render(); return;
+        }
+        var cur = d.currency || 'USD';
+        toast('Booked. Quote ' + money(d.quote_cents, cur) +
+              ', AIAD fee ' + money(d.fee_cents, cur) +
+              ', they receive ' + money(d.net_cents, cur) + '.');
+        await load(); await openBrief(d.brief_id);
+    }
+
+    async function post() {
+        var u = uid();
+        if (!u) { toast('Sign in to post a brief.'); return; }
+        var role = ($('briefRole') || {}).value || '';
+        var title = (($('briefTitle') || {}).value || '').trim();
+        if (!role || !title) { toast('A brief needs a role and a title.'); return; }
+        if (mood.length > MOOD_MAX) { toast('A moodboard holds ' + MOOD_MAX + ' items.'); return; }
+        var minV = (($('briefMin') || {}).value || '').trim();
+        var maxV = (($('briefMax') || {}).value || '').trim();
+        var bMin = minV === '' ? null : parseInt(minV, 10);
+        var bMax = maxV === '' ? null : parseInt(maxV, 10);
+        if (bMin != null && bMax != null && bMax < bMin) { toast('The top of the budget is below the bottom.'); return; }
+        var row = {
+            artist_id: u, role: role, title: title,
+            description: (($('briefDesc') || {}).value || '').trim() || null,
+            budget_min: bMin, budget_max: bMax,
+            currency: (($('briefCurrency') || {}).value || 'USD'),
+            deadline: (($('briefDeadline') || {}).value || '') || null,
+            moodboard: mood
+        };
+        var btn = $('briefPostBtn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Posting…'; }
+        var r = await db.from('collab_briefs').insert(row).select('id').maybeSingle();
+        if (btn) { btn.disabled = false; btn.textContent = 'Post brief'; }
+        if (r.error) { toast('Could not post that brief: ' + r.error.message); return; }
+        mood = [];
+        ['briefTitle', 'briefDesc', 'briefMin', 'briefMax', 'briefDeadline'].forEach(function (id) {
+            var el = $(id); if (el) el.value = '';
+        });
+        toast('Brief posted.');
+        await load(); render();
+    }
+
+    async function setStatus(id, status) {
+        var r = await db.from('collab_briefs').update({ status: status }).eq('id', id);
+        if (r.error) { toast('Could not update that brief: ' + r.error.message); return; }
+        await load(); render();
+    }
+
+    function render() {
+        var host = $('artistBriefsPanel');
+        if (!host) return;
+        var form =
+            '<div class="view-header"><div>' +
+              '<h1 class="view-title">Briefs</h1>' +
+              '<p class="view-subtitle">Post what you need. Collaborators quote, you pick one.</p>' +
+            '</div></div>' +
+            '<div class="rw-card" style="padding:18px;margin-bottom:22px;">' +
+              '<h3 style="margin:0 0 14px;font-size:1rem;">Post a brief</h3>' +
+              '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;">' +
+                '<label style="display:flex;flex-direction:column;gap:5px;font-size:0.76rem;color:var(--text-muted);">Role' +
+                  '<select id="briefRole" class="collab-search-input"><option value="">Choose a role</option>' + roleOptions('') + '</select></label>' +
+                '<label style="display:flex;flex-direction:column;gap:5px;font-size:0.76rem;color:var(--text-muted);">Title' +
+                  '<input id="briefTitle" class="collab-search-input" placeholder="Cover shoot for the single"></label>' +
+                '<label style="display:flex;flex-direction:column;gap:5px;font-size:0.76rem;color:var(--text-muted);">Budget from' +
+                  '<input id="briefMin" class="collab-search-input" type="number" min="0" step="1" placeholder="500"></label>' +
+                '<label style="display:flex;flex-direction:column;gap:5px;font-size:0.76rem;color:var(--text-muted);">Budget to' +
+                  '<input id="briefMax" class="collab-search-input" type="number" min="0" step="1" placeholder="1500"></label>' +
+                '<label style="display:flex;flex-direction:column;gap:5px;font-size:0.76rem;color:var(--text-muted);">Currency' +
+                  '<select id="briefCurrency" class="collab-search-input"><option>USD</option><option>GBP</option><option>EUR</option></select></label>' +
+                '<label style="display:flex;flex-direction:column;gap:5px;font-size:0.76rem;color:var(--text-muted);">Deadline' +
+                  '<input id="briefDeadline" class="collab-search-input" type="date"></label>' +
+              '</div>' +
+              '<label style="display:flex;flex-direction:column;gap:5px;font-size:0.76rem;color:var(--text-muted);margin-top:12px;">Description' +
+                '<textarea id="briefDesc" class="collab-search-input" rows="3" style="height:auto;" placeholder="What the work is, where, and what you need back."></textarea></label>' +
+              '<div style="margin-top:14px;">' +
+                '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">' +
+                  '<span style="font-size:0.76rem;color:var(--text-muted);">Moodboard</span>' +
+                  '<span id="briefMoodCount" style="font-size:0.72rem;color:var(--text-muted);"></span>' +
+                  '<input type="file" id="briefMoodFile" accept="image/*,video/*" multiple style="display:none;" onchange="AIADBriefs.moodAdd(this)">' +
+                  '<button type="button" class="collab-btn-secondary" style="padding:5px 12px;font-size:0.78rem;" ' +
+                          'onclick="document.getElementById(\'briefMoodFile\').click()">Add images</button>' +
+                '</div>' +
+                '<div id="briefMoodList"></div>' +
+              '</div>' +
+              '<button type="button" class="primary-btn" id="briefPostBtn" style="margin-top:16px;" onclick="AIADBriefs.post()">Post brief</button>' +
+            '</div>';
+
+        var body;
+        if (A.busy) body = '<p class="empty">Loading your briefs…</p>';
+        else if (A.err) body = '<p class="empty">' + esc(A.err) + '</p>';
+        else if (!A.list.length) body = '<p class="empty">No briefs yet. Post one above.</p>';
+        else body = A.list.map(function (b) {
+            var offers = b.collab_offers || [];
+            var pending = offers.filter(function (o) { return o.status === 'pending'; }).length;
+            var open = A.openId === b.id;
+            var head =
+                '<div class="rw-card" style="padding:16px;margin-bottom:12px;">' +
+                  '<div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;">' +
+                    '<div style="flex:1;min-width:0;">' +
+                      '<strong>' + esc(b.title) + '</strong>' +
+                      '<div style="font-size:0.78rem;color:var(--text-muted);margin-top:3px;">' +
+                        esc(b.role) + ' · ' + esc(budget(b)) +
+                        (b.deadline ? ' · by ' + esc(b.deadline) : '') +
+                        ' · ' + esc(b.status) +
+                      '</div>' +
+                    '</div>' +
+                    '<span style="font-size:0.78rem;color:var(--text-muted);">' + offers.length + ' quote' + (offers.length === 1 ? '' : 's') +
+                      (pending ? ' · ' + pending + ' pending' : '') + '</span>' +
+                    '<button type="button" class="collab-btn-secondary" style="padding:5px 12px;font-size:0.78rem;" ' +
+                            'onclick="AIADBriefs.' + (open ? 'closeBrief()' : 'openBrief(\'' + b.id + '\')') + '">' +
+                      (open ? 'Hide quotes' : 'View quotes') + '</button>' +
+                    (b.status === 'open'
+                      ? '<button type="button" class="collab-btn-secondary" style="padding:5px 12px;font-size:0.78rem;" ' +
+                        'onclick="AIADBriefs.setStatus(\'' + b.id + '\',\'closed\')">Close</button>' : '') +
+                  '</div>';
+            if (!open) return head + '</div>';
+            var rows = !A.offers.length
+                ? '<p class="empty" style="margin-top:12px;">No quotes on this brief yet.</p>'
+                : A.offers.map(function (o) {
+                    var fee = Math.round(o.quote_cents * (o.platform_fee_bps || 0) / 10000);
+                    return '<div style="border-top:1px solid var(--border-default);padding:11px 0;display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;">' +
+                             '<div style="flex:1;min-width:0;">' +
+                               '<strong>' + esc(A.names[o.collaborator_id] || 'A collaborator') + '</strong>' +
+                               '<div style="font-size:0.78rem;color:var(--text-muted);margin-top:2px;">' +
+                                 'You pay ' + money(o.quote_cents, o.currency) + ' · they receive ' +
+                                 money(o.quote_cents - fee, o.currency) + ' after the ' + money(fee, o.currency) + ' AIAD fee' +
+                               '</div>' +
+                               (o.message ? '<p style="margin:7px 0 0;font-size:0.82rem;">' + esc(o.message) + '</p>' : '') +
+                             '</div>' +
+                             '<span style="font-size:0.76rem;color:var(--text-muted);">' + esc(o.status) + '</span>' +
+                             (o.status === 'pending' && b.status === 'open'
+                               ? '<button type="button" class="primary-btn" style="padding:5px 14px;font-size:0.78rem;" ' +
+                                 'onclick="AIADBriefs.accept(\'' + o.id + '\')">Accept</button>' : '') +
+                           '</div>';
+                  }).join('');
+            return head + rows + '</div>';
+        }).join('');
+
+        host.innerHTML = form + body;
+        renderMood();
+    }
+
+    async function open() { await load(); render(); }
+
+    window.AIADBriefs = {
+        open: open, post: post, openBrief: openBrief, closeBrief: closeBrief,
+        accept: accept, setStatus: setStatus, moodAdd: moodAdd, moodRemove: moodRemove
+    };
+
+    /* ── Collaborator side ───────────────────────────────────────────────── */
+    var C = { list: [], err: null, busy: false, roles: [], mine: {}, openId: null };
+
+    async function myRoles() {
+        var u = uid();
+        if (!u) return [];
+        try {
+            var r = await db.from('profiles').select('collab_roles').eq('id', u).maybeSingle();
+            return (r.data && r.data.collab_roles) || [];
+        } catch (e) { return []; }
+    }
+
+    async function loadOpen() {
+        // anon holds no grant on these tables, so querying signed out returns a raw
+        // "permission denied for table collab_briefs". Say the useful thing instead.
+        if (!uid()) { C.busy = false; C.err = 'Sign in to see open briefs.'; C.list = []; renderOpen(); return; }
+        C.busy = true; renderOpen();
+        C.roles = await myRoles();
+        var q = db.from('collab_briefs')
+            .select('id,artist_id,role,title,description,budget_min,budget_max,currency,deadline,moodboard,created_at')
+            .eq('status', 'open').order('created_at', { ascending: false });
+        // No roles chosen means every brief, rather than none: an empty filter here
+        // would read as "this collaborator wants nothing".
+        if (C.roles.length) q = q.in('role', C.roles);
+        var r = await q;
+        C.busy = false;
+        if (r.error) { C.err = r.error.message; C.list = []; renderOpen(); return; }
+        C.err = null; C.list = r.data || [];
+        // Their own quotes, so a brief already quoted says so instead of offering
+        // a form that the unique constraint will refuse.
+        var u = uid();
+        C.mine = {};
+        if (u && C.list.length) {
+            var mr = await db.from('collab_offers').select('brief_id,quote_cents,currency,status')
+                .eq('collaborator_id', u).in('brief_id', C.list.map(function (b) { return b.id; }));
+            (mr.data || []).forEach(function (o) { C.mine[o.brief_id] = o; });
+        }
+        renderOpen();
+    }
+
+    async function quote(briefId) {
+        var u = uid();
+        if (!u) { toast('Sign in to send a quote.'); return; }
+        var amtEl = $('quoteAmt-' + briefId);
+        var raw = ((amtEl || {}).value || '').trim();
+        if (!raw) { toast('Enter what you charge.'); return; }
+        var major = Number(raw);
+        if (!isFinite(major) || major < 0) { toast('That is not an amount.'); return; }
+        // Cents as an integer, rounded once, here. The column is an integer and a
+        // float that looks like 4999.999 would truncate into the wrong fee.
+        var cents = Math.round(major * 100);
+        var brief = C.list.filter(function (b) { return b.id === briefId; })[0] || {};
+        var btn = $('quoteBtn-' + briefId);
+        if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+        var r = await db.from('collab_offers').insert({
+            brief_id: briefId, collaborator_id: u, quote_cents: cents,
+            currency: brief.currency || 'USD',
+            message: (($('quoteMsg-' + briefId) || {}).value || '').trim() || null
+        });
+        if (btn) { btn.disabled = false; btn.textContent = 'Send quote'; }
+        if (r.error) {
+            // One quote per collaborator per brief is a unique constraint, and that
+            // is a different thing from the insert having gone wrong.
+            var dup = r.error.code === '23505' || /duplicate key|one_per_collaborator/i.test(r.error.message || '');
+            toast(dup ? 'You have already quoted this brief.' : ('Could not send that quote: ' + r.error.message));
+            if (dup) await loadOpen();
+            return;
+        }
+        toast('Quote sent.');
+        await loadOpen();
+    }
+
+    function renderOpen() {
+        var host = $('collabBriefsView');
+        if (!host) return;
+        var head =
+            '<div class="collab-view-header" style="margin-bottom:18px;">' +
+              '<h1 style="margin:0;font-size:1.5rem;">Open Briefs</h1>' +
+              '<p style="margin:5px 0 0;color:var(--text-muted);font-size:0.86rem;">' +
+                (C.roles.length
+                  ? 'Filtered to your roles: ' + esc(C.roles.join(', ')) + '.'
+                  : 'Every open brief. Set your roles in Settings to narrow this.') +
+              '</p></div>';
+        var body;
+        if (C.busy) body = '<p class="empty">Loading briefs…</p>';
+        else if (C.err) body = '<p class="empty">' + esc(C.err) + '</p>';
+        else if (!C.list.length) body = '<p class="empty">No open briefs for your roles right now.</p>';
+        else body = C.list.map(function (b) {
+            var mine = C.mine[b.id];
+            return '<div class="rw-card" style="padding:16px;margin-bottom:12px;">' +
+                     '<strong>' + esc(b.title) + '</strong>' +
+                     '<div style="font-size:0.78rem;color:var(--text-muted);margin-top:3px;">' +
+                       esc(b.role) + ' · ' + esc(budget(b)) + (b.deadline ? ' · by ' + esc(b.deadline) : '') +
+                     '</div>' +
+                     (b.description ? '<p style="margin:9px 0 0;font-size:0.84rem;">' + esc(b.description) + '</p>' : '') +
+                     ((b.moodboard || []).length
+                       ? '<div style="margin-top:9px;font-size:0.76rem;color:var(--text-muted);">' +
+                         (b.moodboard || []).length + ' moodboard item' + ((b.moodboard || []).length === 1 ? '' : 's') + '</div>' : '') +
+                     (mine
+                       ? '<div style="margin-top:12px;font-size:0.82rem;color:var(--text-muted);">You quoted ' +
+                         money(mine.quote_cents, mine.currency) + ' · ' + esc(mine.status) + '</div>'
+                       : '<div style="margin-top:12px;display:flex;gap:9px;flex-wrap:wrap;align-items:flex-start;">' +
+                           '<input id="quoteAmt-' + b.id + '" class="collab-search-input" type="number" min="0" step="0.01" ' +
+                                  'style="max-width:150px;" placeholder="Your fee">' +
+                           '<input id="quoteMsg-' + b.id + '" class="collab-search-input" style="flex:1;min-width:160px;" ' +
+                                  'placeholder="A line about why you">' +
+                           '<button type="button" class="primary-btn" id="quoteBtn-' + b.id + '" ' +
+                                   'style="padding:7px 15px;font-size:0.8rem;" onclick="AIADOpenBriefs.quote(\'' + b.id + '\')">Send quote</button>' +
+                         '</div>') +
+                   '</div>';
+        }).join('');
+        host.innerHTML = head + body;
+    }
+
+    window.AIADOpenBriefs = { open: loadOpen, quote: quote };
+
+    /* ── collab_roles, in collaborator settings ──────────────────────────── */
+    window.AIADCollabRoles = {
+        async show() {
+            var span = $('settingsCollabRoles');
+            if (!span) return;
+            var roles = await myRoles();
+            if (roles.length) span.textContent = roles.join(', ');
+        },
+        async edit() {
+            var sel = $('settingsCollabRolesInput'), span = $('settingsCollabRoles');
+            if (!sel || !span) return;
+            var roles = await myRoles();
+            sel.innerHTML = ROLES.map(function (r) {
+                return '<option value="' + esc(r) + '"' + (roles.indexOf(r) >= 0 ? ' selected' : '') + '>' + esc(r) + '</option>';
+            }).join('');
+            span.style.display = 'none'; sel.style.display = '';
+            var e = $('collabEditRolesBtn'), s2 = $('collabSaveRolesBtn');
+            if (e) e.style.display = 'none';
+            if (s2) s2.style.display = '';
+        },
+        async save() {
+            var sel = $('settingsCollabRolesInput'), span = $('settingsCollabRoles');
+            var u = uid();
+            if (!sel || !span) return;
+            if (!u) { toast('Sign in to save your roles.'); return; }
+            var picked = Array.prototype.slice.call(sel.selectedOptions || []).map(function (o) { return o.value; });
+            var r = await db.from('profiles').update({ collab_roles: picked }).eq('id', u);
+            if (r.error) { toast('Could not save your roles: ' + r.error.message); return; }
+            span.textContent = picked.join(', ') || '—';
+            span.style.display = ''; sel.style.display = 'none';
+            var e = $('collabEditRolesBtn'), s2 = $('collabSaveRolesBtn');
+            if (e) e.style.display = '';
+            if (s2) s2.style.display = 'none';
+            toast('Roles saved.');
+        }
+    };
+})();
+</script>
 </body>
 
 
