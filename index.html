@@ -4057,9 +4057,7 @@ html, body {
                     <div class="dash-nav-item" data-view="milestones" onclick="showArtistView('milestones')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span> Milestones</span></div>
                     <div class="dash-nav-item" data-view="inbox" onclick="showArtistView('inbox')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><span> Inbox </span><span id="artistInboxBadge" style="display:none;margin-left:auto;background:#f59e0b;color:#111;font-size:0.6rem;font-weight:700;min-width:16px;height:16px;border-radius:999px;display:none;align-items:center;justify-content:center;padding:0 5px;">0</span></div>
                     <div class="dash-nav-item" id="navStore" data-view="store" onclick="showArtistView('store')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg><span> Store</span></div>
-                    <div class="dash-nav-item" id="navDistribute" onclick="showArtistView('distribute')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5"/><polyline points="5 12 12 5 19 12"/><line x1="4" y1="21" x2="20" y2="21"/></svg><span> Distribute</span></div>
-                    <div class="dash-nav-item" id="navLibrary" data-view="library" onclick="showArtistView('library')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span>Library</span></div>
-                    <div class="dash-nav-item" id="navReviewQueue" data-view="review" style="display:none;" onclick="showArtistView('review')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span>Review queue</span><span id="navReviewCount" class="lb-navcount"></span></div>
+                    <div class="dash-nav-item" data-view="catalog" onclick="showArtistView('catalog')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span> Catalog</span></div>                    <div class="dash-nav-item" id="navReviewQueue" data-view="review" style="display:none;" onclick="showArtistView('review')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span>Review queue</span><span id="navReviewCount" class="lb-navcount"></span></div>
                     <div class="dash-nav-item dash-nav-dropdown" onclick="toggleCreativeStudio()">
                         <svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
                         <span>Creative Studio</span>
@@ -4098,7 +4096,7 @@ html, body {
                             <div class="dash-nav-item" data-view="supporters" onclick="showArtistView('supporters')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg><span> Supporters</span></div>
                             <div class="dash-nav-item" data-view="revenue" onclick="showArtistView('revenue')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg><span> Revenue</span></div>
                             <div class="dash-nav-item" data-view="store" onclick="showArtistView('store')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg><span> Store</span></div>
-                            <div class="dash-nav-item" data-view="synclibrary" onclick="showArtistView('synclibrary')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><span> Brand Briefs</span></div>
+                            <div class="dash-nav-item" data-view="catalog" onclick="showArtistView('catalog')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><span> Catalog</span></div>
                             <div class="dash-nav-item" data-view="payouts" onclick="showArtistView('payouts')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg><span> Payouts</span></div>
                         </div>
                     </div>
@@ -5442,7 +5440,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     </div>  <!-- /studio-layout -->
                 </div>
 
-                                 <div class="dash-view" id="artistStoreHubView" data-tabhost>
+                 <div class="dash-view" id="artistStoreHubView" data-tabhost>
                     <div class="agent-tabs" role="tablist">
                         <button type="button" class="agent-tab active" data-agent-tab="design">Design</button>
                         <button type="button" class="agent-tab" data-agent-tab="selling">Selling</button>
@@ -5744,7 +5742,30 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 </div>
                 </div><!-- /artistStoreHubView -->
 
-                <div class="dash-view" id="artistSyncLibraryView">
+                                <div class="dash-view" id="artistCatalogView" data-tabhost>
+                    <div class="agent-tabs" role="tablist">
+                        <button type="button" class="agent-tab active" data-agent-tab="library">Library</button>
+                        <button type="button" class="agent-tab" data-agent-tab="distribute">Distribute</button>
+                        <button type="button" class="agent-tab" data-agent-tab="sync">Sync</button>
+                    </div>
+
+                    <div class="agent-tabpanel active" data-agent-panel="library" id="artistLibraryView"></div>
+
+                    <div class="agent-tabpanel" data-agent-panel="distribute" id="artistDistributeView">
+                    <div class="view-header">
+                        <div>
+                            <h1 class="view-title">Distribute to AIAD</h1>
+                            <p class="view-subtitle">Put a release on the AIAD Streaming Layer. Non-exclusive — keep it on Spotify, Apple, everywhere. AIAD takes 0% of your masters and 0% of your publishing.</p>
+                        </div>
+                        <button class="rw-btn rw-btn-ghost" onclick="AIADRelease.showSpecs()">Requirements</button>
+                    </div>
+                    <div class="rw-steps" id="rwSteps"></div>
+                    <div class="rw-banner" id="rwError" style="display:none"></div>
+                    <div class="rw-busy" id="rwBusy" style="display:none"><span class="rw-spin"></span><span>Working…</span></div>
+                    <div id="rwBody"><div class="rw-card rw-empty">Loading…</div></div>
+                </div>
+
+                    <div class="agent-tabpanel" data-agent-panel="sync" id="artistSyncLibraryView">
                     <div style="max-width:780px;margin:0 auto;padding-bottom:40px;">
                         <div style="margin-bottom:28px;">
                             <h1 style="font-size:1.1rem;font-weight:600;color:var(--text-primary);">Sync Library</h1>
@@ -5836,6 +5857,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                         </div>
                     </div>
                 </div>
+                </div><!-- /artistCatalogView -->
 
                 <!-- ── MY STATS — first-class destination for platform handles + self-reported numbers ── -->
                 
@@ -5846,7 +5868,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 <!-- ── PAYOUTS — Stripe Connect status. No internal wallet, no withdraw. ── -->
                 
 
-                <div class="dash-view" id="artistLibraryView"></div>
+                
 
                 <div class="dash-view" id="artistReviewView"></div>
 
@@ -5877,19 +5899,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     <div id="svPublishBody"><div class="sv-muted">Loading…</div></div>
                 </div>
 
-                <div class="dash-view" id="artistDistributeView">
-                    <div class="view-header">
-                        <div>
-                            <h1 class="view-title">Distribute to AIAD</h1>
-                            <p class="view-subtitle">Put a release on the AIAD Streaming Layer. Non-exclusive — keep it on Spotify, Apple, everywhere. AIAD takes 0% of your masters and 0% of your publishing.</p>
-                        </div>
-                        <button class="rw-btn rw-btn-ghost" onclick="AIADRelease.showSpecs()">Requirements</button>
-                    </div>
-                    <div class="rw-steps" id="rwSteps"></div>
-                    <div class="rw-banner" id="rwError" style="display:none"></div>
-                    <div class="rw-busy" id="rwBusy" style="display:none"><span class="rw-spin"></span><span>Working…</span></div>
-                    <div id="rwBody"><div class="rw-card rw-empty">Loading…</div></div>
-                </div>
+                
 
                 <div class="dash-view" id="artistAgentsView">
                     <div class="agents-page-header">
@@ -15105,7 +15115,30 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         const AIAD_TAB_LOADERS = {
             artistMoneyView:    (t) => aiadLoadMoneyTab(t),
             artistStoreHubView: (t) => aiadLoadStoreTab(t),
+            artistCatalogView:  (t) => aiadLoadCatalogTab(t),
         };
+
+        // Lifted verbatim out of the three branches this replaces. The distribute
+        // wizard is opened the same way it always was, so its own flow is untouched.
+        function aiadLoadCatalogTab(tab) {
+            if (tab === 'library') {
+                setTimeout(() => { if (window.AIADLibrary) AIADLibrary.open(); }, 40);
+            } else if (tab === 'distribute') {
+                setTimeout(() => { if (window.AIADRelease) AIADRelease.open(); }, 60);
+            } else if (tab === 'sync') {
+                setTimeout(() => { try { loadMyListings(); loadSyncCatalog(); } catch (e) {} }, 60);
+                // Eligible-track picker + attestation. Rebuilt each time the tab opens so a
+                // track declared human since the last visit shows up without a reload.
+                setTimeout(() => {
+                    try {
+                        const host = document.getElementById('syncAttestHost');
+                        if (host && window.aiadAttestationHtml) host.innerHTML = window.aiadAttestationHtml();
+                        if (window.aiadRenderSyncTrackPicker) window.aiadRenderSyncTrackPicker();
+                    } catch (e) {}
+                }, 80);
+            }
+        }
+        window.aiadLoadCatalogTab = aiadLoadCatalogTab;
 
         function aiadViewTab(hostId, name) {
             const host = document.getElementById(hostId);
@@ -15148,7 +15181,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 try { window.aiadLoadAgentConvos && window.aiadLoadAgentConvos(); } catch (e) {}
             }, 0);
 
-            const allViews = ['artistLibraryView', 'artistReviewView', 'artistPlanView', 'artistHomeView', 'artistPostsView', 'artistSupportersView', 'artistProjectsView', 'artistMoneyView', 'artistScheduleView', 'artistCollaboratorsView', 'artistMusicView', 'artistSongwritingView', 'artistMixMediaView', 'artistStoreHubView', 'artistSyncLibraryView', 'artistMilestonesView', 'artistAgentsView', 'artistInboxView', 'artistSettingsView', 'artistDistributeView', 'episodesView', 'publishView'];
+            const allViews = ['artistCatalogView', 'artistReviewView', 'artistPlanView', 'artistHomeView', 'artistPostsView', 'artistSupportersView', 'artistProjectsView', 'artistMoneyView', 'artistScheduleView', 'artistCollaboratorsView', 'artistMusicView', 'artistSongwritingView', 'artistMixMediaView', 'artistStoreHubView', 'artistMilestonesView', 'artistAgentsView', 'artistInboxView', 'artistSettingsView', 'episodesView', 'publishView'];
             allViews.forEach(v => {
                 const el = document.getElementById(v);
                 if (el) el.classList.remove('active');
@@ -15204,12 +15237,15 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 // of one Store view. Both old keys still resolve and pick their tab.
                 'store': 'artistStoreHubView',
                 'merch': 'artistStoreHubView',
-                'synclibrary': 'artistSyncLibraryView',
+                // Library, Distribute and the Sync Library are tabs of one Catalog view.
+                // Every old key still resolves and picks its tab.
+                'catalog': 'artistCatalogView',
+                'library': 'artistCatalogView',
+                'distribute': 'artistCatalogView',
+                'synclibrary': 'artistCatalogView',
                 'milestones': 'artistMilestonesView',
                 'inbox': 'artistInboxView',
                 'settings': 'artistSettingsView',
-                'distribute': 'artistDistributeView',
-                'library': 'artistLibraryView',
                 'review': 'artistReviewView',
                 // Streaming vertical
                 'episodes': 'episodesView',
@@ -15286,21 +15322,14 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 if (submenu) submenu.classList.add('open');
                 markSub('mixmedia');
                 // history rendered by generation callback
-            } else if (view === 'synclibrary') {
+            } else if (view === 'catalog' || view === 'library'
+                       || view === 'distribute' || view === 'synclibrary') {
                 viewEl.classList.add('active');
-                if (dropdown) dropdown.classList.add('open');
-                if (submenu) submenu.classList.add('open');
-                markSub('synclibrary');
-                setTimeout(() => { try { loadMyListings(); loadSyncCatalog(); } catch (e) {} }, 60);
-                // Eligible-track picker + attestation. Rebuilt each time the view opens so a
-                // track declared human since the last visit shows up without a reload.
-                setTimeout(() => {
-                    try {
-                        const host = document.getElementById('syncAttestHost');
-                        if (host && window.aiadAttestationHtml) host.innerHTML = window.aiadAttestationHtml();
-                        if (window.aiadRenderSyncTrackPicker) window.aiadRenderSyncTrackPicker();
-                    } catch (e) {}
-                }, 80);
+                markNav('catalog');
+                const catTab = (view === 'catalog') ? 'library'
+                             : (view === 'synclibrary') ? 'sync' : view;
+                aiadViewTab('artistCatalogView', catTab);
+                aiadLoadCatalogTab(catTab);
             } else if (view === 'milestones') {
                 viewEl.classList.add('active');
                 markNav('milestones');
@@ -15315,10 +15344,6 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 const storeTab = (view === 'merch') ? 'design' : 'selling';
                 aiadViewTab('artistStoreHubView', storeTab);
                 aiadLoadStoreTab(storeTab);
-            } else if (view === 'distribute') {
-                viewEl.classList.add('active');
-                const _nd = document.getElementById('navDistribute'); if (_nd) _nd.classList.add('active');
-                setTimeout(() => { if (window.AIADRelease) AIADRelease.open(); }, 60);
             } else if (view === 'episodes') {
                 viewEl.classList.add('active');
                 markNav('episodes');
@@ -42945,7 +42970,6 @@ window.AIAD_PROMPTS = [
     var TABS = [
         { id: 'releases', label: 'Releases' },
         { id: 'streaming', label: 'Streaming' },
-        { id: 'sync', label: 'Sync Library' },
         { id: 'private', label: 'Private' },
         { id: 'ai', label: 'AI Generated' }
     ];
@@ -43001,21 +43025,10 @@ window.AIAD_PROMPTS = [
                '<div class="lb-group">' + rows.map(function (t) { return trackRow(t); }).join('') + '</div>';
     }
 
-    /* Sync Library is MOVED, not rebuilt: the existing view element is relocated
-       into this panel the first time the tab is opened. One copy, all its existing
-       wiring intact. */
-    function mountSync() {
-        var panel = document.getElementById('lbPanel');
-        var sync = document.getElementById('artistSyncLibraryView');
-        if (!panel || !sync) return;
-        if (sync.parentNode !== panel) panel.appendChild(sync);
-        sync.classList.add('active');
-        sync.style.display = '';
-    }
-    function unmountSync() {
-        var sync = document.getElementById('artistSyncLibraryView');
-        if (sync) { sync.classList.remove('active'); sync.style.display = 'none'; }
-    }
+    /* Sync Library used to be relocated into #lbPanel the first time this view's
+       'sync' tab was opened. It is a Catalog tab in its own right now, so nothing
+       moves it: it stays a panel of the Catalog view, where showArtistView can
+       actually reach it. */
 
     function render() {
         var el = host();
@@ -43050,7 +43063,6 @@ window.AIAD_PROMPTS = [
             '<div class="lb-tabs">' + tabs + '</div>' +
             '<div id="lbPanel" class="lb-panel">' + body + '</div>';
 
-        if (LS.tab === 'sync') mountSync(); else unmountSync();
     }
 
     function setTab(id) {
@@ -44183,8 +44195,6 @@ window.AIAD_PROMPTS = [
             ms.setAttribute('onclick', on ? "showArtistView('episodes');setMobileNav(this)" : "showArtistView('music');setMobileNav(this)");
             if (ms.lastChild && ms.lastChild.nodeType === 3) ms.lastChild.nodeValue = on ? 'Episodes' : 'Studio';
         }
-        // Brand Briefs is the Sync Library relabelled — same listings, same brief system.
-        var sl = document.querySelector('#artistSyncLibraryView h1'); if (sl) sl.textContent = on ? 'Brand Briefs' : 'Sync Library';
         if (on) {
             restoreGroups();
             var h = (location.hash || '').replace(/^#artist\//, '');
