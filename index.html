@@ -4050,16 +4050,13 @@ html, body {
                     <div class="dash-nav-item" id="navHome" data-view="home" onclick="showArtistView('home')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span> Home</span></div>
                     <div class="dash-nav-item active" data-view="posts" onclick="showArtistView('posts')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/></svg><span> Posts</span></div>
                     <div class="dash-nav-item" data-view="agent" onclick="showArtistView('agent')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span> AIAD Agent</span></div>
+                    <div class="dash-nav-item" data-view="money" onclick="showArtistView('money')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg><span> Money</span></div>
                     <div class="dash-nav-item" data-view="supporters" onclick="showArtistView('supporters')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg><span> Supporters</span></div>
                     <div class="dash-nav-item" data-view="collaborators" onclick="showArtistView('collaborators')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg><span> Collaborators</span></div>
                     <div class="dash-nav-item" data-view="plan" onclick="showArtistView('plan')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span>Plan</span></div>
-                    <div class="dash-nav-item" data-view="revenue" onclick="showArtistView('revenue')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg><span> Revenue</span></div>
-                    <div class="dash-nav-item" data-view="analytics" onclick="showArtistView('analytics')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span> Analytics</span></div>
-                    <div class="dash-nav-item" id="navMyStats" data-view="mystats" onclick="showArtistView('mystats')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span> My Stats</span></div>
                     <div class="dash-nav-item" data-view="milestones" onclick="showArtistView('milestones')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span> Milestones</span></div>
                     <div class="dash-nav-item" data-view="inbox" onclick="showArtistView('inbox')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><span> Inbox </span><span id="artistInboxBadge" style="display:none;margin-left:auto;background:#f59e0b;color:#111;font-size:0.6rem;font-weight:700;min-width:16px;height:16px;border-radius:999px;display:none;align-items:center;justify-content:center;padding:0 5px;">0</span></div>
                     <div class="dash-nav-item" id="navStore" data-view="store" onclick="showArtistView('store')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg><span> Store</span></div>
-                    <div class="dash-nav-item" id="navPayouts" data-view="payouts" onclick="showArtistView('payouts')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg><span> Payouts</span></div>
                     <div class="dash-nav-item" id="navDistribute" onclick="showArtistView('distribute')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5"/><polyline points="5 12 12 5 19 12"/><line x1="4" y1="21" x2="20" y2="21"/></svg><span> Distribute</span></div>
                     <div class="dash-nav-item" id="navLibrary" data-view="library" onclick="showArtistView('library')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span>Library</span></div>
                     <div class="dash-nav-item" id="navReviewQueue" data-view="review" style="display:none;" onclick="showArtistView('review')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span>Review queue</span><span id="navReviewCount" class="lb-navcount"></span></div>
@@ -4268,7 +4265,15 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             </div>
                     </div> <!-- /studio-layout --></div>
 
-                <div class="dash-view" id="artistRevenueView">
+                <div class="dash-view" id="artistMoneyView" data-tabhost>
+                    <div class="agent-tabs" role="tablist">
+                        <button type="button" class="agent-tab active" data-agent-tab="revenue">Revenue</button>
+                        <button type="button" class="agent-tab" data-agent-tab="payouts">Payouts</button>
+                        <button type="button" class="agent-tab" data-agent-tab="analytics">Analytics</button>
+                        <button type="button" class="agent-tab" data-agent-tab="mystats">My Stats</button>
+                    </div>
+
+                    <div class="agent-tabpanel active" data-agent-panel="revenue" id="artistRevenueView">
                     <div class="studio-layout">
                     <div> <!-- main -->
                     <div class="view-header">
@@ -4358,6 +4363,162 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 </div>
             </div>
                     </div> <!-- /studio-layout --></div>
+
+                    <div class="agent-tabpanel" data-agent-panel="payouts" id="artistPayoutsView">
+                    <div class="view-header">
+                        <div>
+                            <h1 class="view-title">Payouts</h1>
+                            <p class="view-subtitle">Stripe holds your money and pays it out. AIAD takes 10% of each sale and never touches the rest.</p>
+                        </div>
+                    </div>
+                    <div id="payoutsBody"></div>
+                </div>
+
+                    <div class="agent-tabpanel" data-agent-panel="analytics" id="artistAnalyticsView">
+                    <div class="studio-layout">
+                    <div> <!-- main -->
+                    <div class="analytics-page-header">
+                        <h1 class="analytics-page-title">Analytics</h1>
+                        <p class="analytics-page-subtitle">Real data across every platform you're on.</p>
+                    </div>
+
+                    <!-- Connected platforms and every connect control used to live here.
+                         They now live in My Stats, which is the single home for stats:
+                         connect + scan at the top, self-reported numbers below. Analytics
+                         keeps only its charts and AI insights. -->
+
+
+                    <div id="spotifyDataSection" style="display:none;margin-bottom:28px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                            <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);">Spotify</div>
+                            <button onclick="disconnectSpotify()" style="padding:6px 14px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:6px;color:var(--text-secondary);font-size:0.75rem;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.06)'">Disconnect</button>
+                        </div>
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:12px;margin-bottom:20px;">
+                            <div class="analytics-summary-card">
+                                <div class="analytics-summary-label">Profile</div>
+                                <div id="spotifyDisplayName" class="analytics-summary-value" style="font-size:1rem;">—</div>
+                                <div id="spotifyFollowers" style="font-size:0.7rem;color:var(--text-muted);">— followers</div>
+                            </div>
+                            <div class="analytics-summary-card">
+                                <div class="analytics-summary-label">Account Type</div>
+                                <div id="spotifyProduct" class="analytics-summary-value" style="font-size:1rem;">—</div>
+                            </div>
+                            <div class="analytics-summary-card">
+                                <div class="analytics-summary-label">Country</div>
+                                <div id="spotifyCountry" class="analytics-summary-value" style="font-size:1rem;">—</div>
+                            </div>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:20px;">
+                            <div style="font-size:0.75rem;font-weight:600;color:var(--text-primary);margin-bottom:14px;">Your Top Tracks — Last 4 Weeks</div>
+                            <div id="spotifyTopTracks" style="display:flex;flex-direction:column;gap:10px;"></div>
+                        </div>
+                    </div>
+
+                    <div class="time-period-selector">
+                        <button class="time-period-btn" onclick="setAnalyticsPeriod(7, this)">7 days</button>
+                        <button class="time-period-btn active" onclick="setAnalyticsPeriod(30, this)">30 days</button>
+                        <button class="time-period-btn" onclick="setAnalyticsPeriod(90, this)">90 days</button>
+                        <button class="time-period-btn" onclick="setAnalyticsPeriod(365, this)">12 months</button>
+                    </div>
+
+                    <div id="analyticsBody"></div>
+                    <div class="aiad-insights" id="analyticsAiadObservations">
+                        <div class="aiad-insights-header">
+                            <div class="aiad-insights-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+                            </div>
+                            <span class="aiad-insights-title">AIAD OBSERVATIONS</span>
+                        </div>
+                        <div style="font-size:0.85rem;color:var(--text-muted);font-style:italic;padding:8px 0;">Observations will appear here once you have activity data.</div>
+                    </div>
+                
+                    </div> <!-- /main -->
+            <div class="studio-agent-col" id="analyticsAiadPanel" style="position:sticky;top:24px;">
+                <div class="studio-agent-header">
+                    <div class="studio-agent-dot"></div>
+                    <span class="studio-agent-name">AIAD · Analytics Insights</span>
+                </div>
+                <div style="padding:11px 13px;border-bottom:1px solid var(--border-default);">
+                    <div class="aiad-obs-item"><p>Listeners staying past the first 30 seconds matters more than raw play count.</p></div>
+                    <div class="aiad-obs-item"><p>Save rate matters more than play count for Spotify editorial consideration.</p></div>
+                </div>
+                <div class="studio-agent-chips">
+                    <div class="studio-agent-chips-label">Quick prompts</div>
+                    <button class="studio-agent-chip" onclick="studioAgentChip('analytics',this)">What metrics matter most</button><button class="studio-agent-chip" onclick="studioAgentChip('analytics',this)">How to read save rate</button><button class="studio-agent-chip" onclick="studioAgentChip('analytics',this)">Improve stream-to-follow ratio</button><button class="studio-agent-chip" onclick="studioAgentChip('analytics',this)">Understand my audience</button>
+                </div>
+                <div class="studio-agent-messages" id="analyticsAgentMsgs">
+                    <div class="studio-agent-msg agent">Ask me anything about analytics insights.</div>
+                </div>
+                <div class="studio-agent-input-row">
+                    <textarea class="studio-agent-input" id="analyticsAgentInput" placeholder="Ask about your data, metrics, growth..." rows="1"
+                        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();studioAgentSend('analytics');}"></textarea>
+                    <button class="studio-agent-send" onclick="studioAgentSend('analytics')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                    </button>
+                </div>
+            </div>
+                    </div> <!-- /studio-layout --></div>
+
+                    <div class="agent-tabpanel" data-agent-panel="mystats" id="artistMyStatsView">
+                    <!-- Connect prompt; filled by the connect-prompt module when the artist
+                         has no platform links. -->
+                    <div id="connectPromptMyStats"></div>
+                    <div class="agents-page-header">
+                        <h1 class="agents-page-title">My Stats</h1>
+                        <p class="agents-page-subtitle">AIAD grounds every recommendation in your real numbers. Connect platforms or self-report — both work.</p>
+                    </div>
+
+                    <!-- Headline stats: the artist's own numbers, with name/photo from Spotify.
+                         Rendered by the self-reported stats module. -->
+                    <div id="srHeadline" style="margin-bottom:16px;"></div>
+
+                    <!-- ── 1. Connect. The ONE place to link a platform. Previously this
+                         lived in three other surfaces (the "Connect your socials" modal, the
+                         Analytics connect box, and the Agents-view panel), all writing the
+                         same artist_stats row. Same callFetchStats path as before. ── -->
+                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:20px 22px;margin-bottom:16px;">
+                        <h3 style="margin:0 0 4px 0;font-size:1rem;font-weight:600;">Connect your platforms</h3>
+                        <p style="font-size:0.82rem;color:var(--text-muted);margin:0 0 14px 0;">Paste your profiles and AIAD pulls what each platform makes public — no sign-in needed. Spotify won't release monthly listeners or followers to apps, so those stay yours to enter below.</p>
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;">
+                            <label style="min-width:0;"><span style="display:block;font-size:0.74rem;color:var(--text-muted);margin-bottom:3px;">Spotify artist link or ID</span>
+                                <input id="myStatsSpotifyId" placeholder="https://open.spotify.com/artist/…" style="width:100%;box-sizing:border-box;background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;"></label>
+                            <label style="min-width:0;"><span style="display:block;font-size:0.74rem;color:var(--text-muted);margin-bottom:3px;">YouTube channel</span>
+                                <input id="myStatsYoutubeHandle" placeholder="@handle or UC… channel ID" style="width:100%;box-sizing:border-box;background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;"></label>
+                            <label style="min-width:0;"><span style="display:block;font-size:0.74rem;color:var(--text-muted);margin-bottom:3px;">Instagram</span>
+                                <input id="myStatsInstagramHandle" placeholder="@yourhandle" style="width:100%;box-sizing:border-box;background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;"></label>
+                            <label style="min-width:0;"><span style="display:block;font-size:0.74rem;color:var(--text-muted);margin-bottom:3px;">TikTok</span>
+                                <input id="myStatsTiktokHandle" placeholder="@yourhandle" style="width:100%;box-sizing:border-box;background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;"></label>
+                        </div>
+                        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px;">
+                            <button onclick="window.saveAndFetchStats()" style="background:linear-gradient(135deg,var(--magenta),var(--magenta-dark));border:none;color:#fff;border-radius:10px;padding:11px 22px;font-weight:600;cursor:pointer;font-size:0.88rem;">Connect &amp; scan</button>
+                            <button onclick="window.saveStatsOnly()" style="background:transparent;border:1px solid var(--border-default);color:var(--text-secondary);border-radius:10px;padding:11px 18px;font-size:0.85rem;cursor:pointer;">Save without scanning</button>
+                        </div>
+                        <div id="myStatsApiStatus" style="margin-top:12px;font-size:0.76rem;color:var(--text-muted);"></div>
+                        <!-- What's actually connected, read back from artist_stats. -->
+                        <div id="myStatsConnected" style="margin-top:12px;"></div>
+                    </div>
+
+                    <!-- ── 2. Your numbers. Self-report editor (record_self_reported_stats). ── -->
+                    <div id="srEditor" style="margin-bottom:16px;"></div>
+
+                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:20px 22px;margin-bottom:16px;">
+                        <h3 style="margin:0 0 4px 0;font-size:1rem;font-weight:600;">Extra details</h3>
+                        <p style="font-size:0.82rem;color:var(--text-muted);margin:0 0 14px 0;">Context AIAD uses alongside your numbers above. Your follower and listener counts live in <strong>Your numbers</strong> — editing them there keeps a single source of truth.</p>
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;">
+                            <input id="srTotalStreams"       type="number" placeholder="Total streams (all-time)" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
+                            <input id="srPrimaryGenre"       placeholder="Primary genre (e.g., R&amp;B, indie pop)" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
+                            <input id="srLatestReleaseName"  placeholder="Latest release title" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
+                            <input id="srLatestReleaseDate"  type="date" placeholder="Latest release date" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
+                            <input id="srLocation"           placeholder="City / market (e.g., Brooklyn NY)" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
+                        </div>
+                    </div>
+
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+                        <button onclick="document.getElementById('myStatsRaw').style.display = document.getElementById('myStatsRaw').style.display === 'none' ? 'block' : 'none';" style="background:transparent;border:1px solid var(--border-default);color:var(--text-secondary);border-radius:10px;padding:11px 16px;font-size:0.82rem;cursor:pointer;">Show raw data</button>
+                    </div>
+                    <pre id="myStatsRaw" style="display:none;background:rgba(0,0,0,0.4);border:1px solid var(--border-default);border-radius:10px;padding:12px;font-size:0.74rem;color:var(--text-secondary);overflow-x:auto;white-space:pre-wrap;max-height:340px;overflow-y:auto;"></pre>
+                </div>
+                </div><!-- /artistMoneyView -->
 
                 <div class="dash-view" id="artistSupportersView">
                     <div class="studio-layout">
@@ -5634,65 +5795,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 </div>
 
                 <!-- ── MY STATS — first-class destination for platform handles + self-reported numbers ── -->
-                <div class="dash-view" id="artistMyStatsView">
-                    <!-- Connect prompt; filled by the connect-prompt module when the artist
-                         has no platform links. -->
-                    <div id="connectPromptMyStats"></div>
-                    <div class="agents-page-header">
-                        <h1 class="agents-page-title">My Stats</h1>
-                        <p class="agents-page-subtitle">AIAD grounds every recommendation in your real numbers. Connect platforms or self-report — both work.</p>
-                    </div>
-
-                    <!-- Headline stats: the artist's own numbers, with name/photo from Spotify.
-                         Rendered by the self-reported stats module. -->
-                    <div id="srHeadline" style="margin-bottom:16px;"></div>
-
-                    <!-- ── 1. Connect. The ONE place to link a platform. Previously this
-                         lived in three other surfaces (the "Connect your socials" modal, the
-                         Analytics connect box, and the Agents-view panel), all writing the
-                         same artist_stats row. Same callFetchStats path as before. ── -->
-                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:20px 22px;margin-bottom:16px;">
-                        <h3 style="margin:0 0 4px 0;font-size:1rem;font-weight:600;">Connect your platforms</h3>
-                        <p style="font-size:0.82rem;color:var(--text-muted);margin:0 0 14px 0;">Paste your profiles and AIAD pulls what each platform makes public — no sign-in needed. Spotify won't release monthly listeners or followers to apps, so those stay yours to enter below.</p>
-                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;">
-                            <label style="min-width:0;"><span style="display:block;font-size:0.74rem;color:var(--text-muted);margin-bottom:3px;">Spotify artist link or ID</span>
-                                <input id="myStatsSpotifyId" placeholder="https://open.spotify.com/artist/…" style="width:100%;box-sizing:border-box;background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;"></label>
-                            <label style="min-width:0;"><span style="display:block;font-size:0.74rem;color:var(--text-muted);margin-bottom:3px;">YouTube channel</span>
-                                <input id="myStatsYoutubeHandle" placeholder="@handle or UC… channel ID" style="width:100%;box-sizing:border-box;background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;"></label>
-                            <label style="min-width:0;"><span style="display:block;font-size:0.74rem;color:var(--text-muted);margin-bottom:3px;">Instagram</span>
-                                <input id="myStatsInstagramHandle" placeholder="@yourhandle" style="width:100%;box-sizing:border-box;background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;"></label>
-                            <label style="min-width:0;"><span style="display:block;font-size:0.74rem;color:var(--text-muted);margin-bottom:3px;">TikTok</span>
-                                <input id="myStatsTiktokHandle" placeholder="@yourhandle" style="width:100%;box-sizing:border-box;background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;"></label>
-                        </div>
-                        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px;">
-                            <button onclick="window.saveAndFetchStats()" style="background:linear-gradient(135deg,var(--magenta),var(--magenta-dark));border:none;color:#fff;border-radius:10px;padding:11px 22px;font-weight:600;cursor:pointer;font-size:0.88rem;">Connect &amp; scan</button>
-                            <button onclick="window.saveStatsOnly()" style="background:transparent;border:1px solid var(--border-default);color:var(--text-secondary);border-radius:10px;padding:11px 18px;font-size:0.85rem;cursor:pointer;">Save without scanning</button>
-                        </div>
-                        <div id="myStatsApiStatus" style="margin-top:12px;font-size:0.76rem;color:var(--text-muted);"></div>
-                        <!-- What's actually connected, read back from artist_stats. -->
-                        <div id="myStatsConnected" style="margin-top:12px;"></div>
-                    </div>
-
-                    <!-- ── 2. Your numbers. Self-report editor (record_self_reported_stats). ── -->
-                    <div id="srEditor" style="margin-bottom:16px;"></div>
-
-                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:20px 22px;margin-bottom:16px;">
-                        <h3 style="margin:0 0 4px 0;font-size:1rem;font-weight:600;">Extra details</h3>
-                        <p style="font-size:0.82rem;color:var(--text-muted);margin:0 0 14px 0;">Context AIAD uses alongside your numbers above. Your follower and listener counts live in <strong>Your numbers</strong> — editing them there keeps a single source of truth.</p>
-                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;">
-                            <input id="srTotalStreams"       type="number" placeholder="Total streams (all-time)" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
-                            <input id="srPrimaryGenre"       placeholder="Primary genre (e.g., R&amp;B, indie pop)" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
-                            <input id="srLatestReleaseName"  placeholder="Latest release title" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
-                            <input id="srLatestReleaseDate"  type="date" placeholder="Latest release date" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
-                            <input id="srLocation"           placeholder="City / market (e.g., Brooklyn NY)" style="background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.85rem;outline:none;">
-                        </div>
-                    </div>
-
-                    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
-                        <button onclick="document.getElementById('myStatsRaw').style.display = document.getElementById('myStatsRaw').style.display === 'none' ? 'block' : 'none';" style="background:transparent;border:1px solid var(--border-default);color:var(--text-secondary);border-radius:10px;padding:11px 16px;font-size:0.82rem;cursor:pointer;">Show raw data</button>
-                    </div>
-                    <pre id="myStatsRaw" style="display:none;background:rgba(0,0,0,0.4);border:1px solid var(--border-default);border-radius:10px;padding:12px;font-size:0.74rem;color:var(--text-secondary);overflow-x:auto;white-space:pre-wrap;max-height:340px;overflow-y:auto;"></pre>
-                </div>
+                
 
                 <!-- ── STORE — artist manages their own products ───────────────────────── -->
                 <div class="dash-view" id="artistStoreView">
@@ -5733,15 +5836,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 </div>
 
                 <!-- ── PAYOUTS — Stripe Connect status. No internal wallet, no withdraw. ── -->
-                <div class="dash-view" id="artistPayoutsView">
-                    <div class="view-header">
-                        <div>
-                            <h1 class="view-title">Payouts</h1>
-                            <p class="view-subtitle">Stripe holds your money and pays it out. AIAD takes 10% of each sale and never touches the rest.</p>
-                        </div>
-                    </div>
-                    <div id="payoutsBody"></div>
-                </div>
+                
 
                 <div class="dash-view" id="artistLibraryView"></div>
 
@@ -6201,90 +6296,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             </div>
                     </div> <!-- /studio-layout --></div>
 
-                <div class="dash-view" id="artistAnalyticsView">
-                    <div class="studio-layout">
-                    <div> <!-- main -->
-                    <div class="analytics-page-header">
-                        <h1 class="analytics-page-title">Analytics</h1>
-                        <p class="analytics-page-subtitle">Real data across every platform you're on.</p>
-                    </div>
-
-                    <!-- Connected platforms and every connect control used to live here.
-                         They now live in My Stats, which is the single home for stats:
-                         connect + scan at the top, self-reported numbers below. Analytics
-                         keeps only its charts and AI insights. -->
-
-
-                    <div id="spotifyDataSection" style="display:none;margin-bottom:28px;">
-                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-                            <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);">Spotify</div>
-                            <button onclick="disconnectSpotify()" style="padding:6px 14px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:6px;color:var(--text-secondary);font-size:0.75rem;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.06)'">Disconnect</button>
-                        </div>
-                        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:12px;margin-bottom:20px;">
-                            <div class="analytics-summary-card">
-                                <div class="analytics-summary-label">Profile</div>
-                                <div id="spotifyDisplayName" class="analytics-summary-value" style="font-size:1rem;">—</div>
-                                <div id="spotifyFollowers" style="font-size:0.7rem;color:var(--text-muted);">— followers</div>
-                            </div>
-                            <div class="analytics-summary-card">
-                                <div class="analytics-summary-label">Account Type</div>
-                                <div id="spotifyProduct" class="analytics-summary-value" style="font-size:1rem;">—</div>
-                            </div>
-                            <div class="analytics-summary-card">
-                                <div class="analytics-summary-label">Country</div>
-                                <div id="spotifyCountry" class="analytics-summary-value" style="font-size:1rem;">—</div>
-                            </div>
-                        </div>
-                        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:20px;">
-                            <div style="font-size:0.75rem;font-weight:600;color:var(--text-primary);margin-bottom:14px;">Your Top Tracks — Last 4 Weeks</div>
-                            <div id="spotifyTopTracks" style="display:flex;flex-direction:column;gap:10px;"></div>
-                        </div>
-                    </div>
-
-                    <div class="time-period-selector">
-                        <button class="time-period-btn" onclick="setAnalyticsPeriod(7, this)">7 days</button>
-                        <button class="time-period-btn active" onclick="setAnalyticsPeriod(30, this)">30 days</button>
-                        <button class="time-period-btn" onclick="setAnalyticsPeriod(90, this)">90 days</button>
-                        <button class="time-period-btn" onclick="setAnalyticsPeriod(365, this)">12 months</button>
-                    </div>
-
-                    <div id="analyticsBody"></div>
-                    <div class="aiad-insights" id="analyticsAiadObservations">
-                        <div class="aiad-insights-header">
-                            <div class="aiad-insights-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-                            </div>
-                            <span class="aiad-insights-title">AIAD OBSERVATIONS</span>
-                        </div>
-                        <div style="font-size:0.85rem;color:var(--text-muted);font-style:italic;padding:8px 0;">Observations will appear here once you have activity data.</div>
-                    </div>
                 
-                    </div> <!-- /main -->
-            <div class="studio-agent-col" id="analyticsAiadPanel" style="position:sticky;top:24px;">
-                <div class="studio-agent-header">
-                    <div class="studio-agent-dot"></div>
-                    <span class="studio-agent-name">AIAD · Analytics Insights</span>
-                </div>
-                <div style="padding:11px 13px;border-bottom:1px solid var(--border-default);">
-                    <div class="aiad-obs-item"><p>Listeners staying past the first 30 seconds matters more than raw play count.</p></div>
-                    <div class="aiad-obs-item"><p>Save rate matters more than play count for Spotify editorial consideration.</p></div>
-                </div>
-                <div class="studio-agent-chips">
-                    <div class="studio-agent-chips-label">Quick prompts</div>
-                    <button class="studio-agent-chip" onclick="studioAgentChip('analytics',this)">What metrics matter most</button><button class="studio-agent-chip" onclick="studioAgentChip('analytics',this)">How to read save rate</button><button class="studio-agent-chip" onclick="studioAgentChip('analytics',this)">Improve stream-to-follow ratio</button><button class="studio-agent-chip" onclick="studioAgentChip('analytics',this)">Understand my audience</button>
-                </div>
-                <div class="studio-agent-messages" id="analyticsAgentMsgs">
-                    <div class="studio-agent-msg agent">Ask me anything about analytics insights.</div>
-                </div>
-                <div class="studio-agent-input-row">
-                    <textarea class="studio-agent-input" id="analyticsAgentInput" placeholder="Ask about your data, metrics, growth..." rows="1"
-                        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();studioAgentSend('analytics');}"></textarea>
-                    <button class="studio-agent-send" onclick="studioAgentSend('analytics')">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                    </button>
-                </div>
-            </div>
-                    </div> <!-- /studio-layout --></div>
                 <div class="dash-view" id="artistSettingsView">
                     <div class="settings-container">
                         <div class="settings-header">
@@ -15050,6 +15062,53 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             }
         }
 
+        // Tabs for a merged view. Same markup and the same active-state rule the
+        // agent page already uses — this only scopes them to one view, so several
+        // merged views can carry tabs without each growing its own switcher.
+        // :scope keeps it to the host's own tabs: a panel may contain tabs of its
+        // own (the agent page sits inside one), and those must not be touched.
+        // The four loaders the old per-view branches ran, now keyed by tab. Only the
+        // selected tab's data is fetched: the other three panels are mounted but
+        // hidden, and loading all four on every visit would quadruple the queries.
+        function aiadLoadMoneyTab(tab) {
+            if (tab === 'revenue') {
+                if (typeof loadRevenueData === 'function') setTimeout(() => loadRevenueData(), 100);
+                try { window.aiadLoadEarnings && window.aiadLoadEarnings(); } catch (e) {}
+            } else if (tab === 'payouts') {
+                setTimeout(() => { if (window.loadPayouts) loadPayouts('payoutsBody'); }, 60);
+            } else if (tab === 'analytics') {
+                setTimeout(() => { try { loadArtistAnalytics(window._analyticsPeriod || 30); } catch (e) {} }, 60);
+            } else if (tab === 'mystats') {
+                setTimeout(() => { if (typeof loadMyStats === 'function') loadMyStats(); }, 60);
+            }
+        }
+        window.aiadLoadMoneyTab = aiadLoadMoneyTab;
+
+        function aiadViewTab(hostId, name) {
+            const host = document.getElementById(hostId);
+            if (!host) return;
+            host.querySelectorAll(':scope > .agent-tabs > .agent-tab').forEach(function (b) {
+                b.classList.toggle('active', b.dataset.agentTab === name);
+            });
+            host.querySelectorAll(':scope > .agent-tabpanel').forEach(function (p) {
+                p.classList.toggle('active', p.dataset.agentPanel === name);
+            });
+        }
+        window.aiadViewTab = aiadViewTab;
+
+        // One delegated listener for every tab host, rather than one per view.
+        document.addEventListener('click', function (e) {
+            if (!e.target || !e.target.closest) return;
+            const tab = e.target.closest('.dash-view[data-tabhost] > .agent-tabs > .agent-tab');
+            if (!tab) return;
+            const host = tab.closest('.dash-view[data-tabhost]');
+            aiadViewTab(host.id, tab.dataset.agentTab);
+            // Revealing a panel is not the same as filling it: the old per-view
+            // branches were what fetched this data, and a tab click never went
+            // through them.
+            if (host.id === 'artistMoneyView') aiadLoadMoneyTab(tab.dataset.agentTab);
+        });
+
         function showArtistView(view) {
             // Markup calls a couple of aliases that aren't real keys. Normalize them
             // before anything else so both the id map AND the branch chain resolve —
@@ -15065,7 +15124,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 try { window.aiadLoadAgentConvos && window.aiadLoadAgentConvos(); } catch (e) {}
             }, 0);
 
-            const allViews = ['artistLibraryView', 'artistReviewView', 'artistPlanView', 'artistHomeView', 'artistPostsView', 'artistSupportersView', 'artistProjectsView', 'artistRevenueView', 'artistScheduleView', 'artistCollaboratorsView', 'artistMusicView', 'artistSongwritingView', 'artistMixMediaView', 'artistMerchView', 'artistSyncLibraryView', 'artistMilestonesView', 'artistAnalyticsView', 'artistMyStatsView', 'artistAgentsView', 'artistInboxView', 'artistSettingsView', 'artistStoreView', 'artistPayoutsView', 'artistDistributeView', 'episodesView', 'publishView'];
+            const allViews = ['artistLibraryView', 'artistReviewView', 'artistPlanView', 'artistHomeView', 'artistPostsView', 'artistSupportersView', 'artistProjectsView', 'artistMoneyView', 'artistScheduleView', 'artistCollaboratorsView', 'artistMusicView', 'artistSongwritingView', 'artistMixMediaView', 'artistMerchView', 'artistSyncLibraryView', 'artistMilestonesView', 'artistAgentsView', 'artistInboxView', 'artistSettingsView', 'artistStoreView', 'artistDistributeView', 'episodesView', 'publishView'];
             allViews.forEach(v => {
                 const el = document.getElementById(v);
                 if (el) el.classList.remove('active');
@@ -15097,19 +15156,23 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 'projects': 'artistPlanView',
                 'collaborators': 'artistCollaboratorsView',
                 'schedule': 'artistPlanView',
-                'revenue': 'artistRevenueView',
+                // Revenue, Payouts, Analytics and My Stats are tabs of one Money view.
+                // Every old key still resolves so #artist/analytics and the streaming
+                // vertical's own nav rows keep working; the tab is picked below.
+                'money': 'artistMoneyView',
+                'revenue': 'artistMoneyView',
+                'payouts': 'artistMoneyView',
+                'analytics': 'artistMoneyView',
+                'mystats': 'artistMoneyView',
                 'music': 'artistMusicView',
                 'songwriting': 'artistSongwritingView',
                 'mixmedia': 'artistMixMediaView',
                 'merch': 'artistMerchView',
                 'synclibrary': 'artistSyncLibraryView',
-                'analytics': 'artistAnalyticsView',
-                'mystats': 'artistMyStatsView',
                 'milestones': 'artistMilestonesView',
                 'inbox': 'artistInboxView',
                 'settings': 'artistSettingsView',
                 'store': 'artistStoreView',
-                'payouts': 'artistPayoutsView',
                 'distribute': 'artistDistributeView',
                 'library': 'artistLibraryView',
                 'review': 'artistReviewView',
@@ -15161,11 +15224,13 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 viewEl.classList.add('active');
                 markNav('collaborators');
                 setTimeout(() => { try { loadCollaborators(); } catch (e) {} }, 100);
-            } else if (view === 'revenue') {
+            } else if (view === 'money' || view === 'revenue' || view === 'payouts'
+                       || view === 'analytics' || view === 'mystats') {
                 viewEl.classList.add('active');
-                markNav('revenue');
-                if (typeof loadRevenueData === 'function') setTimeout(() => loadRevenueData(), 100);
-                try { window.aiadLoadEarnings && window.aiadLoadEarnings(); } catch (e) {}
+                markNav('money');
+                const moneyTab = (view === 'money') ? 'revenue' : view;
+                aiadViewTab('artistMoneyView', moneyTab);
+                aiadLoadMoneyTab(moneyTab);
             } else if (view === 'music') {
                 viewEl.classList.add('active');
                 if (dropdown) dropdown.classList.add('open');
@@ -15207,14 +15272,6 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                         if (window.aiadRenderSyncTrackPicker) window.aiadRenderSyncTrackPicker();
                     } catch (e) {}
                 }, 80);
-            } else if (view === 'analytics') {
-                viewEl.classList.add('active');
-                markNav('analytics');
-                setTimeout(() => { try { loadArtistAnalytics(window._analyticsPeriod || 30); } catch (e) {} }, 60);
-            } else if (view === 'mystats') {
-                viewEl.classList.add('active');
-                markNav('mystats');
-                setTimeout(() => { if (typeof loadMyStats === 'function') loadMyStats(); }, 60);
             } else if (view === 'milestones') {
                 viewEl.classList.add('active');
                 markNav('milestones');
@@ -15227,10 +15284,6 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 viewEl.classList.add('active');
                 markNav('store');
                 setTimeout(() => { if (window.loadStoreManager) loadStoreManager(); }, 60);
-            } else if (view === 'payouts') {
-                viewEl.classList.add('active');
-                markNav('payouts');
-                setTimeout(() => { if (window.loadPayouts) loadPayouts('payoutsBody'); }, 60);
             } else if (view === 'distribute') {
                 viewEl.classList.add('active');
                 const _nd = document.getElementById('navDistribute'); if (_nd) _nd.classList.add('active');
@@ -22945,10 +22998,11 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             artistAgentsView:     () => populateAgentContext(),
             artistSupportersView: () => loadArtistSupporters(),
             artistMilestonesView: () => loadArtistMilestones(),
-            artistAnalyticsView:  () => loadArtistAnalytics(),
-            artistRevenueView:    () => {
-                if (typeof loadRevenueData === 'function') loadRevenueData();
-                if (window.aiadLoadEarnings) window.aiadLoadEarnings(true);
+            // Keyed on the active .dash-view, which is the Money host now rather than
+            // one of its four panels. Re-run only the tab actually on screen.
+            artistMoneyView:      () => {
+                const t = document.querySelector('#artistMoneyView > .agent-tabs > .agent-tab.active');
+                if (window.aiadLoadMoneyTab) window.aiadLoadMoneyTab(t ? t.dataset.agentTab : 'revenue');
             },
             artistInboxView:      () => loadArtistInbox(),
         };
