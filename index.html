@@ -40560,14 +40560,23 @@ window.AIAD_PROMPTS = [
     setInterval(syncFab, 1200);
 })();
 </script>
-<style id="aiad-plan-print-css">
-/* ── Plan → PDF document ─────────────────────────────────────────────────────
-   Screen: the export node is never visible. Print: it is the only thing left. */
-#planPrintDoc { display: none; }
+<style id="aiad-print-shell">
+/* ── The print shell ─────────────────────────────────────────────────────────
+   One hidden host that every exporter fills, prints, and empties again. It used
+   to be one host per exporter, which does not scale: the hide rule names the
+   node to keep, so each new document had to be exempted from every existing
+   rule and every existing rule from it. Each exporter now owns only the styles
+   for its own document, scoped by that document's class prefix, and the page
+   scaffold lives here once.
+
+   Deliberately no PDF library: a print stylesheet plus window.print() produces a
+   real PDF on desktop and on iOS Safari, keeps the text selectable and
+   searchable, and adds nothing to the bundle. */
+#aiadPrintDoc { display: none; }
 
 @media print {
   /* Hide the app, keep the document. Both are body children, so this is one rule. */
-  body > *:not(#planPrintDoc):not(#agentPrintDoc) { display: none !important; }
+  body > *:not(#aiadPrintDoc) { display: none !important; }
   html, body {
     display: block !important;
     background: #fff !important;
@@ -40576,7 +40585,7 @@ window.AIAD_PROMPTS = [
     height: auto !important;
     overflow: visible !important;
   }
-  #planPrintDoc {
+  #aiadPrintDoc {
     display: block !important;
     position: static !important;
     background: #fff;
@@ -40588,10 +40597,15 @@ window.AIAD_PROMPTS = [
   }
   @page { size: letter; margin: 14mm; }
 }
+</style>
+<style id="aiad-plan-print-css">
+/* ── Plan → PDF document ─────────────────────────────────────────────────────
+   The .pd- styles for the plan document. The host and the page scaffold are in
+   the print shell above. */
 
 /* The document itself. Kept outside the print block so it can be proofed on
-   screen by unhiding #planPrintDoc, and so print inherits one set of rules. */
-#planPrintDoc .pd-page {
+   screen by unhiding #aiadPrintDoc, and so print inherits one set of rules. */
+#aiadPrintDoc .pd-page {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   color: #111;
   background: #fff;
@@ -40600,82 +40614,82 @@ window.AIAD_PROMPTS = [
   max-width: 7in;
   margin: 0 auto;
 }
-#planPrintDoc h1, #planPrintDoc h2 {
+#aiadPrintDoc h1, #aiadPrintDoc h2 {
   font-family: 'Lora', Georgia, 'Times New Roman', serif;
   font-weight: 600;
   margin: 0;
   letter-spacing: -0.01em;
 }
 
-#planPrintDoc .pd-head {
+#aiadPrintDoc .pd-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
 }
-#planPrintDoc .pd-mark-svg { width: 118px; height: 28px; display: block; }
-#planPrintDoc .pd-head-right { display: flex; align-items: center; gap: 11px; text-align: right; }
-#planPrintDoc .pd-id { text-align: right; }
-#planPrintDoc .pd-name { font-size: 17pt; line-height: 1.15; }
-#planPrintDoc .pd-sub-line { font-size: 8pt; color: #666; margin-top: 2px; letter-spacing: 0.04em; text-transform: uppercase; }
-#planPrintDoc .pd-avatar {
+#aiadPrintDoc .pd-mark-svg { width: 118px; height: 28px; display: block; }
+#aiadPrintDoc .pd-head-right { display: flex; align-items: center; gap: 11px; text-align: right; }
+#aiadPrintDoc .pd-id { text-align: right; }
+#aiadPrintDoc .pd-name { font-size: 17pt; line-height: 1.15; }
+#aiadPrintDoc .pd-sub-line { font-size: 8pt; color: #666; margin-top: 2px; letter-spacing: 0.04em; text-transform: uppercase; }
+#aiadPrintDoc .pd-avatar {
   width: 42px; height: 42px; border-radius: 50%;
   object-fit: cover; flex-shrink: 0; border: 1px solid #ddd;
 }
-#planPrintDoc .pd-avatar-fallback {
+#aiadPrintDoc .pd-avatar-fallback {
   display: flex; align-items: center; justify-content: center;
   background: #111; color: #fff; font-weight: 600; font-size: 13pt;
   font-family: 'Lora', Georgia, serif; border-color: #111;
 }
 
-#planPrintDoc .pd-rule { height: 2px; background: #111; margin: 12px 0 0; }
-#planPrintDoc .pd-doctitle {
+#aiadPrintDoc .pd-rule { height: 2px; background: #111; margin: 12px 0 0; }
+#aiadPrintDoc .pd-doctitle {
   display: flex; align-items: baseline; justify-content: space-between;
   margin: 14px 0 18px;
 }
-#planPrintDoc .pd-doctitle h2 { font-size: 13pt; }
-#planPrintDoc .pd-doctitle span { font-size: 8pt; color: #666; }
+#aiadPrintDoc .pd-doctitle h2 { font-size: 13pt; }
+#aiadPrintDoc .pd-doctitle span { font-size: 8pt; color: #666; }
 
-#planPrintDoc .pd-sec { margin-bottom: 20px; page-break-inside: avoid; break-inside: avoid; }
-#planPrintDoc .pd-h2 {
+#aiadPrintDoc .pd-sec { margin-bottom: 20px; page-break-inside: avoid; break-inside: avoid; }
+#aiadPrintDoc .pd-h2 {
   font-size: 8pt; text-transform: uppercase; letter-spacing: 0.14em;
   font-family: 'Inter', sans-serif; font-weight: 700; color: #111;
   padding-bottom: 5px; border-bottom: 1px solid #111; margin-bottom: 9px;
 }
-#planPrintDoc .pd-empty { color: #777; font-style: italic; margin: 0; }
+#aiadPrintDoc .pd-empty { color: #777; font-style: italic; margin: 0; }
 
-#planPrintDoc .pd-table { width: 100%; border-collapse: collapse; }
-#planPrintDoc .pd-table th {
+#aiadPrintDoc .pd-table { width: 100%; border-collapse: collapse; }
+#aiadPrintDoc .pd-table th {
   text-align: left; font-size: 7pt; text-transform: uppercase; letter-spacing: 0.1em;
   color: #777; font-weight: 600; padding: 0 8px 5px 0; border-bottom: 1px solid #ddd;
 }
-#planPrintDoc .pd-table td {
+#aiadPrintDoc .pd-table td {
   padding: 7px 8px 7px 0; border-bottom: 1px solid #eee; vertical-align: top;
 }
-#planPrintDoc .pd-table tr { page-break-inside: avoid; break-inside: avoid; }
-#planPrintDoc .pd-td-title { font-weight: 600; width: 46%; }
-#planPrintDoc .pd-sub { display: block; font-weight: 400; color: #666; font-size: 8pt; margin-top: 1px; }
-#planPrintDoc .pd-td-status { width: 17%; color: #333; }
-#planPrintDoc .pd-td-prog { width: 22%; white-space: nowrap; }
-#planPrintDoc .pd-td-date { width: 15%; white-space: nowrap; color: #333; }
+#aiadPrintDoc .pd-table tr { page-break-inside: avoid; break-inside: avoid; }
+#aiadPrintDoc .pd-td-title { font-weight: 600; width: 46%; }
+#aiadPrintDoc .pd-sub { display: block; font-weight: 400; color: #666; font-size: 8pt; margin-top: 1px; }
+#aiadPrintDoc .pd-td-status { width: 17%; color: #333; }
+#aiadPrintDoc .pd-td-prog { width: 22%; white-space: nowrap; }
+#aiadPrintDoc .pd-td-date { width: 15%; white-space: nowrap; color: #333; }
 
-#planPrintDoc .pd-bar {
+#aiadPrintDoc .pd-bar {
   display: inline-block; width: 52px; height: 5px; border-radius: 3px;
   background: #e4e4e4; vertical-align: middle; overflow: hidden;
 }
-#planPrintDoc .pd-bar-fill { display: block; height: 100%; background: #111; border-radius: 3px; }
-#planPrintDoc .pd-pct { font-size: 8pt; color: #333; margin-left: 7px; vertical-align: middle; }
+#aiadPrintDoc .pd-bar-fill { display: block; height: 100%; background: #111; border-radius: 3px; }
+#aiadPrintDoc .pd-pct { font-size: 8pt; color: #333; margin-left: 7px; vertical-align: middle; }
 
-#planPrintDoc .pd-ms { list-style: none; margin: 0; padding: 0; columns: 2; column-gap: 26px; }
-#planPrintDoc .pd-ms li {
+#aiadPrintDoc .pd-ms { list-style: none; margin: 0; padding: 0; columns: 2; column-gap: 26px; }
+#aiadPrintDoc .pd-ms li {
   display: flex; justify-content: space-between; gap: 10px;
   padding: 4px 0; border-bottom: 1px solid #f0f0f0;
   break-inside: avoid; page-break-inside: avoid;
 }
-#planPrintDoc .pd-ms-name { font-weight: 500; }
-#planPrintDoc .pd-ms-date { color: #777; font-size: 8pt; white-space: nowrap; }
+#aiadPrintDoc .pd-ms-name { font-weight: 500; }
+#aiadPrintDoc .pd-ms-date { color: #777; font-size: 8pt; white-space: nowrap; }
 
-#planPrintDoc .pd-foot {
+#aiadPrintDoc .pd-foot {
   display: flex; justify-content: space-between; gap: 16px;
   margin-top: 26px; padding-top: 9px; border-top: 1px solid #ddd;
   font-size: 7.5pt; color: #777;
@@ -40942,10 +40956,10 @@ window.AIAD_PROMPTS = [
         // Claim and clear the node BEFORE fetching: if this run fails, the previous
         // run's document must not linger in the DOM, where a manual Ctrl+P would
         // print somebody's stale plan.
-        var host = document.getElementById('planPrintDoc');
+        var host = document.getElementById('aiadPrintDoc');
         if (!host) {
             host = document.createElement('div');
-            host.id = 'planPrintDoc';
+            host.id = 'aiadPrintDoc';
             document.body.appendChild(host);   // direct child of body: the print rule hides its siblings
         }
         host.innerHTML = '';
@@ -40955,9 +40969,16 @@ window.AIAD_PROMPTS = [
             host.innerHTML = buildDoc(data);
             await Promise.all([imagesReady(host, 2500), fontsReady()]);
 
+            host.dataset.printOwner = 'plan';
+
             var cleanup = function () {
                 window.removeEventListener('afterprint', cleanup);
-                if (host && host.parentNode) host.innerHTML = '';
+                // Only if this document still owns the shared host: a later export
+                // may already have replaced it, and that one's cleanup is its own.
+                if (host && host.parentNode && host.dataset.printOwner === 'plan') {
+                    host.innerHTML = '';
+                    delete host.dataset.printOwner;
+                }
             };
             window.addEventListener('afterprint', cleanup);
             // Safari fires afterprint unreliably; sweep up regardless.
@@ -45296,55 +45317,33 @@ body.aiad-pdrawer-lock{overflow:hidden;}
    Agent answers are plain prose by contract — the edge function's rules forbid
    markdown and emoji, and sanitizeAnswer strips them server side if the model
    drifts — so the text goes onto the page as written, with no conversion. */
-#agentPrintDoc { display: none; }
-
-@media print {
-  body > *:not(#agentPrintDoc):not(#planPrintDoc) { display: none !important; }
-  html, body {
-    display: block !important;
-    background: #fff !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    height: auto !important;
-    overflow: visible !important;
-  }
-  #agentPrintDoc {
-    display: block !important;
-    position: static !important;
-    background: #fff;
-    color: #111;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  @page { size: letter; margin: 14mm; }
-}
 
 /* Outside the print block so the document can be proofed on screen by unhiding
-   #agentPrintDoc, and so print inherits one set of rules. */
-#agentPrintDoc .ad-page {
+   #aiadPrintDoc, and so print inherits one set of rules. */
+#aiadPrintDoc .ad-page {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   color: #111; background: #fff; font-size: 9.5pt; line-height: 1.55;
   max-width: 7in; margin: 0 auto;
 }
-#agentPrintDoc .ad-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
-#agentPrintDoc .ad-mark-svg { width: 118px; height: 28px; display: block; }
-#agentPrintDoc .ad-head-right { text-align: right; }
-#agentPrintDoc .ad-name { font-size: 17pt; line-height: 1.15; margin: 0; }
-#agentPrintDoc .ad-sub-line { font-size: 8pt; color: #666; margin-top: 2px; letter-spacing: 0.04em; text-transform: uppercase; }
-#agentPrintDoc .ad-rule { height: 2px; background: #111; margin: 12px 0 0; }
-#agentPrintDoc .ad-doctitle { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; margin: 16px 0 6px; }
-#agentPrintDoc .ad-doctitle h2 { font-size: 13pt; margin: 0; }
-#agentPrintDoc .ad-doctitle span { font-size: 8pt; color: #666; }
+#aiadPrintDoc .ad-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+#aiadPrintDoc .ad-mark-svg { width: 118px; height: 28px; display: block; }
+#aiadPrintDoc .ad-head-right { text-align: right; }
+#aiadPrintDoc .ad-name { font-size: 17pt; line-height: 1.15; margin: 0; }
+#aiadPrintDoc .ad-sub-line { font-size: 8pt; color: #666; margin-top: 2px; letter-spacing: 0.04em; text-transform: uppercase; }
+#aiadPrintDoc .ad-rule { height: 2px; background: #111; margin: 12px 0 0; }
+#aiadPrintDoc .ad-doctitle { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; margin: 16px 0 6px; }
+#aiadPrintDoc .ad-doctitle h2 { font-size: 13pt; margin: 0; }
+#aiadPrintDoc .ad-doctitle span { font-size: 8pt; color: #666; }
 /* A question and its answer are one unit; a page break between them reads as a
    stray answer with no question above it. */
-#agentPrintDoc .ad-turn { margin-top: 15px; page-break-inside: avoid; break-inside: avoid; }
-#agentPrintDoc .ad-q { font-weight: 600; font-size: 10pt; margin: 0 0 1px; }
-#agentPrintDoc .ad-when { font-size: 7.5pt; color: #777; margin: 0 0 5px; letter-spacing: 0.03em; }
+#aiadPrintDoc .ad-turn { margin-top: 15px; page-break-inside: avoid; break-inside: avoid; }
+#aiadPrintDoc .ad-q { font-weight: 600; font-size: 10pt; margin: 0 0 1px; }
+#aiadPrintDoc .ad-when { font-size: 7.5pt; color: #777; margin: 0 0 5px; letter-spacing: 0.03em; }
 /* The answer is already plain text: pre-wrap keeps the blank lines the response
    contract puts between its sections without turning them into markup. */
-#agentPrintDoc .ad-a { white-space: pre-wrap; margin: 0; padding-left: 11px; border-left: 1.5px solid #ddd; }
-#agentPrintDoc .ad-failed { color: #777; font-style: italic; }
-#agentPrintDoc .ad-foot { margin-top: 22px; padding-top: 8px; border-top: 1px solid #ddd; font-size: 7.5pt; color: #777; }
+#aiadPrintDoc .ad-a { white-space: pre-wrap; margin: 0; padding-left: 11px; border-left: 1.5px solid #ddd; }
+#aiadPrintDoc .ad-failed { color: #777; font-style: italic; }
+#aiadPrintDoc .ad-foot { margin-top: 22px; padding-top: 8px; border-top: 1px solid #ddd; font-size: 7.5pt; color: #777; }
 </style>
 <script>
 /* Agent conversation → PDF. Mirrors AIADPlanExport: claim the node, fill it,
@@ -45454,10 +45453,10 @@ body.aiad-pdrawer-lock{overflow:hidden;}
 
         // Claimed and cleared before fetching, so a failed run cannot leave the
         // previous conversation sitting in the DOM for a manual Ctrl+P to print.
-        var host = document.getElementById('agentPrintDoc');
+        var host = document.getElementById('aiadPrintDoc');
         if (!host) {
             host = document.createElement('div');
-            host.id = 'agentPrintDoc';
+            host.id = 'aiadPrintDoc';
             document.body.appendChild(host);
         }
         host.innerHTML = '';
@@ -45468,9 +45467,16 @@ body.aiad-pdrawer-lock{overflow:hidden;}
             host.innerHTML = buildDoc(rows);
             await fontsReady();
 
+            host.dataset.printOwner = 'agent';
+
             var cleanup = function () {
                 window.removeEventListener('afterprint', cleanup);
-                if (host && host.parentNode) host.innerHTML = '';
+                // Only if this document still owns the shared host: a later export
+                // may already have replaced it, and that one's cleanup is its own.
+                if (host && host.parentNode && host.dataset.printOwner === 'agent') {
+                    host.innerHTML = '';
+                    delete host.dataset.printOwner;
+                }
             };
             window.addEventListener('afterprint', cleanup);
             setTimeout(cleanup, 60000);   // Safari fires afterprint unreliably
