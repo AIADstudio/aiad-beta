@@ -4066,11 +4066,10 @@ html, body {
                         <svg class="dash-nav-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
                     </div>
                     <div class="dash-nav-submenu" id="creativeStudioSubmenu">
-                        <div class="dash-nav-subitem" onclick="showArtistView('music');"><svg class="dash-nav-subicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg> Music Production</div>
-                        <div class="dash-nav-subitem" onclick="showArtistView('songwriting');"><svg class="dash-nav-subicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/></svg> Songwriting</div>
-                        <div class="dash-nav-subitem" onclick="showArtistView('mixmedia');"><svg class="dash-nav-subicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg> Mix-Media</div>
-                        <div class="dash-nav-subitem" onclick="window.location.href='/clips';"><svg class="dash-nav-subicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg> Clip Studio</div>
-                        <div class="dash-nav-subitem" onclick="showArtistView('merch'); restoreLastMerchDesign();"><svg class="dash-nav-subicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0"/></svg> Merch</div>
+                        <div class="dash-nav-subitem" data-view="music" onclick="showArtistView('music');"><svg class="dash-nav-subicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg> Music Production</div>
+                        <div class="dash-nav-subitem" data-view="songwriting" onclick="showArtistView('songwriting');"><svg class="dash-nav-subicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/></svg> Songwriting</div>
+                        <div class="dash-nav-subitem" data-view="mixmedia" onclick="showArtistView('mixmedia');"><svg class="dash-nav-subicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg> Mix-Media</div>
+                        <div class="dash-nav-subitem" data-view="clips" onclick="window.location.href='/clips';"><svg class="dash-nav-subicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg> Clip Studio</div>
                                             </div>
                 </nav>
                 <!-- Streaming vertical: the artist nav relabelled and grouped. Shown when
@@ -5443,7 +5442,13 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     </div>  <!-- /studio-layout -->
                 </div>
 
-                 <div class="dash-view" id="artistMerchView">
+                                 <div class="dash-view" id="artistStoreHubView" data-tabhost>
+                    <div class="agent-tabs" role="tablist">
+                        <button type="button" class="agent-tab active" data-agent-tab="design">Design</button>
+                        <button type="button" class="agent-tab" data-agent-tab="selling">Selling</button>
+                    </div>
+
+                    <div class="agent-tabpanel active" data-agent-panel="design" id="artistMerchView">
                      <div class="studio-layout">
                      <div>  <!-- main col -->
                      <div class="studio-page-header" style="display:flex;justify-content:space-between;align-items:flex-start;">
@@ -5701,6 +5706,44 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                      </div>  <!-- /studio-layout -->
                  </div>
 
+                    <div class="agent-tabpanel" data-agent-panel="selling" id="artistStoreView">
+                    <div class="view-header">
+                        <div>
+                            <h1 class="view-title">Store</h1>
+                            <p class="view-subtitle">Sell directly to your fans. You're the merchant of record — Stripe pays you out.</p>
+                        </div>
+                        <button class="primary-btn" onclick="openProductEditor()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            Add product
+                        </button>
+                    </div>
+
+                    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px;">
+                      <div style="flex:1;min-width:200px;">
+                        <label style="display:block;font-size:0.72rem;color:var(--text-muted);margin-bottom:3px;">Store name <span style="opacity:.7;">(shown on your public store)</span></label>
+                        <input id="storeTitleInput" style="width:100%;box-sizing:border-box;background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.9rem;" placeholder="Your store name">
+                      </div>
+                      <button class="artist-action-btn" onclick="saveStoreTitle()">Save name</button>
+                      <a class="artist-action-btn" id="storeViewLink" href="#" target="_blank" rel="noopener">View store ↗</a>
+                    </div>
+                    <!-- Shown only when payouts aren't set up: without Connect, checkout fails. -->
+                    <div id="storeOnboardBanner" style="display:none;margin-bottom:16px;"></div>
+
+                    <!-- Proposed by a store skill, applied only by the artist. Hidden
+                         until something is pending. -->
+                    <div id="storeStagedPanel" style="display:none;margin-bottom:18px;"></div>
+
+                    <!-- Header, category filter and tiles are all drawn by
+                         aiadStoreGrid(), the one renderer every store surface uses. -->
+                    <div id="storeProductsGrid"></div>
+
+                    <div style="margin-top:28px;">
+                        <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:12px;">Recent sales</div>
+                        <div id="storeSalesList"></div>
+                    </div>
+                </div>
+                </div><!-- /artistStoreHubView -->
+
                 <div class="dash-view" id="artistSyncLibraryView">
                     <div style="max-width:780px;margin:0 auto;padding-bottom:40px;">
                         <div style="margin-bottom:28px;">
@@ -5798,42 +5841,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 
 
                 <!-- ── STORE — artist manages their own products ───────────────────────── -->
-                <div class="dash-view" id="artistStoreView">
-                    <div class="view-header">
-                        <div>
-                            <h1 class="view-title">Store</h1>
-                            <p class="view-subtitle">Sell directly to your fans. You're the merchant of record — Stripe pays you out.</p>
-                        </div>
-                        <button class="primary-btn" onclick="openProductEditor()">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                            Add product
-                        </button>
-                    </div>
-
-                    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px;">
-                      <div style="flex:1;min-width:200px;">
-                        <label style="display:block;font-size:0.72rem;color:var(--text-muted);margin-bottom:3px;">Store name <span style="opacity:.7;">(shown on your public store)</span></label>
-                        <input id="storeTitleInput" style="width:100%;box-sizing:border-box;background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-primary);border-radius:8px;padding:9px 12px;font-size:0.9rem;" placeholder="Your store name">
-                      </div>
-                      <button class="artist-action-btn" onclick="saveStoreTitle()">Save name</button>
-                      <a class="artist-action-btn" id="storeViewLink" href="#" target="_blank" rel="noopener">View store ↗</a>
-                    </div>
-                    <!-- Shown only when payouts aren't set up: without Connect, checkout fails. -->
-                    <div id="storeOnboardBanner" style="display:none;margin-bottom:16px;"></div>
-
-                    <!-- Proposed by a store skill, applied only by the artist. Hidden
-                         until something is pending. -->
-                    <div id="storeStagedPanel" style="display:none;margin-bottom:18px;"></div>
-
-                    <!-- Header, category filter and tiles are all drawn by
-                         aiadStoreGrid(), the one renderer every store surface uses. -->
-                    <div id="storeProductsGrid"></div>
-
-                    <div style="margin-top:28px;">
-                        <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:12px;">Recent sales</div>
-                        <div id="storeSalesList"></div>
-                    </div>
-                </div>
+                
 
                 <!-- ── PAYOUTS — Stripe Connect status. No internal wallet, no withdraw. ── -->
                 
@@ -15084,6 +15092,21 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         }
         window.aiadLoadMoneyTab = aiadLoadMoneyTab;
 
+        // Lifted verbatim out of the two branches this replaces.
+        function aiadLoadStoreTab(tab) {
+            if (tab === 'design') {
+                setTimeout(() => { initMerch(); restoreLastMerchDesign(); renderStudioHistory('merch'); }, 80);
+            } else if (tab === 'selling') {
+                setTimeout(() => { if (window.loadStoreManager) loadStoreManager(); }, 60);
+            }
+        }
+        window.aiadLoadStoreTab = aiadLoadStoreTab;
+
+        const AIAD_TAB_LOADERS = {
+            artistMoneyView:    (t) => aiadLoadMoneyTab(t),
+            artistStoreHubView: (t) => aiadLoadStoreTab(t),
+        };
+
         function aiadViewTab(hostId, name) {
             const host = document.getElementById(hostId);
             if (!host) return;
@@ -15106,7 +15129,8 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             // Revealing a panel is not the same as filling it: the old per-view
             // branches were what fetched this data, and a tab click never went
             // through them.
-            if (host.id === 'artistMoneyView') aiadLoadMoneyTab(tab.dataset.agentTab);
+            const load = AIAD_TAB_LOADERS[host.id];
+            if (load) load(tab.dataset.agentTab);
         });
 
         function showArtistView(view) {
@@ -15124,7 +15148,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 try { window.aiadLoadAgentConvos && window.aiadLoadAgentConvos(); } catch (e) {}
             }, 0);
 
-            const allViews = ['artistLibraryView', 'artistReviewView', 'artistPlanView', 'artistHomeView', 'artistPostsView', 'artistSupportersView', 'artistProjectsView', 'artistMoneyView', 'artistScheduleView', 'artistCollaboratorsView', 'artistMusicView', 'artistSongwritingView', 'artistMixMediaView', 'artistMerchView', 'artistSyncLibraryView', 'artistMilestonesView', 'artistAgentsView', 'artistInboxView', 'artistSettingsView', 'artistStoreView', 'artistDistributeView', 'episodesView', 'publishView'];
+            const allViews = ['artistLibraryView', 'artistReviewView', 'artistPlanView', 'artistHomeView', 'artistPostsView', 'artistSupportersView', 'artistProjectsView', 'artistMoneyView', 'artistScheduleView', 'artistCollaboratorsView', 'artistMusicView', 'artistSongwritingView', 'artistMixMediaView', 'artistStoreHubView', 'artistSyncLibraryView', 'artistMilestonesView', 'artistAgentsView', 'artistInboxView', 'artistSettingsView', 'artistDistributeView', 'episodesView', 'publishView'];
             allViews.forEach(v => {
                 const el = document.getElementById(v);
                 if (el) el.classList.remove('active');
@@ -15141,6 +15165,15 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
 
             const subItems = document.querySelectorAll('#artistDashboard .dash-nav-subitem');
             subItems.forEach(item => item.classList.remove('active'));
+            // By data-view, not by position. The indices these calls used were already
+            // one out — Clip Studio was inserted into the submenu and nothing renumbered
+            // them, so 'merch' highlighted Clip Studio and 'synclibrary' highlighted
+            // Merch. Folding Merch into the Store view would have shifted them again and
+            // left subItems[4] undefined.
+            const markSub = (v) => {
+                const el = document.querySelector('#artistDashboard .dash-nav-subitem[data-view="' + v + '"]');
+                if (el) el.classList.add('active');
+            };
 
             const dropdown = document.querySelector('#artistDashboard .dash-nav-dropdown');
             const submenu = document.getElementById('creativeStudioSubmenu');
@@ -15167,12 +15200,14 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 'music': 'artistMusicView',
                 'songwriting': 'artistSongwritingView',
                 'mixmedia': 'artistMixMediaView',
-                'merch': 'artistMerchView',
+                // Merch Studio and the store manager are the Design and Selling tabs
+                // of one Store view. Both old keys still resolve and pick their tab.
+                'store': 'artistStoreHubView',
+                'merch': 'artistStoreHubView',
                 'synclibrary': 'artistSyncLibraryView',
                 'milestones': 'artistMilestonesView',
                 'inbox': 'artistInboxView',
                 'settings': 'artistSettingsView',
-                'store': 'artistStoreView',
                 'distribute': 'artistDistributeView',
                 'library': 'artistLibraryView',
                 'review': 'artistReviewView',
@@ -15235,7 +15270,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 viewEl.classList.add('active');
                 if (dropdown) dropdown.classList.add('open');
                 if (submenu) submenu.classList.add('open');
-                subItems[0].classList.add('active');
+                markSub('music');
 
                 const trackList = document.getElementById('musicTrackList');
                 loadTracksFromDb();
@@ -15243,25 +15278,19 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 viewEl.classList.add('active');
                 if (dropdown) dropdown.classList.add('open');
                 if (submenu) submenu.classList.add('open');
-                subItems[1].classList.add('active');
+                markSub('songwriting');
                 // history rendered by generation callback
             } else if (view === 'mixmedia') {
                 viewEl.classList.add('active');
                 if (dropdown) dropdown.classList.add('open');
                 if (submenu) submenu.classList.add('open');
-                subItems[2].classList.add('active');
+                markSub('mixmedia');
                 // history rendered by generation callback
-            } else if (view === 'merch') {
-                viewEl.classList.add('active');
-                if (dropdown) dropdown.classList.add('open');
-                if (submenu) submenu.classList.add('open');
-                subItems[3].classList.add('active');
-                setTimeout(() => { initMerch(); restoreLastMerchDesign(); renderStudioHistory('merch'); }, 80);
             } else if (view === 'synclibrary') {
                 viewEl.classList.add('active');
                 if (dropdown) dropdown.classList.add('open');
                 if (submenu) submenu.classList.add('open');
-                subItems[4].classList.add('active');
+                markSub('synclibrary');
                 setTimeout(() => { try { loadMyListings(); loadSyncCatalog(); } catch (e) {} }, 60);
                 // Eligible-track picker + attestation. Rebuilt each time the view opens so a
                 // track declared human since the last visit shows up without a reload.
@@ -15280,10 +15309,12 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 viewEl.classList.add('active');
                 markNav('inbox');
                 setTimeout(function () { if (window.loadArtistInbox) loadArtistInbox(); }, 50);
-            } else if (view === 'store') {
+            } else if (view === 'store' || view === 'merch') {
                 viewEl.classList.add('active');
                 markNav('store');
-                setTimeout(() => { if (window.loadStoreManager) loadStoreManager(); }, 60);
+                const storeTab = (view === 'merch') ? 'design' : 'selling';
+                aiadViewTab('artistStoreHubView', storeTab);
+                aiadLoadStoreTab(storeTab);
             } else if (view === 'distribute') {
                 viewEl.classList.add('active');
                 const _nd = document.getElementById('navDistribute'); if (_nd) _nd.classList.add('active');
@@ -20868,9 +20899,11 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 if (error) throw new Error(error.message);
 
                 showToast('Published to your store');
-                // Lands on the store with the list reloaded — showArtistView('store')
-                // already calls loadStoreManager(), so the new item is on screen.
-                showArtistView('store');
+                // This button lives on the Design tab of the Store view, so the store is
+                // already on screen — switch tabs rather than navigate. The loader is
+                // what puts the row just inserted on the page.
+                aiadViewTab('artistStoreHubView', 'selling');
+                aiadLoadStoreTab('selling');
             } catch (e) {
                 showToast((e && e.message) || 'Could not publish');
             } finally {
