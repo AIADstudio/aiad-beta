@@ -26650,10 +26650,21 @@ document.addEventListener('keydown', function(e) {
                     const watchHrs = typeof sr.youtube_watch_hours === 'number' ? sr.youtube_watch_hours : null;
                     let avgWatch = '—';
                     if (views && watchHrs) {
+                        // Rounded to whole seconds once, here, and every unit below
+                        // is derived from that integer — so the parts always add
+                        // back up to the figure that was rounded.
                         const secs = Math.round((watchHrs * 3600) / views);
-                        avgWatch = secs >= 3600
-                            ? Math.floor(secs / 3600) + 'h ' + Math.round((secs % 3600) / 60) + 'm'
-                            : Math.floor(secs / 60) + 'm ' + String(secs % 60).padStart(2, '0') + 's';
+                        if (secs >= 3600) {
+                            // Minutes are rounded for display, which at 59.5+ carries
+                            // into the hour. Without the carry, 1h 59m 59s rendered
+                            // as "1h 60m".
+                            let h = Math.floor(secs / 3600);
+                            let m = Math.round((secs % 3600) / 60);
+                            if (m === 60) { h += 1; m = 0; }
+                            avgWatch = h + 'h ' + m + 'm';
+                        } else {
+                            avgWatch = Math.floor(secs / 60) + 'm ' + String(secs % 60).padStart(2, '0') + 's';
+                        }
                     }
 
                     stats = [
