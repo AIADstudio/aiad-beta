@@ -4648,7 +4648,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             </div>
                     </div> <!-- /studio-layout --></div>
 
-                <div class="dash-view" id="artistHomeView"><div style="max-width:600px;margin:0 auto;padding:8px 0 60px"><!-- First-project prompt: filled by aiadRenderFirstProjectPrompt when the artist has no projects yet. --><div id="firstProjectPrompt"></div><!-- Install prompt, mobile only, filled by the A2HS module. --><div id="aiadInstallBanner"></div><div id="connectPromptHome"></div><h2 style="font-size:1.4rem;font-weight:700;margin:4px 4px 4px">Home</h2><p style="color:var(--text-secondary);font-size:0.9rem;margin:0 4px 20px">Latest from artists you follow</p><div id="homeFeedInner"><div style="text-align:center;color:var(--text-muted);padding:40px">Loading feed…</div></div></div></div><div class="dash-view active" id="artistPostsView">
+                <div class="dash-view" id="artistHomeView"><div style="max-width:600px;margin:0 auto;padding:8px 0 60px"><!-- First-project prompt: filled by aiadRenderFirstProjectPrompt when the artist has no projects yet. --><div id="firstProjectPrompt"></div><!-- Install prompt, mobile only, filled by the A2HS module. --><div id="aiadInstallBanner"></div><div id="connectPromptHome"></div><!-- Streaming: the YouTube channel card. Filled by AIADYouTube when the creator's industry is streaming and a connection exists. --><div id="ytChannelCard"></div><h2 style="font-size:1.4rem;font-weight:700;margin:4px 4px 4px">Home</h2><p style="color:var(--text-secondary);font-size:0.9rem;margin:0 4px 20px">Latest from artists you follow</p><div id="homeFeedInner"><div style="text-align:center;color:var(--text-muted);padding:40px">Loading feed…</div></div></div></div><div class="dash-view active" id="artistPostsView">
                     <style>
                         /* ── Posts page ── */
                         .posts-page { display: block; }
@@ -14015,7 +14015,10 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
 
         const YOUTUBE_CLIENT_ID = '393323035976-ff9otd2jboj07op1ja5svke06hj9nlmm.apps.googleusercontent.com';
         const YOUTUBE_REDIRECT_URI = 'https://aiad.studio/callback';
-        const YOUTUBE_SCOPES = 'https://www.googleapis.com/auth/youtube.readonly';
+        // readonly reads the channel and the uploads list; upload is what lets a
+        // finished episode go up. Asking for both once beats a second consent
+        // screen the first time someone presses Push to YouTube.
+        const YOUTUBE_SCOPES = 'https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/youtube.upload';
 
         function connectYouTube() {
             const state = oauthState('youtube_');
@@ -14027,7 +14030,10 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 scope: YOUTUBE_SCOPES,
                 state,
                 access_type: 'offline',
-                prompt: 'select_account',
+                // 'consent' as well as 'select_account': Google only returns a
+                // refresh token on a consent screen, and without one the stored
+                // connection dies in an hour and never comes back.
+                prompt: 'consent select_account',
             });
             window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
         }
@@ -14035,9 +14041,20 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         async function handleYouTubeCallback(code) {
             showToast('Connecting YouTube...');
             try {
+                // The user's own JWT, not the anon key. youtube-auth runs with
+                // verify_jwt false (the OAuth redirect cannot carry one), so it
+                // identifies the caller from this header itself — and that is the
+                // only thing that lets it write youtube_tokens and
+                // youtube_connections against a user. With the anon key it falls
+                // back to the old behaviour and persists nothing.
+                let bearer = SUPABASE_ANON_KEY;
+                try {
+                    const s = window.__aiadGetSessionSync && window.__aiadGetSessionSync();
+                    if (s && s.access_token) bearer = s.access_token;
+                } catch (e) {}
                 const res = await fetch('https://uapiytquwuhtewqieegx.supabase.co/functions/v1/youtube-auth?action=exchange', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${bearer}` },
                     body: JSON.stringify({ code })
                 });
                 const tokenData = await res.json();
@@ -14045,6 +14062,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 localStorage.setItem('youtube_access_token', tokenData.access_token);
                 if (tokenData.refresh_token) localStorage.setItem('youtube_refresh_token', tokenData.refresh_token);
                 await loadYouTubeData(tokenData.access_token);
+                try { if (window.AIADYouTube) await window.AIADYouTube.refresh(); } catch (e) {}
             } catch (err) {
                 showToast('YouTube connection error');
             }
@@ -44820,7 +44838,14 @@ window.AIAD_PROMPTS = [
     ];
     // Only AIAD publishes today. YouTube and RSS show as "not connected" until
     // their OAuth lands — the rows are real so the creator sees where it's going.
-    var CONNECTED = { aiad: true, youtube: false, rss: false };
+    // AIAD is always there. YouTube is whatever AIADYouTube found when it asked
+    // youtube_connections, so the row goes live the moment the creator connects
+    // rather than on the next deploy. RSS is still unbuilt.
+    function connectedTargets() {
+        var yt = false;
+        try { yt = !!(window.AIADYouTube && window.AIADYouTube.connected()); } catch (e) {}
+        return { aiad: true, youtube: yt, rss: false };
+    }
 
     var S = { list: [], loaded: false, loading: null, error: null, editing: null, selected: null, publicUrl: undefined };
 
@@ -45221,7 +45246,10 @@ window.AIAD_PROMPTS = [
     }
     function publishFrom(id) { S.selected = id; S.editing = null; window.showArtistView('publish'); }
     function importRss() { toast('RSS import isn’t wired yet — start episode 1 and your feed can be imported later.'); }
-    function importYouTube() { toast('YouTube import isn’t wired yet — it lands with the YouTube connection.'); }
+    function importYouTube() {
+        if (window.AIADYouTube) { window.AIADYouTube.openImport(); return; }
+        toast('YouTube is still loading');
+    }
 
     /* ── Publish view ── */
     function openPublish() {
@@ -45256,10 +45284,28 @@ window.AIAD_PROMPTS = [
     function destHtml(e, t) {
         var d = getDest(e, t.key);
         var status = d ? d.status : null;
-        var connected = !!CONNECTED[t.key];
+        var connected = !!connectedTargets()[t.key];
         var dot = !connected ? '' : status === 'published' ? ' live' : status === 'scheduled' ? ' pending' : '';
         var sub, ctl;
-        if (!connected) {
+        if (t.key === 'youtube') {
+            // YouTube is an upload, not a release window, so it gets its own
+            // controls rather than the members-first ones below.
+            if (!connected) {
+                sub = 'Not connected · ' + esc(t.hint);
+                ctl = '<button type="button" class="sv-btn sv-btn-sm" onclick="AIADYouTube.connect()">Connect YouTube</button>';
+            } else if (status === 'published' && d && d.url) {
+                sub = 'Uploaded ' + esc(fmtDate(d.published_at))
+                    + (d.privacy === 'private' ? ' · still private on YouTube, publish it there when you are ready' : '')
+                    + ' · <a href="' + esc(d.url) + '" target="_blank" rel="noopener">View on YouTube</a>';
+                ctl = '<button type="button" class="sv-btn sv-btn-sm" onclick="AIADYouTube.push(\'' + esc(e.id) + '\')">Upload again</button>';
+            } else if (!e.video_url) {
+                sub = 'Add a video URL to this episode and it can go up to your channel.';
+                ctl = '<button type="button" class="sv-btn sv-btn-sm" disabled>Push to YouTube</button>';
+            } else {
+                sub = 'Uploads as private, so you decide when it goes public on YouTube.';
+                ctl = '<button type="button" class="sv-btn sv-btn-sm sv-btn-primary" onclick="AIADYouTube.push(\'' + esc(e.id) + '\')">Push to YouTube</button>';
+            }
+        } else if (!connected) {
             sub = 'Not connected · ' + esc(t.hint);
             ctl = '<button type="button" class="sv-btn sv-btn-sm" disabled title="Connection coming soon">Connect ' + esc(t.name) + '</button>';
         } else if (status === 'published') {
@@ -46061,6 +46107,319 @@ a.sv-btn{text-decoration:none;display:inline-flex;align-items:center;}
 @media (max-width:768px){
   .sv-onair-title{font-size:1.6rem;}
   .sv-onair-meta{gap:12px;}
+}
+</style>
+
+<script>
+/* ══════════════ STREAMING: YOUTUBE ══════════════
+   The connection the streaming vertical reads from, and the two things it does
+   with it: pull a video in as an episode, and push a finished episode out.
+
+   Reads come straight from public.youtube_connections, which is owner-scoped
+   RLS and holds facts only — channel, handle, thumbnail, three counts. The
+   access and refresh tokens live in public.youtube_tokens, which is
+   service_role only, and nothing in this file can see one. Anything needing a
+   token goes through the `youtube-auth` function, which holds it server-side
+   and refreshes it when it expires.
+
+   The legacy localStorage token the settings page still writes is left alone.
+   It predates this and is not what any of the calls below rely on. */
+(function () {
+    'use strict';
+
+    var FN = 'https://uapiytquwuhtewqieegx.supabase.co/functions/v1/youtube-auth';
+
+    function el(id) { return document.getElementById(id); }
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+    function toast(m) { try { (window.showToast || alert)(m); } catch (e) {} }
+    function session() {
+        try { return window.__aiadGetSessionSync ? window.__aiadGetSessionSync() : null; } catch (e) { return null; }
+    }
+    function streaming() {
+        try { return !!(window.aiadIsStreaming && window.aiadIsStreaming()); } catch (e) { return false; }
+    }
+    function num(n) { return (typeof n === 'number' && isFinite(n)) ? n.toLocaleString() : '—'; }
+    function mins(sec) {
+        if (!sec) return '';
+        var m = Math.round(sec / 60);
+        return m >= 60 ? Math.floor(m / 60) + 'h ' + (m % 60) + 'm' : m + ' min';
+    }
+
+    var S = { conn: undefined, videos: null, videosError: null, loadingVideos: false, busy: false };
+
+    async function call(action, payload, quiet) {
+        var sess = session();
+        if (!sess) { if (!quiet) toast('Sign in first'); return null; }
+        var res, data;
+        try {
+            res = await fetch(FN + '?action=' + encodeURIComponent(action), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sess.access_token },
+                body: JSON.stringify(payload || {}),
+            });
+            data = await res.json();
+        } catch (e) {
+            console.error('[youtube]', action, e);
+            if (!quiet) toast('Could not reach YouTube — ' + (e.message || e));
+            return null;
+        }
+        if (!res.ok) {
+            console.error('[youtube]', action, res.status, data);
+            if (!quiet) toast(data && data.error ? data.error : ('YouTube service returned ' + res.status));
+            return null;
+        }
+        // reconnect_required comes back with a 200 because it is a state, not a
+        // fault: the creator revoked access or the refresh token expired.
+        if (data && data.error === 'reconnect_required') {
+            S.conn = null;
+            if (!quiet) toast('YouTube needs reconnecting — your access expired or was revoked.');
+            return null;
+        }
+        return data;
+    }
+
+    // The connection row, read directly. No function call and no token involved.
+    async function load(quiet) {
+        var sess = session();
+        if (!sess || !window.db) { S.conn = null; return null; }
+        var r = await window.db.from('youtube_connections')
+            .select('channel_id,channel_title,channel_handle,thumbnail_url,subscriber_count,video_count,view_count,connected_at,last_synced_at')
+            .eq('user_id', sess.user.id).maybeSingle();
+        if (r.error) {
+            try { window.reportDbError && window.reportDbError('youtube_connections', 'select', r.error, { where: 'AIADYouTube.load' }); } catch (e) {}
+            if (!quiet) toast('Could not read your YouTube connection — ' + r.error.message);
+            S.conn = null; return null;
+        }
+        S.conn = r.data || null;
+        return S.conn;
+    }
+
+    /* ── Home: the channel card ── */
+    function cardHtml() {
+        var c = S.conn;
+        if (!c) {
+            return '<div class="yt-card yt-card-off">'
+                + '<div class="yt-card-body"><div class="yt-card-title">Connect your YouTube channel</div>'
+                + '<div class="yt-card-sub">Live subscriber and view counts here, your uploads importable as episodes, and a finished episode pushable back to the channel.</div></div>'
+                + '<button type="button" class="sv-btn sv-btn-sm sv-btn-primary" onclick="AIADYouTube.connect()">Connect</button></div>';
+        }
+        var synced = c.last_synced_at ? new Date(c.last_synced_at).toLocaleDateString() : null;
+        return '<div class="yt-card">'
+            + (c.thumbnail_url ? '<img class="yt-avatar" src="' + esc(c.thumbnail_url) + '" alt="">' : '')
+            + '<div class="yt-card-body">'
+            +   '<div class="yt-card-title">' + esc(c.channel_title || 'Your channel') + '</div>'
+            +   (c.channel_handle ? '<div class="yt-card-sub">' + esc(c.channel_handle) + '</div>' : '')
+            +   '<div class="yt-stats">'
+            +     '<span><strong>' + esc(num(c.subscriber_count)) + '</strong> subscribers</span>'
+            +     '<span><strong>' + esc(num(c.view_count)) + '</strong> views</span>'
+            +     '<span><strong>' + esc(num(c.video_count)) + '</strong> videos</span>'
+            +   '</div>'
+            +   (synced ? '<div class="yt-synced">Last synced ' + esc(synced) + '</div>' : '')
+            + '</div>'
+            + '<div class="yt-card-ctl">'
+            +   '<button type="button" class="sv-btn sv-btn-sm" onclick="AIADYouTube.sync()">Refresh</button>'
+            +   '<button type="button" class="sv-btn sv-btn-sm" onclick="AIADYouTube.openImport()">Import a video</button>'
+            + '</div></div>';
+    }
+
+    async function renderCard() {
+        var host = el('ytChannelCard');
+        if (!host) return;
+        // Streaming only. A musician's Home is not the place for this.
+        if (!streaming()) { host.innerHTML = ''; return; }
+        if (S.conn === undefined) await load(true);
+        host.innerHTML = cardHtml();
+    }
+
+    /* ── Import: recent uploads, one click to an episode ── */
+    function importHtml() {
+        if (!S.conn) {
+            return '<div class="sv-first"><strong>YouTube is not connected.</strong><br>Connect the channel and your recent uploads land here, ready to come in as episodes.</div>'
+                + '<div class="sv-actions"><button type="button" class="sv-btn sv-btn-primary" onclick="AIADYouTube.connect()">Connect YouTube</button>'
+                + '<button type="button" class="sv-btn" onclick="AIADYouTube.closeImport()">Cancel</button></div>';
+        }
+        if (S.loadingVideos) return '<div class="sv-muted">Reading your channel…</div>';
+        // A failed call and an empty channel are different answers and must not
+        // collapse into the same sentence — "no uploads" when the real cause was
+        // a 404 from the function is exactly the kind of thing that hides a bad
+        // deploy for a week.
+        if (S.videosError) {
+            return '<div class="sv-error">Couldn’t read your channel — ' + esc(S.videosError)
+                + ' <button type="button" class="sv-link" onclick="AIADYouTube.openImport()">Retry</button></div>'
+                + '<div class="sv-actions"><button type="button" class="sv-btn" onclick="AIADYouTube.closeImport()">Back</button></div>';
+        }
+        if (!S.videos) return '<div class="sv-muted">Nothing loaded yet.</div>';
+        if (!S.videos.length) {
+            return '<div class="sv-first">No uploads came back from this channel.</div>'
+                + '<div class="sv-actions"><button type="button" class="sv-btn" onclick="AIADYouTube.closeImport()">Back</button></div>';
+        }
+        return '<div class="sv-back"><button type="button" class="sv-link" onclick="AIADYouTube.closeImport()">← All episodes</button></div>'
+            + '<div class="sv-section" style="padding-top:4px;">Import from YouTube</div>'
+            + '<div class="sv-list">' + S.videos.map(function (v) {
+                var already = importedId(v.id);
+                return '<div class="sv-row" style="cursor:default;grid-template-columns:72px 1fr auto;">'
+                    + (v.thumbnail ? '<img class="yt-thumb" src="' + esc(v.thumbnail) + '" alt="">' : '<div class="sv-num">—</div>')
+                    + '<div style="min-width:0;"><div class="sv-row-title">' + esc(v.title) + '</div>'
+                    +   '<div class="sv-row-meta">'
+                    +     (v.published_at ? '<span>' + esc(new Date(v.published_at).toLocaleDateString()) + '</span>' : '')
+                    +     (v.duration_seconds ? '<span>' + esc(mins(v.duration_seconds)) + '</span>' : '')
+                    +     '<span>' + esc(num(v.views)) + ' views</span>'
+                    +   '</div></div>'
+                    + (already
+                        ? '<span class="sv-pill">imported</span>'
+                        : '<button type="button" class="sv-btn sv-btn-sm" onclick="AIADYouTube.importVideo(\'' + esc(v.id) + '\')">Import</button>')
+                    + '</div>';
+            }).join('') + '</div>';
+    }
+
+    // An episode already carrying this video id, so the list does not offer to
+    // import the same upload twice.
+    function importedId(videoId) {
+        try {
+            var st = window.AIADStreaming.state();
+            return (st.list || []).some(function (e) {
+                return (Array.isArray(e.destinations) ? e.destinations : [])
+                    .some(function (d) { return d && d.target === 'youtube' && d.video_id === videoId; });
+            });
+        } catch (e) { return false; }
+    }
+
+    function renderImport() {
+        var body = el('svEpisodesBody');
+        if (!body) return;
+        body.innerHTML = importHtml();
+        var a = el('svEpisodesActions'); if (a) a.style.display = 'none';
+    }
+
+    window.AIADYouTube = {
+        connected: function () { return !!S.conn; },
+        connection: function () { return S.conn || null; },
+        connect: function () {
+            if (typeof window.connectYouTube === 'function') { window.connectYouTube(); return; }
+            toast('YouTube sign-in is not available on this page');
+        },
+        // Re-read the row and repaint the card. Called after the OAuth callback.
+        refresh: async function () { await load(true); await renderCard(); },
+        renderCard: renderCard,
+        sync: async function () {
+            if (S.busy) return;
+            S.busy = true;
+            var r = await call('sync', {});
+            S.busy = false;
+            if (!r) { await renderCard(); return; }
+            if (r.connection) S.conn = r.connection;
+            await renderCard();
+            toast('Channel refreshed');
+        },
+        openImport: async function () {
+            showArtistView('episodes');
+            if (S.conn === undefined) await load(true);
+            S.loadingVideos = true; S.videosError = null;
+            setTimeout(renderImport, 60);
+            if (!S.conn) { S.loadingVideos = false; setTimeout(renderImport, 80); return; }
+            var r = await call('videos', { max: 12 });
+            S.loadingVideos = false;
+            if (!r) { S.videos = null; S.videosError = 'the channel read did not come back'; }
+            else if (Array.isArray(r.videos)) { S.videos = r.videos; S.videosError = null; }
+            else { S.videos = []; S.videosError = null; }
+            renderImport();
+        },
+        closeImport: function () {
+            S.videos = null; S.videosError = null;
+            try { window.AIADStreaming.openEpisodes(); } catch (e) {}
+        },
+        importVideo: async function (videoId) {
+            var v = (S.videos || []).filter(function (x) { return x.id === videoId; })[0];
+            if (!v) return;
+            if (!window.AIADStreaming) { toast('Episodes are still loading'); return; }
+            var st = window.AIADStreaming.state();
+            var n = 0;
+            (st.list || []).forEach(function (e) { if (typeof e.episode_number === 'number' && e.episode_number > n) n = e.episode_number; });
+            var row = await window.AIADStreaming.savePatch({
+                title: v.title || 'Untitled',
+                episode_number: n + 1,
+                summary: v.description || null,
+                artwork_url: v.thumbnail || null,
+                video_url: v.url || null,
+                runtime_seconds: v.duration_seconds || null,
+                air_at: v.published_at || null,
+                format: 'video',
+                // It is already out on YouTube, so it comes in published rather
+                // than as a draft, and at the end of the pipeline.
+                status: 'published',
+                stage: 8,
+                members_only: false,
+                members_early_hours: 0,
+                destinations: [{ target: 'youtube', status: 'published', url: v.url,
+                                 video_id: v.id, published_at: v.published_at || null }],
+                pipeline: {},
+            });
+            if (!row) return;
+            toast('Imported as episode ' + (n + 1));
+            renderImport();
+        },
+        push: async function (episodeId) {
+            if (S.busy) return;
+            if (!window.confirm('Upload this episode to YouTube?\n\nIt goes up as private, so nothing is public until you publish it on YouTube yourself. A long episode can exceed the upload window and fail — the episode is untouched if it does.')) return;
+            S.busy = true;
+            toast('Uploading to YouTube — this can take a while.');
+            var r = await call('upload', { episode_id: episodeId });
+            S.busy = false;
+            if (!r || !r.ok) return;
+            try { await window.AIADStreaming.reload(); window.AIADStreaming.openPublish(); } catch (e) {}
+            toast('Uploaded as private on YouTube');
+        },
+        state: function () { return S; },
+    };
+
+    // The card paints whenever Home opens, which is also the first thing a
+    // creator sees after the OAuth round trip.
+    function hook() {
+        var orig = window.showArtistView;
+        if (typeof orig !== 'function' || orig.__ytHooked) return false;
+        var w = function (v) {
+            var r = orig.apply(this, arguments);
+            if (v === 'home') setTimeout(function () { renderCard(); }, 40);
+            return r;
+        };
+        w.__ytHooked = true;
+        if (orig.__streamingHooked) w.__streamingHooked = true;
+        if (orig.__pricingHooked) w.__pricingHooked = true;
+        window.showArtistView = w;
+        return true;
+    }
+    function boot() {
+        // showArtistView is wrapped by two other modules; retry briefly so this
+        // wraps whatever is outermost by then rather than racing them.
+        if (!hook()) { var n = 0, t = setInterval(function () { if (hook() || ++n > 40) clearInterval(t); }, 150); }
+        renderCard();
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+})();
+</script>
+
+<style id="aiad-youtube-css">
+/* The channel card on Home, and the thumbnails in the import list. Same
+   hairline language as the other streaming surfaces. */
+.yt-card{display:flex;align-items:center;gap:14px;flex-wrap:wrap;border:1px solid var(--border-default);border-radius:14px;padding:16px 18px;margin:0 4px 18px;background:var(--bg-card);}
+.yt-card-off{border-style:dashed;}
+.yt-avatar{width:52px;height:52px;border-radius:50%;object-fit:cover;flex-shrink:0;}
+.yt-card-body{min-width:0;flex:1;}
+.yt-card-title{font-size:1rem;font-weight:600;color:var(--text-primary);}
+.yt-card-sub{font-size:0.78rem;color:var(--text-muted);margin-top:2px;line-height:1.45;}
+.yt-stats{display:flex;gap:18px;flex-wrap:wrap;margin-top:8px;font-size:0.8rem;color:var(--text-secondary);}
+.yt-stats strong{color:var(--text-primary);font-weight:700;}
+.yt-synced{font-size:0.68rem;color:var(--text-hint);margin-top:6px;}
+.yt-card-ctl{display:flex;gap:8px;flex-wrap:wrap;}
+.yt-thumb{width:72px;height:40px;object-fit:cover;border-radius:2px;}
+@media (max-width:768px){
+  .yt-card{align-items:flex-start;}
+  .yt-card-ctl{width:100%;}
+  .yt-card-ctl .sv-btn{flex:1 1 auto;}
 }
 </style>
 
