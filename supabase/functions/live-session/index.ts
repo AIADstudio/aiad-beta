@@ -6,10 +6,14 @@
 // ingest URL and a stream key, and a stream key is a WRITE credential — anyone
 // holding it can broadcast as this creator. It is written to
 // public.live_session_secrets, which has RLS on with zero policies and no grant
-// to anon or authenticated, so only the service role can read it. The client is
-// handed the session id and the playback URL and nothing else, on every action.
-// Nothing in this file returns a stream key or an ingest URL. If you are adding
-// an action, that is the rule to keep.
+// to anon or authenticated, so only the service role can read it.
+//
+// Exactly ONE action returns it: `get_ingest`, and only to the owner of that
+// session, because the creator has to put it into OBS. The service role does
+// the read; the caller's JWT is used only to establish who they are, and the
+// grants on live_session_secrets are never widened. Every other action returns
+// the session id and the playback URL and nothing else. If you are adding an
+// action, that is the rule to keep.
 //
 // verify_jwt stays TRUE. Every action is scoped to the caller: the row is read
 // and written with `.eq('user_id', uid)` as well as by id, so the service role
@@ -47,10 +51,30 @@ const CORS = {
 
 const configured = () => Boolean(CF_ACCOUNT && CF_TOKEN);
 
-function json(body: unknown, status = 200) {
+function json(body: unknown, status = 200, extra: Record<string, string> = {}) {
     return new Response(JSON.stringify(body), {
-        status, headers: { ...CORS, "Content-Type": "application/json" },
+        status, headers: { ...CORS, "Content-Type": "application/json", ...extra },
     });
+}
+
+// A refusal that says nothing. Not "not found", not "not yours" — a 403 with no
+// body, so probing session ids tells an attacker nothing beyond the status code
+// they would get for any id at all.
+function forbidden() {
+    return new Response(null, { status: 403, headers: CORS });
+}
+
+// Does this session belong to this caller? One id-and-owner read, used by the
+// two actions that must answer 403 rather than 404. Typed explicitly because
+// the untyped client infers `never` for a selected row.
+type OwnedSession = { id: string; status: string; provider_live_input_id: string | null; title: string | null };
+// deno-lint-ignore no-explicit-any
+async function ownsSession(db: any, id: string, uid: string): Promise<OwnedSession | null> {
+    const { data, error } = await db.from("live_sessions")
+        .select("id,status,provider_live_input_id,title")
+        .eq("id", id).eq("user_id", uid).maybeSingle();
+    if (error) { console.error("[live-session] ownership check", error); return null; }
+    return (data as OwnedSession | null) ?? null;
 }
 
 const CF_BASE = () => `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT}/stream`;
@@ -170,9 +194,88 @@ Deno.serve(async (req) => {
             return json({ configured: configured(), session: row });
         }
 
-        // Everything below works on one session the caller owns.
         const id = String(body?.id ?? "");
         if (!id) return json({ error: "id required" }, 400);
+
+        // ── get_ingest: the one action that returns the stream key ──────────
+        //
+        // The creator cannot broadcast without it — it goes into OBS. So it is
+        // readable, by its owner, through here and nowhere else:
+        //   - the read is done by the service-role client, because
+        //     live_session_secrets grants nothing to authenticated and that
+        //     stays true;
+        //   - the caller's JWT only establishes identity, and a session that is
+        //     not theirs returns 403 with no body;
+        //   - it is returned in this response and never written anywhere else —
+        //     not onto live_sessions, not into a URL, not to a log.
+        // no-store so it does not sit in a proxy or the browser's HTTP cache.
+        if (action === "get_ingest") {
+            const own = await ownsSession(admin, id, uid);
+            if (!own) return forbidden();
+            const { data: sec, error } = await admin.from("live_session_secrets")
+                .select("ingest_url,stream_key").eq("session_id", id).maybeSingle();
+            if (error) return json({ error: error.message }, 400, { "Cache-Control": "no-store" });
+            return json({
+                ingest_url: sec?.ingest_url ?? null,
+                stream_key: sec?.stream_key ?? null,
+                configured: configured(),
+            }, 200, { "Cache-Control": "no-store" });
+        }
+
+        // ── reset_key: cycle the stream key ─────────────────────────────────
+        //
+        // Cloudflare has no rotate-key endpoint on a live input, so cycling it
+        // means a new input. The new one is created FIRST and the row only
+        // moves once it exists, so a failure leaves the creator with the key
+        // they already had rather than none. The old input is deleted after,
+        // best-effort.
+        //
+        // Only while the session is still scheduled. Deleting a live input
+        // deletes its recordings with it, so a key cannot be cycled out from
+        // under a stream that is on air or has already produced a recording.
+        if (action === "reset_key") {
+            const own = await ownsSession(admin, id, uid);
+            if (!own) return forbidden();
+            if (!configured()) return json({ error: "live streaming is not connected yet" }, 400);
+            if (own.status !== "scheduled") {
+                return json({ error: "A key can only be reset before the stream starts — cycling it deletes the Cloudflare input and any recording with it." }, 400);
+            }
+            const oldInput = own.provider_live_input_id;
+            let input: Record<string, unknown>;
+            try {
+                input = await cf("/live_inputs", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        meta: { name: own.title ?? "Untitled stream" },
+                        recording: { mode: "automatic", requireSignedURLs: false, timeoutSeconds: 10 },
+                    }),
+                });
+            } catch (e) {
+                return json({ error: String((e as Error).message ?? e) }, 400);
+            }
+            const rtmps = (input as Record<string, any>)?.rtmps ?? {};
+            const { error: upErr } = await admin.from("live_sessions").update({
+                provider_live_input_id: (input as Record<string, any>)?.uid ?? null,
+                playback_url: playbackUrl(input as Record<string, any>),
+            }).eq("id", id).eq("user_id", uid);
+            if (upErr) return json({ error: upErr.message }, 400);
+            // Overwrite rather than insert: the row is keyed on session_id and
+            // the old key must not survive anywhere.
+            const { error: secErr } = await admin.from("live_session_secrets").upsert({
+                session_id: id, ingest_url: rtmps.url ?? null, stream_key: rtmps.streamKey ?? null,
+            }, { onConflict: "session_id" });
+            if (secErr) return json({ error: `new key not stored: ${secErr.message}` }, 500);
+            if (oldInput) {
+                try { await cf(`/live_inputs/${oldInput}`, { method: "DELETE" }); }
+                catch (e) { console.error("[live-session] old input delete", e); }
+            }
+            return json({
+                ingest_url: rtmps.url ?? null,
+                stream_key: rtmps.streamKey ?? null,
+            }, 200, { "Cache-Control": "no-store" });
+        }
+
+        // Everything below works on one session the caller owns.
         const { data: sess, error: sessErr } = await admin.from("live_sessions")
             .select("id,user_id,status,provider_live_input_id,playback_url,episode_id,title,simulcast")
             .eq("id", id).eq("user_id", uid).maybeSingle();

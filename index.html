@@ -45770,8 +45770,15 @@ window.AIAD_PROMPTS = [
         return (h ? h + ':' + p(m) : m) + ':' + p(sec);
     }
 
-    var S = { loaded: false, loading: null, error: null, list: [], configured: null, busy: false, viewers: null };
+    var S = { loaded: false, loading: null, error: null, list: [], configured: null, busy: false, viewers: null, lastStatus: 0 };
     var tick = null;
+    // The ingest URL and stream key, in memory and nowhere else. Never
+    // localStorage, never a data- attribute, never the URL, never written back
+    // onto the session row — the function hands them over per request and this
+    // is the only copy. Dropped the moment the view is left or the list
+    // reloads, and `shown` defaults false so the key is masked on arrival.
+    var INGEST = null;   // { id, url, key, shown }
+    function clearIngest() { if (INGEST) { INGEST.key = null; INGEST.url = null; } INGEST = null; }
 
     // `quiet` is for the capability probe only. A 404 from an undeployed function
     // is the same answer as "no Cloudflare token" from a deployed one — Live is
@@ -45781,22 +45788,32 @@ window.AIAD_PROMPTS = [
     async function call(payload, quiet) {
         var sess = session();
         if (!sess) { if (!quiet) toast('Sign in first'); return null; }
-        var res, data;
+        S.lastStatus = 0;
+        var res, data = null;
         try {
             res = await fetch(FN, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sess.access_token },
                 body: JSON.stringify(payload),
             });
-            data = await res.json();
         } catch (e) {
             console.error('[live-session]', payload && payload.action, e);
             if (!quiet) toast('Could not reach the live service — ' + (e.message || e));
             return null;
         }
+        S.lastStatus = res.status;
+        // Parsed separately from the fetch: a 403 from get_ingest is deliberately
+        // sent with no body, and reading that as JSON throws. Folding the two
+        // together reported a refusal as a network failure, which is a different
+        // problem with a different fix.
+        try { data = await res.json(); } catch (e) { data = null; }
         if (!res.ok) {
             console.error('[live-session]', payload && payload.action, res.status, data);
-            if (!quiet) toast(data && data.error ? data.error : ('Live service returned ' + res.status));
+            if (!quiet) {
+                toast(res.status === 403 ? 'That stream is not yours.'
+                    : (data && data.error) ? data.error
+                    : ('Live service returned ' + res.status));
+            }
             return null;
         }
         return data;
@@ -45861,13 +45878,45 @@ window.AIAD_PROMPTS = [
         }).join('');
     }
 
+    // Dots, not the key's own length — a masked field should not leak how long
+    // the secret is.
+    var MASK = '\u2022'.repeat(24);
+
+    function ingestHtml(s) {
+        if (S.configured === false) return '';
+        if (!INGEST || INGEST.id !== s.id) {
+            return '<div class="sv-section">Ingest</div>'
+                + '<div class="sv-muted" style="padding:10px 0;">Fetching your ingest details\u2026</div>';
+        }
+        if (INGEST.error) {
+            return '<div class="sv-section">Ingest</div>'
+                + '<div class="sv-error">Couldn\u2019t load your ingest details \u2014 ' + esc(INGEST.error)
+                + '. <button type="button" class="sv-link" onclick="AIADLive.retryIngest(\'' + esc(s.id) + '\')">Retry</button></div>';
+        }
+        if (!INGEST.url && !INGEST.key) {
+            return '<div class="sv-section">Ingest</div>'
+                + '<div class="sv-first">No ingest details were stored for this stream. Discard it and set it up again.</div>';
+        }
+        var shown = !!INGEST.shown;
+        return '<div class="sv-section">Ingest</div>'
+            + '<div class="sv-first" style="padding-bottom:6px;">Point OBS, or whatever you broadcast with, at these. Anyone holding the key can stream as you \u2014 treat it like a password.</div>'
+            + '<div class="lv-secret"><label>Ingest URL</label>'
+            +   '<div class="lv-secret-row"><code id="lvIngestUrl">' + esc(INGEST.url || '\u2014') + '</code>'
+            +     '<button type="button" class="sv-btn sv-btn-sm" onclick="AIADLive.copy(\'url\')">Copy</button></div></div>'
+            + '<div class="lv-secret"><label>Stream key</label>'
+            +   '<div class="lv-secret-row"><code id="lvStreamKey">' + (shown ? esc(INGEST.key || '\u2014') : MASK) + '</code>'
+            +     '<button type="button" class="sv-btn sv-btn-sm" onclick="AIADLive.toggleKey()">' + (shown ? 'Hide' : 'Show') + '</button>'
+            +     '<button type="button" class="sv-btn sv-btn-sm" onclick="AIADLive.copy(\'key\')">Copy</button>'
+            +     '<button type="button" class="sv-btn sv-btn-sm" onclick="AIADLive.resetKey(\'' + esc(s.id) + '\')">Reset key</button></div></div>';
+    }
+
     function readyHtml(s) {
         return '<div class="sv-section" style="padding-top:18px;">Ready to go live</div>'
             + '<div class="sv-first"><strong>' + esc(s.title || 'Untitled stream') + '</strong>'
             + (s.scheduled_for ? '<br>Scheduled for ' + esc(fmtTime(s.scheduled_for)) : '')
             + (s.members_only ? '<br>Members only' : '')
-            + simulcastLine(s)
-            + '<br>Your ingest URL and stream key are held server-side and are never sent to this page.</div>'
+            + simulcastLine(s) + '</div>'
+            + ingestHtml(s)
             + '<div class="sv-actions">'
             +   '<button type="button" class="sv-btn sv-btn-primary" onclick="AIADLive.golive(\'' + esc(s.id) + '\')">Go live</button>'
             +   '<button type="button" class="sv-btn" onclick="AIADLive.addSimulcast(\'' + esc(s.id) + '\')">Add a simulcast destination</button>'
@@ -45949,6 +45998,33 @@ window.AIAD_PROMPTS = [
         else html = preflightHtml();
         body.innerHTML = html + handoffHtml(lastEnded()) + historyHtml();
         clock(a && a.status === 'live' ? a : null);
+        // The key is only fetched for the scheduled session being shown, and
+        // only once per session — not on every repaint.
+        if (a && a.status === 'scheduled' && S.configured !== false
+            && (!INGEST || INGEST.id !== a.id)) fetchIngest(a.id);
+        if (!a || a.status !== 'scheduled') clearIngest();
+    }
+
+    async function fetchIngest(id) {
+        if (INGEST && INGEST.id === id) return;
+        // Placeholder first so a second render does not fire a second request.
+        INGEST = { id: id, url: null, key: null, shown: false, pending: true };
+        var r = await call({ action: 'get_ingest', id: id }, true);
+        // The session on screen may have changed while this was in flight.
+        if (!INGEST || INGEST.id !== id) return;
+        if (!r) {
+            // Quiet on the wire, loud in the card. A 403 on your own session and
+            // an unreachable function are different faults and must not both
+            // render as a blank space where the key should be.
+            INGEST = { id: id, url: null, key: null, shown: false,
+                       error: S.lastStatus === 403
+                           ? 'this stream is not yours'
+                           : 'the ingest details did not come back' };
+            render();
+            return;
+        }
+        INGEST = { id: id, url: r.ingest_url || null, key: r.stream_key || null, shown: false };
+        render();
     }
 
     // One interval, started only while a stream is actually on air, and cleared
@@ -45990,7 +46066,10 @@ window.AIAD_PROMPTS = [
 
     window.AIADLive = {
         open: open,
-        reload: async function () { S.loaded = false; await load(); render(); },
+        reload: async function () { clearIngest(); S.loaded = false; await load(); render(); },
+        // Called when the dashboard moves to another view, so the key does not
+        // sit in memory behind an unrelated screen.
+        close: clearIngest,
         create: async function () {
             if (S.busy) return;
             var title = (el('lvTitle') || {}).value || '';
@@ -46041,8 +46120,48 @@ window.AIAD_PROMPTS = [
             S.loaded = false; await load(); render();
             toast('Simulcast added');
         },
+        retryIngest: function (id) { clearIngest(); fetchIngest(id); },
+        toggleKey: function () {
+            if (!INGEST) return;
+            INGEST.shown = !INGEST.shown;
+            render();
+        },
+        copy: async function (which) {
+            if (!INGEST) return;
+            var v = which === 'key' ? INGEST.key : INGEST.url;
+            if (!v) return;
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) await navigator.clipboard.writeText(v);
+                else {
+                    // Fallback for a context without the async clipboard. The
+                    // node is removed immediately and is never in the document
+                    // outside this call.
+                    var ta = document.createElement('textarea');
+                    ta.value = v; ta.setAttribute('readonly', '');
+                    ta.style.cssText = 'position:fixed;top:-1000px;opacity:0;';
+                    document.body.appendChild(ta); ta.select();
+                    document.execCommand('copy'); ta.value = ''; ta.remove();
+                }
+                toast(which === 'key' ? 'Stream key copied' : 'Ingest URL copied');
+            } catch (e) {
+                console.error('[live-session] copy', e);
+                toast('Could not copy that — select it and copy by hand.');
+            }
+        },
+        resetKey: async function (id) {
+            if (S.busy) return;
+            if (!window.confirm('Reset the stream key?\n\nThe current key stops working immediately and anything already pointed at it will fail to connect. This also issues a new playback URL.')) return;
+            S.busy = true;
+            var r = await call({ action: 'reset_key', id: id });
+            S.busy = false;
+            if (!r) return;
+            INGEST = { id: id, url: r.ingest_url || null, key: r.stream_key || null, shown: false };
+            S.loaded = false; await load(); render();
+            toast('New key issued');
+        },
         discard: async function (id) {
             if (!window.confirm('Discard this stream set-up?')) return;
+            clearIngest();
             // Deleting the session cascades to live_session_secrets, so the stream
             // key goes with it.
             var r = await window.db.from('live_sessions').delete().eq('id', id).eq('user_id', uid());
@@ -46086,6 +46205,23 @@ window.AIAD_PROMPTS = [
         },
         state: function () { return S; },
     };
+
+    // Leaving Live drops the key from memory rather than letting it sit behind
+    // an unrelated screen. Wrapped once; the YouTube module, which wraps after
+    // this one, carries the flag forward so neither double-wraps.
+    (function hookLeave() {
+        var orig = window.showArtistView;
+        if (typeof orig !== 'function' || orig.__liveHooked) return;
+        var w = function (v) {
+            if (v !== 'live') clearIngest();
+            return orig.apply(this, arguments);
+        };
+        w.__liveHooked = true;
+        if (orig.__streamingHooked) w.__streamingHooked = true;
+        if (orig.__pricingHooked) w.__pricingHooked = true;
+        if (orig.__ytHooked) w.__ytHooked = true;
+        window.showArtistView = w;
+    })();
 })();
 </script>
 
@@ -46103,10 +46239,18 @@ window.AIAD_PROMPTS = [
 .sv-onair-meta{display:flex;gap:20px;flex-wrap:wrap;font-size:0.84rem;color:var(--text-secondary);}
 .sv-onair-meta #lvClock{font-variant-numeric:tabular-nums;}
 a.sv-btn{text-decoration:none;display:inline-flex;align-items:center;}
+/* Ingest fields. The key is masked by default and the value is a <code> so a
+   long RTMPS URL wraps instead of pushing the row sideways. */
+.lv-secret{padding:12px 0;border-bottom:1px solid var(--sv-rule);}
+.lv-secret label{display:block;font-size:0.62rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-muted);margin-bottom:7px;}
+.lv-secret-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.lv-secret code{flex:1 1 260px;min-width:0;overflow-wrap:anywhere;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.82rem;color:var(--text-primary);background:rgba(255,255,255,0.05);padding:8px 10px;line-height:1.4;}
 .sv-first code{background:rgba(255,255,255,0.07);padding:1px 6px;font-size:0.86em;}
 @media (max-width:768px){
   .sv-onair-title{font-size:1.6rem;}
   .sv-onair-meta{gap:12px;}
+  .lv-secret-row code{flex:1 1 100%;}
+  .lv-secret-row .sv-btn{flex:1 1 auto;}
 }
 </style>
 
@@ -46389,6 +46533,7 @@ a.sv-btn{text-decoration:none;display:inline-flex;align-items:center;}
         w.__ytHooked = true;
         if (orig.__streamingHooked) w.__streamingHooked = true;
         if (orig.__pricingHooked) w.__pricingHooked = true;
+        if (orig.__liveHooked) w.__liveHooked = true;
         window.showArtistView = w;
         return true;
     }
