@@ -29560,6 +29560,8 @@ function toggleAgeRange(btn) {
             trending:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></svg>',
             compass:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16 8 13 13 8 16 11 11 16 8"/></svg>',
             document:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="14 3 14 9 20 9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>',
+            users:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="3.2"/><path d="M22 20v-2a4 4 0 0 0-3-3.8M16.5 4.2a4 4 0 0 1 0 7.6"/></svg>',
+            broadcast: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8a6 6 0 0 1 0 8.4M7.8 16.2a6 6 0 0 1 0-8.4M19.1 4.9a10 10 0 0 1 0 14.2M4.9 19.1a10 10 0 0 1 0-14.2"/></svg>',
         };
         // ── Stage prompt pools ─────────────────────────────────────────────
         // 14-16 per stage instead of four, tiered by where the artist actually is.
@@ -29806,6 +29808,71 @@ function toggleAgeRange(btn) {
                   "I'm overwhelmed. Help me pick the ONE thing to focus on this quarter",
               ] },
         ];
+        // ── Streaming: the Podcast Studio pipeline ───────────────────────────
+        // Eight stages of its own, rendered by the Podcast Studio view rather than
+        // by the specialized-agent grid. The keys are the public.stage_skills slugs,
+        // and stage-agent's own whitelist has to carry them too — a row in the table
+        // is not reachable until that function is redeployed.
+        const STREAMING_STAGES = [
+            { key: 'streaming_signal', icon: ICONS.trending, name: 'Signal', desc: 'Is anyone actually asking for this?',
+              suggestions: [
+                  "I have an idea but I don't know if anyone wants it — test it for me",
+                  "What should my next episode be, based on what my audience asks me?",
+                  "I'm starting a show. What should episode one be?",
+                  "Here are three ideas. Rank them and tell me why.",
+              ] },
+            { key: 'streaming_saturation', icon: ICONS.compass, name: 'Saturation check', desc: 'Is this already covered, and what is my angle?',
+              suggestions: [
+                  "Everyone covers this topic. Is there an angle left for me?",
+                  "Has this been done to death, or is it open for my audience?",
+                  "How do I cover this differently from the big show that owns it?",
+                  "What do I have that nobody else covering this has?",
+              ] },
+            { key: 'streaming_research', icon: ICONS.search, name: 'Research', desc: 'Build the factual base and find the holes.',
+              suggestions: [
+                  "Build me a research brief for this episode",
+                  "What am I missing before I record this?",
+                  "Which of my claims will a knowledgeable listener pull apart?",
+                  "Are my sources actually independent, or the same one three times?",
+              ] },
+            { key: 'streaming_map', icon: ICONS.document, name: 'Episode map', desc: 'Cold open, beats, timings.',
+              suggestions: [
+                  "Turn my research into a beat sheet with timings",
+                  "What should the cold open be?",
+                  "People drop off four minutes in. Where is the structural problem?",
+                  "How long should this episode actually be?",
+              ] },
+            { key: 'streaming_guests', icon: ICONS.users, name: 'Guests', desc: 'Who to book, how to ask, what to agree.',
+              suggestions: [
+                  "Who should I have on for this, at my channel size?",
+                  "Draft the outreach — short, and not a form letter",
+                  "What do I send the guest before we record, and what do I hold back?",
+                  "They stopped replying. What now?",
+              ] },
+            { key: 'streaming_format', icon: ICONS.mic, name: 'Format', desc: 'Video, audio or live. Length and cadence.',
+              suggestions: [
+                  "Should this be video, audio or live?",
+                  "I keep missing my own schedule. What cadence actually holds?",
+                  "What should I upgrade in my setup, and what should I ignore?",
+                  "Should I batch a season instead of publishing weekly?",
+              ] },
+            { key: 'streaming_rollout', icon: ICONS.link, name: 'Rollout', desc: 'Members first, then clips, titles, destinations.',
+              suggestions: [
+                  "Plan the rollout — members, public, clips",
+                  "How long should members get this before everyone else?",
+                  "Which moments in this episode stand alone as clips?",
+                  "Give me three titles and tell me what each one promises",
+              ] },
+            { key: 'streaming_postmortem', icon: ICONS.scales, name: 'Post-mortem', desc: 'What the numbers said. What to change.',
+              suggestions: [
+                  "Here are the numbers. What do they actually support?",
+                  "Why did this underperform?",
+                  "Review my last few episodes and give me two changes",
+                  "Is this format worth the hours it costs me?",
+              ] },
+        ];
+        window.aiadStreamingStages = STREAMING_STAGES;
+
         // contract_review is a cross-stage sub-agent — accessible via the standalone button below the grid.
         const CONTRACT_REVIEW = {
             key: 'contract_review', icon: ICONS.document, name: 'Contract Review', desc: 'Cross-stage — recording, mgmt, sync, publishing, more',
@@ -29818,6 +29885,7 @@ function toggleAgeRange(btn) {
         };
 
         let activeStage = null;
+        let activeContext = null;
 
         function getSession() {
             // Delegate to the shared resolver — it also checks sessionStorage, which the
@@ -29975,11 +30043,16 @@ function toggleAgeRange(btn) {
             };
         }
 
-        window.openStageAgent = function (key) {
+        // `context` is optional and is passed straight through to stage-agent, which
+        // puts it in front of the question. The Podcast Studio uses it to hand the
+        // agent the episode it is being asked about, so "what should the cold open
+        // be" is answered about this episode rather than in the abstract.
+        window.openStageAgent = function (key, context) {
             const stage = key === 'contract_review'
                 ? CONTRACT_REVIEW
-                : STAGES.find((s) => s.key === key);
+                : (STAGES.find((s) => s.key === key) || STREAMING_STAGES.find((s) => s.key === key));
             if (!stage) return;
+            activeContext = (typeof context === 'string' && context.trim()) ? context.trim() : null;
             try { window.aiadTrackTool && window.aiadTrackTool('stage:' + key); } catch (e) {}
             activeStage = stage;
             const iconEl = document.getElementById('stageAgentEmoji');
@@ -29997,6 +30070,7 @@ function toggleAgeRange(btn) {
         window.closeStageAgent = function () {
             document.getElementById('stageAgentModal').style.display = 'none';
             activeStage = null;
+            activeContext = null;
         };
 
         // ── AI credits: resolve the Supabase client + REST helpers ──────────────
@@ -30226,12 +30300,21 @@ function toggleAgeRange(btn) {
                         stage: activeStage.key,
                         user_id: sess.user.id,
                         message,
+                        ...(activeContext ? { context: activeContext } : {}),
                     }),
                 });
                 const data = await res.json();
                 loading.remove();
 
-                if (!res.ok) throw new Error(data.error || `stage-agent ${res.status}`);
+                if (!res.ok) {
+                    // stage-agent whitelists its slugs, so a stage whose skill row
+                    // exists but whose slug predates the last deploy fails here and
+                    // nowhere else. Say which it is instead of showing the raw error.
+                    if (/Unknown stage/i.test(String(data.error || ''))) {
+                        throw new Error('This agent is not live yet — its prompt is saved but stage-agent has not been redeployed.');
+                    }
+                    throw new Error(data.error || `stage-agent ${res.status}`);
+                }
 
                 const agentBubble = document.createElement('div');
                 agentBubble.style.cssText = 'align-self:flex-start;max-width:96%;background:rgba(255,0,255,0.06);border:1px solid rgba(255,0,255,0.18);border-radius:12px 12px 12px 2px;padding:14px 16px;color:var(--text-secondary);font-size:0.88rem;line-height:1.55;';
@@ -45286,10 +45369,313 @@ window.AIAD_PROMPTS = [
         select: select, editFromPublish: editFromPublish, saveWindow: saveWindow,
         publishAiad: publishAiad, unpublishAiad: unpublishAiad,
         reload: function () { S.loaded = false; return load(); },
-        state: function () { return S; }
+        state: function () { return S; },
+        // Shared with the Podcast Studio so the pipeline writes go through the one
+        // place that reads `error` on every episodes call, rather than growing a
+        // second copy of the same db code.
+        savePatch: save, ensure: ensureLoaded, markActive: markActive
     };
 })();
 </script>
+
+<script>
+/* ══════════════ STREAMING: PODCAST STUDIO ══════════════
+   The eight-stage pipeline, driven off two columns that already exist on
+   public.episodes: `stage` (1-8, the stage the episode is at) and `pipeline`
+   (jsonb, the per-stage record). Nothing new was added to the table for this.
+
+   pipeline shape, keyed by the public.stage_skills slug:
+       { "streaming_signal": { done: true, notes: "…", updated_at: "…" }, … }
+   A slug key rather than an index, so reordering or renaming a stage later
+   cannot silently reattach a creator's notes to a different stage.
+
+   Stage agents: each row opens the existing stage-agent modal with its own slug
+   and the episode as context. The prompts are streaming-only rows in
+   public.stage_skills — none of the music nine is reused. stage-agent also
+   whitelists its slugs, so until it is redeployed these rows answer with the
+   "not live yet" message rather than failing silently.
+
+   Every db write goes through AIADStreaming.savePatch, which is the one place
+   that reads `error` on an episodes call. */
+(function () {
+    'use strict';
+
+    function el(id) { return document.getElementById(id); }
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+    function toast(m) { try { (window.showToast || alert)(m); } catch (e) {} }
+    function stages() { return window.aiadStreamingStages || []; }
+    function streamingState() {
+        try { return window.AIADStreaming ? window.AIADStreaming.state() : null; } catch (e) { return null; }
+    }
+
+    // Which episode the studio is looking at. Remembered so switching away and
+    // back does not drop the creator into a different episode.
+    var SEL_KEY = 'aiad_studio_episode';
+    var UI = { selected: null, open: null };
+    try { UI.selected = localStorage.getItem(SEL_KEY) || null; } catch (e) {}
+
+    function episodes() {
+        var S = streamingState();
+        return (S && Array.isArray(S.list)) ? S.list : [];
+    }
+    function current() {
+        var list = episodes();
+        if (!list.length) return null;
+        var hit = list.filter(function (e) { return e.id === UI.selected; })[0];
+        if (hit) return hit;
+        // Default to the episode furthest from done rather than the newest: the one
+        // in the middle of the pipeline is the one being worked on.
+        var open = list.filter(function (e) { return (e.status || 'draft') !== 'published'; });
+        return open[0] || list[0];
+    }
+    function pipeline(e) {
+        var p = e && e.pipeline;
+        return (p && typeof p === 'object' && !Array.isArray(p)) ? p : {};
+    }
+    function entry(e, slug) {
+        var v = pipeline(e)[slug];
+        return (v && typeof v === 'object') ? v : {};
+    }
+    // episodes.stage is the source of truth for where the episode is. It is
+    // clamped rather than trusted: the Episodes editor lets it be set by hand,
+    // and the music pipeline used the same column with different stage names.
+    function stageNo(e) {
+        return Math.min(8, Math.max(1, parseInt(e && e.stage, 10) || 1));
+    }
+
+    function pickerHtml(e) {
+        var list = episodes();
+        if (list.length < 2) return '';
+        return '<div class="sv-select-row"><label for="svStudioPick" style="font-size:0.62rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-muted);">Episode</label>'
+            + '<select id="svStudioPick" onchange="AIADPodcastStudio.select(this.value)">'
+            + list.map(function (x) {
+                return '<option value="' + esc(x.id) + '"' + (x.id === e.id ? ' selected' : '') + '>'
+                     + (x.episode_number != null ? esc(x.episode_number) + ' · ' : '') + esc(x.title) + '</option>';
+            }).join('')
+            + '</select></div>';
+    }
+
+    function railHtml(e) {
+        var at = stageNo(e);
+        return '<div class="sv-rail">' + stages().map(function (st, i) {
+            var n = i + 1;
+            var rec = entry(e, st.key);
+            var done = !!rec.done;
+            // "Current" is episodes.stage. A later stage can still be marked done —
+            // creators work out of order — so done is read from the record and the
+            // ring only says where the episode officially sits.
+            var cls = 'sv-stagerow' + (done ? ' done' : '') + (n === at ? ' at' : '') + (UI.open === st.key ? ' open' : '');
+            var notes = rec.notes || '';
+            return '<div class="' + cls + '">'
+                + '<button type="button" class="sv-stagehead" onclick="AIADPodcastStudio.toggle(\'' + esc(st.key) + '\')">'
+                +   '<span class="sv-stagenum">' + n + '</span>'
+                +   '<span class="sv-stageicon">' + st.icon + '</span>'
+                +   '<span class="sv-stagetext"><span class="sv-stagename">' + esc(st.name) + '</span>'
+                +     '<span class="sv-stagedesc">' + esc(st.desc) + '</span></span>'
+                +   (done ? '<span class="sv-pill published">done</span>'
+                          : n === at ? '<span class="sv-pill scheduled">here now</span>'
+                          : (notes ? '<span class="sv-pill">notes</span>' : '<span class="sv-stagespacer"></span>'))
+                + '</button>'
+                + '<div class="sv-stagebody">'
+                +   '<label for="svNote_' + esc(st.key) + '" class="sv-notelabel">Your notes for this stage</label>'
+                +   '<textarea id="svNote_' + esc(st.key) + '" class="sv-note" rows="4" placeholder="What you decided, and why.">' + esc(notes) + '</textarea>'
+                +   '<div class="sv-actions">'
+                +     '<button type="button" class="sv-btn sv-btn-sm sv-btn-primary" onclick="AIADPodcastStudio.ask(\'' + esc(st.key) + '\')">Ask the ' + esc(st.name.toLowerCase()) + ' agent</button>'
+                +     '<button type="button" class="sv-btn sv-btn-sm" onclick="AIADPodcastStudio.saveNote(\'' + esc(st.key) + '\')">Save notes</button>'
+                +     '<button type="button" class="sv-btn sv-btn-sm" onclick="AIADPodcastStudio.setDone(\'' + esc(st.key) + '\',' + (done ? 'false' : 'true') + ')">'
+                +       (done ? 'Reopen stage' : 'Mark done') + '</button>'
+                +     (rec.updated_at ? '<span class="sv-stagewhen">saved ' + esc(new Date(rec.updated_at).toLocaleDateString()) + '</span>' : '')
+                +   '</div>'
+                + '</div></div>';
+        }).join('') + '</div>';
+    }
+
+    function bars(e) {
+        var at = stageNo(e), out = '';
+        for (var i = 1; i <= 8; i++) out += '<span class="sv-stage' + (i <= at ? ' done' : '') + '"></span>';
+        return '<div class="sv-studiotop"><div class="sv-stages" style="max-width:260px;">' + out + '</div>'
+             + '<span class="sv-stagewhen">Stage ' + at + ' of 8 · ' + esc(stages()[at - 1] ? stages()[at - 1].name : '') + '</span></div>';
+    }
+
+    function render() {
+        var body = el('svStudioBody'), actions = el('svStudioActions');
+        if (!body) return;
+        var S = streamingState();
+        if (S && S.error) {
+            body.innerHTML = '<div class="sv-error">Couldn’t load episodes — ' + esc(S.error)
+                + ' <button type="button" class="sv-link" onclick="AIADPodcastStudio.open()">Retry</button></div>';
+            if (actions) actions.style.display = 'none';
+            return;
+        }
+        if (!S || !S.loaded) {
+            body.innerHTML = '<div class="sv-muted">Loading…</div>';
+            if (actions) actions.style.display = 'none';
+            return;
+        }
+        var e = current();
+        if (!e) {
+            // No episode, no pipeline. The studio runs on an episode row, so the
+            // honest empty state sends them to make one rather than showing eight
+            // stages attached to nothing.
+            body.innerHTML = '<div class="sv-empty"><h2>No episode to work on yet.</h2>'
+                + '<p>The eight stages run against one episode at a time — signal, saturation, research, map, guests, format, rollout, post-mortem. Start an episode and the pipeline opens with it.</p>'
+                + '<div class="sv-actions"><button type="button" class="sv-btn sv-btn-primary" onclick="AIADPodcastStudio.newEpisode()">Start episode 1</button>'
+                + '<button type="button" class="sv-btn" onclick="showArtistView(\'episodes\')">All episodes</button></div></div>';
+            if (actions) actions.style.display = 'none';
+            return;
+        }
+        UI.selected = e.id;
+        try { localStorage.setItem(SEL_KEY, e.id); } catch (err) {}
+        body.innerHTML = pickerHtml(e) + bars(e) + railHtml(e);
+        if (actions) {
+            actions.style.display = '';
+            actions.innerHTML = '<button type="button" class="sv-btn" onclick="showArtistView(\'episodes\')">Edit episode</button>';
+        }
+    }
+
+    function open() {
+        render();
+        try {
+            if (window.AIADStreaming) window.AIADStreaming.ensure(render);
+            else render();
+        } catch (e) { render(); }
+    }
+
+    async function patch(e, slug, changes, advance) {
+        var p = Object.assign({}, pipeline(e));
+        p[slug] = Object.assign({}, entry(e, slug), changes, { updated_at: new Date().toISOString() });
+        var body = { id: e.id, pipeline: p };
+        if (advance) body.stage = advance;
+        var row = await window.AIADStreaming.savePatch(body);
+        if (!row) return null;          // savePatch already reported it
+        render();
+        return row;
+    }
+
+    // Context handed to the stage agent. Only what the agent can use: the episode's
+    // own facts plus this stage's notes. Not the whole row — a URL or a sponsor fee
+    // is not something a structure question needs.
+    function contextFor(e, slug) {
+        var at = stageNo(e);
+        var lines = [
+            'Episode: ' + (e.episode_number != null ? '#' + e.episode_number + ' ' : '') + (e.title || 'untitled'),
+            e.topic ? 'Topic: ' + e.topic : null,
+            e.format ? 'Format: ' + e.format : null,
+            e.runtime_seconds ? 'Runtime so far: ' + Math.round(e.runtime_seconds / 60) + ' min' : null,
+            e.guest_name ? 'Guest: ' + e.guest_name : null,
+            e.status ? 'Status: ' + e.status : null,
+            'Pipeline position: stage ' + at + ' of 8',
+            e.members_only ? 'Members only: yes'
+                : (e.members_early_hours > 0 ? 'Members get it ' + e.members_early_hours + 'h early' : null),
+        ];
+        var mine = entry(e, slug).notes;
+        if (mine) lines.push('My notes for this stage: ' + mine);
+        // Earlier stages the creator has written down. What was decided upstream is
+        // most of what an answer at this stage depends on.
+        var earlier = [];
+        stages().forEach(function (st, i) {
+            if (st.key === slug) return;
+            var rec = entry(e, st.key);
+            if (rec.notes) earlier.push((i + 1) + ' ' + st.name + ': ' + rec.notes);
+        });
+        if (earlier.length) lines.push('Earlier stages:\n' + earlier.join('\n'));
+        if (e.summary) lines.push('Summary: ' + e.summary);
+        return lines.filter(Boolean).join('\n');
+    }
+
+    window.AIADPodcastStudio = {
+        open: open,
+        select: function (id) {
+            UI.selected = id;
+            UI.open = null;
+            try { localStorage.setItem(SEL_KEY, id); } catch (e) {}
+            render();
+        },
+        toggle: function (slug) {
+            UI.open = (UI.open === slug) ? null : slug;
+            render();
+            if (UI.open) setTimeout(function () { var n = el('svNote_' + slug); if (n) n.focus(); }, 30);
+        },
+        ask: function (slug) {
+            var e = current();
+            if (!e) { toast('Start an episode first'); return; }
+            if (!window.openStageAgent) { toast('Agents are still loading'); return; }
+            // Unsaved notes are part of the question, so they go in the context even
+            // though they are not in the row yet.
+            var n = el('svNote_' + slug);
+            var live = n ? String(n.value) : '';
+            var ctx = contextFor(e, slug);
+            var saved = entry(e, slug).notes || '';
+            if (live.trim() && live.trim() !== saved.trim()) ctx += '\nUnsaved notes for this stage: ' + live.trim();
+            window.openStageAgent(slug, ctx);
+        },
+        saveNote: async function (slug) {
+            var e = current(); if (!e) return;
+            var n = el('svNote_' + slug); if (!n) return;
+            var row = await patch(e, slug, { notes: String(n.value) });
+            if (row) toast('Notes saved');
+        },
+        setDone: async function (slug, done) {
+            var e = current(); if (!e) return;
+            var i = stages().findIndex(function (st) { return st.key === slug; });
+            if (i < 0) return;
+            // Marking the stage the episode is actually at moves it on. Marking a
+            // later one does not drag the episode forward past unfinished work, and
+            // reopening never moves it backwards — that is the creator's call in the
+            // episode editor, where `stage` is an editable field.
+            var advance = (done && (i + 1) === stageNo(e)) ? Math.min(8, i + 2) : null;
+            var n = el('svNote_' + slug);
+            var changes = { done: !!done };
+            if (n) changes.notes = String(n.value);
+            var row = await patch(e, slug, changes, advance);
+            if (row) toast(done ? (advance ? 'Done — on to ' + stages()[advance - 1].name : 'Marked done') : 'Stage reopened');
+        },
+        newEpisode: function () {
+            // The editor lives on the Episodes view, so send them there rather than
+            // growing a second episode form in here.
+            showArtistView('episodes');
+            setTimeout(function () { try { window.AIADStreaming.startFirst(); } catch (e) {} }, 120);
+        },
+    };
+})();
+</script>
+
+<style id="aiad-studio-css">
+/* Podcast Studio — the eight-stage rail. Hairlines and the same type scale as
+   the other streaming views; no card chrome. Colour comes from the token block
+   at the end of the document. */
+.sv-studiotop{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 0 16px;border-bottom:1px solid var(--sv-rule);}
+.sv-rail{border-top:0;}
+.sv-stagerow{border-bottom:1px solid var(--sv-rule);}
+.sv-stagehead{display:flex;align-items:center;gap:14px;width:100%;padding:15px 0;background:none;border:0;border-radius:0;text-align:left;cursor:pointer;font-family:inherit;color:inherit;}
+.sv-stagenum{font-family:var(--sv-serif);font-size:1.15rem;color:var(--text-muted);min-width:18px;flex-shrink:0;}
+.sv-stageicon{width:20px;height:20px;flex-shrink:0;color:var(--text-muted);display:inline-flex;}
+.sv-stageicon svg{width:20px;height:20px;}
+.sv-stagetext{display:flex;flex-direction:column;min-width:0;flex:1;}
+.sv-stagename{font-size:0.95rem;font-weight:500;color:var(--text-primary);}
+.sv-stagedesc{font-size:0.76rem;color:var(--text-muted);margin-top:3px;line-height:1.45;}
+.sv-stagespacer{width:1px;}
+.sv-stagewhen{font-size:0.72rem;color:var(--text-muted);}
+.sv-stagerow.at .sv-stagenum,.sv-stagerow.at .sv-stageicon{color:var(--teal);}
+.sv-stagerow.done .sv-stagename{color:var(--text-secondary);}
+.sv-stagerow:hover .sv-stagename{color:var(--teal-light);}
+.sv-stagebody{display:none;padding:0 0 18px;}
+.sv-stagerow.open .sv-stagebody{display:block;}
+.sv-notelabel{display:block;font-size:0.62rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;}
+.sv-note{width:100%;box-sizing:border-box;background:transparent;border:1px solid var(--border-hover);border-radius:0;color:var(--text-primary);font-family:var(--sv-sans);font-size:0.9rem;line-height:1.55;padding:10px 12px;outline:0;resize:vertical;}
+.sv-note:focus{border-color:var(--text-secondary);}
+.sv-note::placeholder{color:var(--text-hint);}
+@media (max-width:768px){
+  .sv-stagehead{gap:10px;padding:14px 0;}
+  .sv-stagedesc{display:none;}
+  .sv-rail .sv-actions{gap:8px;}
+  .sv-rail .sv-actions .sv-btn{flex:1 1 auto;}
+}
+</style>
 
 <style id="aiad-streaming-mobile-css">
 /* Streaming vertical — mobile overrides. Geometry only; the token block in

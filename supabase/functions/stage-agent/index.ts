@@ -1,7 +1,14 @@
 // Supabase Edge Function: stage-agent
-// Routes user queries to the right AIAD stage skill (Discover/Develop/Record/Rights/Touring/Brand/Finances/Strategy/Contract).
+// Routes a user query to the right AIAD stage skill. Two pipelines share this one
+// function: music artist management (Discover/Develop/Record/Rights/Touring/Brand/
+// Finances/Strategy) and the streaming vertical's Podcast Studio (signal/
+// saturation/research/map/guests/format/rollout/post-mortem). contract_review is
+// shared by both.
 // Server-side execution. Skill content NEVER returned to the client — only structured agent output.
 // Deploy: `supabase functions deploy stage-agent`
+// NOTE: the slug list below is a whitelist. A skill row in public.stage_skills is
+// not reachable until its slug is in it AND this function is redeployed, so adding
+// a stage is always a two-part change: the row, then this deploy.
 // Required env: ANTHROPIC_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
@@ -27,8 +34,17 @@ const CORS = {
 // caller — the response carries the model's answer only, which is the whole
 // point of running skills server-side.
 const STAGE_SLUGS = [
+    // Music artist management — the original nine.
     "discover", "develop", "record_release", "rights_royalties", "touring_live",
     "brand_sync", "finances", "strategy_team", "contract_review",
+    // Streaming — the Podcast Studio's eight-stage pipeline. Separate rows with
+    // separate prompts, not the music nine reworded: the unit is an episode in a
+    // feed rather than a release, so the decisions, the guardrails and the
+    // handoffs are all different. contract_review is shared, since a guest
+    // agreement is a contract like any other.
+    "streaming_signal", "streaming_saturation", "streaming_research",
+    "streaming_map", "streaming_guests", "streaming_format",
+    "streaming_rollout", "streaming_postmortem",
 ] as const;
 type StageSlug = typeof STAGE_SLUGS[number];
 type StageSkill = { slug: StageSlug; name: string; content: string };
@@ -140,27 +156,50 @@ serve(async (req) => {
             try {
                 const supa = createClient(SUPABASE_URL, SERVICE_KEY);
                 const { data: stats } = await supa.from("artist_stats")
-                    .select("spotify_stats,youtube_stats,lastfm_stats,last_fetched_at")
+                    .select("spotify_stats,youtube_stats,lastfm_stats,self_reported,last_fetched_at")
                     .eq("user_id", user_id).maybeSingle();
-                if (stats && (stats.spotify_stats || stats.youtube_stats || stats.lastfm_stats)) {
+                // youtube_connections is client-readable and kept current by
+                // youtube-auth; artist_stats.youtube_stats is the older cached scan.
+                // Both are offered and the context names which is which.
+                let connected: Record<string, unknown> | null = null;
+                try {
+                    const { data: conn } = await supa.from("youtube_connections")
+                        .select("channel_title,channel_handle,subscriber_count,video_count,view_count,last_synced_at")
+                        .eq("user_id", user_id).maybeSingle();
+                    if (conn && conn.channel_title) connected = conn;
+                } catch (e) { console.warn("[stage-agent] youtube_connections lookup", e); }
+
+                if (stats && (stats.spotify_stats || stats.youtube_stats || stats.lastfm_stats || stats.self_reported) || connected) {
                     const compact: Record<string, unknown> = {};
-                    const sp = stats.spotify_stats || {};
+                    const sp = stats?.spotify_stats || {};
                     if (sp.name) compact.spotify = {
                         name: sp.name, followers: sp.followers, popularity: sp.popularity,
                         genres: sp.genres,
                         top_tracks: (sp.top_tracks ?? []).slice(0, 5).map((t: any) => `${t.name} (pop ${t.popularity})`),
                         related: (sp.related_artists ?? []).slice(0, 5).map((a: any) => a.name),
                     };
-                    const yt = stats.youtube_stats || {};
+                    const yt = stats?.youtube_stats || {};
                     if (yt.name) compact.youtube = {
                         name: yt.name, subscribers: yt.subscribers,
                         total_views: yt.total_views, video_count: yt.video_count,
                         recent_videos: (yt.recent_videos ?? []).slice(0, 3).map((v: any) => `${v.title} — ${v.views} views`),
                     };
-                    const lf = stats.lastfm_stats || {};
+                    const lf = stats?.lastfm_stats || {};
                     if (lf.name) compact.lastfm = { name: lf.name, playcount: lf.playcount, country: lf.country };
+                    // Streaming's self-reported figures live in the same jsonb under
+                    // their own keys (record_streaming_stats writes them). Without
+                    // these a streaming stage agent has no idea of the channel's size
+                    // and gives advice pitched at the wrong audience.
+                    const sr = stats?.self_reported || {};
+                    const srPick: Record<string, unknown> = {};
+                    for (const k of ["youtube_subscribers", "youtube_views", "youtube_watch_hours",
+                                     "spotify_podcast_followers", "apple_podcasts_followers"]) {
+                        if (typeof sr[k] === "number") srPick[k] = sr[k];
+                    }
+                    if (Object.keys(srPick).length) compact.reported = srPick;
+                    if (connected) compact.youtube_connected = connected;
                     if (Object.keys(compact).length) {
-                        artistContext = `[Artist data — last fetched ${stats.last_fetched_at ?? "unknown"}]\n${JSON.stringify(compact, null, 2)}`;
+                        artistContext = `[Artist data — last fetched ${stats?.last_fetched_at ?? "unknown"}]\n${JSON.stringify(compact, null, 2)}`;
                     }
                 }
             } catch (e) { console.warn("[stage-agent] stats lookup", e); }
