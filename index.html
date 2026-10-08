@@ -45677,6 +45677,393 @@ window.AIAD_PROMPTS = [
 }
 </style>
 
+<script>
+/* ══════════════ STREAMING: LIVE ══════════════
+   Cloudflare Stream, through the `live-session` edge function.
+
+   Reads come straight from public.live_sessions, which is owner-scoped RLS.
+   Writes all go through the function, because creating a live input produces a
+   stream key and a stream key is a write credential — it is stored in
+   live_session_secrets (service_role only) and never comes back to this file.
+   Nothing here asks for it and nothing here can display it.
+
+   SHIPPED DARK. The function answers `action: "config"` with
+   { configured: false } until CF_STREAM_TOKEN and CF_ACCOUNT_ID are set on it,
+   and the pre-flight card says so instead of the creator finding out when they
+   press Go live. */
+(function () {
+    'use strict';
+
+    var FN = 'https://uapiytquwuhtewqieegx.supabase.co/functions/v1/live-session';
+
+    function el(id) { return document.getElementById(id); }
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+    function toast(m) { try { (window.showToast || alert)(m); } catch (e) {} }
+    function session() {
+        try { return window.__aiadGetSessionSync ? window.__aiadGetSessionSync() : null; } catch (e) { return null; }
+    }
+    function uid() {
+        var s = session();
+        return (s && s.user && s.user.id) || null;
+    }
+    function fmtTime(iso) {
+        if (!iso) return '';
+        var d = new Date(iso); if (isNaN(d)) return '';
+        return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    }
+    function elapsed(iso) {
+        if (!iso) return '';
+        var ms = Date.now() - new Date(iso).getTime();
+        if (!(ms > 0)) return '0:00';
+        var t = Math.floor(ms / 1000), h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), sec = t % 60;
+        var p = function (n) { return (n < 10 ? '0' : '') + n; };
+        return (h ? h + ':' + p(m) : m) + ':' + p(sec);
+    }
+
+    var S = { loaded: false, loading: null, error: null, list: [], configured: null, busy: false, viewers: null };
+    var tick = null;
+
+    // `quiet` is for the capability probe only. A 404 from an undeployed function
+    // is the same answer as "no Cloudflare token" from a deployed one — Live is
+    // not connected — and the pre-flight card already says so. Everything the
+    // creator actually pressed stays loud: a failure there is a real failure and
+    // is never swallowed into an empty state. Both paths always console.error.
+    async function call(payload, quiet) {
+        var sess = session();
+        if (!sess) { if (!quiet) toast('Sign in first'); return null; }
+        var res, data;
+        try {
+            res = await fetch(FN, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sess.access_token },
+                body: JSON.stringify(payload),
+            });
+            data = await res.json();
+        } catch (e) {
+            console.error('[live-session]', payload && payload.action, e);
+            if (!quiet) toast('Could not reach the live service — ' + (e.message || e));
+            return null;
+        }
+        if (!res.ok) {
+            console.error('[live-session]', payload && payload.action, res.status, data);
+            if (!quiet) toast(data && data.error ? data.error : ('Live service returned ' + res.status));
+            return null;
+        }
+        return data;
+    }
+
+    async function load() {
+        var u = uid();
+        S.error = null;
+        if (!u) { S.error = 'Sign in to go live.'; S.list = []; S.loaded = true; return; }
+        if (!window.db) { S.error = 'Database not ready.'; S.loaded = true; return; }
+        var r = await window.db.from('live_sessions').select('*').eq('user_id', u)
+            .order('created_at', { ascending: false }).limit(20);
+        if (r.error) {
+            try { window.reportDbError && window.reportDbError('live_sessions', 'select', r.error, { where: 'AIADLive.load' }); } catch (e) {}
+            S.error = r.error.message; S.loaded = true; return;
+        }
+        S.list = r.data || []; S.loaded = true;
+    }
+
+    // The session the view is about: the one that is live, else the most recent
+    // one still scheduled, else the last one that ended.
+    function active() {
+        return S.list.filter(function (x) { return x.status === 'live'; })[0]
+            || S.list.filter(function (x) { return x.status === 'scheduled'; })[0]
+            || null;
+    }
+    function lastEnded() {
+        return S.list.filter(function (x) { return x.status === 'ended'; })[0] || null;
+    }
+
+    function notConfiguredHtml() {
+        return '<div class="sv-first"><strong>Live is built and not connected.</strong><br>'
+            + 'Everything here is wired to Cloudflare Stream and waiting on one thing: a Cloudflare account and an API token with Stream edit rights, set on the <code>live-session</code> function as <code>CF_ACCOUNT_ID</code> and <code>CF_STREAM_TOKEN</code>. '
+            + 'Until then you can set a stream up, and Go live will tell you the same thing rather than failing halfway.</div>';
+    }
+
+    function preflightHtml() {
+        return '<div class="sv-section" style="padding-top:18px;">Pre-flight</div>'
+            + (S.configured === false ? notConfiguredHtml() : '')
+            + '<div class="sv-grid">'
+            + '<div class="sv-field wide"><label for="lvTitle">Title</label>'
+            +   '<input id="lvTitle" type="text" placeholder="What are you going live with?"></div>'
+            + '<div class="sv-field"><label for="lvWhen">Scheduled for (optional)</label>'
+            +   '<input id="lvWhen" type="datetime-local"></div>'
+            + '<div class="sv-field"><label for="lvEpisode">Attach to an episode (optional)</label>'
+            +   '<select id="lvEpisode">' + episodeOptions() + '</select></div>'
+            + '</div>'
+            + '<label class="sv-check" for="lvMembers"><input id="lvMembers" type="checkbox"><span>Members only <small>— only supporters can watch</small></span></label>'
+            + '<div class="sv-section">Simulcast</div>'
+            + '<label class="sv-check" for="lvSimYoutube"><input id="lvSimYoutube" type="checkbox"><span>YouTube <small>— restream live to your channel</small></span></label>'
+            + '<div class="sv-first" style="padding-top:10px;">A simulcast destination needs that platform’s own stream key at the moment you add it. It is handed to Cloudflare and not stored here.</div>'
+            + '<div class="sv-actions">'
+            +   '<button type="button" class="sv-btn sv-btn-primary" id="lvCreate" onclick="AIADLive.create()">Set up the stream</button>'
+            + '</div>';
+    }
+
+    function episodeOptions() {
+        var list = [];
+        try { var st = window.AIADStreaming && window.AIADStreaming.state(); list = (st && st.list) || []; } catch (e) {}
+        return '<option value="">None</option>' + list.map(function (e) {
+            return '<option value="' + esc(e.id) + '">' + (e.episode_number != null ? esc(e.episode_number) + ' · ' : '') + esc(e.title) + '</option>';
+        }).join('');
+    }
+
+    function readyHtml(s) {
+        return '<div class="sv-section" style="padding-top:18px;">Ready to go live</div>'
+            + '<div class="sv-first"><strong>' + esc(s.title || 'Untitled stream') + '</strong>'
+            + (s.scheduled_for ? '<br>Scheduled for ' + esc(fmtTime(s.scheduled_for)) : '')
+            + (s.members_only ? '<br>Members only' : '')
+            + simulcastLine(s)
+            + '<br>Your ingest URL and stream key are held server-side and are never sent to this page.</div>'
+            + '<div class="sv-actions">'
+            +   '<button type="button" class="sv-btn sv-btn-primary" onclick="AIADLive.golive(\'' + esc(s.id) + '\')">Go live</button>'
+            +   '<button type="button" class="sv-btn" onclick="AIADLive.addSimulcast(\'' + esc(s.id) + '\')">Add a simulcast destination</button>'
+            +   '<button type="button" class="sv-btn" onclick="AIADLive.discard(\'' + esc(s.id) + '\')">Discard</button>'
+            + '</div>';
+    }
+
+    function simulcastLine(s) {
+        var sim = Array.isArray(s.simulcast) ? s.simulcast : [];
+        if (!sim.length) return '';
+        return '<br>Simulcast: ' + sim.map(function (t) { return esc(t.target) + ' (' + esc(t.status || 'pending') + ')'; }).join(', ');
+    }
+
+    // The only place --s-live appears in markup. It is the ON AIR state and
+    // nothing else; the theme block carries the matching rules.
+    function onAirHtml(s) {
+        var v = S.viewers;
+        return '<div class="sv-onair-card">'
+            + '<div class="sv-onair"><span class="sv-onair-dot"></span>ON AIR</div>'
+            + '<div class="sv-onair-title">' + esc(s.title || 'Untitled stream') + '</div>'
+            + '<div class="sv-onair-meta">'
+            +   '<span id="lvClock">' + esc(elapsed(s.started_at)) + '</span>'
+            +   '<span>' + (typeof v === 'number' ? esc(v.toLocaleString()) + ' watching' : 'viewer count pending') + '</span>'
+            +   (s.members_only ? '<span>Members only</span>' : '')
+            + '</div>'
+            + '</div>'
+            + (s.playback_url ? '<div class="sv-first">Playback: <a class="sv-link" href="' + esc(s.playback_url) + '" target="_blank" rel="noopener">open the stream</a></div>' : '')
+            + '<div class="sv-actions">'
+            +   '<button type="button" class="sv-btn sv-btn-primary" onclick="AIADLive.end(\'' + esc(s.id) + '\')">End the stream</button>'
+            + '</div>';
+    }
+
+    function handoffHtml(s) {
+        if (!s) return '';
+        return '<div class="sv-section" style="padding-top:18px;">Last stream</div>'
+            + '<div class="sv-first"><strong>' + esc(s.title || 'Untitled stream') + '</strong><br>'
+            + 'Ended ' + esc(fmtTime(s.ended_at))
+            + (s.peak_viewers ? ' · peak ' + esc(s.peak_viewers) + ' watching' : '')
+            + '<br>' + (s.recording_url
+                ? 'The recording is ready.'
+                : 'No recording came back from this one — Cloudflare records automatically, so this usually means nothing was ingested.')
+            + (s.episode_id ? '<br>Already attached to an episode.' : '')
+            + '</div>'
+            + '<div class="sv-actions">'
+            + (s.recording_url && !s.episode_id
+                ? '<button type="button" class="sv-btn sv-btn-primary" onclick="AIADLive.toEpisode(\'' + esc(s.id) + '\')">Turn it into an episode</button>'
+                : '')
+            + (s.recording_url ? '<a class="sv-btn" href="' + esc(s.recording_url) + '" target="_blank" rel="noopener">Watch the recording</a>' : '')
+            + '</div>';
+    }
+
+    function historyHtml() {
+        var past = S.list.filter(function (x) { return x.status === 'ended' || x.status === 'errored'; }).slice(0, 8);
+        if (past.length < 2) return '';
+        return '<div class="sv-section">Earlier streams</div><div class="sv-list">'
+            + past.slice(1).map(function (s) {
+                return '<div class="sv-row" style="cursor:default;"><div class="sv-num">●</div>'
+                    + '<div style="min-width:0;"><div class="sv-row-title">' + esc(s.title || 'Untitled stream') + '</div>'
+                    + '<div class="sv-row-meta"><span>' + esc(fmtTime(s.ended_at || s.created_at)) + '</span>'
+                    + (s.peak_viewers ? '<span>peak ' + esc(s.peak_viewers) + '</span>' : '')
+                    + (s.recording_url ? '<span>recording saved</span>' : '') + '</div></div>'
+                    + '<span class="sv-pill ' + esc(s.status) + '">' + esc(s.status) + '</span></div>';
+            }).join('') + '</div>';
+    }
+
+    function render() {
+        var body = el('svLiveBody');
+        if (!body) return;
+        if (S.error) {
+            body.innerHTML = '<div class="sv-error">Couldn’t load your streams — ' + esc(S.error)
+                + ' <button type="button" class="sv-link" onclick="AIADLive.open()">Retry</button></div>';
+            return;
+        }
+        if (!S.loaded) { body.innerHTML = '<div class="sv-muted">Loading…</div>'; return; }
+        var a = active();
+        var html;
+        if (a && a.status === 'live') html = onAirHtml(a);
+        else if (a) html = readyHtml(a);
+        else html = preflightHtml();
+        body.innerHTML = html + handoffHtml(lastEnded()) + historyHtml();
+        clock(a && a.status === 'live' ? a : null);
+    }
+
+    // One interval, started only while a stream is actually on air, and cleared
+    // the moment it is not — including when the creator navigates away.
+    function clock(s) {
+        if (tick) { clearInterval(tick); tick = null; }
+        if (!s) return;
+        var n = 0;
+        tick = setInterval(function () {
+            var view = el('liveView');
+            if (!view || !view.classList.contains('active')) { clearInterval(tick); tick = null; return; }
+            var c = el('lvClock');
+            if (c) c.textContent = elapsed(s.started_at);
+            // Viewers every 20s, not every second: it is a Cloudflare API call.
+            if (++n % 20 === 0) refreshViewers(s.id);
+        }, 1000);
+    }
+
+    async function refreshViewers(id) {
+        var r = await call({ action: 'viewers', id: id }, true);
+        if (!r) return;
+        if (typeof r.viewers === 'number' && r.viewers !== S.viewers) { S.viewers = r.viewers; render(); }
+    }
+
+    async function open() {
+        render();
+        if (S.configured === null) {
+            var c = await call({ action: 'config' }, true);
+            S.configured = c ? !!c.configured : false;
+        }
+        if (!S.loaded) await load();
+        // Episodes too: the pre-flight card offers to attach the stream to one, and
+        // the recording handoff numbers the new episode off the existing list. With
+        // an unloaded list the dropdown is empty and the handoff would call every
+        // recording episode 1.
+        try { if (window.AIADStreaming) window.AIADStreaming.ensure(render); } catch (e) {}
+        render();
+    }
+
+    window.AIADLive = {
+        open: open,
+        reload: async function () { S.loaded = false; await load(); render(); },
+        create: async function () {
+            if (S.busy) return;
+            var title = (el('lvTitle') || {}).value || '';
+            if (!String(title).trim()) { toast('Give the stream a title'); var t = el('lvTitle'); if (t) t.focus(); return; }
+            var when = (el('lvWhen') || {}).value || '';
+            var ep = (el('lvEpisode') || {}).value || '';
+            var sim = (el('lvSimYoutube') && el('lvSimYoutube').checked) ? [{ target: 'youtube' }] : [];
+            S.busy = true;
+            var btn = el('lvCreate'); if (btn) { btn.disabled = true; btn.textContent = 'Setting up…'; }
+            var r = await call({
+                action: 'create', title: title,
+                scheduled_for: when ? new Date(when).toISOString() : null,
+                episode_id: ep || null,
+                members_only: !!(el('lvMembers') && el('lvMembers').checked),
+                simulcast: sim,
+            });
+            S.busy = false;
+            if (!r) { if (btn) { btn.disabled = false; btn.textContent = 'Set up the stream'; } return; }
+            if (r.configured === false) toast('Stream saved. Cloudflare is not connected yet, so there is nothing to broadcast to.');
+            S.loaded = false; await load(); render();
+        },
+        golive: async function (id) {
+            var r = await call({ action: 'golive', id: id });
+            if (!r) return;
+            S.viewers = null;
+            S.loaded = false; await load(); render();
+        },
+        end: async function (id) {
+            if (!window.confirm('End the stream?')) return;
+            var r = await call({ action: 'end', id: id });
+            if (!r) return;
+            S.viewers = null;
+            S.loaded = false; await load(); render();
+            toast(r.session && r.session.recording_url ? 'Ended — the recording is ready' : 'Ended');
+        },
+        addSimulcast: async function (id) {
+            // The destination's key is typed here, sent once, and handed to
+            // Cloudflare. It is not stored in this database and not kept in this
+            // page after the call.
+            var url = window.prompt('Destination RTMP(S) URL\n\nFor YouTube this is rtmps://a.rtmps.youtube.com/live2');
+            if (!url) return;
+            var key = window.prompt('That destination’s own stream key.\n\nIt is passed to Cloudflare and not saved here.');
+            if (!key) return;
+            var target = /youtube/i.test(url) ? 'youtube' : 'custom';
+            var r = await call({ action: 'simulcast', id: id, target: target, url: url.trim(), stream_key: key.trim() });
+            key = null;
+            if (!r) return;
+            S.loaded = false; await load(); render();
+            toast('Simulcast added');
+        },
+        discard: async function (id) {
+            if (!window.confirm('Discard this stream set-up?')) return;
+            // Deleting the session cascades to live_session_secrets, so the stream
+            // key goes with it.
+            var r = await window.db.from('live_sessions').delete().eq('id', id).eq('user_id', uid());
+            if (r.error) {
+                try { window.reportDbError && window.reportDbError('live_sessions', 'delete', r.error, { where: 'AIADLive.discard' }); } catch (e) {}
+                toast('Could not discard that — ' + r.error.message); return;
+            }
+            S.loaded = false; await load(); render();
+        },
+        toEpisode: async function (id) {
+            var s = S.list.filter(function (x) { return x.id === id; })[0];
+            if (!s) return;
+            if (!window.AIADStreaming) { toast('Episodes are still loading'); return; }
+            var st = window.AIADStreaming.state();
+            var n = 0;
+            (st.list || []).forEach(function (e) { if (typeof e.episode_number === 'number' && e.episode_number > n) n = e.episode_number; });
+            var secs = (s.started_at && s.ended_at)
+                ? Math.max(0, Math.round((new Date(s.ended_at) - new Date(s.started_at)) / 1000)) : null;
+            var row = await window.AIADStreaming.savePatch({
+                title: s.title || 'Live stream',
+                episode_number: n + 1,
+                format: 'live',
+                status: 'draft',
+                // Recorded, so the pipeline starts at rollout rather than at signal:
+                // the episode already exists, what is left is getting it out.
+                stage: 7,
+                video_url: s.recording_url || null,
+                artwork_url: s.thumbnail_url || null,
+                air_at: s.started_at || null,
+                runtime_seconds: secs,
+                members_only: !!s.members_only,
+                destinations: [],
+                pipeline: {},
+            });
+            if (!row) return;
+            // Link it back, so the handoff cannot be done twice.
+            await window.db.from('live_sessions').update({ episode_id: row.id }).eq('id', id).eq('user_id', uid());
+            S.loaded = false; await load(); render();
+            toast('Episode ' + (n + 1) + ' created from the recording');
+            showArtistView('episodes');
+        },
+        state: function () { return S; },
+    };
+})();
+</script>
+
+<style id="aiad-live-css">
+/* Live — the pre-flight card reuses the .sv-* field language; only the ON AIR
+   block is its own thing, because it has to read across the room. --s-live is
+   applied by the theme block at the end of the document and appears nowhere
+   else in the app. */
+.sv-onair-card{border-top:1px solid var(--sv-rule);border-bottom:1px solid var(--sv-rule);padding:28px 0 26px;margin-top:14px;}
+.sv-onair{display:inline-flex;align-items:center;gap:10px;font-family:var(--sv-sans);font-size:0.72rem;font-weight:700;letter-spacing:0.28em;text-transform:uppercase;border:1px solid currentColor;padding:7px 14px;color:#FF3B30;}
+.sv-onair-dot{width:9px;height:9px;border-radius:50%;background:#FF3B30;animation:sv-onair-pulse 1.6s ease-in-out infinite;}
+@keyframes sv-onair-pulse{0%,100%{opacity:1;}50%{opacity:0.35;}}
+@media (prefers-reduced-motion: reduce){.sv-onair-dot{animation:none;}}
+.sv-onair-title{font-family:var(--sv-serif);font-weight:400;font-size:2rem;line-height:1.1;color:var(--text-primary);margin:18px 0 10px;letter-spacing:-0.01em;}
+.sv-onair-meta{display:flex;gap:20px;flex-wrap:wrap;font-size:0.84rem;color:var(--text-secondary);}
+.sv-onair-meta #lvClock{font-variant-numeric:tabular-nums;}
+a.sv-btn{text-decoration:none;display:inline-flex;align-items:center;}
+.sv-first code{background:rgba(255,255,255,0.07);padding:1px 6px;font-size:0.86em;}
+@media (max-width:768px){
+  .sv-onair-title{font-size:1.6rem;}
+  .sv-onair-meta{gap:12px;}
+}
+</style>
+
 <style id="aiad-streaming-mobile-css">
 /* Streaming vertical — mobile overrides. Geometry only; the token block in
    #aiad-streaming-theme is what sits last before </body>. */
