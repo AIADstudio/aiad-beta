@@ -26587,38 +26587,111 @@ document.addEventListener('keydown', function(e) {
                 const userId = AppState.currentUser?.id || AppState.user?.id;
                 if (!userId) return;
 
-                // Fetch key stats. Supporters and revenue come from the shared
-                // helper so this bar and the agent context card cannot disagree.
-                const [suppResp, postResp, trackResp, projResp] = await Promise.allSettled([
+                // A streaming creator's bar is their own eight figures, one per
+                // nav row. Tracks and Monthly Revenue are music metrics and a
+                // podcaster has neither.
+                const isStreaming = !!(window.aiadIsStreaming && window.aiadIsStreaming());
+
+                // Supporters and revenue come from the shared helper on both
+                // paths, so this bar and the agent context card cannot disagree
+                // and there is still only one place that counts fan_support.
+                // Projects feeds the sidebar cards below on both paths; the rest
+                // is fetched per industry rather than fetching both sets.
+                const common = [
                     window.aiadSupportStats(userId),
+                    db.from('artist_projects').select('id, status').eq('user_id', userId),
+                ];
+                const extra = isStreaming ? [
+                    db.from('episodes').select('id').eq('user_id', userId),
+                    db.from('live_sessions').select('started_at, ended_at').eq('user_id', userId),
+                    db.from('youtube_connections').select('subscriber_count, view_count').eq('user_id', userId).maybeSingle(),
+                    db.from('artist_stats').select('self_reported').eq('user_id', userId).maybeSingle(),
+                ] : [
                     db.from('artist_posts').select('id, created_at').eq('user_id', userId).eq('archived', false),
                     db.from('tracks').select('id').eq('user_id', userId),
-                    db.from('artist_projects').select('id, status').eq('user_id', userId),
-                ]);
+                ];
+                const settled = await Promise.allSettled(common.concat(extra));
+                const [suppResp, projResp, aResp, bResp, cResp, dResp] = settled;
 
                 const support    = suppResp.value || { supporters: 0, revenue: 0, revenueLabel: '$0' };
-                const posts      = postResp.value?.data  || [];
-                const tracks     = trackResp.value?.data || [];
                 const projects   = projResp.value?.data  || [];
 
                 const supCount   = support.supporters;
                 const revFmt     = support.revenueLabel;
                 const activeProj = projects.filter(p => p.status === 'in-progress' || p.status === 'active').length;
 
-                // Build stat items
-                const stats = [
-                    { label: 'Supporters',      val: supCount,           change: null },
-                    { label: 'Monthly Revenue', val: revFmt,             change: null },
-                    { label: 'Posts',           val: posts.length,       change: null },
-                    { label: 'Tracks',          val: tracks.length,      change: null },
-                    { label: 'Active Projects', val: activeProj,         change: null },
-                    { label: 'Plan',            val: window.aiadPlanLabel(),   change: null },
-                    { label: 'Artist Level',    val: window.aiadCareerLabel(), change: null },
-                ];
+                const nfmt = (n) => (typeof n === 'number' && isFinite(n)) ? n.toLocaleString() : '—';
+
+                let stats;
+                if (isStreaming) {
+                    const episodes = aResp?.value?.data || [];
+                    const sessions = bResp?.value?.data || [];
+                    const conn     = cResp?.value?.data || null;
+                    const sr       = dResp?.value?.data?.self_reported || {};
+
+                    // Live hours: only sessions that actually ran. A session with
+                    // one timestamp contributes nothing rather than a wild figure.
+                    const liveSecs = sessions.reduce((t, s) => {
+                        if (!s.started_at || !s.ended_at) return t;
+                        const d = (new Date(s.ended_at) - new Date(s.started_at)) / 1000;
+                        return t + (d > 0 ? d : 0);
+                    }, 0);
+                    const liveHours = liveSecs < 3600 ? (liveSecs / 3600).toFixed(1)
+                                    : (liveSecs / 3600) < 10 ? (liveSecs / 3600).toFixed(1)
+                                    : Math.round(liveSecs / 3600).toLocaleString();
+
+                    // Average watch time is average view duration: the watch hours
+                    // the creator reported, over the views the channel reports.
+                    // Both have to be there — a guess from one of them would be a
+                    // made-up number on a bar people read at a glance.
+                    const views = (typeof conn?.view_count === 'number' && conn.view_count > 0)
+                        ? conn.view_count
+                        : (typeof sr.youtube_views === 'number' && sr.youtube_views > 0 ? sr.youtube_views : null);
+                    const watchHrs = typeof sr.youtube_watch_hours === 'number' ? sr.youtube_watch_hours : null;
+                    let avgWatch = '—';
+                    if (views && watchHrs) {
+                        const secs = Math.round((watchHrs * 3600) / views);
+                        avgWatch = secs >= 3600
+                            ? Math.floor(secs / 3600) + 'h ' + Math.round((secs % 3600) / 60) + 'm'
+                            : Math.floor(secs / 60) + 'm ' + String(secs % 60).padStart(2, '0') + 's';
+                    }
+
+                    stats = [
+                        { label: 'Episodes',       val: nfmt(episodes.length) },
+                        { label: 'Live hours',     val: liveHours },
+                        { label: 'Subscribers',    val: nfmt(conn?.subscriber_count) },
+                        { label: 'Members',        val: nfmt(supCount) },
+                        { label: 'Avg watch time', val: avgWatch,
+                          note: avgWatch === '—' ? 'Needs your YouTube watch hours in My Stats and a connected channel.' : null },
+                        // Two tiles with no data source yet, shown as unknown
+                        // rather than filled with something that looks like a
+                        // measurement. Clip Studio writes to artist_posts and
+                        // keeps no clip record; podcast downloads need the RSS
+                        // host, which is the unbuilt destination on Publish.
+                        { label: 'Clips',          val: '—', note: 'Clip Studio does not record clips yet.' },
+                        { label: 'Downloads',      val: '—', note: 'Needs the podcast RSS destination, which is not built yet.' },
+                        { label: 'Revenue',        val: revFmt },
+                    ];
+                } else {
+                    const posts  = aResp?.value?.data || [];
+                    const tracks = bResp?.value?.data || [];
+                    stats = [
+                        { label: 'Supporters',      val: supCount,           change: null },
+                        { label: 'Monthly Revenue', val: revFmt,             change: null },
+                        { label: 'Posts',           val: posts.length,       change: null },
+                        { label: 'Tracks',          val: tracks.length,      change: null },
+                        { label: 'Active Projects', val: activeProj,         change: null },
+                        { label: 'Plan',            val: window.aiadPlanLabel(),   change: null },
+                        { label: 'Artist Level',    val: window.aiadCareerLabel(), change: null },
+                    ];
+                }
+
+                const escAttr = (t) => String(t).replace(/[&<>"']/g, (c) =>
+                    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
                 // Build HTML — duplicate for seamless scroll loop
                 const makeItems = () => stats.map(s => `
-                    <div class="live-stat-item">
+                    <div class="live-stat-item"${s.note ? ` title="${escAttr(s.note)}"` : ''}>
                         <span>${s.label}</span>
                         <span class="stat-val">${s.val}</span>
                         ${s.change ? `<span class="stat-change ${s.change.dir}">${s.change.text}</span>` : ''}
@@ -45013,6 +45086,12 @@ window.AIAD_PROMPTS = [
         }
         var mf = el('mobileNavFans');
         if (mf && mf.lastChild && mf.lastChild.nodeType === 3) mf.lastChild.nodeValue = on ? 'Audience' : 'Fans';
+        // The stats ticker reads the industry to decide which eight (or seven)
+        // figures it shows, and it is normally painted on a timeout from the
+        // dashboard launch. Repainting here is what makes switching workspace
+        // inside one session swap the bar too, instead of leaving a streaming
+        // creator looking at Tracks and Monthly Revenue.
+        try { window.populateLiveStatsBar && window.populateLiveStatsBar(); } catch (e) {}
         if (on) {
             var h = (location.hash || '').replace(/^#artist\//, '');
             var cur = document.querySelector('#artistDashboard .dash-nav-item.active');
