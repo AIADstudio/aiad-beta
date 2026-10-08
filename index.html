@@ -4031,7 +4031,7 @@ html, body {
             <button class="dash-mobile-nav-item" id="mobileNavStudio" onclick="showArtistView('music');setMobileNav(this)">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Studio
             </button>
-            <button class="dash-mobile-nav-item" onclick="showArtistView('supporters');setMobileNav(this)">
+            <button class="dash-mobile-nav-item" id="mobileNavFans" onclick="showArtistView('supporters');setMobileNav(this)">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>Fans
             </button>
             <button class="dash-mobile-nav-item" onclick="toggleMobileNav('artist');setMobileNav(this)">
@@ -4074,52 +4074,22 @@ html, body {
                 <!-- Streaming vertical: the artist nav relabelled and grouped. Shown when
                      profiles.industry = 'streaming'; the default nav above is hidden then.
                      Items carry data-view so showArtistView's active-marking works on both. -->
+                <!-- Streaming vertical: its own eight-item nav, not the artist nav relabelled.
+                     Shown when profiles.industry = 'streaming'; #artistNavDefault is hidden then,
+                     never deleted, so every other industry is untouched. Money is a tab host
+                     (Revenue / Payouts / Store / Analytics) and Episodes is a tab host
+                     (Episodes / Publish), which is how eight rows cover twelve surfaces.
+                     Settings stays in the top-right account menu; Inbox keeps its badge here
+                     on the Audience row, which is where a creator looks for people. -->
                 <nav class="dash-nav snav" id="streamingNav" style="display:none;">
-                    <div class="snav-group open" data-group="create">
-                        <div class="snav-head" onclick="AIADStreaming.toggleGroup(this)"><span>Create</span><span class="snav-count" data-n="0"></span><svg class="snav-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>
-                        <div class="snav-items">
-                            <div class="dash-nav-item" data-view="episodes" onclick="showArtistView('episodes')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="17 2 12 7 7 2"/></svg><span> Episodes</span></div>
-                            <div class="dash-nav-item" data-view="publish" onclick="showArtistView('publish')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5"/><polyline points="5 12 12 5 19 12"/><line x1="4" y1="21" x2="20" y2="21"/></svg><span> Publish</span></div>
-                            <div class="dash-nav-item" data-view="posts" onclick="showArtistView('posts')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/></svg><span> Posts</span></div>
-                        </div>
-                    </div>
-                    <div class="snav-group open" data-group="studio">
-                        <div class="snav-head" onclick="AIADStreaming.toggleGroup(this)"><span>Creative Studio</span><span class="snav-count" data-n="0"></span><svg class="snav-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>
-                        <div class="snav-items">
-                            <div class="dash-nav-item" data-view="clips" onclick="window.location.href='/clips';"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg><span> Clip Studio</span></div>
-                            <div class="dash-nav-item" data-view="mixmedia" onclick="showArtistView('mixmedia')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg><span> Mix-Media</span></div>
-                            <div class="dash-nav-item" data-view="merch" onclick="showArtistView('merch'); restoreLastMerchDesign();"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0"/></svg><span> Merch Studio</span></div>
-                        </div>
-                    </div>
-                    <div class="snav-group open" data-group="earn">
-                        <div class="snav-head" onclick="AIADStreaming.toggleGroup(this)"><span>Earn</span><span class="snav-count" data-n="0"></span><svg class="snav-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>
-                        <div class="snav-items">
-                            <div class="dash-nav-item" data-view="supporters" onclick="showArtistView('supporters')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg><span> Supporters</span></div>
-                            <div class="dash-nav-item" data-view="revenue" onclick="showArtistView('revenue')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg><span> Revenue</span></div>
-                            <div class="dash-nav-item" data-view="store" onclick="showArtistView('store')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg><span> Store</span></div>
-                            <div class="dash-nav-item" data-view="catalog" onclick="showArtistView('catalog')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><span> Catalog</span></div>
-                            <div class="dash-nav-item" data-view="payouts" onclick="showArtistView('payouts')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg><span> Payouts</span></div>
-                        </div>
-                    </div>
-                    <div class="snav-group" data-group="run">
-                        <div class="snav-head" onclick="AIADStreaming.toggleGroup(this)"><span>Run</span><span class="snav-count" data-n="0"></span><svg class="snav-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>
-                        <div class="snav-items">
-                            <div class="dash-nav-item" data-view="inbox" onclick="showArtistView('inbox')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><span> Inbox</span><span id="streamingInboxBadge" style="display:none;margin-left:auto;background:#f59e0b;color:#111;font-size:0.6rem;font-weight:700;min-width:16px;height:16px;border-radius:999px;align-items:center;justify-content:center;padding:0 5px;">0</span></div>
-                            <div class="dash-nav-item" data-view="plan" onclick="showArtistView('plan')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span> Projects &amp; Schedule</span></div>
-                            <div class="dash-nav-item" data-view="milestones" onclick="showArtistView('milestones')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span> Milestones</span></div>
-                            <div class="dash-nav-item" data-view="collaborators" onclick="showArtistView('collaborators')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg><span> Collaborators</span></div>
-                            <div class="dash-nav-item" data-view="settings" onclick="showArtistView('settings')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg><span> Settings</span></div>
-                        </div>
-                    </div>
-                    <div class="snav-group" data-group="intelligence">
-                        <div class="snav-head" onclick="AIADStreaming.toggleGroup(this)"><span>Intelligence</span><span class="snav-count" data-n="0"></span><svg class="snav-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div>
-                        <div class="snav-items">
-                            <div class="dash-nav-item" data-view="analytics" onclick="showArtistView('analytics')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span> Analytics</span></div>
-                            <div class="dash-nav-item" data-view="mystats" onclick="showArtistView('mystats')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span> My Stats</span></div>
-                            <div class="dash-nav-item" data-view="agent" onclick="showArtistView('agent')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span> Agents</span></div>
-                            <div class="dash-nav-item" data-view="decisions" onclick="AIADStreaming.go('decisions')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="13" y2="13"/></svg><span> Decision Memory</span></div>
-                        </div>
-                    </div>
+                    <div class="dash-nav-item" data-view="home" onclick="showArtistView('home')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span> Home</span></div>
+                    <div class="dash-nav-item" data-view="episodes" onclick="showArtistView('episodes')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="17 2 12 7 7 2"/></svg><span> Episodes</span></div>
+                    <div class="dash-nav-item" data-view="live" onclick="showArtistView('live')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 010 8.49M7.76 16.25a6 6 0 010-8.49M19.07 4.93a10 10 0 010 14.14M4.93 19.07a10 10 0 010-14.14"/></svg><span> Live</span></div>
+                    <div class="dash-nav-item" data-view="podcaststudio" onclick="showArtistView('podcaststudio')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 11a7 7 0 01-14 0M12 18v3M8 21h8"/></svg><span> Podcast Studio</span></div>
+                    <div class="dash-nav-item" data-view="clips" onclick="window.location.href='/clips';"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg><span> Clip Studio</span></div>
+                    <div class="dash-nav-item" data-view="supporters" onclick="showArtistView('supporters')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg><span> Audience</span></div>
+                    <div class="dash-nav-item" data-view="brandbriefs" onclick="showArtistView('brandbriefs')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg><span> Brand Briefs</span></div>
+                    <div class="dash-nav-item" data-view="money" onclick="showArtistView('money')"><svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg><span> Money</span></div>
                 </nav>
                 </aside>
             <main class="dash-main">
@@ -5898,6 +5868,14 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                             <button type="button" class="sv-btn sv-btn-primary" onclick="AIADStreaming.newEpisode()">New episode</button>
                         </div>
                     </div>
+                    <!-- Publish is a tab of Episodes rather than a nav row of its own.
+                         Each view carries its own strip with its own tab marked, so the
+                         active state is static markup and not something JS has to keep
+                         in sync. -->
+                    <div class="sv-tabs" role="tablist">
+                        <button type="button" class="sv-tab active" onclick="showArtistView('episodes')">Episodes</button>
+                        <button type="button" class="sv-tab" onclick="showArtistView('publish')">Publish</button>
+                    </div>
                     <div id="svEpisodesBody"><div class="sv-muted">Loading…</div></div>
                 </div>
 
@@ -5906,11 +5884,47 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     <div class="sv-head">
                         <div>
                             <div class="sv-kicker">Create</div>
-                            <h1 class="sv-title">Publish</h1>
+                            <h1 class="sv-title">Episodes</h1>
                             <p class="sv-sub">Members first, then everywhere else.</p>
                         </div>
                     </div>
+                    <div class="sv-tabs" role="tablist">
+                        <button type="button" class="sv-tab" onclick="showArtistView('episodes')">Episodes</button>
+                        <button type="button" class="sv-tab active" onclick="showArtistView('publish')">Publish</button>
+                    </div>
                     <div id="svPublishBody"><div class="sv-muted">Loading…</div></div>
+                </div>
+
+                <!-- ══════ STREAMING: Live ══════ -->
+                <!-- Cloudflare Stream. Shipped dark until CF_STREAM_TOKEN is set on the
+                     `live-session` edge function; the pre-flight card says so rather than
+                     failing at the Go live click. -->
+                <div class="dash-view sv" id="liveView">
+                    <div class="sv-head">
+                        <div>
+                            <div class="sv-kicker">Broadcast</div>
+                            <h1 class="sv-title">Live</h1>
+                            <p class="sv-sub">Go live, then turn the recording into an episode.</p>
+                        </div>
+                        <div class="sv-head-actions" id="svLiveActions" style="display:none;"></div>
+                    </div>
+                    <div id="svLiveBody"><div class="sv-muted">Loading…</div></div>
+                </div>
+
+                <!-- ══════ STREAMING: Podcast Studio ══════ -->
+                <!-- The eight-stage pipeline, driven off episodes.stage (1-8) and
+                     episodes.pipeline jsonb. Its stage agents are streaming-only rows in
+                     public.stage_skills — none of the music prompts are reused. -->
+                <div class="dash-view sv" id="podcastStudioView">
+                    <div class="sv-head">
+                        <div>
+                            <div class="sv-kicker">Studio</div>
+                            <h1 class="sv-title">Podcast Studio</h1>
+                            <p class="sv-sub">Eight stages from signal to post-mortem, one episode at a time.</p>
+                        </div>
+                        <div class="sv-head-actions" id="svStudioActions" style="display:none;"></div>
+                    </div>
+                    <div id="svStudioBody"><div class="sv-muted">Loading…</div></div>
                 </div>
 
                 
@@ -15215,6 +15229,13 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             // 'agents' is the 6 specialized-agent "Ask" buttons; 'feed' is the settings back-button.
             if (view === 'agents') view = 'agent';
             if (view === 'feed') view = 'posts';
+            // Streaming has no music surfaces. The rows are gone from its nav, but a
+            // bookmark, an old #artist/songwriting link or a button inside a shared
+            // view can still ask for one, and landing a streaming creator on
+            // Songwriting or the Sync Library is the whole problem this vertical
+            // exists to fix. Redirect rather than render: the music markup stays in
+            // the file untouched for every other industry.
+            if (window.aiadStreamingRedirect) view = window.aiadStreamingRedirect(view);
             try { history.replaceState(null, '', '#artist/' + view); } catch (e) {}
             try { window.aiadTrackTool && window.aiadTrackTool('artist:' + view); } catch (e) {}
             // After the view is activated, so the rail node is on screen. Only the
@@ -15224,7 +15245,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 try { window.aiadLoadAgentConvos && window.aiadLoadAgentConvos(); } catch (e) {}
             }, 0);
 
-            const allViews = ['artistCatalogView', 'artistReviewView', 'artistPlanView', 'artistHomeView', 'artistPostsView', 'artistSupportersView', 'artistProjectsView', 'artistMoneyView', 'artistAnalyticsHubView', 'artistScheduleView', 'artistCollaboratorsView', 'artistMusicView', 'artistSongwritingView', 'artistMixMediaView', 'artistStoreHubView', 'artistMilestonesView', 'artistAgentsView', 'artistInboxView', 'artistSettingsView', 'episodesView', 'publishView'];
+            const allViews = ['artistCatalogView', 'artistReviewView', 'artistPlanView', 'artistHomeView', 'artistPostsView', 'artistSupportersView', 'artistProjectsView', 'artistMoneyView', 'artistAnalyticsHubView', 'artistScheduleView', 'artistCollaboratorsView', 'artistMusicView', 'artistSongwritingView', 'artistMixMediaView', 'artistStoreHubView', 'artistMilestonesView', 'artistAgentsView', 'artistInboxView', 'artistSettingsView', 'episodesView', 'publishView', 'liveView', 'podcastStudioView'];
             allViews.forEach(v => {
                 const el = document.getElementById(v);
                 if (el) el.classList.remove('active');
@@ -15292,9 +15313,14 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 'inbox': 'artistInboxView',
                 'settings': 'artistSettingsView',
                 'review': 'artistReviewView',
-                // Streaming vertical
+                // Streaming vertical. Episodes and Publish are one tab host; Live and
+                // Podcast Studio are their own nav rows. 'brandbriefs' is the brief
+                // board on the Collaborators view, which is where it already lives.
                 'episodes': 'episodesView',
-                'publish': 'publishView'
+                'publish': 'publishView',
+                'live': 'liveView',
+                'podcaststudio': 'podcastStudioView',
+                'brandbriefs': 'artistCollaboratorsView'
             };
 
             const viewId = viewIdMap[view];
@@ -15403,6 +15429,19 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 viewEl.classList.add('active');
                 markNav('publish');
                 setTimeout(() => { if (window.AIADStreaming) AIADStreaming.openPublish(); }, 40);
+            } else if (view === 'live') {
+                viewEl.classList.add('active');
+                markNav('live');
+                setTimeout(() => { if (window.AIADLive) AIADLive.open(); }, 40);
+            } else if (view === 'podcaststudio') {
+                viewEl.classList.add('active');
+                markNav('podcaststudio');
+                setTimeout(() => { if (window.AIADPodcastStudio) AIADPodcastStudio.open(); }, 40);
+            } else if (view === 'brandbriefs') {
+                viewEl.classList.add('active');
+                markNav('brandbriefs');
+                aiadViewTab('artistCollaboratorsView', 'briefs');
+                aiadLoadCollabTab('briefs');
             } else if (view === 'review') {
                 viewEl.classList.add('active');
                 markNav('review');
@@ -29861,7 +29900,9 @@ function toggleAgeRange(btn) {
             if (!me) return;
             var n = 0;
             try { var r = await db.from('messages').select('id', { count: 'exact', head: true }).eq('recipient_id', me).eq('read', false); n = r.count || 0; } catch (e) { return; }
-            ['artistInboxBadge', 'streamingInboxBadge', 'collabInboxBadge'].forEach(function (id) {
+            // No streaming badge: the eight-row streaming nav has no Inbox row to
+            // hang one on, and the Audience row opens Supporters, not messages.
+            ['artistInboxBadge', 'collabInboxBadge'].forEach(function (id) {
                 var b = document.getElementById(id);
                 if (!b) return;
                 if (n > 0) { b.textContent = n; b.style.display = (id === 'collabInboxBadge') ? 'inline-block' : 'inline-flex'; }
@@ -30866,14 +30907,37 @@ function toggleAgeRange(btn) {
             ['TiktokHandle',       'TikTok handle',             '@yourhandle',                 'text'],
         ];
 
+        // Streaming asks a different set entirely. Monthly listeners is a Spotify
+        // artist-profile number that a podcaster or streamer does not have, and
+        // asking for a Spotify *artist* link tells them they are on the wrong
+        // product. Their figures are the channel's: YouTube subscribers, lifetime
+        // views and watch time, plus podcast followers on Spotify and Apple, which
+        // is a different Spotify number from the artist-profile one above.
+        const STREAMING_FIELDS = [
+            ['YoutubeSubs',        'YouTube subscribers',         'e.g. 8,000',    'numeric'],
+            ['YoutubeViews',       'YouTube views (all time)',    'e.g. 1,200,000','numeric'],
+            ['YoutubeWatchHours',  'YouTube watch time (hours)',  'e.g. 42,000',   'numeric'],
+            ['YoutubeHandle',      'YouTube handle',              '@yourhandle',   'text'],
+            ['SpotifyPodFollowers','Spotify podcast followers',   'e.g. 3,400',    'numeric'],
+            ['ApplePodFollowers',  'Apple Podcasts followers',    'e.g. 1,900',    'numeric'],
+            ['InstagramFollowers', 'Instagram followers',         'e.g. 15,000',   'numeric'],
+            ['InstagramHandle',    'Instagram handle',            '@yourhandle',   'text'],
+            ['TiktokFollowers',    'TikTok followers',            'e.g. 22,000',   'numeric'],
+            ['TiktokHandle',       'TikTok handle',               '@yourhandle',   'text'],
+        ];
+        const isStreaming = () => { try { return !!(window.aiadIsStreaming && window.aiadIsStreaming()); } catch (e) { return false; } };
+        const activeFields = () => (isStreaming() ? STREAMING_FIELDS : FIELDS);
+
         const INPUT_CSS = 'width:100%;box-sizing:border-box;background:#0d0f17;border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:9px 11px;color:#fff;font-size:0.88rem;outline:none;';
         const LABEL_CSS = 'display:block;font-size:0.74rem;color:#94a3b8;margin-bottom:3px;';
 
-        // Renders the 9 inputs with ids `<prefix><suffix>` so the onboarding step and
-        // the dashboard editor share one field definition and one save path.
+        // Renders the inputs with ids `<prefix><suffix>` so the onboarding step and
+        // the dashboard editor share one field definition and one save path. Which
+        // definition is picked by industry, so neither creator is shown the other's
+        // platforms.
         function fieldsHtml(prefix) {
             return `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;">
-                ${FIELDS.map(([suffix, label, ph, mode]) => `<label style="min-width:0;">
+                ${activeFields().map(([suffix, label, ph, mode]) => `<label style="min-width:0;">
                     <span style="${LABEL_CSS}">${esc(label)}</span>
                     <input id="${prefix}${suffix}" ${mode === 'numeric' ? 'inputmode="numeric"' : ''} placeholder="${esc(ph)}" style="${INPUT_CSS}">
                 </label>`).join('')}
@@ -30886,6 +30950,14 @@ function toggleAgeRange(btn) {
             const v = (suffix) => {
                 const el = document.getElementById(prefix + suffix);
                 return el ? el.value : '';
+            };
+            if (isStreaming()) return {
+                p_youtube_handle:            toYoutubeHandle(v('YoutubeHandle')),
+                p_youtube_subscribers:       toInt(v('YoutubeSubs')),
+                p_youtube_views:             toInt(v('YoutubeViews')),
+                p_youtube_watch_hours:       toInt(v('YoutubeWatchHours')),
+                p_spotify_podcast_followers: toInt(v('SpotifyPodFollowers')),
+                p_apple_podcasts_followers:  toInt(v('ApplePodFollowers')),
             };
             return {
                 p_spotify_id:                toSpotifyId(v('SpotifyId')),
@@ -30903,14 +30975,24 @@ function toggleAgeRange(btn) {
         // Saves whatever the artist filled in. Returns the merged self_reported
         // jsonb, or null when every field was left blank (nothing worth a round trip).
         async function saveStats(prefix) {
-            const spotifyEl = document.getElementById(prefix + 'SpotifyId');
-            const problem = spotifyIdProblem(spotifyEl && spotifyEl.value);
-            showSpotifyFieldError(prefix + 'SpotifyId', problem);
-            if (problem) throw new Error(problem);
+            const streaming = isStreaming();
+            // No Spotify artist field on the streaming form, so nothing to validate.
+            if (!streaming) {
+                const spotifyEl = document.getElementById(prefix + 'SpotifyId');
+                const problem = spotifyIdProblem(spotifyEl && spotifyEl.value);
+                showSpotifyFieldError(prefix + 'SpotifyId', problem);
+                if (problem) throw new Error(problem);
+            }
             const args = readForm(prefix);
             if (Object.values(args).every((x) => x === null)) return null;
             if (!window.db) throw new Error('Not signed in yet');
-            const { data, error } = await window.db.rpc('record_self_reported_stats', args);
+            // Two RPCs, not one widened signature: record_self_reported_stats has a
+            // fixed nine-argument shape built around Spotify monthly listeners and
+            // three call sites depend on it. Both merge into the same
+            // artist_stats.self_reported jsonb, stripping nulls, so a creator who
+            // switches industry keeps whatever they already reported.
+            const fn = streaming ? 'record_streaming_stats' : 'record_self_reported_stats';
+            const { data, error } = await window.db.rpc(fn, args);
             if (error) throw new Error(error.message || 'Could not save your stats');
             return data;
         }
@@ -30957,6 +31039,14 @@ function toggleAgeRange(btn) {
             else self('youtube_subscribers', pick(canon.youtube_subscribers, legacy.youtube_subscribers));
             self('instagram_followers', pick(canon.instagram_followers, legacy.instagram_followers));
             self('tiktok_followers',    pick(canon.tiktok_followers,    legacy.tiktok_followers));
+            // Streaming's own figures. views/watch-hours only ever come from the
+            // creator; YouTube's API returns a lifetime view count but not watch
+            // time, which needs the Analytics API and a different scope.
+            if (prov.youtube.kind !== 'none' && typeof yt.total_views === 'number') platform('youtube_views', yt.total_views, prov.youtube);
+            else self('youtube_views', pick(canon.youtube_views));
+            self('youtube_watch_hours',       pick(canon.youtube_watch_hours));
+            self('spotify_podcast_followers', pick(canon.spotify_podcast_followers));
+            self('apple_podcasts_followers',  pick(canon.apple_podcasts_followers));
             return out;
         }
 
@@ -30971,12 +31061,30 @@ function toggleAgeRange(btn) {
             ['instagram_followers',       'Instagram followers'],
             ['tiktok_followers',          'TikTok followers'],
         ];
+        // Same shape, streaming's platforms. The first entry is the big number, so
+        // subscribers leads the way monthly listeners leads for a musician.
+        const STREAMING_HEADLINE = [
+            ['youtube_subscribers',       'YouTube subscribers'],
+            ['youtube_views',             'YouTube views'],
+            ['youtube_watch_hours',       'Watch time (hours)'],
+            ['spotify_podcast_followers', 'Spotify podcast followers'],
+            ['apple_podcasts_followers',  'Apple Podcasts followers'],
+            ['instagram_followers',       'Instagram followers'],
+            ['tiktok_followers',          'TikTok followers'],
+        ];
+        const activeHeadline = () => (isStreaming() ? STREAMING_HEADLINE : HEADLINE);
 
         function headlineHtml(row) {
             const sr = resolvedStats(row);
             const src = sr.sources;
             const sp = (row && row.spotify_stats) || {};
-            const listeners = sr.spotify_monthly_listeners;
+            const yt = (row && row.youtube_stats) || {};
+            const streaming = isStreaming();
+            // The big number is whatever leads this industry's list: monthly
+            // listeners for a musician, YouTube subscribers for a creator.
+            const HL = activeHeadline();
+            const leadKey = HL[0][0], leadLabel = HL[0][1];
+            const listeners = sr[leadKey];
             const prov = window.aiadPlatformSource(row);
             // Every figure says where it came from. "You reported" is the artist's own
             // number (with the date they gave it). A platform figure is green "via YouTube"
@@ -30990,7 +31098,7 @@ function toggleAgeRange(btn) {
                 return 'via ' + p.label + (p.fresh ? '' : ' · last scanned ' + (p.scanned || 'unknown'));
             };
             const provColour = (k) => (src[k] === 'api' && prov[platformOf(k)].fresh) ? '#22c55e' : '#64748b';
-            const secondary = HEADLINE.slice(1)
+            const secondary = HL.slice(1)
                 .filter(([k]) => typeof sr[k] === 'number')
                 .map(([k, label]) => `<div style="min-width:0;">
                     <div style="font-size:1.05rem;font-weight:700;color:#fff;">${sr[k].toLocaleString()}</div>
@@ -31004,25 +31112,34 @@ function toggleAgeRange(btn) {
                 </div>`;
             }
 
-            const photo = sp.image
-                ? `<img src="${esc(sp.image)}" alt="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0;">`
+            // A streaming creator's identity is their channel. Falling back to the
+            // Spotify artist card here is what made this page read as a musician's.
+            const idImage = streaming ? (yt.thumbnail || yt.image) : sp.image;
+            const idName  = streaming ? yt.name : sp.name;
+            const idVia   = streaming ? 'via YouTube'
+                                      : (prov.spotify.kind === 'third' ? 'via ' + prov.spotify.label : 'via Spotify');
+            const photo = idImage
+                ? `<img src="${esc(idImage)}" alt="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0;">`
                 : '';
-            const name = sp.name
-                ? `<div style="font-size:0.95rem;font-weight:700;color:#fff;">${esc(sp.name)}</div>
-                   <div style="font-size:0.68rem;color:#64748b;">${esc(prov.spotify.kind === 'third' ? 'via ' + prov.spotify.label : 'via Spotify')}</div>`
+            const name = idName
+                ? `<div style="font-size:0.95rem;font-weight:700;color:#fff;">${esc(idName)}</div>
+                   <div style="font-size:0.68rem;color:#64748b;">${esc(idVia)}</div>`
                 : '';
             const anyApi   = Object.values(src).some((s) => s === 'api');
             const anyThird = Object.values(src).some((s) => s === 'third');
             const scanned  = row && row.last_fetched_at ? new Date(row.last_fetched_at).toLocaleDateString() : null;
 
-            return `<div style="background:linear-gradient(90deg,rgba(29,185,84,0.12),rgba(6,182,212,0.08));border:1px solid rgba(29,185,84,0.35);border-radius:14px;padding:18px 20px;">
+            const wash = streaming
+                ? 'background:linear-gradient(90deg,rgba(255,176,32,0.12),rgba(224,150,18,0.08));border:1px solid rgba(255,176,32,0.35);'
+                : 'background:linear-gradient(90deg,rgba(29,185,84,0.12),rgba(6,182,212,0.08));border:1px solid rgba(29,185,84,0.35);';
+            return `<div style="${wash}border-radius:14px;padding:18px 20px;">
                 <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
                     ${photo}
                     <div style="min-width:0;flex:1;">
                         ${name}
                         ${typeof listeners === 'number' ? `
                             <div style="font-size:2rem;font-weight:800;color:#fff;line-height:1.1;margin-top:${name ? '6px' : '0'};">${listeners.toLocaleString()}</div>
-                            <div style="font-size:0.76rem;color:#94a3b8;">Monthly listeners <span style="color:#64748b;">· ${esc(provenance('spotify_monthly_listeners'))}</span></div>` : ''}
+                            <div style="font-size:0.76rem;color:#94a3b8;">${esc(leadLabel)} <span style="color:#64748b;">· ${esc(provenance(leadKey))}</span></div>` : ''}
                     </div>
                 </div>
                 ${secondary ? `<div style="display:flex;gap:22px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.08);">${secondary}</div>` : ''}
@@ -31060,6 +31177,12 @@ function toggleAgeRange(btn) {
             set('YoutubeSubs',        sr.youtube_subscribers);
             set('InstagramFollowers', sr.instagram_followers);
             set('TiktokFollowers',    sr.tiktok_followers);
+            // Streaming-only suffixes. set() no-ops on an input that is not on the
+            // page, so both field sets go through one prefill.
+            set('YoutubeViews',        sr.youtube_views);
+            set('YoutubeWatchHours',   sr.youtube_watch_hours);
+            set('SpotifyPodFollowers', sr.spotify_podcast_followers);
+            set('ApplePodFollowers',   sr.apple_podcasts_followers);
             set('SpotifyId',          row && row.spotify_id);
             set('YoutubeHandle',      row && row.youtube_handle);
             set('InstagramHandle',    row && row.instagram_handle);
@@ -33071,6 +33194,11 @@ Be direct and concrete with real industry insight — never generic filler. When
         window.aiadStartOnboarding = function (opts) {
             opts = opts || {};
             const dash = opts.dash || 'artist';
+            // The two Spotify asks below are artist-profile numbers. Asking a
+            // streaming creator for a Spotify *artist* link on their first screen
+            // tells them they opened the wrong product, so for them the link row
+            // leads with YouTube and the highlighted number is subscribers.
+            const obStream = dash === 'streamer';
             let ov = document.getElementById('aiadOnboardOverlay');
             if (ov) ov.remove();
             ov = document.createElement('div');
@@ -33100,15 +33228,22 @@ Be direct and concrete with real industry insight — never generic filler. When
                         ${OB_FIELD('ob_years','Years making music','e.g. 3')}
                         <div style="font-size:0.72rem;color:#38bdf8;font-weight:700;letter-spacing:.05em;margin:16px 0 6px;">YOUR LINKS</div>
                         <p style="font-size:0.75rem;color:#64748b;margin:0 0 12px;">Just paste your profiles — AIAD pulls your stats automatically, no screenshots or manual numbers needed.</p>
-                        ${OB_FIELD('ob_spotify','Spotify artist link','https://open.spotify.com/artist/...')}
+                        ${obStream ? '' : OB_FIELD('ob_spotify','Spotify artist link','https://open.spotify.com/artist/...')}
                         ${OB_FIELD('ob_youtube','YouTube channel','https://youtube.com/@...')}
+                        ${obStream ? OB_FIELD('ob_podcast','Podcast or show link (optional)','https://podcasters.spotify.com/... or Apple Podcasts') : ''}
                         ${OB_FIELD('ob_instagram','Instagram','@handle')}
                         ${OB_FIELD('ob_tiktok','TikTok','@handle')}
+                        ${obStream ? `
+                        <div style="margin:14px 0;background:linear-gradient(90deg,rgba(255,176,32,0.14),rgba(224,150,18,0.10));border:1px solid rgba(255,176,32,0.4);border-radius:10px;padding:13px;">
+                            <label for="ob_subscribers" style="display:block;font-size:0.85rem;color:#fff;font-weight:700;margin-bottom:2px;">Your YouTube subscribers</label>
+                            <p style="font-size:0.72rem;color:#94a3b8;margin:0 0 9px;">Connect YouTube later and this fills itself. Until then it's the one number that sharpens every piece of advice you'll get.</p>
+                            <input id="ob_subscribers" inputmode="numeric" placeholder="e.g. 8,400" style="width:100%;box-sizing:border-box;background:#0d0f17;border:1px solid rgba(255,176,32,0.5);border-radius:8px;padding:10px 12px;color:#fff;font-size:0.95rem;">
+                        </div>` : `
                         <div style="margin:14px 0;background:linear-gradient(90deg,rgba(29,185,84,0.14),rgba(6,182,212,0.10));border:1px solid rgba(29,185,84,0.4);border-radius:10px;padding:13px;">
                             <label for="ob_monthly_listeners" style="display:block;font-size:0.85rem;color:#fff;font-weight:700;margin-bottom:2px;">🎧 Your Spotify monthly listeners</label>
                             <p style="font-size:0.72rem;color:#94a3b8;margin:0 0 9px;">Spotify doesn't hand this number to apps — so drop it in here (it's on your Spotify for Artists home page). This single number sharpens every piece of AI career advice you'll get.</p>
                             <input id="ob_monthly_listeners" inputmode="numeric" placeholder="e.g. 2,296" style="width:100%;box-sizing:border-box;background:#0d0f17;border:1px solid rgba(29,185,84,0.5);border-radius:8px;padding:10px 12px;color:#fff;font-size:0.95rem;">
-                        </div>
+                        </div>`}
                         ${OB_FIELD('ob_following','Total following (optional)','rough is fine')}
                         <div style="font-size:0.72rem;color:#38bdf8;font-weight:700;letter-spacing:.05em;margin:16px 0 12px;">GOALS & CONTEXT</div>
                         ${OB_FIELD('ob_goal','Your #1 goal for the next 12 months','e.g. hit 50k monthly listeners and book a tour','area')}
@@ -33177,7 +33312,10 @@ Be direct and concrete with real industry insight — never generic filler. When
                 artist_name: g('ob_artist_name'), primary_genre: g('ob_primary_genre'), sound: g('ob_substyle'),
                 career_stage: g('ob_career_stage'), city: g('ob_city'), years_active: g('ob_years'),
                 monthly_listeners: g('ob_monthly_listeners'), total_following: g('ob_following'),
-                links: { spotify: g('ob_spotify'), youtube: g('ob_youtube'), instagram: g('ob_instagram'), tiktok: g('ob_tiktok') },
+                // Streaming's two. The elements only exist on the streaming form, so
+                // g() returns '' for a musician and these stay out of the payload.
+                youtube_subscribers: g('ob_subscribers'),
+                links: { spotify: g('ob_spotify'), youtube: g('ob_youtube'), instagram: g('ob_instagram'), tiktok: g('ob_tiktok'), podcast: g('ob_podcast') },
                 goal_12mo: g('ob_goal'), biggest_challenge: g('ob_challenge'), audience: g('ob_audience'),
                 success_3yr: g('ob_success'), release_cadence: g('ob_cadence'), team: g('ob_team'),
                 submitted_at: new Date().toISOString(),
@@ -33287,6 +33425,9 @@ Be direct and concrete with real industry insight — never generic filler. When
                     carry('InstagramHandle', data.links.instagram);
                     carry('TiktokHandle',    data.links.tiktok);
                     carry('MonthlyListeners', data.monthly_listeners);
+                    // carry() no-ops when the input is not on this industry's form,
+                    // so one list covers both field sets.
+                    carry('YoutubeSubs',      data.youtube_subscribers);
                 }
                 statsStep.style.display = 'block';
                 window.scrollTo(0, 0);
@@ -44476,9 +44617,9 @@ window.AIAD_PROMPTS = [
 <style id="aiad-streaming-css">
 /* ══════════════ STREAMING VERTICAL ══════════════
    Nav groups (relabelled artist nav) + the Episodes / Publish views.
-   Dark ground, teal accent, Newsreader display serif, Inter Tight UI,
-   hairline rules instead of cards. Mobile overrides live in the last
-   <style> block before </body>. */
+   Dark ground, Newsreader display serif, Inter Tight UI, hairline rules
+   instead of cards. Colour comes from #aiad-streaming-theme, the last <style>
+   in the document; mobile overrides from #aiad-streaming-mobile-css. */
 #streamingNav{gap:0 !important;}
 .snav-head{display:flex;align-items:center;gap:8px;padding:14px 12px 6px;font-family:var(--font-body);font-size:0.62rem;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);cursor:pointer;user-select:none;border-top:1px solid var(--border-default);margin-top:6px;}
 .snav-group:first-child .snav-head{border-top:0;margin-top:0;padding-top:4px;}
@@ -44499,6 +44640,17 @@ window.AIAD_PROMPTS = [
 
 .sv{--sv-serif:'Newsreader',Georgia,'Times New Roman',serif;--sv-sans:'Inter Tight','Inter',-apple-system,BlinkMacSystemFont,sans-serif;--sv-rule:rgba(255,255,255,0.1);font-family:var(--sv-sans);max-width:860px;}
 .sv-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;padding-bottom:18px;border-bottom:1px solid var(--sv-rule);margin-bottom:8px;}
+/* Tab strip for the two hosts — Episodes/Publish, and Money's four. A tab is an
+   ordinary view switch, so each view ships its own strip with its own tab marked
+   and there is no active state for JS to keep in sync. Underline, not a pill:
+   the same hairline language as the rest of these views. */
+.sv-tabs{display:flex;gap:22px;border-bottom:1px solid var(--sv-rule);margin:0 0 6px;overflow-x:auto;scrollbar-width:none;}
+.sv-tabs::-webkit-scrollbar{display:none;}
+.sv-tab{background:none;border:0;border-bottom:2px solid transparent;border-radius:0;padding:11px 0;margin-bottom:-1px;font-family:var(--sv-sans);font-size:0.82rem;font-weight:500;letter-spacing:0.01em;color:var(--text-muted);cursor:pointer;white-space:nowrap;}
+.sv-tab:hover{color:var(--text-secondary);}
+.sv-tab.active{color:var(--text-primary);border-bottom-color:var(--teal);}
+/* The injected Money strip lands above a view that was not built expecting one. */
+.sv-tabs-money{--sv-rule:rgba(255,255,255,0.1);font-family:'Inter Tight','Inter',-apple-system,BlinkMacSystemFont,sans-serif;max-width:860px;margin-bottom:20px;}
 .sv-kicker{font-size:0.62rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--teal-light);margin-bottom:6px;}
 .sv-title{font-family:var(--sv-serif);font-weight:400;font-size:2.1rem;line-height:1.05;letter-spacing:-0.01em;color:var(--text-primary);margin:0;}
 .sv-sub{font-size:0.86rem;color:var(--text-secondary);margin:8px 0 0;}
@@ -44605,6 +44757,9 @@ window.AIAD_PROMPTS = [
         try { i = i || localStorage.getItem('aiad_user_industry'); } catch (e) {}
         return i === 'streaming';
     }
+    // Exported because My Stats, the theme and the redirect all need the same
+    // answer and three copies of this would drift.
+    window.aiadIsStreaming = streaming;
     function dbErr(op, error, where) {
         try { window.reportDbError && window.reportDbError('episodes', op, error, { where: 'AIADStreaming.' + where }); } catch (e) {}
     }
@@ -44627,62 +44782,101 @@ window.AIAD_PROMPTS = [
     function dests(e) { return Array.isArray(e && e.destinations) ? e.destinations : []; }
     function getDest(e, key) { return dests(e).filter(function (d) { return d && d.target === key; })[0] || null; }
 
-    /* ── Nav: grouped, collapsible, badge counts on collapsed heads ── */
-    var GROUP_KEY = 'aiad_snav_groups';
-    function saveGroups() {
-        var o = {};
-        document.querySelectorAll('#streamingNav .snav-group').forEach(function (g) { o[g.dataset.group] = g.classList.contains('open'); });
-        try { localStorage.setItem(GROUP_KEY, JSON.stringify(o)); } catch (e) {}
+    /* ── Nav: eight flat rows ──────────────────────────────────────────────
+       The grouped, collapsible nav this replaces was the artist nav relabelled.
+       Streaming gets its own eight rows instead, and two of them are tab hosts,
+       which is how eight rows reach twelve surfaces. */
+
+    // Money is one nav row and four surfaces. Revenue and Payouts are panels
+    // inside artistMoneyView; Store and Analytics are separate views shared with
+    // the music dashboard, so they cannot be moved into it without relocating
+    // thousands of lines of markup. Instead all four carry the same strip, each
+    // with its own tab marked, and a tab click is an ordinary view switch. From
+    // the creator's side it is one Money section with four tabs; from the music
+    // dashboard's side nothing changed at all.
+    var MONEY_TABS = [
+        ['revenue',   'Revenue',   'artistMoneyView'],
+        ['payouts',   'Payouts',   'artistMoneyView'],
+        ['store',     'Store',     'artistStoreHubView'],
+        ['analytics', 'Analytics', 'artistAnalyticsHubView'],
+    ];
+    var MONEY_VIEWS = { money: 'revenue', revenue: 'revenue', payouts: 'payouts',
+                        store: 'store', merch: 'store',
+                        analytics: 'analytics', mystats: 'analytics' };
+
+    function moneyTabsHtml(active) {
+        return '<div class="sv-tabs sv-tabs-money" role="tablist">' + MONEY_TABS.map(function (t) {
+            return '<button type="button" class="sv-tab' + (t[0] === active ? ' active' : '')
+                 + '" onclick="showArtistView(\'' + t[0] + '\')">' + t[1] + '</button>';
+        }).join('') + '</div>';
     }
-    function restoreGroups() {
-        var o = null;
-        try { o = JSON.parse(localStorage.getItem(GROUP_KEY) || 'null'); } catch (e) {}
-        if (!o) return;
-        document.querySelectorAll('#streamingNav .snav-group').forEach(function (g) {
-            if (g.dataset.group in o) g.classList.toggle('open', !!o[g.dataset.group]);
+
+    // Injected, not markup: these three views belong to every industry, so the
+    // strip only exists while a streaming creator is looking at them. Removed
+    // again the moment the industry is not streaming, so switching workspaces in
+    // one session does not leave it behind.
+    function applyMoneyTabs(view) {
+        var active = MONEY_VIEWS[view] || null;
+        var hosts = {};
+        MONEY_TABS.forEach(function (t) { hosts[t[2]] = 1; });
+        Object.keys(hosts).forEach(function (id) {
+            var host = el(id); if (!host) return;
+            var strip = host.querySelector(':scope > .sv-tabs-money');
+            if (!streaming() || !active) { if (strip) strip.remove(); return; }
+            // Which tab is marked depends on the view, not on the host, so the
+            // strip is rebuilt rather than reused.
+            if (strip) strip.remove();
+            host.insertAdjacentHTML('afterbegin', moneyTabsHtml(active));
         });
+        // The Money view's own Revenue/Payouts strip would be a second row of
+        // tabs saying half of what this one says.
+        var own = document.querySelector('#artistMoneyView > .agent-tabs');
+        if (own) own.style.display = streaming() ? 'none' : '';
     }
-    function toggleGroup(head) {
-        var g = head && head.closest('.snav-group'); if (!g) return;
-        g.classList.toggle('open');
-        saveGroups();
-        refreshCounts();
-    }
-    function refreshCounts() {
-        document.querySelectorAll('#streamingNav .snav-group').forEach(function (g) {
-            var n = 0;
-            g.querySelectorAll('.snav-items [id$="Badge"], .snav-items .lb-navcount').forEach(function (b) {
-                if (b.style.display === 'none') return;
-                n += parseInt(b.textContent, 10) || 0;
-            });
-            var c = g.querySelector('.snav-count'); if (!c) return;
-            c.textContent = n; c.setAttribute('data-n', String(n)); c.classList.toggle('has', n > 0);
-        });
-    }
-    // Views that have no item of their own light up the closest one.
-    var ALIAS = { projects: 'plan', schedule: 'plan', agents: 'agent', feed: 'posts', music: 'episodes', library: 'episodes', distribute: 'publish' };
+
+    // Music surfaces a streaming creator must never land on, and the streaming
+    // view that answers the same need. Catalog, Songwriting, Mix-Media and the
+    // Sync Library have no streaming equivalent, so they go to Episodes, which is
+    // where a creator's work actually lives.
+    var REDIRECT = {
+        music: 'episodes', songwriting: 'episodes', mixmedia: 'episodes',
+        catalog: 'episodes', library: 'episodes', distribute: 'publish',
+        synclibrary: 'episodes',
+        // Merch Studio is the design tab of Store, and Store is a Money tab.
+        merch: 'store',
+    };
+    window.aiadStreamingRedirect = function (view) {
+        if (!streaming()) return view;
+        return REDIRECT[view] || view;
+    };
+
+    // Views with no row of their own light up the closest one that has.
+    var ALIAS = {
+        projects: 'plan', schedule: 'plan', agents: 'agent', feed: 'posts',
+        publish: 'episodes',
+        revenue: 'money', payouts: 'money', store: 'money', merch: 'money',
+        analytics: 'money', mystats: 'money',
+        audience: 'supporters', briefs: 'brandbriefs', decisions: 'agent',
+    };
     function markActive(view) {
         var nav = el('streamingNav'); if (!nav) return;
         view = ALIAS[view] || view;
         nav.querySelectorAll('.dash-nav-item').forEach(function (it) { it.classList.toggle('active', it.dataset.view === view); });
-        var act = nav.querySelector('.dash-nav-item.active');
-        var g = act && act.closest('.snav-group');
-        // The group holding the active view is forced open; the user's own
-        // collapsed/open choice for the other groups is left alone.
-        if (g) g.classList.add('open');
-        refreshCounts();
-    }
-    function watchBadges() {
-        var b = el('streamingInboxBadge');
-        if (!b || !window.MutationObserver) return;
-        new MutationObserver(refreshCounts).observe(b, { attributes: true, childList: true, characterData: true, subtree: true });
     }
     function hookNav() {
         var orig = window.showArtistView;
         if (typeof orig !== 'function' || orig.__streamingHooked) return;
         var w = function (v) {
             var r = orig.apply(this, arguments);
-            try { if (streaming()) markActive(v); } catch (e) {}
+            try {
+                if (streaming()) {
+                    // Both run on the resolved view, so a redirected call marks and
+                    // tabs the view the creator actually landed on.
+                    var resolved = window.aiadStreamingRedirect(v);
+                    markActive(resolved);
+                    applyMoneyTabs(resolved);
+                }
+            } catch (e) {}
             return r;
         };
         w.__streamingHooked = true;
@@ -44698,17 +44892,27 @@ window.AIAD_PROMPTS = [
         if (def) def.style.display = on ? 'none' : '';
         if (sn) sn.style.display = on ? '' : 'none';
         if (dash) dash.classList.toggle('is-streaming', on);
+        // On <body> as well as the dashboard: the theme has to reach the stage-agent
+        // modal and the toasts, which are appended to body and are not inside
+        // #artistDashboard. The teal FAB is on body too and is deliberately left
+        // outside the token block, so it stays teal.
+        try { document.body.classList.toggle('streaming-theme', on); } catch (e) {}
         var sub = el('artistDashSubtitle'); if (sub) sub.textContent = on ? 'Creator Dashboard' : 'Artist Dashboard';
         var ms = el('mobileNavStudio');
         if (ms) {
             ms.setAttribute('onclick', on ? "showArtistView('episodes');setMobileNav(this)" : "showArtistView('music');setMobileNav(this)");
             if (ms.lastChild && ms.lastChild.nodeType === 3) ms.lastChild.nodeValue = on ? 'Episodes' : 'Studio';
         }
+        var mf = el('mobileNavFans');
+        if (mf && mf.lastChild && mf.lastChild.nodeType === 3) mf.lastChild.nodeValue = on ? 'Audience' : 'Fans';
         if (on) {
-            restoreGroups();
             var h = (location.hash || '').replace(/^#artist\//, '');
             var cur = document.querySelector('#artistDashboard .dash-nav-item.active');
-            markActive(h || (cur && cur.dataset.view) || 'posts');
+            var v = window.aiadStreamingRedirect(h || (cur && cur.dataset.view) || 'home');
+            markActive(v);
+            applyMoneyTabs(v);
+        } else {
+            applyMoneyTabs(null);
         }
     };
 
@@ -45060,15 +45264,13 @@ window.AIAD_PROMPTS = [
 
     function boot() {
         hookNav();
-        watchBadges();
-        refreshCounts();
         var dash = el('artistDashboard');
         if (dash && dash.classList.contains('active')) { try { window.aiadApplyIndustryNav(); } catch (e) {} }
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 
     window.AIADStreaming = {
-        toggleGroup: toggleGroup, go: function (view) {
+        go: function (view) {
             if (view === 'decisions') {
                 window.showArtistView('agent');
                 setTimeout(function () { try { window.aiadAgentTab && aiadAgentTab('decisions'); } catch (e) {} markActive('decisions'); }, 120);
@@ -45076,6 +45278,7 @@ window.AIAD_PROMPTS = [
             }
             window.showArtistView(view);
         },
+        applyMoneyTabs: applyMoneyTabs,
         openEpisodes: openEpisodes, openPublish: openPublish,
         newEpisode: function () { newEpisode(); }, startFirst: function () { newEpisode(1); },
         edit: edit, cancel: cancel, save: saveEditor, publishFrom: publishFrom,
@@ -45089,7 +45292,8 @@ window.AIAD_PROMPTS = [
 </script>
 
 <style id="aiad-streaming-mobile-css">
-/* Streaming vertical — mobile overrides. Keep this the last <style> before </body>. */
+/* Streaming vertical — mobile overrides. Geometry only; the token block in
+   #aiad-streaming-theme is what sits last before </body>. */
 @media (max-width: 768px) {
   .sv{max-width:none;}
   .sv-title{font-size:1.75rem;}
@@ -45945,6 +46149,108 @@ body.aiad-pdrawer-lock{overflow:hidden;}
     window.AIADAgentExport = { run: run };
 })();
 </script>
+<style id="aiad-streaming-theme">
+/* ══════════════ STREAMING VERTICAL — THEME ══════════════
+   Last <style> in the document on purpose. This file's established pattern is
+   that the block at the end of </body> wins the cascade, and it is the only way
+   a token override lands on top of ~46k lines of earlier rules without
+   !important on every line.
+
+   Colour only. Not one spacing value, radius, font-size or component geometry
+   is touched here — a streaming creator gets the same layout in a different
+   palette, so a change to either side cannot silently reshape the other.
+
+   Scope is body.streaming-theme, set by aiadApplyIndustryNav() alongside the
+   #artistDashboard.is-streaming class. Body rather than the dashboard because
+   the stage-agent modal and the toasts are appended to <body> and would
+   otherwise stay teal and magenta inside an amber dashboard. */
+
+body.streaming-theme {
+    --s-bg:           #0B0D10;
+    --s-surface:      #14181D;
+    --s-line:         #232A32;
+    --s-text:         #F5F1EA;
+    --s-muted:        #9AA3AD;
+    --s-accent:       #FFB020;
+    --s-accent-press: #E09612;
+    /* ON AIR only. Never a decorative fill, never a border, never a hover — if
+       this colour is on screen the creator is broadcasting. */
+    --s-live:         #FF3B30;
+
+    /* The app's own tokens re-pointed at the block above. Doing it here rather
+       than restyling components means every var(--teal) and var(--magenta) in
+       the file — including the ones in views shared with the music dashboard —
+       follows, and nothing has to be enumerated. */
+    --bg-primary:    var(--s-bg);
+    --bg-secondary:  var(--s-surface);
+    --bg-card:       var(--s-surface);
+    --bg-card-hover: #1A1F26;
+    --text-primary:   var(--s-text);
+    --text-secondary: rgba(245,241,234,0.66);
+    --text-muted:     var(--s-muted);
+    --text-hint:      rgba(245,241,234,0.32);
+    --border-default: var(--s-line);
+    --border-hover:   #303945;
+    --focus-ring:     rgba(255,176,32,0.45);
+
+    /* Teal and magenta both collapse onto amber. The two-accent scheme is what
+       produced the teal-to-magenta gradients; one accent produces one gradient. */
+    --teal:          var(--s-accent);
+    --teal-light:    #FFC557;
+    --teal-dark:     var(--s-accent-press);
+    --magenta:       var(--s-accent);
+    --magenta-light: #FFC557;
+    --magenta-dark:  var(--s-accent-press);
+}
+
+body.streaming-theme,
+body.streaming-theme .dashboard,
+body.streaming-theme .dash-main { background: var(--s-bg); color: var(--s-text); }
+
+/* One gradient, amber to ember, wherever a two-colour one was. These are named
+   element by element because most were written inline with
+   linear-gradient(135deg,var(--magenta),var(--magenta-dark)) on the element
+   itself, and an inline style beats a class however late it is declared. */
+body.streaming-theme .sv-btn-primary,
+body.streaming-theme #stageAgentSendBtn,
+body.streaming-theme #dashSrSave,
+body.streaming-theme #svSaveBtn,
+body.streaming-theme #artistDashboard .btn-primary {
+    background: linear-gradient(135deg, var(--s-accent), var(--s-accent-press)) !important;
+    border-color: var(--s-accent-press) !important;
+    color: #1A1203 !important;
+}
+body.streaming-theme .sv-btn-primary:hover,
+body.streaming-theme #stageAgentSendBtn:hover {
+    background: linear-gradient(135deg, #FFC557, var(--s-accent)) !important;
+}
+
+/* Hairlines and surfaces inside the dashboard. */
+body.streaming-theme #artistDashboard .dash-sidebar-left { background: var(--s-bg); border-right: 1px solid var(--s-line); }
+body.streaming-theme #artistDashboard .dash-nav-item.active,
+body.streaming-theme #artistDashboard .dash-nav-item.active .dash-nav-icon { color: var(--s-accent); }
+body.streaming-theme .sv { --sv-rule: var(--s-line); }
+body.streaming-theme .sv-kicker { color: var(--s-accent); }
+body.streaming-theme .sv-tab.active { border-bottom-color: var(--s-accent); }
+body.streaming-theme .sv-pill.published { border-color: var(--s-accent); color: var(--s-accent); }
+body.streaming-theme .sv-stage.done { background: var(--s-accent); }
+body.streaming-theme .sv-dot.live { background: var(--s-accent); box-shadow: 0 0 0 3px rgba(255,176,32,0.18); }
+body.streaming-theme .sv-link { color: var(--s-accent); }
+
+/* ON AIR. The only place --s-live is allowed to appear. */
+body.streaming-theme .sv-onair { color: var(--s-live); border-color: var(--s-live); }
+body.streaming-theme .sv-onair-dot { background: var(--s-live); box-shadow: 0 0 0 4px rgba(255,59,48,0.22); }
+
+/* The teal pill FAB is the release wizard's, lives on <body> outside the
+   dashboard, and belongs to a surface streaming redirects away from. Pinned
+   back to its own colours so the token remap above cannot reach it, and left
+   exactly where it is, bottom-right. */
+body.streaming-theme .rw-fab {
+    background: linear-gradient(135deg, #00B4D8, #0077B6);
+    border-color: rgba(0,212,255,0.4);
+    color: #fff;
+}
+</style>
 </body>
 
 
