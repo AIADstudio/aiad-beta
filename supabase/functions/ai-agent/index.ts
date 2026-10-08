@@ -211,13 +211,15 @@ Deno.serve(async (req)=>{
     if(!conversationId) conversationId = crypto.randomUUID();
     if(!convoTitle) convoTitle = deriveTitle(question);
     try{
-      await admin.from('agent_results').insert({
+      const ins = await admin.from('agent_results').insert({
         question_id: questionId, [ownerKey]: userId,
         question, topic, answer: msg, model: MODEL, status: 'Failed',
         conversation_id: conversationId,
         ...(firstInThread && convoTitle ? { title: convoTitle } : {}),
       });
-    }catch(_){}
+      // The row that records a failure failing is how a failure disappears entirely.
+      if(ins.error) console.error('[ai-agent] failure row insert:', ins.error);
+    }catch(e){ console.error('[ai-agent] failure row threw:', e); }
     // Reverses exactly the spend the client made. A missing or already-refunded
     // id refunds nothing rather than inventing credits.
     try{
@@ -324,9 +326,21 @@ Deno.serve(async (req)=>{
     if(Array.isArray(conversationHistory)) for(const m of conversationHistory) if(m&&m.role&&m.content) messages.push({role:m.role,content:m.content});
     messages.push({role:'user',content:question});
 
-    // Writes the answered row; shared by both response paths.
+    // Writes the answered row; shared by both response paths. Returns the failure
+    // rather than swallowing it into a server log the artist never sees. An answer
+    // that reaches the screen but not the table is gone on the next load, and for
+    // weeks that was indistinguishable from a working agent. The whole error object
+    // goes back to the caller, which shows it and console.errors it.
+    // A missing `admin` is the quietest failure of the lot: nothing was ever written
+    // and nothing was ever logged, so it is reported like any other write failure.
     const recordAnswer = async (answer) => {
-      if(!(admin && userId)) return;
+      if(!(admin && userId)){
+        const why = !admin
+          ? 'no service-role client (SUPABASE_SERVICE_ROLE_KEY is not set on this function)'
+          : 'no caller id';
+        console.error('[ai-agent] agent_results NOT written:', why);
+        return { message: 'The answer was not stored: ' + why + '.' };
+      }
       try{
         const ins = await admin.from('agent_results').insert({
           question_id: questionId, [ownerKey]: userId,
@@ -334,8 +348,12 @@ Deno.serve(async (req)=>{
           conversation_id: conversationId,
           ...(firstInThread && convoTitle ? { title: convoTitle } : {}),
         });
-        if(ins.error) console.error('[ai-agent] agent_results insert:', ins.error.message);
-      }catch(e){ console.error('[ai-agent] agent_results threw:', String(e)); }
+        if(ins.error){ console.error('[ai-agent] agent_results insert:', ins.error); return ins.error; }
+        return null;
+      }catch(e){
+        console.error('[ai-agent] agent_results threw:', e);
+        return { message: String((e&&e.message)||e) };
+      }
     };
 
     const r = await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':ANTHROPIC_KEY,'anthropic-version':'2023-06-01'},body:JSON.stringify({model:MODEL,max_tokens:MAX_TOKENS,system:systemPrompt,messages,...(wantStream?{stream:true}:{})})});
@@ -353,8 +371,9 @@ Deno.serve(async (req)=>{
       // Strip before it is saved as well as before it is returned, so history and
       // the live answer are the same text.
       const answer = sanitizeAnswer(data.content[0].text);
-      await recordAnswer(answer);
-      return new Response(JSON.stringify({answer, question_id: questionId, conversation_id: conversationId, model: MODEL}),{headers:{...cors,'Content-Type':'application/json'}});
+      const storeErr = await recordAnswer(answer);
+      return new Response(JSON.stringify({answer, question_id: questionId, conversation_id: conversationId, model: MODEL,
+        ...(storeErr ? { storage_error: storeErr } : {})}),{headers:{...cors,'Content-Type':'application/json'}});
     }
 
     // An HTTP error before any token is a plain failure, thrown into the catch
@@ -368,7 +387,9 @@ Deno.serve(async (req)=>{
     // NDJSON, one object per line:
     //   {type:"meta", conversation_id, question_id, model}   first
     //   {type:"delta", text}                                  as the model writes
-    //   {type:"done", answer}                                 the sanitised full answer, stored
+    //   {type:"done", answer, storage_error?}                 the sanitised full answer;
+    //       storage_error is present only when the agent_results write failed, and
+    //       carries the whole Supabase error so the client can show and log it
     //   {type:"error", error}                                 instead of done; the credit is refunded
     const enc = new TextEncoder();
     const upstream = r.body;
@@ -392,8 +413,8 @@ Deno.serve(async (req)=>{
           // The same strip the one-shot path applies, on the whole text, so what is
           // stored and what the client settles on are identical.
           const answer = sanitizeAnswer(full);
-          await recordAnswer(answer);
-          send({ type:'done', answer });
+          const storeErr = await recordAnswer(answer);
+          send({ type:'done', answer, ...(storeErr ? { storage_error: storeErr } : {}) });
         }catch(e){
           const msg = String((e&&e.message)||e);
           await recordFailure(msg);

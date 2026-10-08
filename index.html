@@ -584,7 +584,7 @@
                 if (typeof showToast === 'function') showToast('PDF opened in a new tab \u2014 use Share to save it.');
             }
             restore();
-            try { window.aiadTrackAction && window.aiadTrackAction('plan_pdf', { ok: true }); } catch (e) {}
+            try { window.aiadTrackAction && window.aiadTrackAction('plan_pdf', 'artist:agent', { ok: true }); } catch (e) {}
         };
 
         // Supporters and revenue for one artist, read once from fan_support so
@@ -15403,10 +15403,6 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 viewEl.classList.add('active');
                 markNav('publish');
                 setTimeout(() => { if (window.AIADStreaming) AIADStreaming.openPublish(); }, 40);
-            } else if (view === 'library') {
-                viewEl.classList.add('active');
-                markNav('library');
-                setTimeout(() => { if (window.AIADLibrary) AIADLibrary.open(); }, 40);
             } else if (view === 'review') {
                 viewEl.classList.add('active');
                 markNav('review');
@@ -18263,12 +18259,164 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             return null;
         };
 
-        async function sendArtistAgentMessage() {
+        // ── Fragment guard ───────────────────────────────────────────────────
+        // 70 opens of this surface produced 4 questions, and 3 of those were fragments
+        // ("Video editing", "R&B dark", "yo"). A topic gets a topic-shaped answer back:
+        // one artist asked "Video editing", got something unusable, and filed a support
+        // ticket 45 seconds later. So a fragment is turned back into a question before a
+        // credit is spent. Both conditions are required — "Why?" is a real question at
+        // one word, and "should I sign this 360 deal" is a real question with no mark.
+        function aiadAgentIsFragment(text) {
+            var t = String(text || '').trim();
+            if (!t) return false;
+            if (t.indexOf('?') !== -1) return false;
+            return t.split(/\s+/).length < 5;
+        }
+
+        // Three known-good questions per topic, static on purpose: anything generated
+        // from two words of input would be the same guess the agent is already making.
+        // First match wins, so the narrow topics are listed before the broad ones —
+        // "TikTok video" is a TikTok question, not a video one.
+        var _AGENT_TOPIC_QUESTIONS = [
+            { key: 'tiktok', match: ['tiktok', 'tik tok'], questions: [
+                'What should I actually be posting on TikTok to grow from where I am now?',
+                'How much of my time should go into TikTok versus everything else I could be doing?',
+                'Is TikTok worth building for my genre, or should that effort go somewhere else?'] },
+            { key: 'sync', match: ['sync', 'licensing', 'license', 'placement', 'placements', 'film', 'tv'], questions: [
+                'How should I be using sync licensing, and what does my catalogue need before I pitch it?',
+                'Who should I be pitching for sync, and what does a realistic first placement look like?',
+                'What is stopping my music from getting sync placements right now?'] },
+            { key: 'merch', match: ['merch', 'merchandise', 'apparel', 'shirt', 'shirts', 'hoodie', 'hoodies'], questions: [
+                'What merch should I make first, and how much of it should I order?',
+                'How should I price my merch so it actually makes money at my audience size?',
+                'Where does merch fit into my release plan, and when should I launch it?'] },
+            { key: 'touring', match: ['tour', 'tours', 'touring', 'gig', 'gigs', 'live', 'show', 'shows', 'venue', 'venues'], questions: [
+                'Am I ready to tour, and what would a realistic first run of dates look like?',
+                'How do I book shows in markets where I have listeners but no contacts?',
+                'What does a run of shows need to earn to be worth doing at my level?'] },
+            { key: 'pricing', match: ['pricing', 'price', 'prices', 'cost', 'costs', 'charge', 'rate', 'rates'], questions: [
+                'What should I be charging for my work, and how do I raise it without losing people?',
+                'Am I underpricing myself, and what would you charge in my position?',
+                'How should I price my releases, features and merch given my audience size?'] },
+            { key: 'release', match: ['release', 'releases', 'rollout', 'drop', 'single', 'album', 'ep'], questions: [
+                'Show me a week-by-week rollout plan for my next release.',
+                'How far ahead should I be planning my next release, and what has to happen first?',
+                'Should my next release be a single, an EP or an album, and why?'] },
+            { key: 'streaming', match: ['streaming', 'stream', 'streams', 'spotify', 'playlist', 'playlists', 'apple music'], questions: [
+                'How do I grow my monthly listeners from where they are right now?',
+                'What should I be doing about playlists, and which ones are realistic for me?',
+                'What do my streaming numbers actually say about what I should do next?'] },
+            { key: 'video', match: ['video', 'videos', 'visual', 'visuals', 'editing', 'edit', 'editor'], questions: [
+                'What should my next music video actually accomplish, and what should I spend on it?',
+                'Should I be making one polished video or a steady stream of short-form clips?',
+                'Do I hire an editor for my visuals or learn to cut them myself?'] }
+        ];
+
+        // Tokenised, not substring-matched: 'ep' must not fire on "deep" or "prep".
+        // Multi-word terms are checked against the whole normalised string instead.
+        function aiadAgentTopicQuestions(fragment) {
+            var norm = String(fragment || '').toLowerCase().replace(/[^a-z0-9&\s]+/g, ' ').replace(/\s+/g, ' ').trim();
+            var words = norm ? norm.split(' ') : [];
+            for (var i = 0; i < _AGENT_TOPIC_QUESTIONS.length; i++) {
+                var t = _AGENT_TOPIC_QUESTIONS[i];
+                for (var j = 0; j < t.match.length; j++) {
+                    var m = t.match[j];
+                    var hit = (m.indexOf(' ') !== -1) ? (norm.indexOf(m) !== -1) : (words.indexOf(m) !== -1);
+                    if (hit) return t.questions;
+                }
+            }
+            // Unrecognised topic: the artist's own words carried into three full
+            // sentences, so the clarifier still asks something answerable.
+            var f = String(fragment || '').trim();
+            return [
+                'What should I be doing about ' + f + ' right now, given where my career actually is?',
+                'What is the highest-impact move I can make on ' + f + ' in the next 90 days?',
+                'What am I getting wrong about ' + f + ', and what would you do instead?'
+            ];
+        }
+
+        // Fills the input and sends. `asTyped` skips the guard: the artist has been asked
+        // once and said they meant it, so the original string goes through untouched.
+        function _agentClarifierSend(node, text, asTyped) {
+            if (node) node.remove();
+            var input = document.getElementById('artistAgentInput');
+            if (!input) return;
+            input.value = text;
+            sendArtistAgentMessage(asTyped);
+        }
+
+        // The clarifier is a message in the thread, not a modal — it sits where the
+        // answer would have been, so the exchange still reads as one the artist started.
+        // Returns false if it could not be rendered, and the caller then sends the
+        // fragment as-is: a guard that cannot show its alternative must not block.
+        function aiadAgentRenderClarifier(fragment) {
+            var thread = _agentThreadEl();
+            if (!thread) return false;
+
+            var ph = thread.querySelector('.agent-convo-empty');
+            if (ph) ph.remove();
+            var starters = document.getElementById('artistAgentStarters');
+            if (starters && starters.style.display !== 'none') { starters.style.display = 'none'; _agentRotatingChips(true); }
+            // One at a time: a second fragment replaces the first rather than stacking.
+            var prev = thread.querySelector('.agent-clarifier');
+            if (prev) prev.remove();
+
+            var msg = document.createElement('div');
+            msg.className = 'chat-message agent-clarifier';
+            msg.innerHTML = '<div class="chat-message-header">'
+                + '<div class="chat-avatar agent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></div>'
+                + '<span class="chat-name">AIAD</span><span class="chat-time">Just now</span></div>';
+
+            var body = document.createElement('div');
+            body.className = 'chat-content';
+
+            var lead = document.createElement('div');
+            lead.style.cssText = 'margin-bottom:12px;';
+            // textContent, not innerHTML: the fragment is whatever the artist typed.
+            lead.textContent = '\u201C' + fragment + '\u201D is a topic, not a question \u2014 I can answer it, but the answer will be as broad as the question. Which of these did you mean?';
+            body.appendChild(lead);
+
+            var list = document.createElement('div');
+            list.style.cssText = 'display:flex;flex-direction:column;align-items:flex-start;gap:8px;margin-bottom:14px;';
+            aiadAgentTopicQuestions(fragment).forEach(function (q) {
+                var b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'example-prompt';
+                b.style.cssText = 'text-align:left;white-space:normal;';
+                b.textContent = q;
+                b.onclick = function () { _agentClarifierSend(msg, q, false); };
+                list.appendChild(b);
+            });
+            body.appendChild(list);
+
+            var esc = document.createElement('button');
+            esc.type = 'button';
+            esc.textContent = 'Ask \u201C' + fragment + '\u201D as I typed it';
+            esc.style.cssText = 'background:transparent;border:1px solid rgba(255,255,255,0.18);color:var(--text-muted,#64748b);border-radius:8px;padding:7px 12px;font-size:0.8rem;cursor:pointer;';
+            esc.onclick = function () { _agentClarifierSend(msg, fragment, true); };
+            body.appendChild(esc);
+
+            msg.appendChild(body);
+            thread.appendChild(msg);
+            thread.scrollTop = thread.scrollHeight;
+            return true;
+        }
+
+        async function sendArtistAgentMessage(asTyped) {
             const uid = aiadResolvedUserId();
             if (!uid) return;
             const input = document.getElementById('artistAgentInput');
             const message = input.value.trim();
             if (!message) return;
+
+            // Before the credit is spent, and before ai-agent ever sees it. The clarifier
+            // has to render for this to hold — if it cannot, the fragment is sent as
+            // typed, because nothing here is allowed to swallow a question.
+            if (!asTyped && aiadAgentIsFragment(message) && aiadAgentRenderClarifier(message)) {
+                try { window.aiadTrackAction && window.aiadTrackAction('agent_fragment_clarified', 'artist:agent', { fragment: message }); } catch (e) {}
+                input.value = '';
+                return;
+            }
 
             if (!await checkAndConsumeAICredits('mediumResponse')) {
                 showAICreditUpsell();
@@ -18319,6 +18467,9 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             let aiMsg = null;
             let liveEl = null;
             let livePaint = null;
+            // Set when ai-agent answered but could not write the row. Not an exception:
+            // the artist has a real answer on screen, it just will not be there tomorrow.
+            let storageErr = null;
             const ensureBubble = function () {
                 if (aiMsg) return;
                 typingIndicator.remove();
@@ -18391,6 +18542,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     // A function that does not stream yet answers in one piece.
                     if (!data || !data.answer) throw new Error('The agent returned no answer.');
                     aiResponse = data.answer;
+                    storageErr = data.storage_error || null;
                     if (data.conversation_id) aiadAdoptConversation(data.conversation_id, message, aiResponse);
                 } else {
                     // NDJSON: meta, then deltas, then done (the sanitised full answer) or error.
@@ -18409,7 +18561,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                             try { ev = JSON.parse(line); } catch (e) { continue; }
                             if (ev.type === 'meta') { convoId = ev.conversation_id || null; }
                             else if (ev.type === 'delta') { live += ev.text || ''; ensureBubble(); paintLive(live); }
-                            else if (ev.type === 'done') { finalAnswer = ev.answer; }
+                            else if (ev.type === 'done') { finalAnswer = ev.answer; storageErr = ev.storage_error || null; }
                             else if (ev.type === 'error') { streamErr = ev.error || 'The agent failed.'; }
                         }
                     }
@@ -18425,7 +18577,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                     // every question in this thread carries it.
                     if (convoId) aiadAdoptConversation(convoId, message, aiResponse);
                 }
-                try { window.aiadTrackAction && window.aiadTrackAction('agent_submit', { ok: true }); } catch (e) {}
+                try { window.aiadTrackAction && window.aiadTrackAction('agent_submit', 'artist:agent', { ok: true }); } catch (e) {}
             } catch (err) {
                 const detail = (err && err.message) || String(err);
                 try { window.aiadTrackError && window.aiadTrackError(detail, { action: 'agent_submit' }); } catch (e) {}
@@ -18441,6 +18593,25 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             ensureBubble();
             liveEl.innerHTML = window.aiadRenderMarkdown(aiResponse);
             aiMsg.insertAdjacentHTML('beforeend', aiadPlanActions(aiResponse, message));
+
+            // A write that failed used to end here, silently: the answer rendered, the
+            // row was never stored, and the thread was empty on the next visit with
+            // nothing in the UI or the console to say so. The whole Supabase error goes
+            // to the console and its full text onto the screen — no summary, no
+            // generic copy, no empty state standing in for a failure.
+            if (storageErr) {
+                console.error('[AIAD] agent_results insert failed', storageErr);
+                let detail;
+                try { detail = (typeof storageErr === 'string') ? storageErr : JSON.stringify(storageErr); }
+                catch (e) { detail = String(storageErr); }
+                const warn = document.createElement('div');
+                warn.className = 'chat-content';
+                warn.style.cssText = 'margin-top:10px;padding:9px 11px;border:1px solid rgba(248,113,113,0.45);border-radius:9px;color:#f87171;font-size:0.82rem;white-space:pre-wrap;word-break:break-word;';
+                warn.textContent = 'This answer was NOT saved — it will be gone when you reload. ' + detail;
+                aiMsg.appendChild(warn);
+                try { showToast('That answer was not saved: ' + detail); } catch (e) {}
+            }
+
             chatThread.scrollTop = chatThread.scrollHeight;
         }
 
@@ -18606,15 +18777,18 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             thread.appendChild(d);
         }
 
-        // 55 opens against 9 answers: artists were landing on an empty box and leaving.
-        // These give a first-time artist something to press. They are deliberately fixed
-        // rather than drawn from nextPrompts() — the point is a known-good first question,
-        // not variety, and the rotating chips under the input already cover variety.
+        // 70 opens of this surface against 4 questions ever asked: artists were landing
+        // on an empty box and leaving. These give a first-time artist something to press.
+        // Every one is a real question pulled from agent_results that produced a good
+        // answer — not an invented example, and deliberately fixed rather than drawn from
+        // nextPrompts(), because the point is a known-good first question, not variety.
+        // The rotating chips under the input already cover variety.
         var _AGENT_STARTERS = [
-            'What should I be working on this month?',
-            'How do I get my music into sync licensing?',
-            'Review my release plan and tell me what\'s missing',
-            'What\'s realistic for my first 1000 listeners?'
+            'Where is the money I am leaving on the table right now?',
+            'What should I do about TikTok? I have barely built it.',
+            'How should I be using sync? I have not had a placement since 2023.',
+            'Show me a rollout plan for an artist who has never released music.',
+            'How should I price my new merch collection?'
         ];
 
         // The rotating "Try asking" chips under the input are a separate surface every
@@ -18646,6 +18820,9 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 + _AGENT_STARTERS.map(function (q) {
                     return '<button type="button" class="example-prompt" data-starter="' + _agentEsc(q) + '">' + _agentEsc(q) + '</button>';
                   }).join('')
+                + '</div>'
+                + '<div style="margin-top:10px;font-size:0.78rem;line-height:1.5;color:var(--text-muted);">'
+                + 'AIAD answers a full question far better than a topic — a whole sentence gets you a decision, two words get you a summary.'
                 + '</div></div>';
             box.querySelectorAll('button[data-starter]').forEach(function (b) {
                 b.addEventListener('click', function () {
@@ -20425,6 +20602,10 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         }
 
         async function handleSignUp() {
+            // Ask before an account is created on an address that can never receive
+            // the verification mail. Answering either way re-enters this function.
+            if (!aiadEmailTypoGate('signUpEmail', handleSignUp)) return;
+
             const name = document.getElementById('signUpName').value.trim();
             const username = document.getElementById('signUpUsername').value.trim();
             const email = document.getElementById('signUpEmail').value.trim();
@@ -22767,6 +22948,140 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
             if (btn) btn.textContent = 'Generate Concept';
         }
 
+        // ── Email typo guard ──────────────────────────────────────────────────
+        // One artist created four accounts in twelve minutes, each on a mistyped
+        // address. A typo in the domain is unrecoverable and completely silent: the
+        // verification mail goes nowhere, the screen says signup worked, so they try
+        // again. A domain one edit away from a common provider is offered back before
+        // the form is sent. It is an offer, never a block — "Keep" submits exactly
+        // what was typed, and an address that matches nothing is never questioned.
+        const AIAD_EMAIL_DOMAINS = ['gmail.com', 'googlemail.com', 'icloud.com', 'outlook.com', 'hotmail.com', 'yahoo.com', 'proton.me'];
+
+        // The domains that have actually cost signups here, and the provider each one
+        // was meant to be. Checked before the distance pass and winning over it, because
+        // distance alone gets exactly these wrong: "goole.com" is four edits from
+        // gmail.com and one from google.com — so it is either missed, or, if google.com
+        // were on the allowlist, "corrected" to an address that bounces. google.com does
+        // not accept consumer mail and is deliberately not on the allowlist.
+        // Several entries below are reachable by distance too; they stay listed anyway,
+        // so the ones we know about are answered by name rather than by coincidence.
+        const AIAD_EMAIL_TYPOS = {
+            'goole.com':   'gmail.com',
+            'gogle.com':   'gmail.com',
+            'googel.com':  'gmail.com',
+            'gmail.co':    'gmail.com',
+            'gmail.cm':    'gmail.com',
+            'gmai.com':    'gmail.com',
+            'gmail.con':   'gmail.com',
+            'gnail.com':   'gmail.com',
+            'icloud.co':   'icloud.com',
+            'iclould.com': 'icloud.com',
+            'outlok.com':  'outlook.com',
+            'yaho.com':    'yahoo.com',
+            'yahoo.co':    'yahoo.com',
+        };
+
+        // Damerau-Levenshtein. Plain Levenshtein scores a swapped pair ("gmial.com")
+        // as two edits, which would miss the single commonest typo there is, so an
+        // adjacent transposition counts as one.
+        function aiadEditDistance(a, b) {
+            if (a === b) return 0;
+            if (Math.abs(a.length - b.length) > 1) return 2;   // can't be one edit apart
+            const d = [];
+            for (let i = 0; i <= a.length; i++) d[i] = [i];
+            for (let j = 0; j <= b.length; j++) d[0][j] = j;
+            for (let i = 1; i <= a.length; i++) {
+                for (let j = 1; j <= b.length; j++) {
+                    const cost = a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1;
+                    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+                    if (i > 1 && j > 1 && a.charAt(i - 1) === b.charAt(j - 2) && a.charAt(i - 2) === b.charAt(j - 1)) {
+                        d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+                    }
+                }
+            }
+            return d[a.length][b.length];
+        }
+
+        // The provider this address was probably meant for, or null. A domain already
+        // on the list, or nowhere near one, returns null — a custom domain must never
+        // be second-guessed.
+        window.aiadSuggestEmailDomain = function (email) {
+            const at = String(email || '').lastIndexOf('@');
+            if (at < 1) return null;
+            const domain = String(email).slice(at + 1).trim().toLowerCase();
+            if (!domain || AIAD_EMAIL_DOMAINS.indexOf(domain) !== -1) return null;
+            // Own property only: a domain is free-typed text and must not reach
+            // Object.prototype ("constructor" is a legal hostname label).
+            if (Object.prototype.hasOwnProperty.call(AIAD_EMAIL_TYPOS, domain)) return AIAD_EMAIL_TYPOS[domain];
+            for (let i = 0; i < AIAD_EMAIL_DOMAINS.length; i++) {
+                if (aiadEditDistance(domain, AIAD_EMAIL_DOMAINS[i]) === 1) return AIAD_EMAIL_DOMAINS[i];
+            }
+            return null;
+        };
+
+        // The exact address already answered for, per field, so the question is asked
+        // once and an artist who meant it is not asked again.
+        const _aiadEmailTypoAck = {};
+
+        // True means carry on. False means the confirm step is on screen instead —
+        // both of its buttons call `resubmit`, so the submit the artist asked for
+        // still happens either way.
+        function aiadEmailTypoGate(inputId, resubmit) {
+            const input = document.getElementById(inputId);
+            if (!input) return true;
+            const value = input.value.trim();
+            const hintId = inputId + 'TypoHint';
+            const stale = document.getElementById(hintId);
+            if (stale) stale.remove();
+            if (_aiadEmailTypoAck[inputId] === value.toLowerCase()) return true;
+            const suggestion = window.aiadSuggestEmailDomain(value);
+            if (!suggestion) return true;
+
+            const at = value.lastIndexOf('@');
+            const local = value.slice(0, at);
+            const typed = value.slice(at + 1);
+
+            const box = document.createElement('div');
+            box.id = hintId;
+            box.style.cssText = 'margin-top:8px;padding:10px 12px;border:1px solid rgba(245,158,11,0.45);background:rgba(245,158,11,0.08);border-radius:10px;';
+            const q = document.createElement('div');
+            q.textContent = 'Did you mean @' + suggestion + '?';
+            q.style.cssText = 'color:#f59e0b;font-weight:600;font-size:0.84rem;margin-bottom:8px;';
+            box.appendChild(q);
+
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;';
+            const mkBtn = function (label, css, onClick) {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.textContent = label;
+                b.style.cssText = css;
+                b.onclick = onClick;
+                return b;
+            };
+            row.appendChild(mkBtn('Use @' + suggestion,
+                'background:#f59e0b;border:none;color:#0a0a0f;border-radius:8px;padding:7px 12px;font-weight:600;font-size:0.8rem;cursor:pointer;',
+                function () {
+                    input.value = local + '@' + suggestion;
+                    _aiadEmailTypoAck[inputId] = input.value.toLowerCase();
+                    box.remove();
+                    // Re-runs the field's own oninput so the submit button's enabled
+                    // state matches the value we just wrote.
+                    try { input.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {}
+                    resubmit();
+                }));
+            row.appendChild(mkBtn('Keep @' + typed,
+                'background:transparent;border:1px solid rgba(255,255,255,0.18);color:var(--text-muted,#64748b);border-radius:8px;padding:7px 12px;font-size:0.8rem;cursor:pointer;',
+                function () {
+                    _aiadEmailTypoAck[inputId] = value.toLowerCase();
+                    box.remove();
+                    resubmit();
+                }));
+            box.appendChild(row);
+            (input.parentNode || input).appendChild(box);
+            return false;
+        }
+
         function validateSignIn() {
             const email = document.getElementById('signInEmail').value.trim();
             const password = document.getElementById('signInPassword').value;
@@ -23172,6 +23487,8 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         });
 
         async function handleSignIn() {
+            if (!aiadEmailTypoGate('signInEmail', handleSignIn)) return;
+
             const email = document.getElementById('signInEmail').value.trim();
             const password = document.getElementById('signInPassword').value;
             const btn = document.getElementById('signInBtn');
@@ -23234,6 +23551,10 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
         };
 
         async function handleForgotPassword() {
+            // Worse than a dead signup: a reset link that lands in an inbox the artist
+            // does not own. Same gate, same field, same two buttons.
+            if (!aiadEmailTypoGate('signInEmail', handleForgotPassword)) return;
+
             const email = document.getElementById('signInEmail').value.trim();
             if (!email) {
                 showToast('Enter your email first');
@@ -30018,6 +30339,7 @@ function toggleAgeRange(btn) {
             try {
                 const data = await callFetchStats('fetch', 'mystats');
                 if (!data) return;
+                lastScanErrors = data.errors || null;
                 renderMyStatsStatus(data);
                 (window.showToast || alert)('Connected — stats saved & refreshed');
                 localStorage.setItem('aiad_stats_collected', '1');
@@ -30036,17 +30358,22 @@ function toggleAgeRange(btn) {
             } catch (e) { (window.showToast || alert)('Failed: ' + e.message); }
         };
 
-        // The Connected panel below now carries the numbers, so this line only reports what
-        // went wrong. It used to lead with "Spotify API: 0 followers · pop 0" — Spotify
-        // returns 0 to every app, so that read as "your scan found nothing" on a scan that
-        // actually worked.
+        // Errors from the most recent fetch-artist-stats call. Held here so the platform
+        // cards can show them after loadMyStats re-renders from the DB row.
+        let lastScanErrors = null;
+        // Per-platform failures go on that platform's card (renderConnectedPlatforms).
+        // This line only carries errors with no card to land on (lastfm, chartmetric).
+        // It used to lead with "Spotify API: 0 followers · pop 0" — Spotify returns 0 to
+        // every app, so that read as "your scan found nothing" on a scan that worked.
         function renderMyStatsStatus(data) {
             const el = document.getElementById('myStatsApiStatus');
             const raw = document.getElementById('myStatsRaw');
             if (!el) return;
-            const errs = data.errors ? Object.entries(data.errors).map(([k, v]) => `${k}: ${v}`).join(' · ') : '';
-            el.innerHTML = errs
-                ? `<span style="color:#f59e0b;">Some sources didn't respond — ${escHtml(errs)}. Anything you entered yourself is still saved.</span>`
+            const other = Object.entries(data.errors || {})
+                .filter(([k]) => !PLATFORMS.some((p) => p.key === k))
+                .map(([k, v]) => `${k}: ${v}`).join(' · ');
+            el.innerHTML = other
+                ? `<span style="color:#f59e0b;">Some sources didn't respond — ${escHtml(other)}. Anything you entered yourself is still saved.</span>`
                 : '';
             if (raw) raw.textContent = JSON.stringify(data, null, 2);
         }
@@ -30084,6 +30411,53 @@ function toggleAgeRange(btn) {
                 tiktok_followers:    pick(canon.tiktok_followers,    legacy.tiktok_followers),
             };
         }
+        // Where each platform's stats blob came from, and whether it's current.
+        //   kind 'api'   — the platform answered a scan. Spotify is only believed when
+        //                  BOTH followers and popularity are present; YouTube when
+        //                  subscribers is. One field alone is not proof the API wrote it.
+        //   kind 'third' — the blob names its own `source` (e.g. a kworb.net report):
+        //                  seeded by hand, labelled from that value, never "via Spotify".
+        //   kind 'none'  — nothing but self_reported: the scan came back empty and every
+        //                  figure on that card is the artist's own.
+        //   fresh        — last_fetched_at within 7 days. Nine artists carry Spotify data
+        //                  10–50 days old that can't refresh while the app is blocked; a
+        //                  cached blob is not a live feed, so "Live" needs a recent scan.
+        // Instagram and TikTok have no API path at all.
+        const FRESH_MS = 7 * 24 * 60 * 60 * 1000;
+        function platformSource(row) {
+            const sp = (row && row.spotify_stats) || {};
+            const yt = (row && row.youtube_stats) || {};
+            // Freshness is per platform. The edge function stamps _fetched_at inside each
+            // blob when THAT fetch succeeds; the row-level last_fetched_at bumps whenever
+            // any one platform succeeds, so a Spotify blob untouched since August would
+            // read as fresh off a scan where only YouTube worked. Rows scanned before the
+            // stamp existed have no _fetched_at yet — only those fall back to the row.
+            const parse = (v) => { const d = v ? new Date(v) : null; return d && !isNaN(d) ? d : null; };
+            const rowFetched = parse(row && row.last_fetched_at);
+            const of = (blob, label, isApi) => {
+                const fetched = parse(blob._fetched_at) || rowFetched;
+                const fresh = !!fetched && (Date.now() - fetched.getTime()) < FRESH_MS;
+                const scanned = fetched ? fetched.toLocaleDateString() : null;
+                // Only `source` marks third-party data; `_fetched_at` is our own stamp.
+                if (typeof blob.source === 'string' && blob.source.trim()) return { kind: 'third', label: blob.source.trim(), fresh: false, scanned };
+                if (isApi) return { kind: 'api', label, fresh, scanned };
+                return { kind: 'none', label, fresh: false, scanned };
+            };
+            const rowScanned = rowFetched ? rowFetched.toLocaleDateString() : null;
+            return {
+                spotify:   of(sp, 'Spotify', typeof sp.followers === 'number' && typeof sp.popularity === 'number'),
+                youtube:   of(yt, 'YouTube', typeof yt.subscribers === 'number'),
+                instagram: { kind: 'none', label: 'Instagram', fresh: false, scanned: rowScanned },
+                tiktok:    { kind: 'none', label: 'TikTok',    fresh: false, scanned: rowScanned },
+            };
+        }
+        window.aiadPlatformSource = platformSource;
+        function selfReportedDate(row) {
+            const canon  = (row && row.self_reported) || {};
+            const legacy = (row && row.spotify_stats && row.spotify_stats.self_reported) || {};
+            const d = canon.updated_at || legacy._updated_at;
+            return d ? new Date(d).toLocaleDateString() : null;
+        }
         function renderConnectedPlatforms(row) {
             const host = document.getElementById('myStatsConnected');
             if (!host) return;
@@ -30091,46 +30465,66 @@ function toggleAgeRange(btn) {
             const sr = mergedSelfReported(row);
             const sp = row.spotify_stats || {};
             const yt = row.youtube_stats || {};
+            const live = platformSource(row);
+            const srDate = selfReportedDate(row);
+            const errs = lastScanErrors || {};
+            const reported = (n, what) => fmtNum(n) ? fmtNum(n) + ' ' + what : null;
+            const join = (parts) => parts.filter(Boolean).join(' · ');
 
+            // api: what the platform returned on the last scan. self: what the artist
+            // typed. Both render, each under its own label, so a self-reported number
+            // can never pass as a platform metric.
             const state = {
                 spotify: {
                     on: !!row.spotify_id,
-                    detail: [fmtNum(sr.monthly_listeners) && fmtNum(sr.monthly_listeners) + ' monthly listeners',
-                             fmtNum(sr.spotify_followers) && fmtNum(sr.spotify_followers) + ' followers',
-                             sp.name && 'as ' + sp.name].filter(Boolean).join(' · '),
+                    api: live.spotify.kind !== 'none' ? join([sp.name && 'as ' + sp.name,
+                                             sp.followers > 0 && fmtNum(sp.followers) + ' followers',
+                                             typeof sp.popularity === 'number' && 'popularity ' + sp.popularity]) : '',
+                    self: join([reported(sr.monthly_listeners, 'monthly listeners'), reported(sr.spotify_followers, 'followers')]),
                 },
                 youtube: {
                     on: !!row.youtube_handle,
-                    // Prefer the real API number; fall back to what the artist reported.
-                    detail: [fmtNum(typeof yt.subscribers === 'number' ? yt.subscribers : sr.youtube_subscribers)
-                               && fmtNum(typeof yt.subscribers === 'number' ? yt.subscribers : sr.youtube_subscribers) + ' subscribers',
-                             fmtNum(yt.total_views) && fmtNum(yt.total_views) + ' views'].filter(Boolean).join(' · '),
+                    api: live.youtube.kind !== 'none' ? join([fmtNum(yt.subscribers) + ' subscribers', fmtNum(yt.total_views) && fmtNum(yt.total_views) + ' views']) : '',
+                    self: join([reported(sr.youtube_subscribers, 'subscribers')]),
                 },
                 instagram: {
                     on: !!row.instagram_handle,
-                    detail: [fmtNum(sr.instagram_followers) && fmtNum(sr.instagram_followers) + ' followers'].filter(Boolean).join(' · '),
+                    api: '',
+                    self: join([reported(sr.instagram_followers, 'followers')]),
                 },
                 tiktok: {
                     on: !!row.tiktok_handle,
-                    detail: [fmtNum(sr.tiktok_followers) && fmtNum(sr.tiktok_followers) + ' followers'].filter(Boolean).join(' · '),
+                    api: '',
+                    self: join([reported(sr.tiktok_followers, 'followers')]),
                 },
             };
 
-            const connected = PLATFORMS.filter(p => state[p.key].on);
-            if (!connected.length) {
+            const shown = PLATFORMS.filter(p => state[p.key].on || state[p.key].self || errs[p.key]);
+            if (!shown.length) {
                 host.innerHTML = '<div style="font-size:0.78rem;color:var(--text-muted);">Nothing connected yet — paste a link above and hit Connect &amp; scan.</div>';
                 return;
             }
             const when = row.last_fetched_at ? new Date(row.last_fetched_at).toLocaleString() : null;
+            const pill = (text, colour) => `<span style="margin-left:auto;flex-shrink:0;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.08em;padding:2px 7px;border-radius:999px;border:1px solid ${colour}66;color:${colour};">${text}</span>`;
             host.innerHTML = `
-                <div style="font-size:0.62rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:8px;">Connected</div>
+                <div style="font-size:0.62rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:8px;">Platforms</div>
                 <div style="display:flex;flex-direction:column;gap:8px;">
-                    ${connected.map((p) => {
-                        const d = state[p.key].detail;
-                        return `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:rgba(255,255,255,0.03);border:1px solid ${p.colour}44;border-radius:10px;">
-                            <span style="width:8px;height:8px;border-radius:50%;background:${p.colour};flex-shrink:0;"></span>
-                            <span style="font-size:0.82rem;font-weight:600;color:var(--text-primary);">${escHtml(p.label)}</span>
-                            <span style="font-size:0.76rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${d ? escHtml(d) : 'connected — no numbers yet'}</span>
+                    ${shown.map((p) => {
+                        const s = state[p.key];
+                        const err = errs[p.key];
+                        const src = live[p.key];
+                        const lines = [];
+                        if (s.api)  lines.push(`<div style="font-size:0.76rem;color:var(--text-secondary);">${escHtml(s.api)} <span style="color:${src.kind === 'api' && src.fresh ? '#22c55e' : 'var(--text-muted)'};">· via ${escHtml(src.label)}${src.kind === 'api' && !src.fresh ? ' · last scanned ' + escHtml(src.scanned || 'unknown') : ''}</span></div>`);
+                        if (s.self) lines.push(`<div style="font-size:0.76rem;color:var(--text-muted);"><span style="color:var(--text-secondary);">You reported</span> ${escHtml(s.self)}${srDate ? ' · ' + escHtml(srDate) : ''}</div>`);
+                        if (err)    lines.push(`<div style="font-size:0.74rem;color:#f59e0b;">${escHtml(p.label)} didn't respond on the last scan — ${escHtml(err)}</div>`);
+                        if (!lines.length) lines.push(`<div style="font-size:0.76rem;color:var(--text-muted);">connected — no numbers yet</div>`);
+                        return `<div style="padding:9px 12px;background:rgba(255,255,255,0.03);border:1px solid ${err ? '#f59e0b66' : p.colour + '44'};border-radius:10px;">
+                            <div style="display:flex;align-items:center;gap:10px;">
+                                <span style="width:8px;height:8px;border-radius:50%;background:${src.kind === 'api' && src.fresh ? p.colour : 'transparent'};border:1px solid ${p.colour};flex-shrink:0;"></span>
+                                <span style="font-size:0.82rem;font-weight:600;color:var(--text-primary);">${escHtml(p.label)}</span>
+                                ${src.kind === 'api' && src.fresh ? pill('Live', '#22c55e') : (src.kind === 'none' ? pill('Not connected', '#94a3b8') : '')}
+                            </div>
+                            <div style="display:flex;flex-direction:column;gap:2px;margin-top:5px;padding-left:18px;">${lines.join('')}</div>
                         </div>`;
                     }).join('')}
                 </div>
@@ -30162,7 +30556,9 @@ function toggleAgeRange(btn) {
                 setVal('srLatestReleaseName', sr.latest_release_name);
                 setVal('srLatestReleaseDate', sr.latest_release_date);
                 setVal('srLocation',          sr.location);
-                renderMyStatsStatus({ spotify_stats: row.spotify_stats, youtube_stats: row.youtube_stats, self_reported: sr });
+                // Carry the last scan's errors through; re-rendering used to wipe them, so a
+                // failed Spotify call read as a clean scan with the old number still up.
+                renderMyStatsStatus({ spotify_stats: row.spotify_stats, youtube_stats: row.youtube_stats, self_reported: sr, errors: lastScanErrors });
                 if (mergedSelfReported(row).monthly_listeners || row.spotify_id || row.youtube_handle) {
                     localStorage.setItem('aiad_stats_collected', '1');
                 }
@@ -30252,7 +30648,7 @@ function toggleAgeRange(btn) {
                 if (o) o.style.display = 'none';
                 const b = document.getElementById('aiadStatsBanner');
                 if (b) b.style.display = 'none';
-                try { window.aiadTrackAction && window.aiadTrackAction('onboarding_save', { ok: true }); } catch (_) {}
+                try { window.aiadTrackAction && window.aiadTrackAction('onboarding_save', 'artist:stats-onboarding', { ok: true }); } catch (_) {}
                 (window.showToast || (() => {}))('Saved — AIAD will use this in every response');
             } catch (e) {
                 try { window.aiadTrackError && window.aiadTrackError(e && e.message, { action: 'onboarding_save' }); } catch (_) {}
@@ -30539,16 +30935,29 @@ function toggleAgeRange(btn) {
         function resolvedStats(row) {
             const canon  = (row && row.self_reported) || {};
             const legacy = (row && row.spotify_stats && row.spotify_stats.self_reported) || {};
+            const sp     = (row && row.spotify_stats) || {};
             const yt     = (row && row.youtube_stats) || {};
+            const prov   = window.aiadPlatformSource(row);
             const pick = (...vals) => vals.find((v) => typeof v === 'number');
-            return {
-                spotify_monthly_listeners: pick(canon.spotify_monthly_listeners, legacy.monthly_listeners),
-                spotify_followers:         pick(canon.spotify_followers,   legacy.spotify_followers),
-                youtube_subscribers:       pick(yt.subscribers, canon.youtube_subscribers, legacy.youtube_subscribers),
-                instagram_followers:       pick(canon.instagram_followers, legacy.instagram_followers),
-                tiktok_followers:          pick(canon.tiktok_followers,    legacy.tiktok_followers),
-                updated_at:                canon.updated_at || legacy._updated_at,
-            };
+            // Each value is tagged with where it came from so the headline can say so:
+            // 'self' (the artist), 'api' (the platform answered a scan), or 'third' (the
+            // blob names its own source — seeded from a report, not from the API).
+            // YouTube's platform number wins when there is one. Spotify's follower count
+            // is only trusted when it's non-zero — Spotify hands 0 to apps it hasn't
+            // approved, and 0 "via Spotify" would look like a real collapse.
+            const out = { sources: {}, updated_at: canon.updated_at || legacy._updated_at };
+            const tag  = (k, v, s) => { out[k] = v; if (typeof v === 'number') out.sources[k] = s; };
+            const self = (k, v) => tag(k, v, 'self');
+            const platform = (k, v, p) => tag(k, v, p.kind);
+            self('spotify_monthly_listeners', pick(canon.spotify_monthly_listeners, legacy.monthly_listeners));
+            const srFollowers = pick(canon.spotify_followers, legacy.spotify_followers);
+            if (typeof srFollowers === 'number') self('spotify_followers', srFollowers);
+            else if (prov.spotify.kind !== 'none' && typeof sp.followers === 'number' && sp.followers > 0) platform('spotify_followers', sp.followers, prov.spotify);
+            if (prov.youtube.kind !== 'none' && typeof yt.subscribers === 'number') platform('youtube_subscribers', yt.subscribers, prov.youtube);
+            else self('youtube_subscribers', pick(canon.youtube_subscribers, legacy.youtube_subscribers));
+            self('instagram_followers', pick(canon.instagram_followers, legacy.instagram_followers));
+            self('tiktok_followers',    pick(canon.tiktok_followers,    legacy.tiktok_followers));
+            return out;
         }
 
         // ── Headline stats: self-reported numbers are the primary figures.
@@ -30565,13 +30974,28 @@ function toggleAgeRange(btn) {
 
         function headlineHtml(row) {
             const sr = resolvedStats(row);
+            const src = sr.sources;
             const sp = (row && row.spotify_stats) || {};
             const listeners = sr.spotify_monthly_listeners;
+            const prov = window.aiadPlatformSource(row);
+            // Every figure says where it came from. "You reported" is the artist's own
+            // number (with the date they gave it). A platform figure is green "via YouTube"
+            // only while the scan is fresh; older ones carry their scan date in muted text,
+            // and hand-seeded rows name the report they were compiled from.
+            const platformOf = (k) => k.startsWith('youtube') ? 'youtube' : 'spotify';
+            const provenance = (k) => {
+                if (src[k] === 'self') return 'You reported' + (sr.updated_at ? ' · ' + new Date(sr.updated_at).toLocaleDateString() : '');
+                const p = prov[platformOf(k)];
+                if (p.kind === 'third') return 'via ' + p.label;
+                return 'via ' + p.label + (p.fresh ? '' : ' · last scanned ' + (p.scanned || 'unknown'));
+            };
+            const provColour = (k) => (src[k] === 'api' && prov[platformOf(k)].fresh) ? '#22c55e' : '#64748b';
             const secondary = HEADLINE.slice(1)
                 .filter(([k]) => typeof sr[k] === 'number')
                 .map(([k, label]) => `<div style="min-width:0;">
                     <div style="font-size:1.05rem;font-weight:700;color:#fff;">${sr[k].toLocaleString()}</div>
                     <div style="font-size:0.7rem;color:#94a3b8;">${esc(label)}</div>
+                    <div style="font-size:0.62rem;color:${provColour(k)};margin-top:2px;">${esc(provenance(k))}</div>
                 </div>`).join('');
 
             if (typeof listeners !== 'number' && !secondary) {
@@ -30585,8 +31009,11 @@ function toggleAgeRange(btn) {
                 : '';
             const name = sp.name
                 ? `<div style="font-size:0.95rem;font-weight:700;color:#fff;">${esc(sp.name)}</div>
-                   <div style="font-size:0.68rem;color:#64748b;">via Spotify</div>`
+                   <div style="font-size:0.68rem;color:#64748b;">${esc(prov.spotify.kind === 'third' ? 'via ' + prov.spotify.label : 'via Spotify')}</div>`
                 : '';
+            const anyApi   = Object.values(src).some((s) => s === 'api');
+            const anyThird = Object.values(src).some((s) => s === 'third');
+            const scanned  = row && row.last_fetched_at ? new Date(row.last_fetched_at).toLocaleDateString() : null;
 
             return `<div style="background:linear-gradient(90deg,rgba(29,185,84,0.12),rgba(6,182,212,0.08));border:1px solid rgba(29,185,84,0.35);border-radius:14px;padding:18px 20px;">
                 <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
@@ -30595,11 +31022,11 @@ function toggleAgeRange(btn) {
                         ${name}
                         ${typeof listeners === 'number' ? `
                             <div style="font-size:2rem;font-weight:800;color:#fff;line-height:1.1;margin-top:${name ? '6px' : '0'};">${listeners.toLocaleString()}</div>
-                            <div style="font-size:0.76rem;color:#94a3b8;">Monthly listeners</div>` : ''}
+                            <div style="font-size:0.76rem;color:#94a3b8;">Monthly listeners <span style="color:#64748b;">· ${esc(provenance('spotify_monthly_listeners'))}</span></div>` : ''}
                     </div>
                 </div>
                 ${secondary ? `<div style="display:flex;gap:22px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.08);">${secondary}</div>` : ''}
-                <div style="font-size:0.68rem;color:#64748b;margin-top:12px;">Your numbers${typeof (row && row.youtube_stats && row.youtube_stats.subscribers) === 'number' ? ', plus YouTube from the API' : ''}${sr.updated_at ? ' · updated ' + esc(new Date(sr.updated_at).toLocaleDateString()) : ''}</div>
+                <div style="font-size:0.68rem;color:#64748b;margin-top:12px;">"You reported" figures are yours${anyApi ? `; "via" figures came back from the platform${scanned ? ' on ' + esc(scanned) : ''}` : (anyThird ? '; the rest were compiled from a third-party report' : ' — no platform has returned live numbers yet')}.</div>
             </div>`;
         }
 
@@ -33793,13 +34220,19 @@ Be direct and concrete with real industry insight — never generic filler. When
     // Until now the table only ever held heartbeat/tool_open/session_start, so a
     // failed generation or a save that never landed looked exactly like a user
     // who wandered off. These two make the difference visible.
-    window.aiadTrackAction = function (action, metadata) {
+    // The surface is the caller's to name. This read currentTool() instead, which
+    // resolves AppState.currentPage at *insert* time rather than the tool the action
+    // fired from — so agent_submit and plan_pdf were filed under 'industry-selection'
+    // and 'sign-in', whichever onboarding page AppState still held. Deliberately no
+    // fallback: a call site that names no surface inserts null, so the gap is visible
+    // in usage_events instead of being papered over with a wrong tool name.
+    window.aiadTrackAction = function (action, tool, metadata) {
       try {
         if (!action) return;
         var meta = {}; for (var k in (metadata || {})) meta[k] = metadata[k];
         meta.action = action;
         touchSession();
-        track('action', currentTool(), meta);
+        track('action', (typeof tool === 'string' && tool) ? tool : null, meta);
       } catch (e) {}
     };
     window.aiadTrackError = function (message, metadata) {
@@ -44679,7 +45112,6 @@ window.AIAD_PROMPTS = [
   #streamingNav .dash-nav-item{padding:11px 12px !important;font-size:0.9rem;}
 }
 </style>
-
 <style id="aiad-store-css">
 /* ══════════════ STORE — luxury minimal grid + product drawer ══════════════
    Everything here is scoped under .aiad-store (the grid) or .aiad-pdrawer (the
