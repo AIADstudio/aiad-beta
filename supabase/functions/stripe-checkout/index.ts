@@ -196,7 +196,14 @@ serve(async (req) => {
             let foundingNumber: number | null = null;
             let isNew = false;
             let rateActive = false;
-            const { data: enr } = await supa.rpc("enroll_founding_artist", { p_user_id: user_id });
+            // The RPC error is NOT swallowed. While it was, a failing enrolment
+            // left rateActive false and the checkout went out at list price with
+            // no trial and no coupon — the same silent overcharge the coupon
+            // path refuses to allow. A live example: artist_profiles carries a
+            // unique index on founding_number, a stale mirror row sat on the
+            // founder's number, and the upsert inside the RPC raised 23505.
+            const { data: enr, error: enrErr } = await supa.rpc("enroll_founding_artist", { p_user_id: user_id });
+            if (enrErr) throw new Error(`enroll_founding_artist failed: ${enrErr.message}`);
             const row = Array.isArray(enr) ? enr[0] : enr;
             if (row && row.founding_number) {
                 foundingNumber = row.founding_number;
