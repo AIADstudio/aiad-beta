@@ -93,18 +93,20 @@ async function stripeGET(path: string) {
     return { ok: res.ok, data: await res.json() };
 }
 // ── Founding coupon ──────────────────────────────────────────────────────
-// Both coupons are duration=repeating, 12 months. Nothing here may create or
-// apply a forever discount. The code this replaces POSTed a fresh 30%/forever
-// coupon whenever one was missing, so the discount could not be retired:
-// deleting it in Stripe only got it recreated on the next artist checkout.
+// Both coupons are duration=repeating, 12 months, and their names stay under
+// Stripe's 40-character ceiling on coupon.name — a longer one is rejected
+// outright. Nothing here may create or apply a forever discount: the code
+// this replaces POSTed a fresh 30%/forever coupon whenever one was missing,
+// so the discount could not be retired — deleting it in Stripe only got it
+// recreated on the next artist checkout.
 const FOUNDING_COUPONS: Record<string, { id: string; env: string; percent: string; name: string }> = {
     month: {
         id: "FOUNDING20MONTH", env: "STRIPE_FOUNDING_COUPON_MONTH", percent: "20",
-        name: "AIAD Founding Artist — 20% off monthly for 12 months",
+        name: "AIAD Founding 20% monthly, 12 months",
     },
     year: {
         id: "FOUNDING30YEAR", env: "STRIPE_FOUNDING_COUPON_YEAR", percent: "30",
-        name: "AIAD Founding Artist — 30% off yearly for 12 months",
+        name: "AIAD Founding 30% yearly, 12 months",
     },
 };
 
