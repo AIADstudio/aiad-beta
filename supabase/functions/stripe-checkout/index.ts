@@ -9,7 +9,7 @@ const SERVICE_KEY   = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 //  First 100 artists to check out = the founding cohort. Each gets:
 //    • a permanent founding_number (assigned in signup order, 1..100)
 //    • a 30-day free trial
-//    • the STRIPE_FOUNDING_COUPON (30% off, forever)
+//    • the founding coupon: 20% off monthly or 30% off yearly, 12 months
 //  Artist tiers are priced by real Stripe price IDs ($29 / $59 / $99).
 //  Once the 100 spots are gone, artists pay standard price, no trial/coupon.
 //
@@ -62,8 +62,6 @@ const ARTIST_PRICE_ENV: Record<string, string> = {
     artist_premier: "PRICE_PREMIER",
 };
 
-const FALLBACK_COUPON_ID = "FOUNDING100LIFE"; // used only if STRIPE_FOUNDING_COUPON unset
-
 async function stripeAPI(path: string, body: URLSearchParams) {
     const res = await fetch(`https://api.stripe.com/v1${path}`, {
         method: "POST",
@@ -78,16 +76,42 @@ async function stripeGET(path: string) {
     const res = await fetch(`https://api.stripe.com/v1${path}`, { headers: { "Authorization": `Bearer ${STRIPE_SECRET}` } });
     return { ok: res.ok, data: await res.json() };
 }
-async function ensureFoundingCoupon(): Promise<string> {
-    const envId = Deno.env.get("STRIPE_FOUNDING_COUPON");
-    if (envId) return envId; // trust the configured coupon
-    const got = await stripeGET(`/coupons/${FALLBACK_COUPON_ID}`);
-    if (got.ok && got.data?.id) return FALLBACK_COUPON_ID;
-    await stripeAPI("/coupons", new URLSearchParams({
-        id: FALLBACK_COUPON_ID, percent_off: "30", duration: "forever",
-        name: "AIAD Founding Member — 30% for life",
+// ── Founding coupon ──────────────────────────────────────────────────────
+// Both coupons are duration=repeating, 12 months. Nothing here may create or
+// apply a forever discount. The code this replaces POSTed a fresh 30%/forever
+// coupon whenever one was missing, so the discount could not be retired:
+// deleting it in Stripe only got it recreated on the next artist checkout.
+const FOUNDING_COUPONS: Record<string, { id: string; env: string; percent: string; name: string }> = {
+    month: {
+        id: "FOUNDING20MONTH", env: "STRIPE_FOUNDING_COUPON_MONTH", percent: "20",
+        name: "AIAD Founding Artist — 20% off monthly for 12 months",
+    },
+    year: {
+        id: "FOUNDING30YEAR", env: "STRIPE_FOUNDING_COUPON_YEAR", percent: "30",
+        name: "AIAD Founding Artist — 30% off yearly for 12 months",
+    },
+};
+
+async function resolveFoundingCoupon(interval: string): Promise<string> {
+    const spec = FOUNDING_COUPONS[interval === "year" ? "year" : "month"];
+    const id = Deno.env.get(spec.env) || spec.id;
+
+    const got = await stripeGET(`/coupons/${encodeURIComponent(id)}`);
+    if (got.ok && got.data?.id) {
+        // An override pointing at a forever coupon is the thing being removed.
+        if (got.data.duration === "forever") {
+            throw new Error(`Founding coupon ${id} is duration=forever; refusing to apply it`);
+        }
+        return got.data.id;
+    }
+
+    // stripeAPI throws on any non-2xx, so a failed create fails the checkout.
+    const created = await stripeAPI("/coupons", new URLSearchParams({
+        id, percent_off: spec.percent, duration: "repeating", duration_in_months: "12",
+        name: spec.name,
     }));
-    return FALLBACK_COUPON_ID;
+    if (!created?.id) throw new Error(`Could not resolve founding coupon ${id}`);
+    return created.id;
 }
 
 serve(async (req) => {
@@ -117,7 +141,7 @@ serve(async (req) => {
             if (!priceId) throw new Error(`Artist price not configured: ${ARTIST_PRICE_ENV[plan]}`);
 
             // Claim a founding spot. is_new => first-time claim (grant trial);
-            // rate_active => still entitled to the 30%-off-forever coupon.
+            // rate_active => still entitled to the founding coupon.
             let foundingNumber: number | null = null;
             let isNew = false;
             let rateActive = false;
@@ -157,9 +181,13 @@ serve(async (req) => {
                 params.set("subscription_data[metadata][trial_days]", String(ARTIST_TRIAL_DAYS));
             }
             if (rateActive) {
-                // Entitled to the founding 30%-off-forever coupon.
-                const coupon = await ensureFoundingCoupon();
-                params.set("discounts[0][coupon]", coupon);
+                // Artist tiers check out monthly today, so this asks for
+                // FOUNDING20MONTH; the yearly work passes "year" and gets
+                // FOUNDING30YEAR. An unresolvable coupon throws out of this
+                // handler rather than falling through to full price: a founding
+                // artist silently charged list price is a refund and a support
+                // ticket, where an error is one retry.
+                params.set("discounts[0][coupon]", await resolveFoundingCoupon("month"));
             }
 
             let session;
