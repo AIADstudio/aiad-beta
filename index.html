@@ -31627,10 +31627,10 @@ function toggleAgeRange(btn) {
         // or granted.
         async function renderPricing() {
             // Delegates to AIADPricing so settings, onboarding and the deck cannot
-            // disagree. The body this replaced had two defects: it billed the founding
-            // discount as "30% off for life" (the term is 12 months), and it applied
-            // that discount to the yearly price as well as the monthly one, when yearly
-            // already carries two free months and is not discounted again.
+            // disagree. The body this replaced sold the founding discount as a
+            // permanent 30% cut, which was never the term. Founding terms are 20% off
+            // monthly or 30% off yearly, for 12 months, and AIADPricing is the only
+            // place they are written down.
             const mounts = document.querySelectorAll('.aiad-pricing-mount');
             if (!mounts.length || !window.AIADPricing) return;
             await AIADPricing.loadState();
@@ -42058,8 +42058,9 @@ window.AIAD_PROMPTS = [
 
     var FOUNDING_END = Date.parse('2026-09-30T23:59:59Z');   // same instant as claim_founding_spot
     var FOUNDING_SPOTS = 100;
-    var FOUNDING_DISCOUNT = 0.30;      // monthly only, 12 months, after the free window
-    var FOUNDING_DISCOUNT_MONTHS = 12;
+    var FOUNDING_DISCOUNT_MONTH = 0.20;   // monthly rate, after the free window
+    var FOUNDING_DISCOUNT_YEAR = 0.30;    // yearly rate, i.e. the first annual invoice
+    var FOUNDING_DISCOUNT_MONTHS = 12;    // both run 12 months
     var YEARLY_MONTHS_CHARGED = 10;    // pay 10, get 12
 
     var PLANS = [
@@ -42086,11 +42087,17 @@ window.AIAD_PROMPTS = [
 
     // ── Prices ──────────────────────────────────────────────────────────────
     function yearly(p) { return p.monthly * YEARLY_MONTHS_CHARGED; }
-    function foundingMonthly(p) { return Math.round(p.monthly * (1 - FOUNDING_DISCOUNT)); }
-    /* The founding discount is on the MONTHLY rate only. Yearly already carries
-       two free months, so it is not discounted again for founding members. */
+    function foundingMonthly(p) { return Math.round(p.monthly * (1 - FOUNDING_DISCOUNT_MONTH)); }
+    function foundingYearly(p) { return Math.round(yearly(p) * (1 - FOUNDING_DISCOUNT_YEAR)); }
+    /* Founding terms: 20% off monthly or 30% off yearly, each for 12 months. Yearly
+       is discounted on top of the two free months it already carries, which is why
+       the two percentages differ. */
     function priceFor(p, interval, founding) {
-        if (interval === 'year') return { amount: yearly(p), was: null, unit: '/yr' };
+        if (interval === 'year') {
+            return founding
+                ? { amount: foundingYearly(p), was: yearly(p), unit: '/yr' }
+                : { amount: yearly(p), was: null, unit: '/yr' };
+        }
         return founding
             ? { amount: foundingMonthly(p), was: p.monthly, unit: '/mo' }
             : { amount: p.monthly, was: null, unit: '/mo' };
@@ -42151,7 +42158,11 @@ window.AIAD_PROMPTS = [
 
     /* What a founding member actually pays, said plainly. Free first, then the
        discounted rate, then full price — three phases, so say all three. */
-    function foundingCopy(p) {
+    function foundingCopy(p, iv) {
+        if (iv === 'year') {
+            return 'Free until ' + endLabel() + ', then $' + foundingYearly(p)
+                 + ' for the first year, then $' + yearly(p) + '/yr.';
+        }
         return 'Free until ' + endLabel() + ', then $' + foundingMonthly(p) + '/mo for '
              + FOUNDING_DISCOUNT_MONTHS + ' months, then $' + p.monthly + '/mo.';
     }
@@ -42175,8 +42186,9 @@ window.AIAD_PROMPTS = [
               '<strong>$' + pr.amount + '</strong><span class="pt-unit">' + pr.unit + '</span>' +
             '</div>' +
             (interval === 'year'
-              ? '<div class="pt-note">' + YEARLY_MONTHS_CHARGED + ' months, 12 months of access</div>'
-              : (founding ? '<div class="pt-note pt-note-founding">' + esc(foundingCopy(p)) + '</div>' : '')) +
+              ? '<div class="pt-note">' + YEARLY_MONTHS_CHARGED + ' months, 12 months of access</div>' +
+                (founding ? '<div class="pt-note pt-note-founding">' + esc(foundingCopy(p, 'year')) + '</div>' : '')
+              : (founding ? '<div class="pt-note pt-note-founding">' + esc(foundingCopy(p, 'month')) + '</div>' : '')) +
             '<div class="pt-credits">' + p.credits.toLocaleString() + ' credits a month</div>' +
             '<p class="pt-pos">' + esc(p.positioning) + '</p>' +
             '<ul class="pt-features">' +
@@ -42203,8 +42215,8 @@ window.AIAD_PROMPTS = [
         if (founding && windowOpen()) {
             banner = '<div class="pt-strip">You\'re a Founding Artist' +
                 (state.foundingNumber ? ' — #' + state.foundingNumber : '') +
-                '. Free until ' + esc(endLabel()) + ', then 30% off for ' + FOUNDING_DISCOUNT_MONTHS +
-                ' months. <strong>' + daysLeft() + ' days left.</strong></div>';
+                '. Free until ' + esc(endLabel()) + ', then 20% off monthly or 30% off yearly, for ' +
+                FOUNDING_DISCOUNT_MONTHS + ' months. <strong>' + daysLeft() + ' days left.</strong></div>';
         } else if (windowOpen() && state.spotsLeft !== null && state.spotsLeft > 0) {
             banner = '<div class="pt-strip">Founding programme closes ' + esc(endLabel()) +
                 ' — <strong>' + state.spotsLeft + ' of ' + FOUNDING_SPOTS + ' spots left.</strong></div>';
@@ -42274,7 +42286,8 @@ window.AIAD_PROMPTS = [
         } else {
             cls = '';
             html = '<strong>Founding programme</strong>' +
-                '<span>Closes ' + esc(endLabel()) + '. Free until then, then 30% off for 12 months.</span>' +
+                '<span>Closes ' + esc(endLabel()) +
+                '. Free until then, then 20% off monthly or 30% off yearly, for 12 months.</span>' +
                 '<span class="fs-count">' + state.spotsLeft + ' of ' + FOUNDING_SPOTS + ' spots left · ' + d + ' days</span>';
         }
         if (!existing) {
