@@ -4066,6 +4066,8 @@ html, body {
                     </div>
                     <div class="dash-nav-submenu" id="creativeStudioSubmenu">
                         <div class="dash-nav-subitem" data-view="music" onclick="showArtistView('music');"><svg class="dash-nav-subicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg> Music Production</div>
+                        <div class="dash-nav-subitem" data-view="beatmarket" onclick="showArtistView('beatmarket');"><svg class="dash-nav-subicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg> Beat Market</div>
+                        <div class="dash-nav-subitem" data-view="beatvault" onclick="showArtistView('beatvault');"><svg class="dash-nav-subicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/><circle cx="12" cy="16" r="1.5"/></svg> Beat Vault</div>
                         <div class="dash-nav-subitem" data-view="songwriting" onclick="showArtistView('songwriting');"><svg class="dash-nav-subicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/></svg> Songwriting</div>
                         <div class="dash-nav-subitem" data-view="mixmedia" onclick="showArtistView('mixmedia');"><svg class="dash-nav-subicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg> Mix-Media</div>
                         <div class="dash-nav-subitem" data-view="clips" onclick="window.location.href='/clips';"><svg class="dash-nav-subicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg> Clip Studio</div>
@@ -5925,6 +5927,195 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                         <div class="sv-head-actions" id="svStudioActions" style="display:none;"></div>
                     </div>
                     <div id="svStudioBody"><div class="sv-muted">Loading…</div></div>
+                </div>
+
+                <!-- ══════ BEAT LEASING: marketplace ══════ -->
+                <!-- The grid comes from beat_market(), which is SECURITY DEFINER and selects
+                     only status='listed', so no draft can surface here however the view is
+                     opened. "From $X" is min_price_cents across the beat's ENABLED tiers;
+                     the real per-tier price and terms are read in the licence modal, which
+                     re-reads beat_licenses rather than trusting anything on the card. -->
+                <div class="dash-view" id="beatMarketView">
+                    <div class="view-header">
+                        <div>
+                            <h1 class="view-title">Beat Market</h1>
+                            <p class="view-subtitle">Lease or buy beats from AIAD producers. Preview first, licence second.</p>
+                        </div>
+                        <button class="bv-btn ghost" onclick="showFanView('myLicenses')">My Licenses</button>
+                    </div>
+
+                    <div class="bm-toolbar">
+                        <div class="bm-field bm-wide">
+                            <label for="bmSearch">Search</label>
+                            <input type="search" id="bmSearch" placeholder="Title, tag or genre" autocomplete="off">
+                        </div>
+                        <div class="bm-field">
+                            <label for="bmGenre">Genre</label>
+                            <select id="bmGenre"><option value="">All genres</option></select>
+                        </div>
+                        <div class="bm-row2">
+                            <div class="bm-field">
+                                <label for="bmBpmMin">BPM from</label>
+                                <input type="number" id="bmBpmMin" inputmode="numeric" min="20" max="400" placeholder="any">
+                            </div>
+                            <div class="bm-field">
+                                <label for="bmBpmMax">BPM to</label>
+                                <input type="number" id="bmBpmMax" inputmode="numeric" min="20" max="400" placeholder="any">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bm-actions">
+                        <button class="bv-btn" style="flex:1;" onclick="AIADBeats.applyFilters()">Apply filters</button>
+                        <button class="bv-btn ghost" onclick="AIADBeats.clearFilters()">Clear</button>
+                    </div>
+
+                    <div class="bm-grid" id="bmGrid"></div>
+                    <div id="bmMore" style="padding:4px 0 48px;text-align:center;"></div>
+                </div>
+
+                <!-- ══════ BEAT LEASING: producer vault ══════ -->
+                <!-- Order matters in createBeat(): the beats row is inserted FIRST because
+                     every storage path carries the beat id, and the deliverables go to the
+                     private beat-files bucket whose INSERT policy requires the first folder
+                     to be auth.uid(). The tagged preview and cover go to artist-media like
+                     every other public asset in the file. -->
+                <div class="dash-view" id="beatVaultView">
+                    <div class="view-header">
+                        <div>
+                            <h1 class="view-title">Beat Vault</h1>
+                            <p class="view-subtitle">Upload a beat, price its licences, then publish it to the market.</p>
+                        </div>
+                        <button class="bv-btn ghost" onclick="showArtistView('beatmarket')">Open market</button>
+                    </div>
+
+                    <div class="bv-card">
+                        <div class="bv-h">Upload beat</div>
+
+                        <div class="bv-grid">
+                            <div class="bm-field bm-wide">
+                                <label for="bvTitle">Title *</label>
+                                <input type="text" id="bvTitle" placeholder="Beat name" autocomplete="off" maxlength="120">
+                            </div>
+                            <div class="bm-field">
+                                <label for="bvBpm">BPM</label>
+                                <input type="number" id="bvBpm" inputmode="numeric" min="20" max="400" placeholder="140">
+                            </div>
+                            <div class="bm-field">
+                                <label for="bvKey">Key</label>
+                                <select id="bvKey">
+                                    <option value="">Any key</option>
+                                    <option>C Major</option><option>C# Major</option><option>D Major</option>
+                                    <option>D# Major</option><option>E Major</option><option>F Major</option>
+                                    <option>F# Major</option><option>G Major</option><option>G# Major</option>
+                                    <option>A Major</option><option>A# Major</option><option>B Major</option>
+                                    <option>C Minor</option><option>C# Minor</option><option>D Minor</option>
+                                    <option>D# Minor</option><option>E Minor</option><option>F Minor</option>
+                                    <option>F# Minor</option><option>G Minor</option><option>G# Minor</option>
+                                    <option>A Minor</option><option>A# Minor</option><option>B Minor</option>
+                                </select>
+                            </div>
+                            <div class="bm-field">
+                                <label for="bvGenre">Genre</label>
+                                <input type="text" id="bvGenre" list="bvGenreList" placeholder="Hip-Hop" autocomplete="off" maxlength="60">
+                                <datalist id="bvGenreList">
+                                    <option>Hip-Hop</option><option>Trap</option><option>Drill</option>
+                                    <option>R&amp;B / Soul</option><option>Afrobeats</option><option>Amapiano</option>
+                                    <option>Dancehall</option><option>Reggaeton</option><option>Pop</option>
+                                    <option>Electronic</option><option>House</option><option>Drum &amp; Bass</option>
+                                    <option>Lo-fi</option><option>Jazz</option><option>Rock</option>
+                                </datalist>
+                            </div>
+                            <div class="bm-field bm-wide">
+                                <label for="bvMoods">Moods <span style="text-transform:none;letter-spacing:0;">(comma separated)</span></label>
+                                <input type="text" id="bvMoods" placeholder="dark, cinematic, confident" autocomplete="off">
+                            </div>
+                            <div class="bm-field bm-wide">
+                                <label for="bvTags">Tags <span style="text-transform:none;letter-spacing:0;">(comma separated — these are searchable)</span></label>
+                                <input type="text" id="bvTags" placeholder="drake type beat, 808, melodic" autocomplete="off">
+                            </div>
+                            <div class="bm-field bm-wide">
+                                <label for="bvDesc">Description</label>
+                                <textarea id="bvDesc" rows="3" placeholder="What the beat is for, how it was made, anything a buyer should know." style="resize:vertical;"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="bv-h" style="margin-top:20px;">Cover &amp; preview</div>
+                        <div class="bv-file">
+                            <div>
+                                <div class="bv-fname">Cover art</div>
+                                <div class="bv-fhint" id="bvCoverName">No file chosen — a square image works best</div>
+                            </div>
+                            <label class="bv-pick">Choose<input type="file" id="bvCover" accept="image/*" style="display:none;" onchange="AIADBeats.pickedFile(this,'bvCoverName')"></label>
+                        </div>
+                        <div class="bv-file">
+                            <div>
+                                <div class="bv-fname">Tagged preview *</div>
+                                <div class="bv-fhint" id="bvPreviewName">No file chosen — this is the public, tagged audio</div>
+                            </div>
+                            <label class="bv-pick">Choose<input type="file" id="bvPreview" accept="audio/*" style="display:none;" onchange="AIADBeats.pickedFile(this,'bvPreviewName')"></label>
+                        </div>
+
+                        <div class="bv-h" style="margin-top:20px;">Deliverables <span style="text-transform:none;letter-spacing:0;font-weight:400;">— private, released on purchase</span></div>
+                        <div class="bv-file">
+                            <div>
+                                <div class="bv-fname">Untagged MP3</div>
+                                <div class="bv-fhint" id="bvF_mp3_untagged">No file chosen</div>
+                            </div>
+                            <label class="bv-pick">Choose<input type="file" id="bvFile_mp3_untagged" accept="audio/*" style="display:none;" onchange="AIADBeats.pickedFile(this,'bvF_mp3_untagged')"></label>
+                        </div>
+                        <div class="bv-file">
+                            <div>
+                                <div class="bv-fname">WAV master</div>
+                                <div class="bv-fhint" id="bvF_wav">No file chosen</div>
+                            </div>
+                            <label class="bv-pick">Choose<input type="file" id="bvFile_wav" accept="audio/*,.wav" style="display:none;" onchange="AIADBeats.pickedFile(this,'bvF_wav')"></label>
+                        </div>
+                        <div class="bv-file">
+                            <div>
+                                <div class="bv-fname">Stems (ZIP)</div>
+                                <div class="bv-fhint" id="bvF_stems_zip">No file chosen</div>
+                            </div>
+                            <label class="bv-pick">Choose<input type="file" id="bvFile_stems_zip" accept=".zip,application/zip" style="display:none;" onchange="AIADBeats.pickedFile(this,'bvF_stems_zip')"></label>
+                        </div>
+                        <div class="bv-file">
+                            <div>
+                                <div class="bv-fname">MIDI</div>
+                                <div class="bv-fhint" id="bvF_midi">No file chosen</div>
+                            </div>
+                            <label class="bv-pick">Choose<input type="file" id="bvFile_midi" accept=".mid,.midi,audio/midi" style="display:none;" onchange="AIADBeats.pickedFile(this,'bvF_midi')"></label>
+                        </div>
+                        <div class="bv-file">
+                            <div>
+                                <div class="bv-fname">Project file</div>
+                                <div class="bv-fhint" id="bvF_project_file">No file chosen — the session a buy-out gets</div>
+                            </div>
+                            <label class="bv-pick">Choose<input type="file" id="bvFile_project_file" style="display:none;" onchange="AIADBeats.pickedFile(this,'bvF_project_file')"></label>
+                        </div>
+
+                        <label class="bv-check"><input type="checkbox" id="bvSample"> This beat contains an uncleared sample</label>
+                        <label class="bv-check"><input type="checkbox" id="bvFree"> Offer a free tagged download</label>
+
+                        <button class="bv-btn" id="bvCreateBtn" style="width:100%;margin-top:16px;" onclick="AIADBeats.createBeat()">Create draft &amp; price licences</button>
+                        <div id="bvCreateMsg" class="bv-msg"></div>
+                    </div>
+
+                    <div class="bv-card" id="bvTierCard" style="display:none;">
+                        <div class="bv-h">Licence tiers — <span id="bvTierBeatName" style="color:var(--text-secondary);text-transform:none;letter-spacing:0;"></span></div>
+                        <div style="font-size:0.76rem;color:var(--text-muted);line-height:1.55;margin-bottom:12px;">
+                            Eight tiers are seeded at their default price. Set your own price per tier and switch off the ones you don't want to sell. Changes save as you make them.
+                        </div>
+                        <div id="bvTierList"></div>
+                        <div class="bm-actions" style="margin-top:16px;">
+                            <button class="bv-btn" id="bvPublishBtn" style="flex:1;" onclick="AIADBeats.publish()">Publish to market</button>
+                            <button class="bv-btn ghost" onclick="AIADBeats.closeTiers()">Done</button>
+                        </div>
+                        <div id="bvTierMsg" class="bv-msg"></div>
+                    </div>
+
+                    <div class="bv-card">
+                        <div class="bv-h">My beats</div>
+                        <div id="bvBeatList"><div class="bm-empty">Loading…</div></div>
+                    </div>
                 </div>
 
                 
@@ -8873,6 +9064,10 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                         <svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
                         <span>My Orders</span>
                     </div>
+                    <div class="dash-nav-item" onclick="showFanView('myLicenses')">
+                        <svg class="dash-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                        <span>My Licenses</span>
+                    </div>
                 </nav>
                 <div class="dash-sidebar-footer">
                     <div class="dash-user-profile" onclick="showFanView('settings')" style="cursor: pointer;" title="Profile & Settings">
@@ -9279,6 +9474,28 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                         </div>
                     </div>
                     <div id="fanOrdersList"></div>
+                </div>
+
+                <!-- ══════ BEAT LEASING: buyer's licences ══════ -->
+                <!-- my_beat_licenses() returns the buyer's own paid licences with the terms
+                     SNAPSHOT taken at sale time, not today's tier terms — a producer who
+                     re-prices or re-words a tier later cannot change what was sold. The
+                     per-deliverable download rows come from beat_files, whose SELECT policy
+                     (has_beat_file_access) already limits a buyer to the kinds their tier
+                     actually includes. -->
+                <div class="dash-view" id="myLicensesView">
+                    <div class="view-header">
+                        <div>
+                            <h1 class="view-title">My Licenses</h1>
+                            <p class="view-subtitle">Every beat licence you hold, with its terms and files.</p>
+                        </div>
+                        <!-- Not showArtistView() directly: that only toggles .active on a
+                             view inside #artistDashboard, which is display:none while the fan
+                             dashboard is up, so the click would look dead. gotoMarket()
+                             surfaces the dashboard first, the way showFanView does. -->
+                        <button class="bv-btn ghost" onclick="AIADBeats.gotoMarket()">Beat Market</button>
+                    </div>
+                    <div id="myLicensesList"><div class="bm-empty">Loading…</div></div>
                 </div>
 
                 <div class="dash-view" id="fanSettingsView">
@@ -15263,7 +15480,7 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 try { window.aiadLoadAgentConvos && window.aiadLoadAgentConvos(); } catch (e) {}
             }, 0);
 
-            const allViews = ['artistCatalogView', 'artistReviewView', 'artistPlanView', 'artistHomeView', 'artistPostsView', 'artistSupportersView', 'artistProjectsView', 'artistMoneyView', 'artistAnalyticsHubView', 'artistScheduleView', 'artistCollaboratorsView', 'artistMusicView', 'artistSongwritingView', 'artistMixMediaView', 'artistStoreHubView', 'artistMilestonesView', 'artistAgentsView', 'artistInboxView', 'artistSettingsView', 'episodesView', 'publishView', 'liveView', 'podcastStudioView'];
+            const allViews = ['artistCatalogView', 'artistReviewView', 'artistPlanView', 'artistHomeView', 'artistPostsView', 'artistSupportersView', 'artistProjectsView', 'artistMoneyView', 'artistAnalyticsHubView', 'artistScheduleView', 'artistCollaboratorsView', 'artistMusicView', 'artistSongwritingView', 'artistMixMediaView', 'artistStoreHubView', 'artistMilestonesView', 'artistAgentsView', 'artistInboxView', 'artistSettingsView', 'episodesView', 'publishView', 'liveView', 'podcastStudioView', 'beatMarketView', 'beatVaultView'];
             allViews.forEach(v => {
                 const el = document.getElementById(v);
                 if (el) el.classList.remove('active');
@@ -15338,7 +15555,11 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 'publish': 'publishView',
                 'live': 'liveView',
                 'podcaststudio': 'podcastStudioView',
-                'brandbriefs': 'artistCollaboratorsView'
+                'brandbriefs': 'artistCollaboratorsView',
+                // Beat leasing. Two Creative Studio surfaces: the market a buyer
+                // browses and the vault a producer lists from.
+                'beatmarket': 'beatMarketView',
+                'beatvault': 'beatVaultView'
             };
 
             const viewId = viewIdMap[view];
@@ -15417,6 +15638,18 @@ document.addEventListener("click",function(e){var w=document.getElementById("acc
                 if (submenu) submenu.classList.add('open');
                 markSub('mixmedia');
                 // history rendered by generation callback
+            } else if (view === 'beatmarket') {
+                viewEl.classList.add('active');
+                if (dropdown) dropdown.classList.add('open');
+                if (submenu) submenu.classList.add('open');
+                markSub('beatmarket');
+                setTimeout(function () { try { window.AIADBeats && AIADBeats.openMarket(); } catch (e) { console.warn('[AIAD] beat market load failed:', e); } }, 40);
+            } else if (view === 'beatvault') {
+                viewEl.classList.add('active');
+                if (dropdown) dropdown.classList.add('open');
+                if (submenu) submenu.classList.add('open');
+                markSub('beatvault');
+                setTimeout(function () { try { window.AIADBeats && AIADBeats.openVault(); } catch (e) { console.warn('[AIAD] beat vault load failed:', e); } }, 40);
             } else if (view === 'catalog' || view === 'library'
                        || view === 'distribute' || view === 'synclibrary') {
                 viewEl.classList.add('active');
@@ -27396,6 +27629,7 @@ function showFanView(view) {
         myCreators:'fanArtistsView', discover:'fanDiscoverView',
         community:'fanCommunityView', artist:'fanArtistView', settings:'fanSettingsView',
         mySupport:'fanArtistsView', following:'fanArtistsView', orders:'fanOrdersView',
+        myLicenses:'myLicensesView',
     };
     const viewId = viewMap[view] || null;
     const viewEl = viewId ? document.getElementById(viewId) : null;
@@ -27427,7 +27661,7 @@ function showFanView(view) {
     if (rs && view !== 'settings') rs.style.display = 'block';
     const navItems = document.querySelectorAll('#fanDashboard .dash-nav-item');
     navItems.forEach(n => n.classList.remove('active'));
-    const navIdx = { home:0, feed:1, myCreators:2, mySupport:2, following:2, artists:2, discover:3, community:4, orders:5 };
+    const navIdx = { home:0, feed:1, myCreators:2, mySupport:2, following:2, artists:2, discover:3, community:4, orders:5, myLicenses:6 };
     if (navIdx[view] !== undefined && navItems[navIdx[view]]) navItems[navIdx[view]].classList.add('active');
     if (view==='home')    setTimeout(() => { loadFanHomeFeed(); loadFanSupportGrid(); loadFanSidebarPledges(); loadFanSidebarDiscovery(); }, 100);
     if (view==='feed')    setTimeout(() => loadFanFeed(), 100);
@@ -27435,6 +27669,7 @@ function showFanView(view) {
     if (view==='discover') setTimeout(() => _execDiscoverSearch(), 100);
     if (view==='settings') setTimeout(() => applyFanSettingsProfile(), 100);
     if (view==='orders')  setTimeout(() => { if (window.loadMyOrders) loadMyOrders('fanOrdersList'); }, 100);
+    if (view==='myLicenses') setTimeout(() => { try { window.AIADBeats && AIADBeats.openLicenses(); } catch (e) { console.warn('[AIAD] licences load failed:', e); } }, 100);
 }
 
 // Back off an artist page. showFanView records the dashboard we came from, so
@@ -47527,6 +47762,1164 @@ body.aiad-pdrawer-lock{overflow:hidden;}
     }
 
     window.AIADAgentExport = { run: run };
+})();
+</script>
+<style id="aiad-beats-css">
+/* ══════════════ BEAT LEASING ══════════════
+   Mobile-first: every grid starts at one or two columns and only widens at 760px.
+   Namespaced .bm-/.bv-/.bl- so nothing here can reach an existing view, and placed
+   before the streaming theme block so that block still wins its token remap. */
+
+/* ── market toolbar ── */
+.bm-toolbar{display:flex;flex-direction:column;gap:10px;margin-bottom:12px;}
+.bm-field{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:9px 13px;display:flex;flex-direction:column;gap:3px;min-width:0;}
+.bm-field label{font-size:0.6rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);}
+.bm-field input,.bm-field select,.bm-field textarea{background:transparent;border:none;outline:none;color:var(--text-primary);font-size:0.875rem;font-family:inherit;width:100%;min-width:0;padding:0;}
+.bm-field select{cursor:pointer;appearance:none;-webkit-appearance:none;}
+.bm-field select option{background:#1a1a2e;}
+.bm-field input::placeholder,.bm-field textarea::placeholder{color:var(--text-hint);}
+.bm-row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.bm-actions{display:flex;gap:8px;margin-bottom:18px;}
+
+/* ── market grid ── */
+.bm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:12px;}
+.bm-card{background:var(--bg-card);border:1px solid var(--border-default);border-radius:14px;overflow:hidden;cursor:pointer;display:flex;flex-direction:column;transition:border-color .15s;}
+.bm-card:hover{border-color:var(--border-hover);}
+.bm-cover{position:relative;aspect-ratio:1/1;background:linear-gradient(135deg,rgba(0,180,216,0.18),rgba(255,0,255,0.14));}
+.bm-cover img{width:100%;height:100%;object-fit:cover;display:block;}
+.bm-play{position:absolute;bottom:8px;left:8px;width:36px;height:36px;border-radius:50%;border:none;cursor:pointer;background:linear-gradient(135deg,var(--teal),var(--teal-dark));color:#041014;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(0,0,0,0.45);padding:0;}
+.bm-play svg{width:12px;height:12px;}
+.bm-stems{position:absolute;top:8px;right:8px;font-size:0.55rem;letter-spacing:0.08em;text-transform:uppercase;padding:3px 7px;border-radius:999px;background:rgba(0,0,0,0.6);color:var(--teal-light);border:1px solid rgba(0,212,255,0.35);}
+.bm-body{padding:10px 12px 12px;display:flex;flex-direction:column;gap:5px;flex:1;min-width:0;}
+.bm-title{font-size:0.86rem;font-weight:600;color:var(--text-primary);line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bm-producer{font-size:0.71rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bm-meta{font-size:0.7rem;color:var(--text-secondary);display:flex;flex-wrap:wrap;gap:2px 8px;}
+.bm-chips{display:flex;flex-wrap:wrap;gap:4px;}
+.bm-chip{font-size:0.58rem;padding:2px 7px;border-radius:999px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.25);color:var(--teal-light);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;}
+.bm-price{margin-top:auto;padding-top:7px;font-size:0.82rem;font-weight:700;background:linear-gradient(135deg,var(--teal-light),var(--magenta-light));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+.bm-empty{padding:32px 14px;text-align:center;color:var(--text-muted);font-size:0.85rem;line-height:1.6;}
+
+/* ── licence modal ── */
+.bl-head{display:flex;gap:12px;align-items:center;margin-bottom:16px;}
+.bl-head img{width:56px;height:56px;border-radius:10px;object-fit:cover;flex-shrink:0;background:linear-gradient(135deg,rgba(0,180,216,0.2),rgba(255,0,255,0.15));}
+.bl-tier{border:1px solid var(--border-default);border-radius:12px;padding:12px 14px;margin-bottom:10px;background:rgba(255,255,255,0.03);}
+.bl-tier.open{border-color:rgba(0,212,255,0.4);background:rgba(0,212,255,0.04);}
+.bl-tierhead{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;cursor:pointer;}
+.bl-tiername{font-size:0.9rem;font-weight:600;color:var(--text-primary);}
+.bl-tiersum{font-size:0.72rem;color:var(--text-muted);margin-top:3px;line-height:1.45;}
+.bl-tierprice{font-size:0.95rem;font-weight:700;color:var(--teal-light);white-space:nowrap;}
+.bl-body{margin-top:11px;border-top:1px solid var(--border-default);padding-top:9px;}
+.bl-sub{font-size:0.6rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin:0 0 5px;}
+.bl-term{display:flex;justify-content:space-between;gap:12px;padding:5px 0;font-size:0.76rem;border-bottom:1px solid rgba(255,255,255,0.05);}
+.bl-term:last-child{border-bottom:none;}
+.bl-termk{color:var(--text-muted);}
+.bl-termv{color:var(--text-primary);font-weight:500;text-align:right;}
+.bl-deliv{display:flex;flex-wrap:wrap;gap:5px;margin:4px 0 2px;}
+.bl-dchip{font-size:0.62rem;padding:3px 9px;border-radius:999px;background:rgba(255,255,255,0.06);border:1px solid var(--border-default);color:var(--text-secondary);}
+.bl-buy{width:100%;margin-top:12px;padding:11px;border:none;border-radius:10px;background:linear-gradient(135deg,var(--teal),var(--magenta-dark));color:#fff;font-size:0.84rem;font-weight:700;cursor:pointer;font-family:inherit;}
+.bl-buy:disabled{opacity:.5;cursor:default;}
+.bl-quote{margin-top:10px;padding:11px 13px;border-radius:10px;background:rgba(0,212,255,0.07);border:1px solid rgba(0,212,255,0.22);font-size:0.76rem;color:var(--text-secondary);line-height:1.7;}
+.bl-quote b{color:var(--text-primary);}
+.bl-warn{margin-top:10px;padding:10px 12px;border-radius:10px;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.3);font-size:0.74rem;color:#fcd34d;line-height:1.55;}
+
+/* ── licence list (buyer) ── */
+.bl-lic{background:var(--bg-card);border:1px solid var(--border-default);border-radius:16px;padding:15px;margin-bottom:12px;}
+.bl-licnum{font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:9px;}
+.bl-licrow{display:grid;grid-template-columns:52px 1fr;gap:12px;align-items:center;}
+.bl-licrow img{width:52px;height:52px;border-radius:9px;object-fit:cover;background:linear-gradient(135deg,rgba(0,180,216,0.2),rgba(255,0,255,0.15));}
+.bl-dl{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px;}
+.bl-dlbtn{display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:9px;border:1px solid var(--border-hover);background:rgba(255,255,255,0.04);color:var(--text-primary);font-size:0.74rem;font-weight:500;cursor:pointer;font-family:inherit;}
+.bl-dlbtn:hover{border-color:var(--teal);color:var(--teal-light);}
+.bl-dlbtn:disabled{opacity:.45;cursor:default;}
+.bl-dlbtn svg{width:13px;height:13px;flex-shrink:0;}
+
+/* ── vault ── */
+.bv-card{background:var(--bg-card);border:1px solid var(--border-default);border-radius:16px;padding:16px;margin-bottom:14px;}
+.bv-h{font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:12px;}
+.bv-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.bm-wide{grid-column:1/-1;}
+.bv-file{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.05);}
+.bv-fname{font-size:0.8rem;color:var(--text-primary);font-weight:500;}
+.bv-fhint{font-size:0.68rem;color:var(--text-muted);margin-top:2px;line-height:1.4;word-break:break-word;}
+.bv-pick{padding:7px 13px;border-radius:9px;border:1px solid var(--border-hover);background:transparent;color:var(--text-secondary);font-size:0.72rem;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0;}
+.bv-pick:hover{border-color:var(--teal);color:var(--teal-light);}
+.bv-check{display:flex;align-items:center;gap:9px;margin-top:14px;font-size:0.78rem;color:var(--text-secondary);cursor:pointer;}
+.bv-check input{width:16px;height:16px;accent-color:var(--teal);flex-shrink:0;}
+.bv-btn{padding:10px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--teal),var(--teal-dark));color:#041014;font-size:0.8rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
+.bv-btn.ghost{background:transparent;border:1px solid var(--border-hover);color:var(--text-secondary);font-weight:500;}
+.bv-btn.ghost:hover{border-color:var(--teal);color:var(--teal-light);}
+.bv-btn:disabled{opacity:.5;cursor:default;}
+.bv-msg{font-size:0.76rem;line-height:1.55;margin-top:10px;color:var(--text-secondary);}
+.bv-msg.err{color:#fca5a5;}
+.bv-msg.ok{color:var(--teal-light);}
+.bv-tierrow{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;padding:11px 0;border-bottom:1px solid rgba(255,255,255,0.05);}
+.bv-tiername{font-size:0.8rem;font-weight:600;color:var(--text-primary);}
+.bv-tierdel{font-size:0.66rem;color:var(--text-muted);margin-top:2px;line-height:1.4;}
+.bv-price-in{width:96px;background:rgba(255,255,255,0.05);border:1px solid var(--border-default);border-radius:8px;padding:7px 9px;color:var(--text-primary);font-size:0.8rem;font-family:inherit;text-align:right;}
+.bv-price-in:focus{outline:none;border-color:var(--teal);}
+.bv-sw{position:relative;width:40px;height:22px;border-radius:999px;border:none;cursor:pointer;background:rgba(255,255,255,0.14);transition:background .15s;flex-shrink:0;padding:0;}
+.bv-sw.on{background:var(--teal);}
+.bv-sw::after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .15s;}
+.bv-sw.on::after{transform:translateX(18px);}
+.bv-beat{display:grid;grid-template-columns:48px 1fr;gap:11px;align-items:center;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.06);}
+.bv-beat:last-child{border-bottom:none;}
+.bv-thumb{width:48px;height:48px;border-radius:9px;object-fit:cover;background:linear-gradient(135deg,rgba(0,180,216,0.2),rgba(255,0,255,0.15));}
+.bv-bmeta{font-size:0.7rem;color:var(--text-muted);margin-top:3px;display:flex;flex-wrap:wrap;gap:2px 9px;align-items:center;}
+.bv-status{font-size:0.57rem;text-transform:uppercase;letter-spacing:0.08em;padding:3px 8px;border-radius:999px;border:1px solid var(--border-hover);color:var(--text-muted);white-space:nowrap;}
+.bv-status.listed{border-color:var(--teal);color:var(--teal-light);}
+.bv-status.exclusive_sold,.bv-status.bought_out{border-color:var(--magenta-dark);color:var(--magenta-light);}
+.bv-bactions{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px;grid-column:1/-1;}
+
+@media (min-width:760px){
+  .bm-toolbar{flex-direction:row;align-items:flex-end;}
+  .bm-toolbar>.bm-field{flex:1;}
+  .bm-toolbar>.bm-field.bm-wide{flex:1.6;grid-column:auto;}
+  .bm-toolbar>.bm-row2{flex:1;}
+  .bm-actions{max-width:420px;}
+  .bm-grid{grid-template-columns:repeat(auto-fill,minmax(186px,1fr));gap:16px;}
+  .bv-beat{grid-template-columns:48px 1fr auto;}
+  .bv-bactions{grid-column:auto;margin-top:0;}
+}
+</style>
+<script>
+/* ══════════════ BEAT LEASING ══════════════
+   Three surfaces over the beats / beat_files / beat_licenses / beat_license_sales /
+   license_tiers schema: the market (#beatMarketView), the producer's vault
+   (#beatVaultView) and the buyer's licences (#myLicensesView).
+
+   What the server owns, and why nothing here duplicates it:
+     • beat_market() is SECURITY DEFINER and selects only status='listed', so the
+       grid cannot show a draft however it is called.
+     • beat_sale_quote() is the only price that counts. The modal shows prices read
+       from beat_licenses, but the quote is re-asked before checkout because a tier
+       can be re-priced or switched off between the grid loading and the Buy click.
+     • beat_license_sales has SELECT policies and no client INSERT policy, by design:
+       a licence can only be minted server-side. window.aiadBeatCheckout is the seam
+       that route drops into; the stub below charges nothing and says so.
+     • beat_files' SELECT policy (has_beat_file_access) already limits a buyer to the
+       kinds their paid tier includes, so the download list is the entitlement — it
+       is not filtered again on the client.                                        */
+(function () {
+    'use strict';
+
+    var PAGE = 24;
+    var S = {
+        rows: [], offset: 0, done: false, loading: false, filters: null,
+        beatId: null, beat: null,          // licence modal subject
+        tierBeat: null,                    // vault tier editor subject
+        files: {}, titles: {}              // my-licences deliverables, by beat
+    };
+
+    function db() { return window.db; }
+    function $(id) { return document.getElementById(id); }
+    function uid() { try { return window.aiadResolvedUserId ? window.aiadResolvedUserId() : null; } catch (e) { return null; } }
+    function toast(m) { try { (window.showToast || function (x) { console.log('[AIAD beats]', x); })(m); } catch (e) {} }
+    function report(op, detail, err) { try { window.__aiadReportError && window.__aiadReportError(op, detail, err); } catch (e) {} }
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+    function say(el, text, cls) {
+        if (!el) return;
+        el.textContent = text || '';
+        el.className = 'bv-msg' + (cls ? ' ' + cls : '');
+    }
+    function money(c) {
+        c = Number(c);
+        if (!isFinite(c)) return '—';
+        var d = c / 100;
+        return '$' + (c % 100 === 0
+            ? d.toLocaleString('en-US')
+            : d.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    }
+    function bytes(n) {
+        n = Number(n) || 0;
+        if (n < 1024) return n + ' B';
+        if (n < 1048576) return (n / 1024).toFixed(0) + ' KB';
+        if (n < 1073741824) return (n / 1048576).toFixed(1) + ' MB';
+        return (n / 1073741824).toFixed(2) + ' GB';
+    }
+    function fmtDur(s) {
+        s = Number(s); if (!isFinite(s) || s <= 0) return '';
+        var m = Math.floor(s / 60), r = Math.floor(s % 60);
+        return m + ':' + (r < 10 ? '0' : '') + r;
+    }
+    function fmtDate(iso) {
+        try { return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
+        catch (e) { return ''; }
+    }
+
+    var ICON_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+    var ICON_DL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+
+    var DELIV = {
+        mp3_untagged: { label: 'Untagged MP3', ext: 'mp3' },
+        wav:          { label: 'WAV master',   ext: 'wav' },
+        stems_zip:    { label: 'Stems (ZIP)',  ext: 'zip' },
+        midi:         { label: 'MIDI',         ext: 'mid' },
+        project_file: { label: 'Project file', ext: 'zip' }
+    };
+    var DELIV_ORDER = ['mp3_untagged', 'wav', 'stems_zip', 'midi', 'project_file'];
+    function delivLabel(k) { return (DELIV[k] && DELIV[k].label) || String(k || '').replace(/_/g, ' '); }
+
+    /* The six rows the spec names, in its order, then every other key the tier
+       carries. The remainder is not padding: 'exclusive' and 'transfers_master' are
+       the whole difference between a lease and a buy-out, and hiding them would
+       misdescribe what someone is about to buy. */
+    var TERM_ORDER = ['streams', 'distribution_copies', 'music_videos', 'radio_stations', 'broadcast_sync', 'term_years'];
+    var TERM_LABEL = {
+        streams: 'Streams', distribution_copies: 'Distribution copies', music_videos: 'Music videos',
+        radio_stations: 'Radio stations', broadcast_sync: 'Broadcast / sync', term_years: 'Term',
+        exclusive: 'Exclusive', credit_required: 'Producer credit required',
+        live_performance: 'Live performance', transfers_master: 'Transfers the master',
+        prior_leases_survive: 'Leases already sold stay valid'
+    };
+    function termLabel(k) {
+        return TERM_LABEL[k] || String(k).replace(/_/g, ' ').replace(/^./, function (c) { return c.toUpperCase(); });
+    }
+    function termValue(k, v) {
+        if (v === true) return 'Yes';
+        if (v === false) return 'No';
+        if (v === null || v === undefined || v === '') return '—';
+        if (v === 'unlimited') return 'Unlimited';
+        if (v === 'perpetual') return 'Perpetual';
+        if (k === 'term_years' && typeof v === 'number') return v + (v === 1 ? ' year' : ' years');
+        if (typeof v === 'number') return v.toLocaleString('en-US');
+        return String(v).replace(/-/g, ' ').replace(/^./, function (c) { return c.toUpperCase(); });
+    }
+    function termRows(terms) {
+        if (!terms || typeof terms !== 'object') return '<div class="bl-term"><span class="bl-termk">Terms</span><span class="bl-termv">—</span></div>';
+        var keys = TERM_ORDER.filter(function (k) { return Object.prototype.hasOwnProperty.call(terms, k); })
+            .concat(Object.keys(terms).filter(function (k) { return TERM_ORDER.indexOf(k) < 0; }).sort());
+        if (!keys.length) return '<div class="bl-term"><span class="bl-termk">Terms</span><span class="bl-termv">—</span></div>';
+        return keys.map(function (k) {
+            return '<div class="bl-term"><span class="bl-termk">' + esc(termLabel(k)) +
+                   '</span><span class="bl-termv">' + esc(termValue(k, terms[k])) + '</span></div>';
+        }).join('');
+    }
+    function delivChips(list) {
+        if (!list || !list.length) return '<span class="bl-dchip">—</span>';
+        return list.map(function (k) { return '<span class="bl-dchip">' + esc(delivLabel(k)) + '</span>'; }).join('');
+    }
+
+    /* ─────────────────────────── market ─────────────────────────── */
+
+    function filtersFromDom() {
+        var num = function (id) {
+            var el = $(id); if (!el || el.value === '') return null;
+            var v = parseInt(el.value, 10);
+            return isFinite(v) ? v : null;
+        };
+        var s = $('bmSearch'), g = $('bmGenre');
+        return {
+            genre: (g && g.value) || null,
+            search: (s && s.value.trim()) || null,
+            bpmMin: num('bmBpmMin'),
+            bpmMax: num('bmBpmMax')
+        };
+    }
+
+    async function loadGenres() {
+        var sel = $('bmGenre');
+        if (!sel || sel.getAttribute('data-filled') === '1') return;
+        /* Built from the beats actually on the market. beat_market matches genre with
+           '=', so a hand-written list would quietly filter everything out the moment a
+           producer typed their genre differently. */
+        var r = await db().from('beats').select('genre').eq('status', 'listed').not('genre', 'is', null);
+        if (r.error) { report('select.beats', 'beat genres', r.error); return; }
+        var seen = {}, out = [];
+        (r.data || []).forEach(function (x) {
+            var g = String(x.genre || '').trim();
+            if (g && !seen[g.toLowerCase()]) { seen[g.toLowerCase()] = 1; out.push(g); }
+        });
+        out.sort(function (a, b) { return a.localeCompare(b); });
+        var keep = sel.value;
+        sel.innerHTML = '<option value="">All genres</option>' + out.map(function (g) {
+            return '<option value="' + esc(g) + '">' + esc(g) + '</option>';
+        }).join('');
+        if (keep) sel.value = keep;
+        sel.setAttribute('data-filled', '1');
+    }
+
+    async function loadMarket(reset) {
+        var grid = $('bmGrid'), more = $('bmMore');
+        if (!grid || S.loading) return;
+        if (reset) {
+            S.rows = []; S.offset = 0; S.done = false; S.filters = filtersFromDom();
+            grid.innerHTML = '<div class="bm-empty">Loading the market…</div>';
+        }
+        if (S.done) return;
+        S.loading = true;
+        if (more && !reset) more.innerHTML = '<div style="color:var(--text-muted);font-size:0.78rem;padding:10px 0;">Loading…</div>';
+        var f = S.filters || filtersFromDom();
+        var r = await db().rpc('beat_market', {
+            p_limit: PAGE, p_offset: S.offset,
+            p_genre: f.genre || null, p_search: f.search || null,
+            p_bpm_min: f.bpmMin, p_bpm_max: f.bpmMax
+        });
+        S.loading = false;
+        if (r.error) {
+            report('rpc.beat_market', 'beat_market', r.error);
+            grid.innerHTML = '';
+            if (more) more.innerHTML = '<div class="bm-empty">Could not load the market: ' + esc(r.error.message) + '</div>';
+            return;
+        }
+        var rows = r.data || [];
+        S.rows = S.rows.concat(rows);
+        S.offset += rows.length;
+        if (rows.length < PAGE) S.done = true;
+        renderMarket();
+    }
+
+    function byId(id) {
+        for (var i = 0; i < S.rows.length; i++) if (S.rows[i].id === id) return S.rows[i];
+        return null;
+    }
+
+    function metaLine(b) {
+        if (!b) return '';
+        var out = [];
+        if (b.producer_name) out.push(b.producer_name);
+        if (b.bpm) out.push(b.bpm + ' BPM');
+        if (b.key_sig) out.push(b.key_sig);
+        if (b.genre) out.push(b.genre);
+        return out.join(' · ');
+    }
+
+    function card(b) {
+        var meta = [];
+        if (b.bpm) meta.push(b.bpm + ' BPM');
+        if (b.key_sig) meta.push(b.key_sig);
+        var d = fmtDur(b.duration_seconds); if (d) meta.push(d);
+
+        var chips = [];
+        if (b.genre) chips.push(b.genre);
+        (b.moods || []).slice(0, 2).forEach(function (m) { if (m) chips.push(m); });
+
+        var price = (b.min_price_cents === null || b.min_price_cents === undefined)
+            ? 'No tier on sale'
+            : 'From ' + money(b.min_price_cents);
+
+        return '<div class="bm-card" onclick="AIADBeats.openLicense(\'' + b.id + '\')" role="button" tabindex="0"' +
+                    ' onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();AIADBeats.openLicense(\'' + b.id + '\');}">' +
+            '<div class="bm-cover">' +
+                (b.cover_url ? '<img src="' + esc(b.cover_url) + '" alt="" loading="lazy">' : '') +
+                (b.has_stems ? '<span class="bm-stems">Stems</span>' : '') +
+                /* id is playBtn-beat-<uuid> so loadGlobalTrack's own setRowPlayState
+                   swaps this button's icon on play and pause — no second player. */
+                (b.preview_url
+                    ? '<button class="bm-play" id="playBtn-beat-' + b.id + '" aria-label="Preview ' + esc(b.title) + '"' +
+                      ' onclick="event.stopPropagation();AIADBeats.preview(\'' + b.id + '\')">' + ICON_PLAY + '</button>'
+                    : '') +
+            '</div>' +
+            '<div class="bm-body">' +
+                '<div class="bm-title">' + esc(b.title) + '</div>' +
+                '<div class="bm-producer">' + esc(b.producer_name || 'Producer') + '</div>' +
+                (meta.length ? '<div class="bm-meta">' + meta.map(function (m) { return '<span>' + esc(m) + '</span>'; }).join('') + '</div>' : '') +
+                (chips.length ? '<div class="bm-chips">' + chips.map(function (c) { return '<span class="bm-chip">' + esc(c) + '</span>'; }).join('') + '</div>' : '') +
+                '<div class="bm-price">' + esc(price) + '</div>' +
+            '</div>' +
+        '</div>';
+    }
+
+    function renderMarket() {
+        var grid = $('bmGrid'), more = $('bmMore');
+        if (!grid) return;
+        if (!S.rows.length) {
+            var f = S.filters || {};
+            var filtered = !!(f.genre || f.search || f.bpmMin || f.bpmMax);
+            grid.innerHTML = '';
+            if (more) {
+                more.innerHTML = '<div class="bm-empty">' + (filtered
+                    ? 'No beats match those filters. Widen the BPM range or clear the search.'
+                    : 'No beats on the market yet. Producers list them from the Beat Vault.') + '</div>';
+            }
+            return;
+        }
+        grid.innerHTML = S.rows.map(card).join('');
+        if (more) {
+            more.innerHTML = S.done
+                ? '<div style="color:var(--text-muted);font-size:0.74rem;padding:12px 0;">' + S.rows.length + ' beat' + (S.rows.length === 1 ? '' : 's') + '</div>'
+                : '<button class="bv-btn ghost" onclick="AIADBeats.loadMore()">Load more</button>';
+        }
+    }
+
+    function preview(id) {
+        var b = byId(id);
+        if (!b || !b.preview_url) { toast('No preview on this beat yet.'); return; }
+        if (typeof window.loadGlobalTrack !== 'function') { toast('The player is not ready yet — try again in a moment.'); return; }
+        /* The existing bottom player, not a second <audio>: one player means one
+           thing playing, and its pause/seek/now-playing chrome already works. */
+        window.loadGlobalTrack({
+            trackId: 'beat-' + id,
+            title: b.title + (b.producer_name ? ' — ' + b.producer_name : ''),
+            audioUrl: b.preview_url,
+            imageUrl: b.cover_url || '',
+            tags: (b.tags || []).slice(0, 6),
+            source: 'beat'
+        });
+    }
+
+    function applyFilters() { loadMarket(true); }
+
+    function clearFilters() {
+        ['bmSearch', 'bmBpmMin', 'bmBpmMax'].forEach(function (id) { var el = $(id); if (el) el.value = ''; });
+        var g = $('bmGenre'); if (g) g.value = '';
+        loadMarket(true);
+    }
+
+    function openMarket() {
+        loadGenres();
+        var s = $('bmSearch');
+        if (s && s.getAttribute('data-wired') !== '1') {
+            s.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); loadMarket(true); } });
+            s.setAttribute('data-wired', '1');
+        }
+        loadMarket(true);
+    }
+
+    /* ─────────────────────── licence modal ─────────────────────── */
+
+    async function openLicense(id) {
+        var modal = $('globalModal'), body = $('modalBody');
+        if (!modal || !body) return;
+        S.beatId = id;
+        S.beat = byId(id);
+        body.innerHTML = '<div class="bm-empty">Loading licences…</div>';
+        modal.classList.add('active');
+
+        /* Read fresh rather than reuse the card: the card carries only the minimum
+           price across tiers, and a producer can switch a tier off at any time. */
+        var lr = await db().from('beat_licenses')
+            .select('tier_slug,price_cents,is_enabled,terms_override')
+            .eq('beat_id', id).eq('is_enabled', true);
+        var tr = await db().from('license_tiers')
+            .select('slug,sort_order,name,summary,deliverables,terms,is_exclusive,is_buyout')
+            .order('sort_order');
+
+        if (S.beatId !== id) return;   // a second card was opened while this loaded
+        if (lr.error || tr.error) {
+            var e = lr.error || tr.error;
+            report('select.beat_licenses', 'licence modal', e);
+            body.innerHTML = '<div class="bm-empty">Could not load the licences: ' + esc(e.message) + '</div>';
+            return;
+        }
+
+        var tiers = {};
+        (tr.data || []).forEach(function (t) { tiers[t.slug] = t; });
+
+        var list = (lr.data || []).map(function (l) {
+            var t = tiers[l.tier_slug];
+            if (!t) return null;              // tier went inactive; license_tiers RLS hides it
+            var terms = Object.assign({}, t.terms || {}, l.terms_override || {});
+            return {
+                slug: t.slug, sort_order: t.sort_order, name: t.name, summary: t.summary,
+                deliverables: t.deliverables || [], terms: terms,
+                is_exclusive: t.is_exclusive, is_buyout: t.is_buyout,
+                price_cents: l.price_cents
+            };
+        }).filter(Boolean).sort(function (a, b) { return a.sort_order - b.sort_order; });
+
+        body.innerHTML = renderLicenseModal(list);
+    }
+
+    function renderLicenseModal(list) {
+        var b = S.beat || {};
+        var head = '<div class="bl-head">' +
+            (b.cover_url ? '<img src="' + esc(b.cover_url) + '" alt="">' : '<img alt="">') +
+            '<div style="min-width:0;">' +
+                '<div style="font-size:1.02rem;font-weight:600;color:var(--text-primary);line-height:1.3;">' + esc(b.title || 'Beat') + '</div>' +
+                '<div style="font-size:0.74rem;color:var(--text-muted);margin-top:4px;">' + esc(metaLine(b)) + '</div>' +
+            '</div></div>';
+
+        if (!list.length) {
+            return head + '<div class="bm-empty">This producer has not switched on a licence tier for this beat yet.</div>';
+        }
+
+        return head +
+            '<div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:10px;">Tap a tier for its files and terms.</div>' +
+            list.map(function (t) {
+                return '<div class="bl-tier" id="blTier-' + t.slug + '">' +
+                    '<div class="bl-tierhead" onclick="AIADBeats.toggleTier(\'' + t.slug + '\')">' +
+                        '<div style="min-width:0;">' +
+                            '<div class="bl-tiername">' + esc(t.name) + '</div>' +
+                            '<div class="bl-tiersum">' + esc(t.summary || '') + '</div>' +
+                        '</div>' +
+                        '<div class="bl-tierprice">' + money(t.price_cents) + '</div>' +
+                    '</div>' +
+                    '<div class="bl-body" id="blBody-' + t.slug + '" style="display:none;">' +
+                        '<p class="bl-sub">Files you receive</p>' +
+                        '<div class="bl-deliv">' + delivChips(t.deliverables) + '</div>' +
+                        '<p class="bl-sub" style="margin-top:12px;">Terms</p>' +
+                        termRows(t.terms) +
+                        (t.is_buyout
+                            ? '<div class="bl-warn">A buy-out assigns the master and the producer&#39;s composition share to you.</div>'
+                            : t.is_exclusive
+                                ? '<div class="bl-warn">Exclusive rights take the beat off the market. Leases already sold stay valid.</div>'
+                                : '') +
+                        '<button class="bl-buy" id="blBuy-' + t.slug + '" onclick="AIADBeats.buy(\'' + t.slug + '\')">Buy — ' + money(t.price_cents) + '</button>' +
+                        '<div id="blQuote-' + t.slug + '"></div>' +
+                    '</div>' +
+                '</div>';
+            }).join('');
+    }
+
+    function toggleTier(slug) {
+        var tier = $('blTier-' + slug), body = $('blBody-' + slug);
+        if (!tier || !body) return;
+        var open = body.style.display !== 'none';
+        body.style.display = open ? 'none' : '';
+        tier.classList.toggle('open', !open);
+    }
+
+    function quoteReason(reason) {
+        if (reason === 'tier_unavailable') return 'That tier is no longer on sale for this beat.';
+        if (reason === 'beat_not_found') return 'This beat is no longer available.';
+        if (reason === 'exclusive_sold') return 'Exclusive rights to this beat have been sold, so it is off the market.';
+        if (reason === 'bought_out') return 'This beat has been bought out, so it is off the market.';
+        if (reason === 'draft') return 'This beat is not published yet.';
+        return 'This beat cannot be licensed right now' + (reason ? ' (' + reason + ')' : '') + '.';
+    }
+
+    async function buy(slug) {
+        var btn = $('blBuy-' + slug), host = $('blQuote-' + slug);
+        if (!btn || !host || !S.beatId) return;
+        var label = btn.textContent;
+        btn.disabled = true; btn.textContent = 'Pricing…';
+        /* The price on screen came from beat_licenses; this is the server's own
+           quote, including the platform fee split, and it is what checkout must
+           be handed. */
+        var r = await db().rpc('beat_sale_quote', { p_beat: S.beatId, p_tier: slug });
+        btn.disabled = false; btn.textContent = label;
+        if (r.error) {
+            report('rpc.beat_sale_quote', 'beat_sale_quote', r.error);
+            host.innerHTML = '<div class="bl-quote" style="color:#fca5a5;">Could not price that licence: ' + esc(r.error.message) + '</div>';
+            return;
+        }
+        var q = r.data || {};
+        if (!q.ok) {
+            host.innerHTML = '<div class="bl-warn">' + esc(quoteReason(q.reason)) + '</div>';
+            return;
+        }
+        host.innerHTML = '<div class="bl-quote">' +
+                '<div><b>' + esc(q.tier_name) + '</b> on <b>' + esc(q.beat_title) + '</b></div>' +
+                '<div>Price <b>' + money(q.price_cents) + '</b></div>' +
+                '<div>Platform fee ' + money(q.platform_fee_cents) + ' · producer receives ' + money(q.producer_earnings_cents) + '</div>' +
+                '<div>Contract ' + esc(q.contract_version) + '</div>' +
+            '</div>' +
+            '<button class="bl-buy" onclick="AIADBeats.checkout(\'' + slug + '\')">Continue to checkout</button>';
+    }
+
+    function checkout(slug) {
+        if (!S.beatId) return;
+        try {
+            var r = window.aiadBeatCheckout(S.beatId, slug);
+            if (r && typeof r.then === 'function') {
+                r.then(function () {}, function (e) { console.warn('[AIAD beats] checkout rejected', e); });
+            }
+        } catch (e) {
+            console.error('[AIAD beats] checkout', e);
+            toast('Checkout could not be started.');
+        }
+    }
+
+    /* beat_license_sales has no client INSERT policy, deliberately — a licence is
+       minted server-side or not at all. This stub takes no money and says so; the
+       Stripe route replaces it by defining window.aiadBeatCheckout earlier. */
+    if (typeof window.aiadBeatCheckout !== 'function') {
+        window.aiadBeatCheckout = function (beatId, tierSlug) {
+            console.log('[AIAD beats] checkout stub — no payment taken', beatId, tierSlug);
+            toast('Checkout is not connected yet — nothing was charged.');
+            return Promise.resolve({ ok: false, reason: 'not_wired' });
+        };
+    }
+
+    /* ─────────────────────────── vault ─────────────────────────── */
+
+    function fileOf(id) { var el = $(id); return (el && el.files && el.files[0]) || null; }
+    function valOf(id) { var el = $(id); return el ? String(el.value || '').trim() : ''; }
+    function intOf(id) {
+        var v = parseInt(valOf(id), 10);
+        return isFinite(v) ? v : null;
+    }
+    function listOf(id) {
+        return valOf(id).split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+    }
+    function extOf(file, fallback) {
+        var m = String((file && file.name) || '').match(/\.([A-Za-z0-9]{1,8})$/);
+        return '.' + (m ? m[1].toLowerCase() : fallback);
+    }
+
+    function pickedFile(input, hintId) {
+        var h = $(hintId);
+        if (!h) return;
+        var f = input && input.files && input.files[0];
+        h.textContent = f ? (f.name + ' · ' + bytes(f.size)) : 'No file chosen';
+        h.style.color = f ? 'var(--teal-light)' : '';
+    }
+
+    async function upload(bucket, path, file) {
+        if (typeof window.aiadStorageUpload !== 'function') {
+            return { ok: false, status: 0, body: 'upload helper missing' };
+        }
+        return window.aiadStorageUpload(bucket, path, file, file.type || 'application/octet-stream');
+    }
+
+    /* Metadata only — the file is never decoded. Resolves null rather than
+       rejecting, because a missing duration must not fail an upload. */
+    function audioDuration(file) {
+        return new Promise(function (resolve) {
+            var url = null, timer = null, a = null;
+            var finish = function (v) {
+                if (timer) clearTimeout(timer);
+                if (url) { try { URL.revokeObjectURL(url); } catch (e) {} }
+                resolve(v);
+            };
+            try {
+                url = URL.createObjectURL(file);
+                a = new Audio();
+                a.preload = 'metadata';
+                a.onloadedmetadata = function () {
+                    finish(isFinite(a.duration) && a.duration > 0 ? Math.round(a.duration) : null);
+                };
+                a.onerror = function () { finish(null); };
+                a.src = url;
+                timer = setTimeout(function () { finish(null); }, 6000);
+            } catch (e) { finish(null); }
+        });
+    }
+
+    function clearUploadForm() {
+        ['bvTitle', 'bvBpm', 'bvGenre', 'bvMoods', 'bvTags', 'bvDesc'].forEach(function (id) { var el = $(id); if (el) el.value = ''; });
+        var k = $('bvKey'); if (k) k.value = '';
+        ['bvSample', 'bvFree'].forEach(function (id) { var el = $(id); if (el) el.checked = false; });
+        var files = ['bvCover', 'bvPreview'].concat(DELIV_ORDER.map(function (x) { return 'bvFile_' + x; }));
+        files.forEach(function (id) { var el = $(id); if (el) el.value = ''; });
+        var hints = { bvCoverName: 'No file chosen — a square image works best', bvPreviewName: 'No file chosen — this is the public, tagged audio' };
+        DELIV_ORDER.forEach(function (k2) { hints['bvF_' + k2] = 'No file chosen'; });
+        hints.bvF_project_file = 'No file chosen — the session a buy-out gets';
+        Object.keys(hints).forEach(function (id) { var el = $(id); if (el) { el.textContent = hints[id]; el.style.color = ''; } });
+    }
+
+    async function createBeat() {
+        var btn = $('bvCreateBtn'), msg = $('bvCreateMsg');
+        var u = uid();
+        if (!u) { say(msg, 'Sign in to upload a beat.', 'err'); return; }
+
+        var title = valOf('bvTitle');
+        if (!title) { say(msg, 'Give the beat a title first.', 'err'); return; }
+
+        var preview = fileOf('bvPreview');
+        if (!preview) { say(msg, 'A tagged preview is required — it is what the market plays.', 'err'); return; }
+
+        var deliv = [];
+        DELIV_ORDER.forEach(function (k) { var f = fileOf('bvFile_' + k); if (f) deliv.push({ kind: k, file: f }); });
+        if (!deliv.length) { say(msg, 'Add at least one deliverable — every tier includes the untagged MP3.', 'err'); return; }
+
+        if (btn) btn.disabled = true;
+        var finish = function (text, cls) { if (btn) btn.disabled = false; say(msg, text, cls); };
+
+        say(msg, 'Creating the draft…');
+        /* The row goes in first because every storage path below carries the beat
+           id. producer_id is sent explicitly even though the column defaults to
+           auth.uid(): the INSERT policy checks the value, so being explicit is
+           what makes the failure legible if the session is stale. */
+        var ins = await db().from('beats').insert({
+            producer_id: u,
+            title: title,
+            bpm: intOf('bvBpm'),
+            key_sig: valOf('bvKey') || null,
+            genre: valOf('bvGenre') || null,
+            moods: listOf('bvMoods'),
+            tags: listOf('bvTags'),
+            description: valOf('bvDesc') || null,
+            contains_sample: !!($('bvSample') && $('bvSample').checked),
+            free_download: !!($('bvFree') && $('bvFree').checked),
+            status: 'draft'
+        }).select('id,title').single();
+        if (ins.error) {
+            report('insert.beats', 'beats', ins.error);
+            finish('Could not create the beat: ' + ins.error.message, 'err');
+            return;
+        }
+        var beatId = ins.data.id;
+
+        // Public assets -> artist-media, like every other public asset in the file.
+        var coverUrl = null;
+        var cover = fileOf('bvCover');
+        if (cover) {
+            say(msg, 'Uploading cover…');
+            var cu = await upload('artist-media', u + '/beats/' + beatId + '/cover' + extOf(cover, 'jpg'), cover);
+            if (cu.ok) coverUrl = cu.publicUrl;
+            else report('storage.upload', 'artist-media', new Error('beat cover ' + cu.status));
+        }
+
+        say(msg, 'Uploading preview…');
+        var pu = await upload('artist-media', u + '/beats/' + beatId + '/preview' + extOf(preview, 'mp3'), preview);
+        if (!pu.ok) {
+            report('storage.upload', 'artist-media', new Error('beat preview ' + pu.status));
+            finish('The preview did not upload (' + pu.status + '). The draft was saved — open it below and try again.', 'err');
+            loadVault();
+            return;
+        }
+        var previewUrl = pu.publicUrl;
+
+        /* Deliverables -> the private beat-files bucket at the agreed convention,
+           <producer_uid>/<beat_id>/<kind>.<ext>. The first folder must be auth.uid()
+           or the bucket's INSERT policy rejects it. */
+        var rows = [], failed = [];
+        for (var i = 0; i < deliv.length; i++) {
+            var d = deliv[i];
+            say(msg, 'Uploading ' + delivLabel(d.kind) + ' (' + (i + 1) + ' of ' + deliv.length + ')…');
+            var path = u + '/' + beatId + '/' + d.kind + extOf(d.file, DELIV[d.kind].ext);
+            var r = await upload('beat-files', path, d.file);
+            if (r.ok) rows.push({ beat_id: beatId, kind: d.kind, bucket: 'beat-files', path: path, bytes: d.file.size });
+            else {
+                failed.push(delivLabel(d.kind));
+                report('storage.upload', 'beat-files', new Error('beat deliverable ' + d.kind + ' ' + r.status));
+            }
+        }
+
+        say(msg, 'Finishing up…');
+        var hasStems = rows.some(function (x) { return x.kind === 'stems_zip'; });
+        var dur = await audioDuration(preview);
+        var upd = await db().from('beats').update({
+            cover_url: coverUrl,
+            preview_url: previewUrl,
+            duration_seconds: dur,
+            has_stems: hasStems,
+            preview_tagged: true
+        }).eq('id', beatId);
+        if (upd.error) report('update.beats', 'beats', upd.error);
+
+        if (rows.length) {
+            var fr = await db().from('beat_files').insert(rows);
+            if (fr.error) {
+                report('insert.beat_files', 'beat_files', fr.error);
+                failed.push('the file index');
+            }
+        }
+
+        // Seeds all eight active tiers at their default price, ON CONFLICT DO NOTHING.
+        var seed = await db().rpc('beat_license_defaults', { p_beat: beatId });
+        if (seed.error) {
+            report('rpc.beat_license_defaults', 'beat_license_defaults', seed.error);
+            finish('Beat saved, but the licence tiers did not seed: ' + seed.error.message, 'err');
+            loadVault();
+            return;
+        }
+
+        clearUploadForm();
+        finish(failed.length
+            ? 'Beat saved — but ' + failed.join(' and ') + ' did not upload. Price the tiers below, and re-upload before you publish.'
+            : 'Beat saved. Price its tiers below, then publish.', failed.length ? 'err' : 'ok');
+        openTiers(beatId, ins.data.title);
+        loadVault();
+    }
+
+    async function openTiers(beatId, title) {
+        S.tierBeat = beatId;
+        var card2 = $('bvTierCard'), list = $('bvTierList'), name = $('bvTierBeatName');
+        if (!card2 || !list) return;
+        card2.style.display = '';
+        if (name) name.textContent = title || '';
+        say($('bvTierMsg'), '');
+        list.innerHTML = '<div class="bm-empty">Loading tiers…</div>';
+        try { card2.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {}
+
+        var lr = await db().from('beat_licenses').select('tier_slug,price_cents,is_enabled').eq('beat_id', beatId);
+        var tr = await db().from('license_tiers').select('slug,sort_order,name,deliverables,default_price_cents').order('sort_order');
+        if (S.tierBeat !== beatId) return;
+        if (lr.error || tr.error) {
+            var e = lr.error || tr.error;
+            report('select.beat_licenses', 'tier editor', e);
+            list.innerHTML = '<div class="bm-empty">Could not load the tiers: ' + esc(e.message) + '</div>';
+            return;
+        }
+
+        var have = {};
+        (lr.data || []).forEach(function (l) { have[l.tier_slug] = l; });
+        var tiers = (tr.data || []).filter(function (t) { return have[t.slug]; });
+        if (!tiers.length) {
+            list.innerHTML = '<div class="bm-empty">No tiers on this beat yet. ' +
+                '<button class="sv-link" onclick="AIADBeats.seedTiers()">Seed the eight defaults</button></div>';
+            return;
+        }
+
+        list.innerHTML = tiers.map(function (t) {
+            var l = have[t.slug];
+            var dollars = (Number(l.price_cents) / 100);
+            var shown = (Number(l.price_cents) % 100 === 0) ? String(dollars) : dollars.toFixed(2);
+            return '<div class="bv-tierrow">' +
+                '<div style="min-width:0;">' +
+                    '<div class="bv-tiername">' + esc(t.name) + '</div>' +
+                    '<div class="bv-tierdel">' + esc((t.deliverables || []).map(delivLabel).join(' · ')) + '</div>' +
+                '</div>' +
+                '<input class="bv-price-in" type="number" min="0" step="0.01" value="' + esc(shown) + '"' +
+                    ' id="bvP-' + t.slug + '" aria-label="Price in dollars for ' + esc(t.name) + '"' +
+                    ' onchange="AIADBeats.savePrice(\'' + t.slug + '\')">' +
+                '<button class="bv-sw' + (l.is_enabled ? ' on' : '') + '" id="bvE-' + t.slug + '"' +
+                    ' role="switch" aria-checked="' + (l.is_enabled ? 'true' : 'false') +
+                    '" aria-label="Sell the ' + esc(t.name) + ' tier"' +
+                    ' onclick="AIADBeats.toggleTierEnabled(\'' + t.slug + '\')"></button>' +
+            '</div>';
+        }).join('');
+    }
+
+    async function seedTiers() {
+        if (!S.tierBeat) return;
+        var r = await db().rpc('beat_license_defaults', { p_beat: S.tierBeat });
+        if (r.error) {
+            report('rpc.beat_license_defaults', 'beat_license_defaults', r.error);
+            say($('bvTierMsg'), 'Could not seed the tiers: ' + r.error.message, 'err');
+            return;
+        }
+        openTiers(S.tierBeat, $('bvTierBeatName') ? $('bvTierBeatName').textContent : '');
+    }
+
+    function closeTiers() {
+        var card2 = $('bvTierCard');
+        if (card2) card2.style.display = 'none';
+        S.tierBeat = null;
+    }
+
+    async function savePrice(slug) {
+        var el = $('bvP-' + slug), msg = $('bvTierMsg');
+        if (!el || !S.tierBeat) return;
+        var cents = Math.round(parseFloat(el.value) * 100);
+        if (!isFinite(cents) || cents < 0) { say(msg, 'That price is not a number.', 'err'); return; }
+        var r = await db().from('beat_licenses').update({ price_cents: cents })
+            .eq('beat_id', S.tierBeat).eq('tier_slug', slug);
+        if (r.error) {
+            report('update.beat_licenses', 'beat_licenses', r.error);
+            say(msg, 'Could not save that price: ' + r.error.message, 'err');
+            return;
+        }
+        el.value = (cents % 100 === 0) ? String(cents / 100) : (cents / 100).toFixed(2);
+        say(msg, 'Saved.', 'ok');
+    }
+
+    async function toggleTierEnabled(slug) {
+        var btn = $('bvE-' + slug), msg = $('bvTierMsg');
+        if (!btn || !S.tierBeat) return;
+        var next = !btn.classList.contains('on');
+        btn.disabled = true;
+        var r = await db().from('beat_licenses').update({ is_enabled: next })
+            .eq('beat_id', S.tierBeat).eq('tier_slug', slug);
+        btn.disabled = false;
+        if (r.error) {
+            report('update.beat_licenses', 'beat_licenses', r.error);
+            say(msg, 'Could not change that tier: ' + r.error.message, 'err');
+            return;
+        }
+        btn.classList.toggle('on', next);
+        btn.setAttribute('aria-checked', next ? 'true' : 'false');
+        say(msg, next ? 'Tier switched on.' : 'Tier switched off.', 'ok');
+    }
+
+    async function publish() {
+        var msg = $('bvTierMsg'), btn = $('bvPublishBtn');
+        if (!S.tierBeat) return;
+        if (!document.querySelectorAll('#bvTierList .bv-sw.on').length) {
+            say(msg, 'Switch on at least one tier before publishing — a listing with nothing for sale cannot be bought.', 'err');
+            return;
+        }
+        if (btn) btn.disabled = true;
+        // A listing with no preview gives the market nothing to play.
+        var cur = await db().from('beats').select('preview_url,title').eq('id', S.tierBeat).single();
+        if (!cur.error && cur.data && !cur.data.preview_url) {
+            if (btn) btn.disabled = false;
+            say(msg, 'This beat has no preview yet, so buyers would have nothing to hear.', 'err');
+            return;
+        }
+        var r = await db().from('beats').update({ status: 'listed' }).eq('id', S.tierBeat);
+        if (btn) btn.disabled = false;
+        if (r.error) {
+            report('update.beats', 'beats', r.error);
+            say(msg, 'Could not publish: ' + r.error.message, 'err');
+            return;
+        }
+        say(msg, 'Published — it is on the market now.', 'ok');
+        toast('Beat published');
+        loadVault();
+    }
+
+    async function loadVault() {
+        var host = $('bvBeatList');
+        if (!host) return;
+        var u = uid();
+        if (!u) { host.innerHTML = '<div class="bm-empty">Sign in to see your beats.</div>'; return; }
+        host.innerHTML = '<div class="bm-empty">Loading…</div>';
+
+        var br = await db().from('beats')
+            .select('id,title,bpm,key_sig,genre,status,cover_url,preview_url,has_stems,created_at')
+            .eq('producer_id', u).order('created_at', { ascending: false });
+        if (br.error) {
+            report('select.beats', 'my beats', br.error);
+            host.innerHTML = '<div class="bm-empty">Could not load your beats: ' + esc(br.error.message) + '</div>';
+            return;
+        }
+        var beats = br.data || [];
+        if (!beats.length) {
+            host.innerHTML = '<div class="bm-empty">No beats yet. Upload one above and it lands here as a draft.</div>';
+            return;
+        }
+
+        /* Sales per beat. RLS on beat_license_sales already restricts this to rows
+           where the caller is the producer or the buyer; the producer_id filter is
+           what keeps the caller's own PURCHASES out of their sales count. */
+        var sr = await db().from('beat_license_sales').select('beat_id,status,producer_earnings_cents').eq('producer_id', u);
+        if (sr.error) report('select.beat_license_sales', 'my sales', sr.error);
+        var paid = {}, pending = {}, earned = {};
+        (sr.data || []).forEach(function (s) {
+            if (s.status === 'paid') {
+                paid[s.beat_id] = (paid[s.beat_id] || 0) + 1;
+                earned[s.beat_id] = (earned[s.beat_id] || 0) + (Number(s.producer_earnings_cents) || 0);
+            } else if (s.status === 'pending') {
+                pending[s.beat_id] = (pending[s.beat_id] || 0) + 1;
+            }
+        });
+
+        host.innerHTML = beats.map(function (b) {
+            var meta = [];
+            if (b.bpm) meta.push(b.bpm + ' BPM');
+            if (b.key_sig) meta.push(b.key_sig);
+            if (b.genre) meta.push(b.genre);
+            var n = paid[b.id] || 0;
+            meta.push(n + (n === 1 ? ' sale' : ' sales'));
+            if (earned[b.id]) meta.push(money(earned[b.id]) + ' earned');
+            if (pending[b.id]) meta.push(pending[b.id] + ' pending');
+
+            var status = String(b.status || 'draft');
+            return '<div class="bv-beat">' +
+                (b.cover_url
+                    ? '<img class="bv-thumb" src="' + esc(b.cover_url) + '" alt="" loading="lazy">'
+                    : '<div class="bv-thumb"></div>') +
+                '<div style="min-width:0;">' +
+                    '<div class="bv-tiername">' + esc(b.title) + '</div>' +
+                    '<div class="bv-bmeta">' +
+                        '<span class="bv-status ' + esc(status) + '">' + esc(status.replace(/_/g, ' ')) + '</span>' +
+                        meta.map(function (m) { return '<span>' + esc(m) + '</span>'; }).join('') +
+                    '</div>' +
+                '</div>' +
+                '<div class="bv-bactions">' +
+                    /* The id only — passing the title through an inline attribute would
+                       mean quoting a producer's own text into JS inside HTML. */
+                    '<button class="bv-btn ghost" onclick="AIADBeats.openTiersFor(\'' + b.id + '\')">Tiers &amp; publish</button>' +
+                    (b.preview_url
+                        ? '<button class="bv-btn ghost" onclick="AIADBeats.previewOwn(\'' + b.id + '\')">Play preview</button>'
+                        : '') +
+                '</div>' +
+            '</div>';
+        }).join('');
+        S.mine = beats;
+    }
+
+    // Looks the title up from the list already on screen, so the vault row can pass
+    // an id alone.
+    function openTiersFor(id) {
+        var title = '';
+        (S.mine || []).forEach(function (x) { if (x.id === id) title = x.title || ''; });
+        return openTiers(id, title);
+    }
+
+    function previewOwn(id) {
+        var b = null;
+        (S.mine || []).forEach(function (x) { if (x.id === id) b = x; });
+        if (!b || !b.preview_url) { toast('No preview on this beat yet.'); return; }
+        if (typeof window.loadGlobalTrack !== 'function') { toast('The player is not ready yet.'); return; }
+        window.loadGlobalTrack({
+            trackId: 'beat-' + id, title: b.title, audioUrl: b.preview_url,
+            imageUrl: b.cover_url || '', tags: [], source: 'beat'
+        });
+    }
+
+    function openVault() { loadVault(); }
+
+    /* ───────────────────── my licences (buyer) ───────────────────── */
+
+    async function loadLicenses() {
+        var host = $('myLicensesList');
+        if (!host) return;
+        var u = uid();
+        if (!u) { host.innerHTML = '<div class="bm-empty">Sign in to see your licences.</div>'; return; }
+        host.innerHTML = '<div class="bm-empty">Loading…</div>';
+
+        var r = await db().rpc('my_beat_licenses');
+        if (r.error) {
+            report('rpc.my_beat_licenses', 'my_beat_licenses', r.error);
+            host.innerHTML = '<div class="bm-empty">Could not load your licences: ' + esc(r.error.message) + '</div>';
+            return;
+        }
+        var rows = r.data || [];
+        if (!rows.length) {
+            host.innerHTML = '<div class="bm-empty">No licences yet.<br>Anything you licence in the Beat Market appears here with its files, terms and licence number.</div>';
+            return;
+        }
+
+        /* The deliverable paths are not in the RPC, so beat_files is read directly.
+           Its SELECT policy is has_beat_file_access(beat_id, kind), which already
+           limits the rows to the kinds each PAID tier includes — what comes back is
+           the entitlement, so it is not filtered again here. */
+        var ids = [], seen = {};
+        rows.forEach(function (x) { if (x.beat_id && !seen[x.beat_id]) { seen[x.beat_id] = 1; ids.push(x.beat_id); } });
+        S.files = {}; S.titles = {};
+        if (ids.length) {
+            var fr = await db().from('beat_files').select('beat_id,kind,path,bytes').in('beat_id', ids);
+            if (fr.error) report('select.beat_files', 'beat_files', fr.error);
+            (fr.data || []).forEach(function (f) {
+                if (!S.files[f.beat_id]) S.files[f.beat_id] = [];
+                S.files[f.beat_id].push(f);
+            });
+        }
+        rows.forEach(function (x) { S.titles[x.beat_id] = x.beat_title; });
+
+        host.innerHTML = rows.map(licenceCard).join('');
+    }
+
+    function licenceCard(l) {
+        var files = S.files[l.beat_id] || [];
+        var byKind = {};
+        files.forEach(function (f) { byKind[f.kind] = f; });
+
+        var meta = [];
+        if (l.bpm) meta.push(l.bpm + ' BPM');
+        if (l.key_sig) meta.push(l.key_sig);
+        if (l.producer_name) meta.push(l.producer_name);
+
+        var wanted = (l.deliverables && l.deliverables.length) ? l.deliverables : DELIV_ORDER;
+        var dl = wanted.map(function (k) {
+            var f = byKind[k];
+            if (!f) {
+                return '<button class="bl-dlbtn" disabled title="Not delivered yet">' + ICON_DL +
+                       esc(delivLabel(k)) + ' · pending</button>';
+            }
+            return '<button class="bl-dlbtn" onclick="AIADBeats.download(\'' + l.beat_id + '\',\'' + esc(k) + '\',this)">' +
+                   ICON_DL + esc(delivLabel(k)) + (f.bytes ? ' · ' + bytes(f.bytes) : '') + '</button>';
+        }).join('');
+
+        var paid = String(l.status || '') === 'paid';
+
+        return '<div class="bl-lic">' +
+            '<div class="bl-licnum">' + esc(l.license_number || '—') + ' · ' + esc(fmtDate(l.created_at)) +
+                (paid ? '' : ' · ' + esc(String(l.status || 'pending'))) + '</div>' +
+            '<div class="bl-licrow">' +
+                (l.cover_url ? '<img src="' + esc(l.cover_url) + '" alt="" loading="lazy">' : '<img alt="">') +
+                '<div style="min-width:0;">' +
+                    '<div style="font-size:0.92rem;font-weight:600;color:var(--text-primary);line-height:1.3;">' + esc(l.beat_title || 'Beat') + '</div>' +
+                    '<div style="font-size:0.74rem;color:var(--text-muted);margin-top:3px;">' +
+                        esc(l.tier_name || l.tier_slug || '') + ' · ' + money(l.price_cents) +
+                        (meta.length ? ' · ' + esc(meta.join(' · ')) : '') +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+            '<div class="bl-dl">' + dl + '</div>' +
+            '<div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;">' +
+                '<button class="sv-link" style="font-size:0.74rem;" onclick="AIADBeats.toggleTerms(\'' + l.sale_id + '\')">Licence terms</button>' +
+                (l.contract_url
+                    ? '<a href="' + esc(l.contract_url) + '" target="_blank" rel="noopener noreferrer" style="font-size:0.74rem;color:var(--teal-light);">Signed contract</a>'
+                    : '<span style="font-size:0.74rem;color:var(--text-hint);">Contract not issued yet</span>') +
+            '</div>' +
+            /* The snapshot taken at sale time, not today's tier terms: a producer who
+               re-prices or re-words a tier later cannot change what was sold. */
+            '<div id="blTerms-' + esc(l.sale_id) + '" style="display:none;margin-top:10px;border-top:1px solid var(--border-default);padding-top:8px;">' +
+                '<p class="bl-sub">Terms as sold</p>' + termRows(l.terms_snapshot) +
+            '</div>' +
+        '</div>';
+    }
+
+    function toggleTerms(saleId) {
+        var el = $('blTerms-' + saleId);
+        if (!el) return;
+        el.style.display = el.style.display === 'none' ? '' : 'none';
+    }
+
+    async function download(beatId, kind, btn) {
+        var files = S.files[beatId] || [];
+        var f = null;
+        files.forEach(function (x) { if (x.kind === kind) f = x; });
+        if (!f) { toast('That file is not part of your licence.'); return; }
+
+        var base = String(S.titles[beatId] || 'beat').replace(/[^A-Za-z0-9 _-]/g, '').trim() || 'beat';
+        var m = String(f.path).match(/\.([A-Za-z0-9]{1,8})$/);
+        var name = base + ' - ' + kind + '.' + (m ? m[1] : (DELIV[kind] && DELIV[kind].ext) || 'bin');
+
+        var label = btn ? btn.innerHTML : null;
+        if (btn) { btn.disabled = true; btn.innerHTML = 'Preparing…'; }
+        var restore = function () { if (btn) { btn.disabled = false; if (label !== null) btn.innerHTML = label; } };
+
+        try {
+            /* beat-files is private and its storage policy grants SELECT only on the
+               producer's own folder, so the client call below signs fine for a producer
+               and fails for a buyer. window.aiadBeatDownload is the seam for the
+               server route that signs with the service role; when it is defined it
+               takes precedence, and until then a buyer is told plainly rather than
+               handed a dead link. */
+            if (typeof window.aiadBeatDownload === 'function') {
+                var url = await window.aiadBeatDownload(f.path, name, { beat_id: beatId, kind: kind });
+                restore();
+                if (url) { window.open(url, '_blank', 'noopener'); return; }
+                toast('That download could not be prepared.');
+                return;
+            }
+            var r = await db().storage.from('beat-files').createSignedUrl(f.path, 120, { download: name });
+            restore();
+            if (r.error || !r.data || !r.data.signedUrl) {
+                report('storage.sign', 'beat-files', r.error || new Error('no signed url'));
+                toast('File delivery is not switched on yet — your licence and its terms are safe here.');
+                return;
+            }
+            window.open(r.data.signedUrl, '_blank', 'noopener');
+        } catch (e) {
+            restore();
+            console.error('[AIAD beats] download', e);
+            report('storage.sign', 'beat-files', e);
+            toast('That download failed.');
+        }
+    }
+
+    /* Mirrors what showFanView does for #fanDashboard: surface the dashboard BEFORE
+       toggling a view inside it, otherwise .active lands on a view whose container
+       is still display:none and the click looks dead. */
+    function gotoMarket() {
+        var dash = $('artistDashboard');
+        if (dash && !dash.classList.contains('active')) {
+            document.querySelectorAll('.dashboard-container, .collab-dashboard').forEach(function (d) { d.classList.remove('active'); });
+            ['.header', '.main', '.footer'].forEach(function (sel) {
+                var el = document.querySelector(sel); if (el) el.style.display = 'none';
+            });
+            dash.classList.add('active');
+        }
+        if (typeof window.showArtistView === 'function') window.showArtistView('beatmarket');
+    }
+
+    window.AIADBeats = {
+        openMarket: openMarket,
+        applyFilters: applyFilters,
+        clearFilters: clearFilters,
+        loadMore: function () { loadMarket(false); },
+        preview: preview,
+        previewOwn: previewOwn,
+        openLicense: openLicense,
+        toggleTier: toggleTier,
+        buy: buy,
+        checkout: checkout,
+        openVault: openVault,
+        pickedFile: pickedFile,
+        createBeat: createBeat,
+        openTiers: openTiers,
+        openTiersFor: openTiersFor,
+        seedTiers: seedTiers,
+        closeTiers: closeTiers,
+        savePrice: savePrice,
+        toggleTierEnabled: toggleTierEnabled,
+        publish: publish,
+        openLicenses: loadLicenses,
+        toggleTerms: toggleTerms,
+        download: download,
+        gotoMarket: gotoMarket
+    };
 })();
 </script>
 <style id="aiad-streaming-theme">
