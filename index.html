@@ -48324,6 +48324,65 @@ body.aiad-pdrawer-lock{overflow:hidden;}
         }
     }
 
+    /* ── delivery ──────────────────────────────────────────────────────────────
+       The beat-files bucket is private and grants storage SELECT only where the
+       first folder is auth.uid() — the producer. A buyer can read the beat_files
+       ROW (has_beat_file_access) but cannot sign the object behind it, so the
+       browser alone can never deliver a purchase. beat-download closes that: it
+       re-checks entitlement with the same has_beat_file_access the table policy
+       uses, called as the CALLER, then signs with the service role.
+
+       It takes beat_id and kind, never a path — the server resolves the path
+       itself, so nothing the browser claims decides which object gets signed.
+
+       Returns the URL; returns null when the server refused (already explained to
+       the reader); THROWS when the service could not be reached, which is the only
+       case download() retries directly. */
+    var BEAT_DOWNLOAD_FN = 'https://uapiytquwuhtewqieegx.supabase.co/functions/v1/beat-download';
+
+    function downloadRefusal(status, data) {
+        var r = data && data.reason;
+        if (r === 'not_entitled') return 'That file is not part of a licence on this account.';
+        if (r === 'not_uploaded') return 'The producer has not uploaded that file yet.';
+        if (r === 'no_session' || status === 401) return 'Your session expired — sign in again.';
+        if (r === 'bad_kind' || r === 'bad_request') return 'That download request was malformed.';
+        return (data && data.error) || 'That download could not be prepared.';
+    }
+
+    window.aiadBeatDownload = async function (path, filename, meta) {
+        meta = meta || {};
+        if (!meta.beat_id || !meta.kind) { toast('That download is missing its beat.'); return null; }
+
+        var sess = null;
+        try { sess = window.__aiadGetSessionSync ? window.__aiadGetSessionSync() : null; } catch (e) {}
+        if (!sess || !sess.access_token) {
+            // Falls back to the async read, which also refreshes an expired token.
+            try { var g = await db().auth.getSession(); sess = g && g.data && g.data.session; } catch (e) {}
+        }
+        if (!sess || !sess.access_token) { toast('Sign in to download your files.'); return null; }
+
+        var res, data;
+        try {
+            res = await fetch(BEAT_DOWNLOAD_FN, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sess.access_token },
+                body: JSON.stringify({ beat_id: meta.beat_id, kind: meta.kind })
+            });
+            data = await res.json().catch(function () { return {}; });
+        } catch (e) {
+            // Unreachable, not refused. Thrown so download() can try the direct
+            // route for a producer rather than treating a blip as a denial.
+            throw e;
+        }
+        if (!res.ok || !data || !data.url) {
+            report('fn.beat-download', String(meta.kind),
+                   new Error('beat-download ' + res.status + ' ' + ((data && data.reason) || '')));
+            toast(downloadRefusal(res.status, data));
+            return null;
+        }
+        return data.url;
+    };
+
     /* beat_license_sales has no client INSERT policy, deliberately — a licence is
        minted server-side or not at all. This stub takes no money and says so; the
        Stripe route replaces it by defining window.aiadBeatCheckout earlier. */
@@ -48849,33 +48908,31 @@ body.aiad-pdrawer-lock{overflow:hidden;}
         if (btn) { btn.disabled = true; btn.innerHTML = 'Preparing…'; }
         var restore = function () { if (btn) { btn.disabled = false; if (label !== null) btn.innerHTML = label; } };
 
+        /* One path for everyone: beat-download covers the producer branch too, so
+           there is a single place where entitlement is decided. A null return means
+           the server refused and has already said why — do not second-guess it with
+           a direct attempt. A throw means the service could not be reached, which is
+           the only case worth a fallback. */
         try {
-            /* beat-files is private and its storage policy grants SELECT only on the
-               producer's own folder, so the client call below signs fine for a producer
-               and fails for a buyer. window.aiadBeatDownload is the seam for the
-               server route that signs with the service role; when it is defined it
-               takes precedence, and until then a buyer is told plainly rather than
-               handed a dead link. */
-            if (typeof window.aiadBeatDownload === 'function') {
-                var url = await window.aiadBeatDownload(f.path, name, { beat_id: beatId, kind: kind });
-                restore();
-                if (url) { window.open(url, '_blank', 'noopener'); return; }
-                toast('That download could not be prepared.');
-                return;
-            }
-            var r = await db().storage.from('beat-files').createSignedUrl(f.path, 120, { download: name });
+            var url = await window.aiadBeatDownload(f.path, name, { beat_id: beatId, kind: kind });
             restore();
-            if (r.error || !r.data || !r.data.signedUrl) {
-                report('storage.sign', 'beat-files', r.error || new Error('no signed url'));
-                toast('File delivery is not switched on yet — your licence and its terms are safe here.');
-                return;
-            }
-            window.open(r.data.signedUrl, '_blank', 'noopener');
+            if (url) window.open(url, '_blank', 'noopener');
         } catch (e) {
-            restore();
-            console.error('[AIAD beats] download', e);
-            report('storage.sign', 'beat-files', e);
-            toast('That download failed.');
+            console.warn('[AIAD beats] download route unreachable, trying direct', e);
+            /* A PRODUCER can still sign their own object from the browser — the
+               bucket grants them storage SELECT on their own folder. A buyer cannot,
+               and falls through to the message below, which is the honest outcome
+               rather than a dead link. */
+            try {
+                var r = await db().storage.from('beat-files').createSignedUrl(f.path, 120, { download: name });
+                restore();
+                if (!r.error && r.data && r.data.signedUrl) { window.open(r.data.signedUrl, '_blank', 'noopener'); return; }
+                report('storage.sign', 'beat-files', r.error || new Error('no signed url'));
+            } catch (e2) {
+                restore();
+                report('storage.sign', 'beat-files', e2);
+            }
+            toast('Could not reach the download service — try again in a moment.');
         }
     }
 
