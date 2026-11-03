@@ -105,6 +105,18 @@
         border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit}
       .buy:disabled{opacity:.55;cursor:not-allowed}
       .buy-note{margin-top:10px;font-size:12px;color:var(--text-muted);text-align:center;min-height:14px}
+      /* Receipt (the return from Stripe) */
+      .rsheet{position:relative;background:var(--bg-2);border:1px solid var(--border);border-radius:18px;width:100%;max-width:460px;
+        padding:30px 26px 26px;text-align:center;max-height:90vh;overflow:auto}
+      .rsheet .cls{position:absolute;top:14px;right:16px;background:none;border:none;color:var(--text-2);font-size:26px;line-height:1;cursor:pointer}
+      .rsheet .eyebrow{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--text-muted)}
+      .rsheet h2{margin-top:10px;font-size:1.4rem;font-weight:700;letter-spacing:-0.01em}
+      .rsheet .rc-msg{margin-top:12px;color:var(--text-2);font-size:14px;line-height:1.6}
+      .rsheet .rc-lines{margin-top:18px;display:flex;flex-direction:column;gap:7px;text-align:left}
+      .rsheet .rc-lines .row{display:flex;justify-content:space-between;gap:16px;font-size:13px;border-top:1px solid var(--border);padding-top:7px}
+      .rsheet .rc-lines .row .k{color:var(--text-muted)}
+      .rsheet .rc-lines .row .v{color:var(--text-2);text-align:right}
+      .rsheet .buy{display:block;text-align:center;text-decoration:none}
       .state{max-width:640px;margin:0 auto;padding:100px 24px;text-align:center;color:var(--text-muted);font-size:15px}
       .state a{color:var(--teal-light)}
     </style>
@@ -145,6 +157,18 @@
           <button class="buy" id="ovBuy">Buy now</button>
           <div class="buy-note" id="ovNote"></div>
         </div>
+      </div>
+    </div>
+
+    <!-- Receipt: where Stripe drops a guest back -->
+    <div class="ov" id="rc">
+      <div class="rsheet">
+        <button class="cls" id="rcClose" aria-label="Close">&times;</button>
+        <div class="eyebrow" id="rcEyebrow">Order</div>
+        <h2 id="rcTitle"></h2>
+        <div class="rc-msg" id="rcMsg"></div>
+        <div class="rc-lines" id="rcLines"></div>
+        <a class="buy" id="rcDownload" style="display:none" download>Download your files</a>
       </div>
     </div>
 
@@ -316,21 +340,20 @@
 
       document.getElementById('ovBuy').addEventListener('click', async () => {
         if (!CURRENT) return;
-        const token = storedSession();
         const note = document.getElementById('ovNote');
         if ((window._selSizes || []).length && !SEL.size) { note.textContent = 'Please select a size.'; return; }
         if ((window._selColors || []).length && !SEL.color) { note.textContent = 'Please select a color.'; return; }
-        if (!token) {
-          note.textContent = 'Sign in to your AIAD account to buy.';
-          setTimeout(() => { window.location.href = '/'; }, 1100);
-          return;
-        }
+        // No account needed. store-checkout runs with auth optional and treats the
+        // anon key as "guest", so a signed-out shopper goes straight to Stripe, which
+        // collects their email on its own page. A stored session still gets sent, so
+        // a signed-in buyer keeps their order tied to their account.
+        const token = storedSession();
         const buy = document.getElementById('ovBuy');
         buy.disabled = true; buy.textContent = 'Opening checkout…';
         try {
           const res = await fetch(`${SUPABASE_URL}/functions/v1/store-checkout`, {
             method:'POST',
-            headers:{ 'Content-Type':'application/json', 'Authorization':`Bearer ${token}`, 'apikey':SUPABASE_ANON_KEY },
+            headers:{ 'Content-Type':'application/json', 'Authorization':`Bearer ${token || SUPABASE_ANON_KEY}`, 'apikey':SUPABASE_ANON_KEY },
             body: JSON.stringify({ product_id: CURRENT.id, quantity: QTY, variant: { size: SEL.size || null, color: SEL.color || null } }),
           });
           const data = await res.json().catch(() => ({}));
@@ -357,6 +380,101 @@
           PRODUCTS = Array.isArray(prods) ? prods : [];
           render();
         } catch (e) { notFound(username); }
+      })();
+
+      // ── Return from Stripe ───────────────────────────────────────
+      // A guest has no order history to land in, so Stripe sends them back to the
+      // storefront and the session id in the URL is the only handle they hold on
+      // their own purchase. store-receipt trades it for a receipt; the id is then
+      // stripped from the address bar so it stops riding along in history and
+      // referrers. The receipt deliberately carries no address and no email.
+      (function storeReturn() {
+        const q = new URLSearchParams(location.search);
+        const outcome = q.get('store');
+        if (outcome !== 'success' && outcome !== 'canceled') return;
+        const sessionId = q.get('session') || '';
+
+        const rc = document.getElementById('rc');
+        const eyebrow = document.getElementById('rcEyebrow');
+        const title = document.getElementById('rcTitle');
+        const msg = document.getElementById('rcMsg');
+        const lines = document.getElementById('rcLines');
+        const dl = document.getElementById('rcDownload');
+        const close = () => rc.classList.remove('open');
+        document.getElementById('rcClose').addEventListener('click', close);
+        rc.addEventListener('click', (e) => { if (e.target.id === 'rc') close(); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+        rc.classList.add('open');
+        try { history.replaceState({}, '', location.pathname); } catch (e) {}
+
+        if (outcome === 'canceled') {
+          eyebrow.textContent = 'Checkout';
+          title.textContent = 'Checkout canceled';
+          msg.textContent = 'Nothing was charged. The store is right where you left it.';
+          return;
+        }
+        eyebrow.textContent = 'Order';
+        title.textContent = 'Thank you';
+        if (!/^cs_[A-Za-z0-9_]{10,200}$/.test(sessionId)) {
+          msg.textContent = 'Your payment went through. Look for the confirmation in your email.';
+          return;
+        }
+        msg.textContent = 'Fetching your receipt…';
+
+        const row = (k, v) => `<div class="row"><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span></div>`;
+        const COPY = {
+          paid:       ['Payment complete', 'Your order is confirmed. A receipt is on its way to your email.'],
+          processing: ['Payment received', 'We’re finalising your order — this takes a few seconds.'],
+          pending:    ['Waiting on confirmation', 'Stripe hasn’t confirmed this payment yet. If you finished checkout it will land shortly.'],
+        };
+
+        let tries = 0;
+        async function poll() {
+          tries++;
+          let r, code;
+          try {
+            const res = await fetch(`${SUPABASE_URL}/functions/v1/store-receipt`, {
+              method: 'POST',
+              headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${SUPABASE_ANON_KEY}`, 'apikey':SUPABASE_ANON_KEY },
+              body: JSON.stringify({ session_id: sessionId }),
+            });
+            code = res.status;
+            r = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(r.error || `Receipt unavailable (${res.status})`);
+          } catch (e) {
+            if (code === 404) {
+              title.textContent = 'Order not found';
+              msg.textContent = 'We couldn’t find an order for that link. If you were charged, email us and we’ll sort it out.';
+            } else {
+              msg.textContent = 'Your payment went through, but the receipt wouldn’t load just now. Look for the confirmation in your email.';
+            }
+            return;
+          }
+
+          const copy = COPY[r.status] || ['Order', 'Status: ' + (r.status || 'unknown')];
+          title.textContent = copy[0];
+          msg.textContent = copy[1];
+
+          const v = r.variant || {};
+          lines.innerHTML = [
+            r.product_name ? row('Item', r.product_name) : '',
+            (Number(r.quantity) > 1) ? row('Quantity', String(r.quantity)) : '',
+            v.size ? row('Size', v.size) : '',
+            v.color ? row('Color', v.color) : '',
+            (r.amount != null) ? row('Total', fmtMoney(r.amount, r.currency)) : '',
+            (r.fulfillment_status === 'unfulfilled') ? row('Shipping', 'Preparing to ship') : '',
+          ].join('');
+
+          // The seller supplies this URL, so only ever follow an http(s) one.
+          if (r.download_url && /^https?:\/\//i.test(r.download_url)) {
+            dl.href = r.download_url;
+            dl.style.display = 'block';
+          }
+          // The webhook is what marks it paid and attaches the download, and it
+          // often lands a beat after Stripe has already redirected the buyer.
+          if (r.status !== 'paid' && tries < 5) setTimeout(poll, 4000);
+        }
+        poll();
       })();
     </script>
 </body>

@@ -44,9 +44,23 @@ serve(async (req) => {
       const { data: ord } = await supa.from("orders")
         .update({ status: "paid", stripe_payment_intent: s.payment_intent ?? null, shipping, updated_at: new Date().toISOString() })
         .eq("stripe_session_id", s.id).eq("status", "pending")
-        .select("id, product_id, quantity").maybeSingle();
+        .select("id, buyer_id, product_id, quantity").maybeSingle();
 
       if (ord) {
+        // A guest order has no account to read an email off, so the address Stripe
+        // collected on its own page is the only way to reach the buyer about their
+        // own purchase. Written separately from the status flip above, and swallowed
+        // on failure: if guest_email isn't in the schema yet, the sale must still
+        // record as paid rather than have Stripe retry the event forever.
+        if (!ord.buyer_id) {
+          const guestEmail = s.customer_details?.email ?? null;
+          if (guestEmail) {
+            const { error: gErr } = await supa.from("orders")
+              .update({ guest_email: guestEmail }).eq("id", ord.id);
+            if (gErr) console.error("[store-webhook] guest_email not stored:", gErr.message);
+          }
+        }
+
         // Digital delivery marker + physical inventory. (No wallet credit — money is
         // in the artist's connected account; Stripe pays them out.)
         const { data: prod } = await supa.from("products")

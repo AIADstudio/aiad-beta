@@ -461,9 +461,8 @@
       }
 
       // Products are anon-readable when is_active (RLS "Public can read active
-      // products"), so the storefront needs no extra RPC. Buying does need a
-      // session — store-checkout reads auth.uid() to block self-purchase — so a
-      // signed-out visitor is sent to sign up rather than into a failing checkout.
+      // products"), so the storefront needs no extra RPC. Buying needs no account
+      // either — store-checkout takes guests — so this is a plain link to the shop.
       async function loadStorefront(artistId, username, name) {
         const host = document.getElementById('storefront');
         if (!host || !artistId) return;
@@ -545,10 +544,10 @@
       }
 
       async function buyProduct(productId, btn) {
-        // store-checkout reads auth.uid() to price the order and block self-purchase,
-        // so an anonymous visitor is sent to sign up rather than into a failing call.
+        // store-checkout runs with auth optional and reads the anon key as "guest",
+        // so a signed-out visitor goes to Stripe instead of being bounced to sign up.
+        // A stored session still rides along, keeping the order on their account.
         const token = storedSession();
-        if (!token) { window.location.href = '/'; return; }
         const orig = btn.textContent;
         btn.disabled = true; btn.textContent = 'Opening checkout…';
         try {
@@ -556,7 +555,7 @@
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
+              'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
               'apikey': SUPABASE_ANON_KEY,
             },
             body: JSON.stringify({ product_id: productId, quantity: 1 }),
