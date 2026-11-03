@@ -5,6 +5,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // arrives as a CONNECT event (event.account = the artist's account). We only
 // record the order + deliver the goods. Money is in the artist's Stripe balance;
 // there is NO internal wallet to credit.
+//
+// A bag is several orders rows sharing one stripe_session_id, so everything here
+// works on the whole set rather than a single row. The `status = pending` filter on
+// the flip is what keeps it exactly-once: a replayed event matches nothing and the
+// rest of the handler is skipped.
 const WEBHOOK_SECRET = Deno.env.get("STORE_WEBHOOK_SECRET")!;
 const SUPABASE_URL   = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY    = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -40,38 +45,52 @@ serve(async (req) => {
 
       const shipping = s.shipping_details ?? s.customer_details ?? null;
 
-      // Flip pending -> paid exactly once.
-      const { data: ord } = await supa.from("orders")
+      // Flip every pending line of this bag to paid, exactly once.
+      const { data: ords } = await supa.from("orders")
         .update({ status: "paid", stripe_payment_intent: s.payment_intent ?? null, shipping, updated_at: new Date().toISOString() })
         .eq("stripe_session_id", s.id).eq("status", "pending")
-        .select("id, buyer_id, product_id, quantity").maybeSingle();
+        .select("id, buyer_id, product_id, quantity");
 
-      if (ord) {
+      const rows = ords ?? [];
+      if (rows.length) {
         // A guest order has no account to read an email off, so the address Stripe
         // collected on its own page is the only way to reach the buyer about their
-        // own purchase. Written separately from the status flip above, and swallowed
-        // on failure: if guest_email isn't in the schema yet, the sale must still
-        // record as paid rather than have Stripe retry the event forever.
-        if (!ord.buyer_id) {
+        // own purchase. One update covers every guest line of the bag. Written
+        // separately from the status flip above, and swallowed on failure: if
+        // guest_email isn't in the schema yet, the sale must still record as paid
+        // rather than have Stripe retry the event forever.
+        if (rows.some((r) => !r.buyer_id)) {
           const guestEmail = s.customer_details?.email ?? null;
           if (guestEmail) {
             const { error: gErr } = await supa.from("orders")
-              .update({ guest_email: guestEmail }).eq("id", ord.id);
+              .update({ guest_email: guestEmail })
+              .eq("stripe_session_id", s.id).is("buyer_id", null);
             if (gErr) console.error("[store-webhook] guest_email not stored:", gErr.message);
           }
         }
 
+        // Inventory comes off the TOTAL per product, not per row: the same product
+        // can appear on two lines in two sizes, and decrementing row by row would
+        // read a stale count in between.
+        const qtyByProduct = new Map<string, number>();
+        for (const r of rows) {
+          const pid = String(r.product_id);
+          qtyByProduct.set(pid, (qtyByProduct.get(pid) ?? 0) + Number(r.quantity || 1));
+        }
+
         // Digital delivery marker + physical inventory. (No wallet credit — money is
         // in the artist's connected account; Stripe pays them out.)
-        const { data: prod } = await supa.from("products")
-          .select("product_kind, digital_file_url, inventory").eq("id", ord.product_id).maybeSingle();
-        if (prod) {
+        for (const [pid, qty] of qtyByProduct) {
+          const { data: prod } = await supa.from("products")
+            .select("product_kind, digital_file_url, inventory").eq("id", pid).maybeSingle();
+          if (!prod) continue;
           if (prod.product_kind === "digital" && prod.digital_file_url) {
-            await supa.from("orders").update({ digital_download_url: prod.digital_file_url }).eq("id", ord.id);
+            const ids = rows.filter((r) => String(r.product_id) === pid).map((r) => r.id);
+            await supa.from("orders").update({ digital_download_url: prod.digital_file_url }).in("id", ids);
           }
           if (prod.product_kind === "physical" && prod.inventory != null) {
-            const newInv = Math.max(0, Number(prod.inventory) - Number(ord.quantity || 1));
-            await supa.from("products").update({ inventory: newInv }).eq("id", ord.product_id);
+            const newInv = Math.max(0, Number(prod.inventory) - qty);
+            await supa.from("products").update({ inventory: newInv }).eq("id", pid);
           }
         }
       }

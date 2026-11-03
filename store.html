@@ -105,6 +105,46 @@
         border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit}
       .buy:disabled{opacity:.55;cursor:not-allowed}
       .buy-note{margin-top:10px;font-size:12px;color:var(--text-muted);text-align:center;min-height:14px}
+      /* Bag button + drawer */
+      .bagbtn{position:relative;display:flex;align-items:center;gap:7px;background:transparent;border:1px solid var(--border-2);
+        border-radius:999px;padding:7px 15px;color:var(--text);font-family:inherit;font-size:12px;letter-spacing:.06em;
+        text-transform:uppercase;font-weight:600;cursor:pointer}
+      .bagbtn:hover{border-color:var(--text)}
+      .bagbtn .cnt{min-width:18px;height:18px;border-radius:999px;background:var(--teal-light);color:#001018;font-size:11px;
+        font-weight:700;display:none;align-items:center;justify-content:center;padding:0 5px;letter-spacing:0}
+      .bagbtn.has .cnt{display:flex}
+      .drawer{position:fixed;inset:0;z-index:70;display:none}
+      .drawer.open{display:block}
+      .drawer .scrim{position:absolute;inset:0;background:rgba(4,4,7,0.72);backdrop-filter:blur(6px)}
+      .drawer .panel{position:absolute;top:0;right:0;height:100%;width:100%;max-width:420px;background:var(--bg-2);
+        border-left:1px solid var(--border);display:flex;flex-direction:column}
+      .drawer .dhead{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:20px 22px;border-bottom:1px solid var(--border)}
+      .drawer .dhead h2{font-size:1.05rem;font-weight:700}
+      .drawer .dhead button{background:none;border:none;color:var(--text-2);font-size:26px;line-height:1;cursor:pointer}
+      .drawer .dbody{flex:1;overflow:auto;padding:4px 22px 14px}
+      .drawer .dfoot{padding:18px 22px 22px;border-top:1px solid var(--border)}
+      .bagline{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid var(--border)}
+      .bagline .th{width:58px;height:72px;border-radius:8px;object-fit:cover;background:var(--bg-card);
+        border:1px solid var(--border);flex-shrink:0}
+      .bagline .mid{flex:1;min-width:0}
+      .bagline .nm{font-size:13px;font-weight:600;line-height:1.35}
+      .bagline .vr{margin-top:3px;font-size:11px;color:var(--text-muted)}
+      .bagline .ctl{margin-top:8px;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+      .bagline .ctl button{width:26px;height:26px;border-radius:7px;border:1px solid var(--border-2);background:transparent;
+        color:#fff;font-size:15px;line-height:1;cursor:pointer;font-family:inherit}
+      .bagline .ctl .q{min-width:20px;text-align:center;font-size:13px}
+      .bagline .ctl .rm{width:auto;padding:0 9px;height:26px;font-size:10px;color:var(--text-muted);border-color:transparent;
+        text-transform:uppercase;letter-spacing:.07em}
+      .bagline .ctl .rm:hover{color:var(--text)}
+      .bagline .lt{font-size:13px;font-weight:600;white-space:nowrap}
+      .bagnote{margin:12px 0 0;padding:9px 12px;border:1px solid var(--border-2);border-radius:9px;
+        font-size:11px;color:var(--text-muted);line-height:1.5}
+      .subtot{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--text-2);margin-bottom:14px}
+      .subtot .v{font-size:1.15rem;font-weight:700;color:var(--text)}
+      .bagempty{padding:54px 0;text-align:center;color:var(--text-muted);font-size:14px;line-height:1.7}
+      .ghost{margin-top:10px;width:100%;background:transparent;border:1px solid var(--border-2);color:var(--text);
+        border-radius:12px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
+      .ghost:hover{border-color:var(--text)}
       /* Receipt (the return from Stripe) */
       .rsheet{position:relative;background:var(--bg-2);border:1px solid var(--border);border-radius:18px;width:100%;max-width:460px;
         padding:30px 26px 26px;text-align:center;max-height:90vh;overflow:auto}
@@ -116,7 +156,8 @@
       .rsheet .rc-lines .row{display:flex;justify-content:space-between;gap:16px;font-size:13px;border-top:1px solid var(--border);padding-top:7px}
       .rsheet .rc-lines .row .k{color:var(--text-muted)}
       .rsheet .rc-lines .row .v{color:var(--text-2);text-align:right}
-      .rsheet .buy{display:block;text-align:center;text-decoration:none}
+      .rsheet .buy{display:block;text-align:center}
+      .rsheet .rc-note{margin-top:9px;font-size:11px;color:var(--text-muted)}
       .state{max-width:640px;margin:0 auto;padding:100px 24px;text-align:center;color:var(--text-muted);font-size:15px}
       .state a{color:var(--teal-light)}
     </style>
@@ -127,6 +168,7 @@
       <div class="nav-mid"><a href="#" id="navShop">Shop</a></div>
       <div class="nav-right">
         <a id="navProfile" href="#">Profile</a>
+        <button class="bagbtn" id="bagBtn">Bag <span class="cnt" id="bagCount">0</span></button>
         <a class="aiad" href="/">Powered by AIAD</a>
       </div>
     </nav>
@@ -154,9 +196,20 @@
             <span class="qv" id="qVal">1</span>
             <button class="qbtn" id="qPlus">+</button>
           </div>
-          <button class="buy" id="ovBuy">Buy now</button>
+          <button class="buy" id="ovBuy">Add to bag</button>
+          <button class="ghost" id="ovKeep">Continue shopping</button>
           <div class="buy-note" id="ovNote"></div>
         </div>
+      </div>
+    </div>
+
+    <!-- Bag -->
+    <div class="drawer" id="bag">
+      <div class="scrim" id="bagScrim"></div>
+      <div class="panel">
+        <div class="dhead"><h2>Your bag</h2><button id="bagClose" aria-label="Close">&times;</button></div>
+        <div class="dbody" id="bagBody"></div>
+        <div class="dfoot" id="bagFoot"></div>
       </div>
     </div>
 
@@ -168,7 +221,8 @@
         <h2 id="rcTitle"></h2>
         <div class="rc-msg" id="rcMsg"></div>
         <div class="rc-lines" id="rcLines"></div>
-        <a class="buy" id="rcDownload" style="display:none" download>Download your files</a>
+        <div id="rcDownloads"></div>
+        <div class="rc-note" id="rcNote"></div>
       </div>
     </div>
 
@@ -288,6 +342,232 @@
         host.querySelectorAll('.card').forEach(c => c.addEventListener('click', () => openProduct(PRODUCTS[+c.dataset.i])));
       }
 
+      // ── The bag ──────────────────────────────────────────────────
+      // ONE BAG, ONE SELLER. A Stripe direct charge lands on a single connected
+      // account and one Checkout Session cannot be split across two, so a bag
+      // spanning two artists could not be paid for at all. The bag therefore
+      // remembers which store filled it, and adding from a different store offers to
+      // start over rather than quietly mixing the two.
+      //
+      // localStorage is per-origin and can throw outright in a private window, so
+      // every read and write is wrapped and the storefront still works without it —
+      // the bag just stops surviving a reload.
+      const CART_KEY = 'aiad_cart_v1';
+      const MAX_LINES = 8;
+
+      const emptyCart = () => ({ username: null, artist_id: null, items: [] });
+      let CART = emptyCart();
+
+      function loadCart() {
+        try {
+          const raw = localStorage.getItem(CART_KEY);
+          if (!raw) return emptyCart();
+          const c = JSON.parse(raw);
+          if (!c || !Array.isArray(c.items)) return emptyCart();
+          return {
+            username: c.username || null,
+            artist_id: c.artist_id || null,
+            items: c.items.filter((it) => it && it.product_id).slice(0, MAX_LINES).map((it) => ({
+              product_id: String(it.product_id),
+              name: String(it.name || 'Item'),
+              price: Number(it.price) || 0,
+              currency: it.currency || 'usd',
+              image: it.image || null,
+              product_kind: it.product_kind || 'physical',
+              size: it.size || null,
+              color: it.color || null,
+              quantity: Math.max(1, parseInt(it.quantity, 10) || 1),
+            })),
+          };
+        } catch (e) { return emptyCart(); }
+      }
+      function saveCart(c) {
+        CART = c;
+        try {
+          if (!c.items.length) localStorage.removeItem(CART_KEY);
+          else localStorage.setItem(CART_KEY, JSON.stringify(c));
+        } catch (e) {}
+        paintBagCount();
+      }
+      const bagUnits = () => CART.items.reduce((n, it) => n + (Number(it.quantity) || 1), 0);
+      function paintBagCount() {
+        const btn = document.getElementById('bagBtn'); if (!btn) return;
+        const n = bagUnits();
+        document.getElementById('bagCount').textContent = String(n);
+        btn.classList.toggle('has', n > 0);
+      }
+
+      // One file is one file, so a digital line never goes past 1. A physical product
+      // with null inventory is untracked rather than sold out.
+      function maxQtyFor(pr) {
+        if (!pr) return 1;
+        if (pr.product_kind === 'digital') return 1;
+        if (pr.inventory === null || pr.inventory === undefined) return 99;
+        return Math.max(0, Number(pr.inventory) || 0);
+      }
+      const variantOf = (it) =>
+        [it.size ? 'Size: ' + it.size : '', it.color ? 'Color: ' + it.color : ''].filter(Boolean).join('  ·  ');
+      const lineTotal = (it) => (Number(it.price) || 0) * (Number(it.quantity) || 1);
+      const bagSubtotal = () => CART.items.reduce((s, it) => s + lineTotal(it), 0);
+
+      function addToBag(pr, sel, qty) {
+        const note = document.getElementById('ovNote');
+        if (CART.items.length && CART.artist_id && CART.artist_id !== PROFILE.id) {
+          const other = CART.username ? '@' + CART.username : 'another store';
+          const ok = confirm('Your bag has items from ' + other + ". A bag can only hold one store's items. Start a new bag for @" + PROFILE.username + '?');
+          if (!ok) return false;
+          CART = emptyCart();
+        }
+        CART.username = PROFILE.username;
+        CART.artist_id = PROFILE.id;
+
+        const cap = maxQtyFor(pr);
+        if (cap <= 0) { note.textContent = 'That one is sold out.'; return false; }
+
+        const size = sel.size || null, color = sel.color || null;
+        // The same product in the same size and colour is one line, not two.
+        const line = CART.items.find((it) =>
+          it.product_id === pr.id && (it.size || null) === size && (it.color || null) === color);
+        if (line) {
+          const want = (Number(line.quantity) || 1) + qty;
+          if (want > cap) {
+            note.textContent = pr.product_kind === 'digital'
+              ? 'That download is already in your bag.'
+              : 'Only ' + cap + ' available, and your bag already has ' + line.quantity + '.';
+            return false;
+          }
+          line.quantity = want;
+        } else {
+          if (CART.items.length >= MAX_LINES) {
+            note.textContent = 'A bag holds ' + MAX_LINES + ' different items. Check out, then start another.';
+            return false;
+          }
+          // Say so rather than quietly trimming the quantity: someone who asked for
+          // more than exists should be told, not handed a different order. The
+          // stepper above already stops short of this, so it is the safety net.
+          if (qty > cap) {
+            note.textContent = pr.product_kind === 'digital'
+              ? 'Digital items come one to a bag.'
+              : 'Only ' + cap + ' available.';
+            return false;
+          }
+          CART.items.push({
+            product_id: pr.id, name: pr.name, price: Number(pr.price) || 0,
+            currency: pr.currency || 'usd', image: imagesOf(pr)[0] || null,
+            product_kind: pr.product_kind, size, color, quantity: qty,
+          });
+        }
+        saveCart(CART);
+        return true;
+      }
+
+      function openBag() { renderBag(); document.getElementById('bag').classList.add('open'); }
+      function closeBag() { document.getElementById('bag').classList.remove('open'); }
+
+      function renderBag() {
+        const body = document.getElementById('bagBody');
+        const foot = document.getElementById('bagFoot');
+        if (!CART.items.length) {
+          body.innerHTML = '<div class="bagempty">Your bag is empty.<br/>Tap anything in the store to add it.</div>';
+          foot.innerHTML = '<button class="ghost" id="bagKeep" style="margin-top:0">Keep shopping</button>';
+          wireBag();
+          return;
+        }
+        const cur = CART.items[0].currency || 'usd';
+        // The bag survives moving between storefronts, so say plainly whose it is when
+        // it isn't this one's — the checkout still goes to that seller.
+        const foreign = (PROFILE && CART.username && CART.username !== PROFILE.username)
+          ? '<div class="bagnote">These items are from @' + esc(CART.username) + '. Checking out sends you to that store’s payment page.</div>'
+          : '';
+        body.innerHTML = foreign + CART.items.map((it, i) => {
+          const vr = variantOf(it);
+          const thumb = it.image ? '<img class="th" src="' + esc(it.image) + '" alt="">' : '<div class="th"></div>';
+          const ctl = it.product_kind === 'digital'
+            ? '<span class="vr">Digital · 1 copy</span>'
+            : '<button data-dec="' + i + '" aria-label="One fewer">−</button>'
+              + '<span class="q">' + esc(it.quantity) + '</span>'
+              + '<button data-inc="' + i + '" aria-label="One more">+</button>';
+          return '<div class="bagline">' + thumb
+            + '<div class="mid"><div class="nm">' + esc(it.name) + '</div>'
+            + (vr ? '<div class="vr">' + esc(vr) + '</div>' : '')
+            + '<div class="ctl">' + ctl + '<button class="rm" data-rm="' + i + '">Remove</button></div></div>'
+            + '<div class="lt">' + fmtMoney(lineTotal(it), it.currency) + '</div></div>';
+        }).join('');
+        foot.innerHTML =
+          '<div class="subtot"><span>Subtotal</span><span class="v">' + fmtMoney(bagSubtotal(), cur) + '</span></div>'
+          + '<button class="buy" id="bagCheckout" style="margin-top:0">Checkout</button>'
+          + '<button class="ghost" id="bagKeep">Keep shopping</button>'
+          + '<div class="buy-note" id="bagNote"></div>';
+        wireBag();
+      }
+
+      function wireBag() {
+        const body = document.getElementById('bagBody');
+        body.querySelectorAll('[data-inc]').forEach((b) => b.addEventListener('click', () => changeQty(+b.dataset.inc, 1)));
+        body.querySelectorAll('[data-dec]').forEach((b) => b.addEventListener('click', () => changeQty(+b.dataset.dec, -1)));
+        body.querySelectorAll('[data-rm]').forEach((b) => b.addEventListener('click', () => {
+          CART.items.splice(+b.dataset.rm, 1); saveCart(CART); renderBag();
+        }));
+        const keep = document.getElementById('bagKeep');
+        if (keep) keep.addEventListener('click', closeBag);
+        const co = document.getElementById('bagCheckout');
+        if (co) co.addEventListener('click', checkoutBag);
+      }
+
+      function changeQty(i, delta) {
+        const it = CART.items[i]; if (!it) return;
+        const note = document.getElementById('bagNote');
+        const next = (Number(it.quantity) || 1) + delta;
+        if (next < 1) { CART.items.splice(i, 1); saveCart(CART); renderBag(); return; }
+        // Re-read the live product, so a cap that was true when the item went in
+        // cannot quietly go stale while the bag sits there.
+        const pr = PRODUCTS.find((p) => p.id === it.product_id);
+        const cap = pr ? maxQtyFor(pr) : (it.product_kind === 'digital' ? 1 : 99);
+        if (next > cap) { if (note) note.textContent = 'Only ' + cap + ' available.'; return; }
+        it.quantity = next; saveCart(CART); renderBag();
+      }
+
+      async function checkoutBag() {
+        if (!CART.items.length) return;
+        const btn = document.getElementById('bagCheckout');
+        const note = document.getElementById('bagNote');
+        // No account needed. store-checkout runs with auth optional and treats the
+        // anon key as "guest", so a signed-out shopper goes straight to Stripe, which
+        // collects their email on its own page. A stored session still gets sent, so
+        // a signed-in buyer keeps their order tied to their account.
+        const token = storedSession();
+        btn.disabled = true; btn.textContent = 'Opening checkout…';
+        try {
+          const res = await fetch(`${SUPABASE_URL}/functions/v1/store-checkout`, {
+            method: 'POST',
+            headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${token || SUPABASE_ANON_KEY}`, 'apikey':SUPABASE_ANON_KEY },
+            body: JSON.stringify({ items: CART.items.map((it) => ({
+              product_id: it.product_id,
+              quantity: it.quantity,
+              variant: { size: it.size || null, color: it.color || null },
+            })) }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error || `Checkout failed (${res.status})`);
+          if (!data.url) throw new Error('No checkout link returned');
+          // Emptied before we leave. Stripe owns this bag now, and a back-button
+          // return should land on an empty bag rather than a stale one the buyer
+          // might pay for twice.
+          saveCart(emptyCart());
+          window.location.href = data.url;
+        } catch (e) {
+          note.textContent = e.message;
+          btn.disabled = false; btn.textContent = 'Checkout';
+        }
+      }
+
+      document.getElementById('bagBtn').addEventListener('click', openBag);
+      document.getElementById('bagClose').addEventListener('click', closeBag);
+      document.getElementById('bagScrim').addEventListener('click', closeBag);
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeBag(); });
+      CART = loadCart();
+      paintBagCount();
+
       // ── Product quick-view ──
       let CURRENT = null, SEL = { size: null, color: null };
       function openProduct(pr) {
@@ -327,7 +607,7 @@
         document.getElementById('ovQtyRow').style.display = (pr.product_kind === 'physical' && !soldOut) ? 'flex' : 'none';
         document.getElementById('qVal').textContent = '1';
         const buy = document.getElementById('ovBuy');
-        buy.disabled = !!soldOut; buy.textContent = soldOut ? 'Sold out' : 'Buy now';
+        buy.disabled = !!soldOut; buy.textContent = soldOut ? 'Sold out' : 'Add to bag';
         document.getElementById('ovNote').textContent = '';
         document.getElementById('ov').classList.add('open');
       }
@@ -336,35 +616,29 @@
       document.getElementById('ov').addEventListener('click', e => { if (e.target.id === 'ov') closeOv(); });
       document.addEventListener('keydown', e => { if (e.key === 'Escape') closeOv(); });
       document.getElementById('qMinus').addEventListener('click', () => { QTY = Math.max(1, QTY-1); document.getElementById('qVal').textContent = QTY; });
-      document.getElementById('qPlus').addEventListener('click', () => { QTY = QTY+1; document.getElementById('qVal').textContent = QTY; });
+      document.getElementById('qPlus').addEventListener('click', () => {
+        // Never offer more than the seller has; store-checkout refuses it anyway, and
+        // being told at the Stripe page would be a worse place to find out.
+        const cap = maxQtyFor(CURRENT);
+        if (QTY + 1 > cap) { document.getElementById('ovNote').textContent = 'Only ' + cap + ' available.'; return; }
+        QTY = QTY + 1; document.getElementById('qVal').textContent = QTY;
+      });
 
-      document.getElementById('ovBuy').addEventListener('click', async () => {
+      // Adding is local and instant now — nothing leaves the browser until Checkout
+      // in the bag drawer. The size/colour gate stays exactly where it was: a line
+      // with no size chosen is a line the seller cannot fulfil.
+      document.getElementById('ovBuy').addEventListener('click', () => {
         if (!CURRENT) return;
         const note = document.getElementById('ovNote');
+        note.textContent = '';
         if ((window._selSizes || []).length && !SEL.size) { note.textContent = 'Please select a size.'; return; }
         if ((window._selColors || []).length && !SEL.color) { note.textContent = 'Please select a color.'; return; }
-        // No account needed. store-checkout runs with auth optional and treats the
-        // anon key as "guest", so a signed-out shopper goes straight to Stripe, which
-        // collects their email on its own page. A stored session still gets sent, so
-        // a signed-in buyer keeps their order tied to their account.
-        const token = storedSession();
-        const buy = document.getElementById('ovBuy');
-        buy.disabled = true; buy.textContent = 'Opening checkout…';
-        try {
-          const res = await fetch(`${SUPABASE_URL}/functions/v1/store-checkout`, {
-            method:'POST',
-            headers:{ 'Content-Type':'application/json', 'Authorization':`Bearer ${token || SUPABASE_ANON_KEY}`, 'apikey':SUPABASE_ANON_KEY },
-            body: JSON.stringify({ product_id: CURRENT.id, quantity: QTY, variant: { size: SEL.size || null, color: SEL.color || null } }),
-          });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(data.error || `Checkout failed (${res.status})`);
-          if (!data.url) throw new Error('No checkout link returned');
-          window.location.href = data.url;
-        } catch (e) {
-          note.textContent = e.message;
-          buy.disabled = false; buy.textContent = 'Buy now';
-        }
+        if (!addToBag(CURRENT, SEL, QTY)) return;
+        closeOv();
+        openBag();
       });
+
+      document.getElementById('ovKeep').addEventListener('click', closeOv);
 
       (async function () {
         const username = getUsername();
@@ -399,7 +673,8 @@
         const title = document.getElementById('rcTitle');
         const msg = document.getElementById('rcMsg');
         const lines = document.getElementById('rcLines');
-        const dl = document.getElementById('rcDownload');
+        const dls = document.getElementById('rcDownloads');
+        const note = document.getElementById('rcNote');
         const close = () => rc.classList.remove('open');
         document.getElementById('rcClose').addEventListener('click', close);
         rc.addEventListener('click', (e) => { if (e.target.id === 'rc') close(); });
@@ -428,6 +703,28 @@
           pending:    ['Waiting on confirmation', 'Stripe hasn’t confirmed this payment yet. If you finished checkout it will land shortly.'],
         };
 
+        // The guest trades their session id for a short-lived signed URL, per line,
+        // because a bag can hold more than one download. Signed with
+        // Content-Disposition: attachment, so this saves the file and leaves the
+        // receipt on screen rather than navigating away from it.
+        async function downloadLine(btn, productId) {
+          const label = btn.textContent;
+          btn.disabled = true; btn.textContent = 'Preparing\u2026';
+          try {
+            const res = await fetch(`${SUPABASE_URL}/functions/v1/store-download`, {
+              method: 'POST',
+              headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${SUPABASE_ANON_KEY}`, 'apikey':SUPABASE_ANON_KEY },
+              body: JSON.stringify({ session_id: sessionId, product_id: productId }),
+            });
+            const d = await res.json().catch(() => ({}));
+            if (!res.ok || !d.url) throw new Error(d.error || 'Could not prepare your download');
+            window.location.href = d.url;
+          } catch (e) {
+            msg.textContent = e.message;
+          }
+          btn.disabled = false; btn.textContent = label;
+        }
+
         let tries = 0;
         async function poll() {
           tries++;
@@ -455,20 +752,36 @@
           title.textContent = copy[0];
           msg.textContent = copy[1];
 
-          const v = r.variant || {};
-          lines.innerHTML = [
-            r.product_name ? row('Item', r.product_name) : '',
-            (Number(r.quantity) > 1) ? row('Quantity', String(r.quantity)) : '',
-            v.size ? row('Size', v.size) : '',
-            v.color ? row('Color', v.color) : '',
-            (r.amount != null) ? row('Total', fmtMoney(r.amount, r.currency)) : '',
-            (r.fulfillment_status === 'unfulfilled') ? row('Shipping', 'Preparing to ship') : '',
-          ].join('');
+          // A bag is a list of lines. An older response with only the single-item
+          // fields still renders, as one line.
+          const items = (Array.isArray(r.items) && r.items.length) ? r.items : [{
+            product_id: null, product_name: r.product_name, quantity: r.quantity,
+            amount: r.amount, variant: r.variant, fulfillment_status: r.fulfillment_status,
+            download_ready: !!r.download_ready,
+          }];
+          lines.innerHTML = items.map((it) => {
+            const v = it.variant || {};
+            const bits = [v.size ? 'Size: ' + v.size : '', v.color ? 'Color: ' + v.color : ''].filter(Boolean).join(' \u00b7 ');
+            const qty = Number(it.quantity) > 1 ? ' \u00d7 ' + it.quantity : '';
+            const label = (it.product_name || 'Item') + qty + (bits ? '  (' + bits + ')' : '');
+            return row(label, it.amount != null ? fmtMoney(it.amount, r.currency) : '');
+          }).join('')
+            + ((r.order_total != null && items.length > 1) ? row('Order total', fmtMoney(r.order_total, r.currency)) : '')
+            + (items.some((it) => it.fulfillment_status === 'unfulfilled') ? row('Shipping', 'Preparing to ship') : '');
 
-          // The seller supplies this URL, so only ever follow an http(s) one.
-          if (r.download_url && /^https?:\/\//i.test(r.download_url)) {
-            dl.href = r.download_url;
-            dl.style.display = 'block';
+          // store-receipt only says whether a download exists; the signed URL is
+          // minted by store-download when a button is clicked, so it cannot go stale
+          // while the receipt sits open.
+          const ready = items.filter((it) => it.download_ready);
+          if (ready.length) {
+            dls.innerHTML = ready.map((it) =>
+              '<button class="buy" data-dl="' + esc(it.product_id || '') + '">Download '
+              + esc(it.product_name || 'your files') + '</button>').join('');
+            dls.querySelectorAll('[data-dl]').forEach((b) =>
+              b.addEventListener('click', () => downloadLine(b, b.dataset.dl)));
+            note.textContent = ready.length > 1
+              ? 'Grab them now \u2014 these download links live on this page only.'
+              : 'Grab it now \u2014 this download link lives on this page only.';
           }
           // The webhook is what marks it paid and attaches the download, and it
           // often lands a beat after Stripe has already redirected the buyer.

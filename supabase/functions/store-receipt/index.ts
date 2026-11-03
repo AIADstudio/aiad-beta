@@ -5,11 +5,13 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // Stripe sends them back to the storefront the checkout session id is the only
 // handle they hold on their own order — this function turns it into a receipt.
 //
-// That makes the session id a bearer token, and it is a weak one: it sits in a URL,
-// in browser history, in a referrer. So this returns only what the person who just
-// paid already knows — what they bought, what it cost, whether it went through —
-// and NEVER the buyer's email or the shipping address. A guessed or shared session
-// id must not become a way to read a stranger's home address.
+// A bag is several orders rows sharing one session id, so the receipt is a list.
+//
+// The session id is a bearer token, and a weak one: it sits in a URL, in browser
+// history, in a referrer. So this returns only what the person who just paid
+// already knows — what they bought, what it cost, whether it went through — and
+// NEVER the buyer's email or the shipping address. A guessed or shared session id
+// must not become a way to read a stranger's home address.
 const STRIPE_SECRET = Deno.env.get("STRIPE_STORE_KEY")!;
 const SUPABASE_URL  = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY   = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -43,21 +45,27 @@ serve(async (req) => {
     if (!SESSION_RE.test(session_id)) return jsonResponse({ error: "Invalid session id" }, 400);
 
     const supa = createClient(SUPABASE_URL, SERVICE_KEY);
-    const { data: ord, error } = await supa.from("orders")
-      .select("id, artist_id, product_name, quantity, amount, currency, variant, status, fulfillment_status, digital_download_url")
-      .eq("stripe_session_id", session_id).maybeSingle();
+    // One insert gives every line the same created_at, so id breaks the tie and the
+    // receipt lists the bag in a stable order on every reload.
+    const { data: rows, error } = await supa.from("orders")
+      .select("id, artist_id, product_id, product_name, quantity, amount, currency, variant, status, fulfillment_status, digital_download_url")
+      .eq("stripe_session_id", session_id)
+      .order("created_at", { ascending: true }).order("id", { ascending: true });
     if (error) throw new Error("Could not load order");
-    if (!ord) return jsonResponse({ error: "Order not found" }, 404);
+    if (!rows || !rows.length) return jsonResponse({ error: "Order not found" }, 404);
+
+    // The webhook flips the whole bag together, so the lines agree in practice; take
+    // "paid" only when every one of them says so.
+    let status = rows.every((r) => r.status === "paid") ? "paid" : String(rows[0].status);
 
     // The webhook is what flips pending -> paid, and it may not have landed yet —
     // Stripe redirects the buyer the instant payment succeeds, often first. Ask
     // Stripe directly so the buyer isn't told "pending" about money already taken.
-    let status = String(ord.status);
     if (status === "pending") {
       try {
         const { data: acct } = await supa.from("stripe_accounts")
           .select("stripe_account_id")
-          .eq("user_id", ord.artist_id).eq("livemode", LIVEMODE).maybeSingle();
+          .eq("user_id", rows[0].artist_id).eq("livemode", LIVEMODE).maybeSingle();
         if (acct?.stripe_account_id) {
           // Direct charge: the session lives on the seller's account, not ours.
           const res = await fetch(`https://api.stripe.com/v1/checkout/sessions/${session_id}`, {
@@ -76,19 +84,42 @@ serve(async (req) => {
       }
     }
 
-    // digital_download_url only once the money is actually in. "processing" means
-    // Stripe says paid but the webhook hasn't delivered yet — there is nothing to
-    // hand over at that point anyway.
+    // Whether a download EXISTS, never where it lives: digital_download_url holds a
+    // path inside the private store-digital bucket, and handing that to an
+    // unauthenticated caller would publish the seller's own folder name for nothing
+    // in return. The guest trades their session id for a short-lived signed URL at
+    // store-download, at the moment they click. Only once the money is actually in —
+    // "processing" means Stripe says paid but the webhook has not delivered yet, so
+    // there is nothing to hand over at that point anyway.
     const paid = status === "paid";
+    const items = rows.map((r) => ({
+      product_id: r.product_id,
+      product_name: r.product_name ?? null,
+      quantity: r.quantity,
+      amount: r.amount,
+      variant: r.variant ?? {},
+      fulfillment_status: r.fulfillment_status,
+      download_ready: paid && !!r.digital_download_url,
+    }));
+    // Summed in cents: adding the numerics directly drifts (35.00 + 150.10 and
+    // friends), and a receipt that is a cent off is a support ticket.
+    const order_total = Math.round(rows.reduce((s, r) => s + Math.round(Number(r.amount || 0) * 100), 0)) / 100;
+
+    const first = rows[0];
     return jsonResponse({
       status,
-      product_name: ord.product_name ?? null,
-      quantity: ord.quantity,
-      amount: ord.amount,
-      currency: ord.currency,
-      variant: ord.variant ?? {},
-      fulfillment_status: ord.fulfillment_status,
-      download_url: paid ? (ord.digital_download_url ?? null) : null,
+      currency: first.currency,
+      items,
+      item_count: items.length,
+      order_total,
+      // The single-item fields this endpoint has always returned, taken from the
+      // first line, so an older client keeps rendering something sensible.
+      product_name: first.product_name ?? null,
+      quantity: first.quantity,
+      amount: first.amount,
+      variant: first.variant ?? {},
+      fulfillment_status: first.fulfillment_status,
+      download_ready: paid && !!first.digital_download_url,
     });
   } catch (err) {
     return jsonResponse({ error: String((err as Error).message ?? err) }, 400);
