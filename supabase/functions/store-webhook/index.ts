@@ -45,10 +45,17 @@ serve(async (req) => {
 
       const shipping = s.shipping_details ?? s.customer_details ?? null;
 
-      // Flip every pending line of this bag to paid, exactly once.
+      // Flip every claimable line of this bag to paid, exactly once.
+      //
+      // 'abandoned' counts as claimable. A session swept to abandoned stays open on
+      // Stripe for 24 hours, and a payment is a fact where abandonment was only ever
+      // an inference — on 2026-11-03 six live sessions were swept while still open.
+      // Refusing to claim one would take the card and record nothing: no inventory
+      // move, no seller notification, and a 200 back to Stripe. Still exactly-once,
+      // because a row already 'paid' matches neither value.
       const { data: ords } = await supa.from("orders")
         .update({ status: "paid", stripe_payment_intent: s.payment_intent ?? null, shipping, updated_at: new Date().toISOString() })
-        .eq("stripe_session_id", s.id).eq("status", "pending")
+        .eq("stripe_session_id", s.id).in("status", ["pending", "abandoned"])
         .select("id, buyer_id, product_id, quantity");
 
       const rows = ords ?? [];

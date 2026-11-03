@@ -160,6 +160,98 @@ async function upsertPledge(supa: any, sub: any): Promise<boolean> {
     return true;
 }
 
+/* Store orders (fan buys an artist's product; a DIRECT charge on the artist's
+   connected account, so the event arrives with event.account set).
+
+   These carry metadata.kind = 'store_order' and no metadata.plan, so without this
+   branch the platform-plan guard in checkout.session.completed drops them and the
+   orders row stays 'pending' forever. That is exactly what happened to every store
+   order placed before 2026-09-28: 80 rows, none ever reaching 'paid'.
+
+   A bag is SEVERAL orders rows sharing one stripe_session_id. Both this endpoint
+   and store-webhook receive checkout.session.completed for connected accounts, and
+   whichever lands first claims the rows while the other correctly no-ops. So this
+   cannot do a lesser job and leave the rest to the other one: which endpoint wins
+   is a Stripe dashboard setting that can change without anything here knowing.
+   Everything below therefore mirrors store-webhook v14 exactly. */
+async function completeStoreOrder(supa: any, s: any): Promise<void> {
+    if (!s?.id) return;
+    const paymentIntent = typeof s.payment_intent === "string"
+        ? s.payment_intent
+        : (s.payment_intent?.id ?? null);
+
+    // Claim 'abandoned' as well as 'pending'. A swept session stays open on Stripe
+    // for 24 hours, and a payment is a fact where abandonment was only ever an
+    // inference — refusing to claim it would take the money and record nothing.
+    // Still exactly-once: a row already 'paid' matches neither value.
+    const shipping = s.shipping_details ?? s.customer_details ?? null;
+    const { data: rows, error } = await supa.from("orders")
+        .update({
+            status: "paid",
+            stripe_payment_intent: paymentIntent,
+            shipping,
+            updated_at: new Date().toISOString(),
+        })
+        .eq("stripe_session_id", s.id)
+        .in("status", ["pending", "abandoned"])
+        .select("id, buyer_id, product_id, quantity");
+    if (error) throw new Error(`orders paid update: ${error.message}`);
+
+    const claimed = rows ?? [];
+    // Already handled by an earlier delivery, or by store-webhook.
+    if (!claimed.length) return;
+
+    // Past this point the rows are already 'paid', so a throw would 500, Stripe
+    // would retry, and the retry would claim nothing and skip all of it — the work
+    // could never be redone. These steps log and carry on instead.
+
+    // A guest order has no account to read an email off, so the address Stripe
+    // collected on its own page is the only way to reach the buyer about their own
+    // purchase. One update covers every guest line of the bag.
+    if (claimed.some((r: any) => !r.buyer_id)) {
+        const guestEmail = s.customer_details?.email ?? null;
+        if (guestEmail) {
+            const { error: gErr } = await supa.from("orders")
+                .update({ guest_email: guestEmail })
+                .eq("stripe_session_id", s.id).is("buyer_id", null);
+            if (gErr) console.error("[stripe-webhook] guest_email not stored:", gErr.message);
+        }
+    }
+
+    // Inventory comes off the TOTAL per product, not per row: the same product can
+    // appear on two lines in two sizes, and decrementing row by row would read a
+    // stale count in between.
+    const qtyByProduct = new Map<string, number>();
+    for (const r of claimed) {
+        const pid = String(r.product_id);
+        qtyByProduct.set(pid, (qtyByProduct.get(pid) ?? 0) + Number(r.quantity || 1));
+    }
+
+    for (const [pid, qty] of qtyByProduct) {
+        const { data: prod, error: pErr } = await supa.from("products")
+            .select("product_kind, digital_file_url, inventory").eq("id", pid).maybeSingle();
+        if (pErr) { console.error("[stripe-webhook] products read:", pErr.message); continue; }
+        if (!prod) continue;
+
+        // Digital goods: attach the file to EVERY line of this product, not just the
+        // first one, so a bag with two downloads delivers both. A digital product can
+        // no longer be listed without a file, but an older order may still point at
+        // one, so a missing url is tolerated rather than thrown on.
+        if (prod.product_kind === "digital" && prod.digital_file_url) {
+            const ids = claimed.filter((r: any) => String(r.product_id) === pid).map((r: any) => r.id);
+            const { error: dErr } = await supa.from("orders")
+                .update({ digital_download_url: prod.digital_file_url }).in("id", ids);
+            if (dErr) console.error("[stripe-webhook] orders download url:", dErr.message);
+        }
+        if (prod.product_kind === "physical" && prod.inventory != null) {
+            const newInv = Math.max(0, Number(prod.inventory) - qty);
+            const { error: iErr } = await supa.from("products")
+                .update({ inventory: newInv }).eq("id", pid);
+            if (iErr) console.error("[stripe-webhook] products inventory:", iErr.message);
+        }
+    }
+}
+
 async function handleEvent(event: any) {
     const supa = createClient(SUPABASE_URL, SERVICE_KEY);
 
@@ -174,6 +266,12 @@ async function handleEvent(event: any) {
                 // The session carries the metadata even if subscription_data did not.
                 sub.metadata = { ...(s.metadata ?? {}), ...(sub.metadata ?? {}) };
                 await upsertPledge(supa, sub);
+                return;
+            }
+
+            // A store order has no `plan` either, for the same reason.
+            if (s.metadata?.kind === "store_order") {
+                await completeStoreOrder(supa, s);
                 return;
             }
 
