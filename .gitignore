@@ -7,3 +7,10 @@
 
 # Node
 node_modules/
+
+# Secrets. Edge functions read FAL_KEY / ANTHROPIC_API_KEY / service keys from
+# Supabase function secrets, never from a file in here. Nothing .env-shaped has
+# ever been committed (checked 2026-11-07); this keeps it that way.
+.env
+.env.*
+!.env.example
