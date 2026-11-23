@@ -37,6 +37,13 @@ async function networkFirst(req) {
     const cache = await caches.open(RUNTIME_CACHE);
     try {
         const fresh = await fetch(req, { cache: "no-store" });
+
+        // Vercel's Security Checkpoint answers 403 with x-vercel-mitigated: challenge and a
+        // page that refreshes itself until its cookie handshake completes. Answering it from
+        // cache means the handshake never finishes and the visitor never gets in; caching it
+        // poisons the shell. Hand it straight back, cache nothing.
+        if (fresh && fresh.headers.get("x-vercel-mitigated")) return fresh;
+
         if (fresh && fresh.ok && fresh.type === "basic") {
             cache.put(req, fresh.clone());
             return fresh;

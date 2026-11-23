@@ -29747,10 +29747,13 @@ function toggleAgeRange(btn) {
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', async () => {
                 try {
+                    // Was there already a controller when this page loaded? If not, the first
+                    // activate + clients.claim() of a fresh registration fires controllerchange
+                    // on its own, and reloading for that is a reload for nothing — the page
+                    // already has the code it just downloaded.
+                    const hadController = !!navigator.serviceWorker.controller;
                     const reg = await navigator.serviceWorker.register('/sw.js');
-                    // Force update check on each page load so deploys reach users immediately.
                     reg.update().catch(() => {});
-                    // When a new SW is installed and waiting, tell it to take over.
                     reg.addEventListener('updatefound', () => {
                         const nw = reg.installing;
                         if (!nw) return;
@@ -29760,11 +29763,16 @@ function toggleAgeRange(btn) {
                             }
                         });
                     });
-                    // Reload once when the active SW changes so the page picks up new code.
-                    let reloaded = false;
+                    // The old guard was `let reloaded = false` — reset by the very reload it
+                    // guards, so every load could reload again, forever. The one-shot has to
+                    // outlive the page, so it lives in sessionStorage: one automatic reload
+                    // per tab, ever. No sessionStorage (private mode) means never auto-reload.
                     navigator.serviceWorker.addEventListener('controllerchange', () => {
-                        if (reloaded) return;
-                        reloaded = true;
+                        if (!hadController) return;
+                        try {
+                            if (sessionStorage.getItem('aiad_sw_reloaded') === '1') return;
+                            sessionStorage.setItem('aiad_sw_reloaded', '1');
+                        } catch (e) { return; }
                         location.reload();
                     });
                 } catch (e) { /* swallow */ }
